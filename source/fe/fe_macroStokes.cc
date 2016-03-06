@@ -18,9 +18,12 @@
 #include <deal.II/base/qprojector.h>
 #include <deal.II/base/polynomials_p.h>
 #include <deal.II/base/table.h>
+
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
+
 #include <deal.II/dofs/dof_accessor.h>
+
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
 #include <deal.II/fe/fe_macroStokes.h>
@@ -34,24 +37,24 @@
 DEAL_II_NAMESPACE_OPEN
 
 template <int dim>
-FE_MacroStokes<dim>::FE_MacroStokes ()
+FE_MacroStokes<dim>::FE_MacroStokes (const unsigned int deg)
   :
   FE_PolyTensor<PolynomialsMacroStokes<dim>, dim> (
     deg,
-    FiniteElementData<dim>(get_dpo_vector(deg),
+    FiniteElementData<dim>(get_dpo_vector(),
                            dim, deg+1, FiniteElementData<dim>::Hdiv),
     get_ria_vector (deg),
     std::vector<ComponentMask>(PolynomialsMacroStokes<dim>::compute_n_pols(deg),
                                std::vector<bool>(dim,true)))
 {
+
   Assert (dim == 2, ExcImpossibleInDim(dim));
-  Assert (deg == 0, ExcMessage("MacroStokes Elements are degree 2"));
+  Assert (deg == 2, ExcMessage("MacroStokes Elements are only implemented for degree 2"));
 
   const unsigned int n_dofs = this->dofs_per_cell;
 
   this->mapping_type = mapping_bdm;
   // TODO -- this should probably be mapping_piola
-
 
   // Set up the generalized support
   // points
@@ -69,8 +72,8 @@ FE_MacroStokes<dim>::FE_MacroStokes ()
   FullMatrix<double> M(n_dofs, n_dofs);
   FETools::compute_node_matrix(M, *this);
 
-//   std::cout << std::endl;
-//   M.print_formatted(std::cout, 2, true);
+  std::cout << std::endl;
+  M.print_formatted(std::cout, 2, true);
 
   this->inverse_node_matrix.reinit(n_dofs, n_dofs);
   this->inverse_node_matrix.invert(M);
@@ -78,25 +81,6 @@ FE_MacroStokes<dim>::FE_MacroStokes ()
   // will be the correct ones, not
   // the raw shape functions anymore.
 
-  // Embedding errors become pretty large, so we just replace the
-  // regular threshold in both "computing_..." functions by 1.
-  this->reinit_restriction_and_prolongation_matrices(true, true);
-  FETools::compute_embedding_matrices (*this, this->prolongation, true, 1.);
-
-  FullMatrix<double> face_embeddings[GeometryInfo<dim>::max_children_per_face];
-  for (unsigned int i=0; i<GeometryInfo<dim>::max_children_per_face; ++i)
-    face_embeddings[i].reinit (this->dofs_per_face, this->dofs_per_face);
-  FETools::compute_face_embedding_matrices(*this, face_embeddings, 0, 0, 1.);
-  this->interface_constraints.reinit((1<<(dim-1)) * this->dofs_per_face,
-                                     this->dofs_per_face);
-  unsigned int target_row=0;
-  for (unsigned int d=0; d<GeometryInfo<dim>::max_children_per_face; ++d)
-    for (unsigned int i=0; i<face_embeddings[d].m(); ++i)
-      {
-        for (unsigned int j=0; j<face_embeddings[d].n(); ++j)
-          this->interface_constraints(target_row,j) = face_embeddings[d](i,j);
-        ++target_row;
-      }
 }
 
 
@@ -165,60 +149,41 @@ FE_MacroStokes<dim>::interpolate(
           ExcDimensionMismatch(values.size(), this->generalized_support_points.size()));
   Assert (local_dofs.size() == this->dofs_per_cell,
           ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-
-  // First do interpolation on faces. There, the component evaluated
-  // depends on the face direction and orientation.
-
-  // The index of the first dof on this face or the cell
+  
+  // First evaluate dofs at vertices.
   unsigned int dbase = 0;
-  // The index of the first generalized support point on this face or the cell
-  unsigned int pbase = 0;
-  for (unsigned int f = 0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+  for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v)
     {
-      // Old version with no moments in 2D. See comment below in
-      // initialize_support_points()
-      if (test_values_face.size() == 0)
-        {
-          for (unsigned int i=0; i<this->dofs_per_face; ++i)
-            local_dofs[dbase+i] = values[GeometryInfo<dim>::unit_normal_direction[f]][pbase+i];
-          pbase += this->dofs_per_face;
-        }
-      else
-        {
-          for (unsigned int i=0; i<this->dofs_per_face; ++i)
-            {
-              double s = 0.;
-              for (unsigned int k=0; k<test_values_face.size(); ++k)
-                s += values[GeometryInfo<dim>::unit_normal_direction[f]][pbase+k] * test_values_face[k][i];
-              local_dofs[dbase+i] = s;
-            }
-          pbase += test_values_face.size();
-        }
-      dbase += this->dofs_per_face;
+      local_dofs[dbase+2*v] = values[0][v];
+      local_dofs[dbase+2*v+1] = values[1][v];
     }
+  
+  dbase += 2*GeometryInfo<dim>::vertices_per_cell;
+  // Second, calculate line integrals around edges
 
-  AssertDimension (dbase, this->dofs_per_face * GeometryInfo<dim>::faces_per_cell);
-  AssertDimension (pbase, this->generalized_support_points.size() - test_values_cell.size());
+  // We need edge points with weights for the integrals (think of a better way to do this)
+  // *** the 3 in the constructor needs to be fixed***
+  QGauss<dim-1> edge_points (3);
+  Quadrature<dim> edges = QProjector<dim>::project_to_all_faces(edge_points);
 
-  // Done for BDM1
-  if (dbase == this->dofs_per_cell) return;
-
-  // What's missing are the interior
-  // degrees of freedom. In each
-  // point, we take all components of
-  // the solution.
-  Assert ((this->dofs_per_cell - dbase) % dim == 0, ExcInternalError());
-
-  for (unsigned int d=0; d<dim; ++d, dbase += test_values_cell[0].size())
+  for (unsigned int e = 0; e < GeometryInfo<dim>::faces_per_cell; ++e)
+  {
+    double s0 = 0;
+    double s1 = 0;
+    for (unsigned int k = 0; k < 3; ++k)
     {
-      for (unsigned int i=0; i<test_values_cell[0].size(); ++i)
-        {
-          double s = 0.;
-          for (unsigned int k=0; k<test_values_cell.size(); ++k)
-            s += values[d][pbase+k] * test_values_cell[k][i];
-          local_dofs[dbase+i] = s;
-        }
+    // Think about replacing the 4
+      s0 +=  values[0][3*e + 4 + k] * edges.weight(3*e + k) ;
+      s1 += values[1][3*e + 4 + k] * edges.weight(3*e + k) ;
     }
+    local_dofs[dbase+2*e] = s0;
+    local_dofs[dbase+2*e + 1] = s1;
+  }
+
+  for (unsigned int i = 0; i < local_dofs.size(); ++i)
+    std::cout << "local_dofs [" << i << "] = " << local_dofs[i] << std::endl;
+
+  dbase += 2*GeometryInfo<dim>::faces_per_cell;
 
   Assert (dbase == this->dofs_per_cell, ExcInternalError());
 }
@@ -228,22 +193,17 @@ FE_MacroStokes<dim>::interpolate(
 
 template <int dim>
 std::vector<unsigned int>
-FE_MacroStokes<dim>::get_dpo_vector (const unsigned int deg)
+FE_MacroStokes<dim>::get_dpo_vector ()
 {
-  // the element is face-based and we have as many degrees of freedom
-  // on the faces as there are polynomials of degree up to
-  // deg. Observe the odd convention of
-  // PolynomialSpace::compute_n_pols()!
-  unsigned int dofs_per_face = PolynomialSpace<dim-1>::compute_n_pols(deg+1);
-
-  // and then there are interior dofs, namely the number of
-  // polynomials up to degree deg-2 in dim dimensions.
+  // Since this element is only designed for degree 2 the
+  // degrees of freedom are not dynamic
+  unsigned int vertex_dofs = 2;
+  unsigned int edge_dofs = 2;
   unsigned int interior_dofs = 0;
-  if (deg>1)
-    interior_dofs = dim * PolynomialSpace<dim>::compute_n_pols(deg-1);
-
+  
   std::vector<unsigned int> dpo(dim+1);
-  dpo[dim-1] = dofs_per_face;
+  dpo[0] = vertex_dofs;
+  dpo[dim-1] = edge_dofs;
   dpo[dim]   = interior_dofs;
 
   return dpo;
@@ -260,132 +220,53 @@ FE_MacroStokes<dim>::get_ria_vector (const unsigned int deg)
       Assert (false, ExcImpossibleInDim(1));
       return std::vector<bool>();
     }
+  if (dim==3)
+    {
+      Assert(false, ExcImpossibleInDim(3));
+      return std::vector<bool>();
+    }
 
   const unsigned int dofs_per_cell = PolynomialsMacroStokes<dim>::compute_n_pols(deg);
-  const unsigned int dofs_per_face = PolynomialSpace<dim-1>::compute_n_pols(deg);
+  const unsigned int dofs_per_vertex = 2;
+  const unsigned int dofs_per_face = 2;
 
   Assert(GeometryInfo<dim>::faces_per_cell*dofs_per_face < dofs_per_cell,
          ExcInternalError());
 
-  // all dofs need to be
-  // non-additive, since they have
-  // continuity requirements.
-  // however, the interior dofs are
-  // made additive
-  std::vector<bool> ret_val(dofs_per_cell,false);
-  for (unsigned int i=GeometryInfo<dim>::faces_per_cell*dofs_per_face;
-       i < dofs_per_cell; ++i)
-    ret_val[i] = true;
+  std::vector<bool> ret_val(dofs_per_cell,true);
 
   return ret_val;
 }
-
-
-namespace
-{
-  // This function sets up the values of the polynomials we want to
-  // take moments with in the quadrature points. In fact, we multiply
-  // thos by the weights, such that the sum of function values and
-  // test_values over quadrature points yields the interpolated degree
-  // of freedom.
-  template <int dim>
-  void
-  initialize_test_values (std::vector<std::vector<double> > &test_values,
-                          const Quadrature<dim> &quadrature,
-                          const unsigned int deg)
-  {
-    PolynomialsP<dim> poly(deg);
-    std::vector<Tensor<1,dim> > dummy1;
-    std::vector<Tensor<2,dim> > dummy2;
-    std::vector<Tensor<3,dim> > dummy3;
-    std::vector<Tensor<4,dim> > dummy4;
-
-    test_values.resize(quadrature.size());
-
-    for (unsigned int k=0; k<quadrature.size(); ++k)
-      {
-        test_values[k].resize(poly.n());
-        poly.compute(quadrature.point(k), test_values[k], dummy1, dummy2,
-                     dummy3, dummy4);
-        for (unsigned int i=0; i < poly.n(); ++i)
-          {
-            test_values[k][i] *= quadrature.weight(k);
-          }
-      }
-  }
-
-  // This specialization only serves to avoid error messages. Nothing
-  // useful can be computed in dimension zero and thus the vector
-  // length stays zero.
-  template <>
-  void
-  initialize_test_values (std::vector<std::vector<double> > &,
-                          const Quadrature<0> &,
-                          const unsigned int)
-  {}
-}
-
 
 template <int dim>
 void
 FE_MacroStokes<dim>::initialize_support_points (const unsigned int deg)
 {
-  // Our support points are quadrature points on faces and inside the
-  // cell. First on the faces, we have to test polynomials of degree
-  // up to deg, which means we need dg+1 points in each direction. The
-  // fact that we do not have tensor product polynomials will be
-  // considered later. In 2D, we can use point values.
-  QGauss<dim-1> face_points (deg+1);
+  // AB - support points are vertices and quadrature points on the
+  // edges of the cell.  One the edges, we need to calculate the line
+  // integrals which need to be exact for quadratics.
+  this->generalized_support_points.resize(GeometryInfo<dim>::vertices_per_cell
+				  + (deg+1)*GeometryInfo<dim>::faces_per_cell);
+  // Generalized support points for vertices
+  for (unsigned int v=0; v < GeometryInfo<dim>::vertices_per_cell; ++v)
+  {
+    this->generalized_support_points[v] = GeometryInfo<dim>::unit_cell_vertex(v);
+  }
+  // The next set of support points are for line integrals on
+  // the edges.  Since the functions are quadratics on the boundary
+  // we use 3 Gaussian points for the quadrature.
+  QGauss<dim-1> edge_points (deg + 1);
+  Quadrature<dim> edges = QProjector<dim>::project_to_all_faces(edge_points);
 
-  // Copy the quadrature formula to the face points.
-  this->generalized_face_support_points.resize (face_points.size());
-  for (unsigned int k=0; k<face_points.size(); ++k)
-    this->generalized_face_support_points[k] = face_points.point(k);
-
-  // In the interior, we only test with polynomials of degree up to
-  // deg-2, thus we use deg points. Note that deg>=1 and the lowest
-  // order element has no points in the cell, such that we have to
-  // distinguish this case.
-  QGauss<dim> cell_points(deg==1 ? 0 : deg);
-
-  // Compute the size of the whole support point set
-  const unsigned int npoints
-    = cell_points.size() + GeometryInfo<dim>::faces_per_cell * face_points.size();
-
-  this->generalized_support_points.resize (npoints);
-
-  Quadrature<dim> faces = QProjector<dim>::project_to_all_faces(face_points);
-  for (unsigned int k=0; k < face_points.size()*GeometryInfo<dim>::faces_per_cell; ++k)
-    this->generalized_support_points[k]
-      = faces.point(k+QProjector<dim>
-                    ::DataSetDescriptor::face(0, true, false, false,
-                                              this->dofs_per_face));
-
-  // Currently, for backward compatibility, we do not use moments, but
-  // point values on faces in 2D. In 3D, this is impossible, since the
-  // moments are only taken with respect to PolynomialsP.
-  if (dim>2)
-    initialize_test_values(test_values_face, face_points, deg);
-
-  if (deg<=1) return;
-
-  // Remember where interior points start
-  const unsigned int ibase = face_points.size()*GeometryInfo<dim>::faces_per_cell;
-  for (unsigned int k=0; k<cell_points.size(); ++k)
-    {
-      this->generalized_support_points[ibase+k] = cell_points.point(k);
-    }
-  // Finally, compute the values of
-  // the test functions in the
-  // interior quadrature points
-
-  initialize_test_values(test_values_cell, cell_points, deg-2);
+  for (unsigned int k=0; k < edges.size(); ++k)
+    this->generalized_support_points[k+GeometryInfo<dim>::vertices_per_cell] 
+      = edges.point(k);
 }
 
 
 
 /*-------------- Explicit Instantiations -------------------------------*/
-#include "fe_macroStokes.inst"
+template class FE_MacroStokes<2>;
 
 DEAL_II_NAMESPACE_CLOSE
 

@@ -31,9 +31,15 @@
 DEAL_II_NAMESPACE_OPEN
 
 /**
+ * This is the base class for macro finite elements. 
+ * (Possible name changes - PolynomialsMacroDivFree ?)
  *
- *
- *
+ * The piecewise basis used to construct the shape 
+ * functions is
+ * @f{align*}
+ * @f}
+ * Notice that these functions are peicewise continuous quadratic functions
+ * with constant divergence over the entire quadrilateral.
  * @ingroup Polynomials
  * @author Alistair Bentley / Timo Heister
  * @date 2016
@@ -46,7 +52,7 @@ public:
    * Constructor. Creates all basis functions for MacroStokes Element.
    * This element is only valid for degree k = 2
    */
-  PolynomialsMarcoStokes ();
+  PolynomialsMacroStokes (const unsigned int k);
 
   /**
    * Computes the value and the first and second derivatives of each MacroStokes
@@ -74,8 +80,8 @@ public:
   unsigned int n () const;
 
   /**
-   * Returns the degree of the MacroStokes polynomials (Note: This will always
-   * return 2)
+   * Returns the degree of the MacroStokes polynomials resticted to each 
+     triangular sub-element (Note: This will always return 2)
    */
   unsigned int degree () const;
 
@@ -91,12 +97,18 @@ public:
    */
   static unsigned int compute_n_pols(unsigned int degree);
 
-private:
+
+protected:
+
   /**
-   * An object representing the polynomial space used here. The constructor
-   * fills this with the monomial basis.
+   * Given a point on the reference element, this function returns
+   * the macro element region which is used to select the correct
+   * polynomial for evaluation.
    */
-  const PolynomialSpace<dim> polynomial_space;
+  unsigned int quad_region(const Point<dim> &unit_point) const;
+
+
+private:
 
   /**
    * Storage for monomials. In 2D, this is just the polynomial of order
@@ -105,7 +117,7 @@ private:
   std::vector<Polynomials::Polynomial<double> > monomials;
 
   /**
-   * Number of MacroStokes polynomials.
+   * There are 16 MacroStokes polynomials.
    */
   unsigned int n_pols;
 
@@ -122,12 +134,12 @@ private:
   /**
    * Auxiliary memory.
    */
-  mutable std::vector<Tensor<1,dim> > p_grads;
+  //  mutable std::vector<Tensor<1,dim> > p_grads;
 
   /**
    * Auxiliary memory.
    */
-  mutable std::vector<Tensor<2,dim> > p_grad_grads;
+  //  mutable std::vector<Tensor<2,dim> > p_grad_grads;
 
   /**
    * Auxiliary memory.
@@ -138,12 +150,13 @@ private:
    * Auxiliary memory.
    */
   mutable std::vector<Tensor<4,dim> > p_fourth_derivatives;
+
 };
 
 
 template <int dim>
 inline unsigned int
-PolynomialsMarcoStokes<dim>::n() const
+PolynomialsMacroStokes<dim>::n() const
 {
   return 16;
 }
@@ -151,7 +164,7 @@ PolynomialsMarcoStokes<dim>::n() const
 
 template <int dim>
 inline unsigned int
-PolynomialsMarcoStokes<dim>::degree() const
+PolynomialsMacroStokes<dim>::degree() const
 {
   return 2;
 }
@@ -159,7 +172,7 @@ PolynomialsMarcoStokes<dim>::degree() const
 
 template <int dim>
 inline std::string
-PolynomialsMarcoStokes<dim>::name() const
+PolynomialsMacroStokes<dim>::name() const
 {
   return "MacroStokes";
 }
