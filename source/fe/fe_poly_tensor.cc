@@ -20,6 +20,7 @@
 #include <deal.II/base/polynomials_raviart_thomas.h>
 #include <deal.II/base/polynomials_abf.h>
 #include <deal.II/base/polynomials_nedelec.h>
+#include <deal.II/base/polynomials_macroStokes.h>
 #include <deal.II/fe/fe_poly_tensor.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_cartesian.h>
@@ -1806,6 +1807,6 @@ FE_PolyTensor<PolynomialType,dim,spacedim>::requires_update_flags(const UpdateFl
 
 // explicit instantiations
 #include "fe_poly_tensor.inst"
-
+template class FE_PolyTensor<PolynomialsMacroStokes<2>, 2>;
 
 DEAL_II_NAMESPACE_CLOSE

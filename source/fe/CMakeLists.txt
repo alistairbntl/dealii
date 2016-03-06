@@ -29,6 +29,7 @@ SET(_src
   fe_dgq.cc
   fe_dg_vector.cc
   fe_face.cc
+  fe_macroStokes.cc
   fe_nedelec.cc
   fe_nothing.cc
   fe_poly.cc

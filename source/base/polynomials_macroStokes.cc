@@ -27,19 +27,13 @@ DEAL_II_NAMESPACE_OPEN
 template <int dim>
 PolynomialsMacroStokes<dim>::PolynomialsMacroStokes (const unsigned int k)
   :
-  polynomial_space (Polynomials::Legendre::generate_complete_basis(k)),
-  monomials((dim==2) ? (1) : (k+2)),
-  n_pols(compute_n_pols(k)),
-  p_values(polynomial_space.n()),
-  p_grads(polynomial_space.n()),
-  p_grad_grads(polynomial_space.n())
+  monomials(3),
+  n_pols(16),
+  p_values(16)
 {
   switch (dim)
     {
     case 2:
-      monomials[0] = Polynomials::Monomial<double> (k+1);
-      break;
-    case 3:
       for (unsigned int i=0; i<monomials.size(); ++i)
         monomials[i] = Polynomials::Monomial<double> (i);
       break;
@@ -47,8 +41,6 @@ PolynomialsMacroStokes<dim>::PolynomialsMacroStokes (const unsigned int k)
       Assert(false, ExcNotImplemented());
     }
 }
-
-
 
 template <int dim>
 void
@@ -70,7 +62,6 @@ PolynomialsMacroStokes<dim>::compute (const Point<dim>            &unit_point,
   Assert(fourth_derivatives.size()==n_pols|| fourth_derivatives.size()==0,
          ExcDimensionMismatch(fourth_derivatives.size(), n_pols));
 
-  // third and fourth derivatives not implemented
   (void)third_derivatives;
   Assert(third_derivatives.size()==0,
          ExcNotImplemented());
@@ -78,342 +69,202 @@ PolynomialsMacroStokes<dim>::compute (const Point<dim>            &unit_point,
   Assert(fourth_derivatives.size()==0,
          ExcNotImplemented());
 
-  const unsigned int n_sub = polynomial_space.n();
+  const unsigned int n_sub = 16;
+ 
+  // compute values of polynomials and insert into tensors
+  std::vector<std::vector<double> > monovalL(dim, std::vector<double>(4));
 
-  // guard access to the scratch
-  // arrays in the following block
-  // using a mutex to make sure they
-  // are not used by multiple threads
-  // at once
-  {
-    Threads::Mutex::ScopedLock lock(mutex);
+  for (unsigned int d=0; d<dim; ++d) {
+     monomials[1].value(unit_point(d),monovalL[d]);
+  }  
 
-    p_values.resize((values.size() == 0) ? 0 : n_sub);
-    p_grads.resize((grads.size() == 0) ? 0 : n_sub);
-    p_grad_grads.resize((grad_grads.size() == 0) ? 0 : n_sub);
+  unsigned int region = 0;
+  region = quad_region(unit_point);
 
-    // Compute values of complete space
-    // and insert into tensors.  Result
-    // will have first all polynomials
-    // in the x-component, then y and
-    // z.
-    polynomial_space.compute (unit_point, p_values, p_grads, p_grad_grads,
-                              p_third_derivatives, p_fourth_derivatives);
+  double x = monovalL[0][0];
+  double y = monovalL[1][0];
+  double xy = monovalL[0][0]*monovalL[1][0];
+  double x2 = monovalL[0][0]*monovalL[0][0];
+  double y2 = monovalL[1][0]*monovalL[1][0];
 
-    std::fill(values.begin(), values.end(), Tensor<1,dim>());
-    for (unsigned int i=0; i<p_values.size(); ++i)
-      for (unsigned int j=0; j<dim; ++j)
-        values[i+j*n_sub][j] = p_values[i];
-
-    std::fill(grads.begin(), grads.end(), Tensor<2,dim>());
-    for (unsigned int i=0; i<p_grads.size(); ++i)
-      for (unsigned int j=0; j<dim; ++j)
-        grads[i+j*n_sub][j] = p_grads[i];
-
-    std::fill(grad_grads.begin(), grad_grads.end(), Tensor<3,dim>());
-    for (unsigned int i=0; i<p_grad_grads.size(); ++i)
-      for (unsigned int j=0; j<dim; ++j)
-        grad_grads[i+j*n_sub][j] = p_grad_grads[i];
+  switch (region) {
+  case 1:
+    values[0][0] = 1.0-1.0*x-1.0*y; 
+    values[0][1] = -1.0+1.0*x+1.0*y;
+    values[1][0] = 0.5-1.0*y-0.5*x2+0.5*y2; 
+    values[1][1] = -1.0*x+1.0*x2+1.0*xy; 
+    values[2][0] = +2.0*y-2.0*xy-2.0*y2; 
+    values[2][1] = -1.0+2.0*x-1.0*x2+1.0*y2; 
+    values[3][0] = -1.0+1.0*x+1.0*y; 
+    values[3][1] = 1.0-1.0*x-1.0*y; 
+    values[4][0] = -0.5+1.0*y+0.5*x2-0.5*y2; 
+    values[4][1] = 1.0*x-1.0*x2-1.0*xy; 
+    values[5][0] = -2.0*y+2.0*xy+2.0*y2; 
+    values[5][1] = 1.0-2.0*x+1.0*x2-1.0*y2; 
+    values[6][0] = 1.0; 
+    values[6][1] = 0.; 
+    values[7][0] = 1.0*x; 
+    values[7][1] = 0.; 
+    values[8][0] = 1.0*y; 
+    values[8][1] = 0.; 
+    values[9][0] = 1.0*y2; 
+    values[9][1] = 0.; 
+    values[10][0] = 0.; 
+    values[10][1] = 1.0; 
+    values[11][0] = 0.; 
+    values[11][1] = 1.0*x; 
+    values[12][0] = 0.; 
+    values[12][1] = 1.0*y; 
+    values[13][0] = 0.; 
+    values[13][1] = +1.0*x2; 
+    values[14][0] = -0.5*x2; 
+    values[14][1] = 1.0*xy; 
+    values[15][0] = -2.0*xy; 
+    values[15][1] = 1.0*y2; 
+   break;
+  case 2:
+    values[0][0] = 1.0-1.0*x-1.0*y; 
+    values[0][1] = -1.0+1.0*x+1.0*y; 
+    values[1][0] = 0.5-1.0*y-0.5*x2+0.5*y2; 
+    values[1][1] = -1.0*x+1.0*x2+1.0*xy; 
+    values[2][0] = +2.0*y-2.0*xy-2.0*y2; 
+    values[2][1] = -1.0+2.0*x-1.0*x2+1.0*y2; 
+    values[3][0] = -1.0+2.0*y; 
+    values[3][1] = 1.0-2.0*x; 
+    values[4][0] = -0.5+1.0*y; 
+    values[4][1] = +1.0*x-2.0*x2; 
+    values[5][0] = -2.0*y+4.0*y2; 
+    values[5][1] = 1.0-2.0*x; 
+    values[6][0] = 1.0; 
+    values[6][1] = 0.; 
+    values[7][0] = +1.0*x; 
+    values[7][1] = 0.; 
+    values[8][0] = +1.0*y; 
+    values[8][1] = 0.; 
+    values[9][0] = +1.0*y2; 
+    values[9][1] = 0.; 
+    values[10][0] = 0.; 
+    values[10][1] = 1.0; 
+    values[11][0] = 0.; 
+    values[11][1] = +1.0*x; 
+    values[12][0] = +1.0*x-1.0*y; 
+    values[12][1] = +1.0*x; 
+    values[13][0] = 0.; 
+    values[13][1] = +1.0*x2; 
+    values[14][0] = -0.5*y2; 
+    values[14][1] = +1.0*x2; 
+    values[15][0] = -2.0*y2; 
+    values[15][1] = +1.0*x2; 
+    break;
+  case 3:
+    values[0][0] = 0.; 
+    values[0][1] = 0.; 
+    values[1][0] = 0.; 
+    values[1][1] = 0.; 
+    values[2][0] = 0.; 
+    values[2][1] = 0.; 
+    values[3][0] = -1.0*x+1.0*y; 
+    values[3][1] = -1.0*x+1.0*y; 
+    values[4][0] = -0.5*x2+0.5*y2; 
+    values[4][1] = -1.0*x2+1.0*xy; 
+    values[5][0] = -2.0*xy+2.0*y2; 
+    values[5][1] = -1.0*x2+1.0*y2; 
+    values[6][0] = 1.0; 
+    values[6][1] = 0.; 
+    values[7][0] = +1.0*x; 
+    values[7][1] = 0.; 
+    values[8][0] = +1.0*y; 
+    values[8][1] = 0.; 
+    values[9][0] = +1.0*y2; 
+    values[9][1] = 0.; 
+    values[10][0] = 0.; 
+    values[10][1] = 1.0; 
+    values[11][0] = 0.; 
+    values[11][1] = +1.0*x; 
+    values[12][0] = +1.0*x-1.0*y; 
+    values[12][1] = +1.0*x; 
+    values[13][0] = 0.; 
+    values[13][1] = +1.0*x2; 
+    values[14][0] = -0.5*y2; 
+    values[14][1] = +1.0*x2; 
+    values[15][0] = -2.0*y2; 
+    values[15][1] = +1.0*x2; 
+    break;
+  case 4:
+    values[0][0] = 0.; 
+    values[0][1] = 0.; 
+    values[1][0] = 0.; 
+    values[1][1] = 0.; 
+    values[2][0] = 0.; 
+    values[2][1] = 0.; 
+    values[3][0] = 0.; 
+    values[3][1] = 0.; 
+    values[4][0] = 0.; 
+    values[4][1] = 0.; 
+    values[5][0] = 0.; 
+    values[5][1] = 0.; 
+    values[6][0] = 1.0; 
+    values[6][1] = 0.; 
+    values[7][0] = +1.0*x; 
+    values[7][1] = 0.; 
+    values[8][0] = +1.0*y; 
+    values[8][1] = 0.; 
+    values[9][0] = +1.0*y2; 
+    values[9][1] = 0.; 
+    values[10][0] = 0.; 
+    values[10][1] = 1.0; 
+    values[11][0] = 0.; 
+    values[11][1] = +1.0*x; 
+    values[12][0] = 0.; 
+    values[12][1] = +1.0*y; 
+    values[13][0] = 0.; 
+    values[13][1] = +1.0*x2; 
+    values[14][0] = -0.5*x2; 
+    values[14][1] = +1.0*xy; 
+    values[15][0] = -2.0*xy; 
+    values[15][1] = +1.0*y2; 
+    break;
+  default:
+    Assert(false,ExcNotImplemented());
   }
-
-  // This is the first polynomial not
-  // covered by the P_k subspace
-  unsigned int start = dim*n_sub;
-
-  // Store values of auxiliary
-  // polynomials and their three
-  // derivatives
-  std::vector<std::vector<double> > monovali(dim, std::vector<double>(4));
-  std::vector<std::vector<double> > monovalk(dim, std::vector<double>(4));
-
-  if (dim == 2)
-    {
-      for (unsigned int d=0; d<dim; ++d)
-        monomials[0].value(unit_point(d), monovali[d]);
-      if (values.size() != 0)
-        {
-          values[start][0] = monovali[0][0];
-          values[start][1] = -unit_point(1) * monovali[0][1];
-          values[start+1][0] = unit_point(0) * monovali[1][1];
-          values[start+1][1] = -monovali[1][0];
-        }
-      if (grads.size() != 0)
-        {
-          grads[start][0][0] = monovali[0][1];
-          grads[start][0][1] = 0.;
-          grads[start][1][0] = -unit_point(1) * monovali[0][2];
-          grads[start][1][1] = -monovali[0][1];
-          grads[start+1][0][0] = monovali[1][1];
-          grads[start+1][0][1] = unit_point(0) * monovali[1][2];
-          grads[start+1][1][0] = 0.;
-          grads[start+1][1][1] = -monovali[1][1];
-        }
-      if (grad_grads.size() != 0)
-        {
-          grad_grads[start][0][0][0] = monovali[0][2];
-          grad_grads[start][0][0][1] = 0.;
-          grad_grads[start][0][1][0] = 0.;
-          grad_grads[start][0][1][1] = 0.;
-          grad_grads[start][1][0][0] = -unit_point(1) * monovali[0][3];
-          grad_grads[start][1][0][1] = -monovali[0][2];
-          grad_grads[start][1][1][0] = -monovali[0][2];
-          grad_grads[start][1][1][1] = 0.;
-          grad_grads[start+1][0][0][0] = 0;
-          grad_grads[start+1][0][0][1] = monovali[1][2];
-          grad_grads[start+1][0][1][0] = monovali[1][2];
-          grad_grads[start+1][0][1][1] = unit_point(0) * monovali[1][3];
-          grad_grads[start+1][1][0][0] = 0.;
-          grad_grads[start+1][1][0][1] = 0.;
-          grad_grads[start+1][1][1][0] = 0.;
-          grad_grads[start+1][1][1][1] = -monovali[1][2];
-        }
-    }
-  else // dim == 3
-    {
-      // The number of curls in each
-      // component. Note that the
-      // table in BrezziFortin91 has
-      // a typo, but the text has the
-      // right basis
-
-      // Note that the next basis
-      // function is always obtained
-      // from the previous by cyclic
-      // rotation of the coordinates
-      const unsigned int n_curls = monomials.size() - 1;
-      for (unsigned int i=0; i<n_curls; ++i, start+=dim)
-        {
-          for (unsigned int d=0; d<dim; ++d)
-            {
-              // p(t) = t^(i+1)
-              monomials[i+1].value(unit_point(d), monovali[d]);
-              // q(t) = t^(k-i)
-              monomials[degree()-i].value(unit_point(d), monovalk[d]);
-            }
-          if (values.size() != 0)
-            {
-              // x p'(y) q(z)
-              values[start][0] = unit_point(0) * monovali[1][1] * monovalk[2][0];
-              // - p(y) q(z)
-              values[start][1] = -monovali[1][0] * monovalk[2][0];
-              values[start][2] = 0.;
-
-              // y p'(z) q(x)
-              values[start+1][1] = unit_point(1) * monovali[2][1] * monovalk[0][0];
-              // - p(z) q(x)
-              values[start+1][2] = -monovali[2][0] * monovalk[0][0];
-              values[start+1][0] = 0.;
-
-              // z p'(x) q(y)
-              values[start+2][2] = unit_point(2) * monovali[0][1] * monovalk[1][0];
-              // -p(x) q(y)
-              values[start+2][0] = -monovali[0][0] * monovalk[1][0];
-              values[start+2][1] = 0.;
-            }
-          if (grads.size() != 0)
-            {
-              grads[start][0][0] = monovali[1][1] * monovalk[2][0];
-              grads[start][0][1] = unit_point(0) * monovali[1][2] * monovalk[2][0];
-              grads[start][0][2] = unit_point(0) * monovali[1][1] * monovalk[2][1];
-              grads[start][1][0] = 0.;
-              grads[start][1][1] = -monovali[1][1] * monovalk[2][0];
-              grads[start][1][2] = -monovali[1][0] * monovalk[2][1];
-              grads[start][2][0] = 0.;
-              grads[start][2][1] = 0.;
-              grads[start][2][2] = 0.;
-
-              grads[start+1][1][1] = monovali[2][1] * monovalk[0][0];
-              grads[start+1][1][2] = unit_point(1) * monovali[2][2] * monovalk[0][0];
-              grads[start+1][1][0] = unit_point(1) * monovali[2][1] * monovalk[0][1];
-              grads[start+1][2][1] = 0.;
-              grads[start+1][2][2] = -monovali[2][1] * monovalk[0][0];
-              grads[start+1][2][0] = -monovali[2][0] * monovalk[0][1];
-              grads[start+1][0][1] = 0.;
-              grads[start+1][0][2] = 0.;
-              grads[start+1][0][0] = 0.;
-
-              grads[start+2][2][2] = monovali[0][1] * monovalk[1][0];
-              grads[start+2][2][0] = unit_point(2) * monovali[0][2] * monovalk[1][0];
-              grads[start+2][2][1] = unit_point(2) * monovali[0][1] * monovalk[1][1];
-              grads[start+2][0][2] = 0.;
-              grads[start+2][0][0] = -monovali[0][1] * monovalk[1][0];
-              grads[start+2][0][1] = -monovali[0][0] * monovalk[1][1];
-              grads[start+2][1][2] = 0.;
-              grads[start+2][1][0] = 0.;
-              grads[start+2][1][1] = 0.;
-            }
-          if (grad_grads.size() != 0)
-            {
-              grad_grads[start][0][0][0] = 0.;
-              grad_grads[start][0][0][1] = monovali[1][2]*monovalk[2][0];
-              grad_grads[start][0][0][2] = monovali[1][1]*monovalk[2][1];
-              grad_grads[start][0][1][0] = monovali[1][2]*monovalk[2][0];
-              grad_grads[start][0][1][1] = unit_point(0)*monovali[1][3]*monovalk[2][0];
-              grad_grads[start][0][1][2] = unit_point(0)*monovali[1][2]*monovalk[2][1];
-              grad_grads[start][0][2][0] = monovali[1][1]*monovalk[2][1];
-              grad_grads[start][0][2][1] = unit_point(0)*monovali[1][2]*monovalk[2][1];
-              grad_grads[start][0][2][2] = unit_point(0)*monovali[1][1]*monovalk[2][2];
-              grad_grads[start][1][0][0] = 0.;
-              grad_grads[start][1][0][1] = 0.;
-              grad_grads[start][1][0][2] = 0.;
-              grad_grads[start][1][1][0] = 0.;
-              grad_grads[start][1][1][1] = -monovali[1][2]*monovalk[2][0];
-              grad_grads[start][1][1][2] = -monovali[1][1]*monovalk[2][1];
-              grad_grads[start][1][2][0] = 0.;
-              grad_grads[start][1][2][1] = -monovali[1][1]*monovalk[2][1];
-              grad_grads[start][1][2][2] = -monovali[1][0]*monovalk[2][2];
-              grad_grads[start][2][0][0] = 0.;
-              grad_grads[start][2][0][1] = 0.;
-              grad_grads[start][2][0][2] = 0.;
-              grad_grads[start][2][1][0] = 0.;
-              grad_grads[start][2][1][1] = 0.;
-              grad_grads[start][2][1][2] = 0.;
-              grad_grads[start][2][2][0] = 0.;
-              grad_grads[start][2][2][1] = 0.;
-              grad_grads[start][2][2][2] = 0.;
-
-              grad_grads[start+1][0][0][0] = 0.;
-              grad_grads[start+1][0][0][1] = 0.;
-              grad_grads[start+1][0][0][2] = 0.;
-              grad_grads[start+1][0][1][0] = 0.;
-              grad_grads[start+1][0][1][1] = 0.;
-              grad_grads[start+1][0][1][2] = 0.;
-              grad_grads[start+1][0][2][0] = 0.;
-              grad_grads[start+1][0][2][1] = 0.;
-              grad_grads[start+1][0][2][2] = 0.;
-              grad_grads[start+1][1][0][0] = unit_point(1)*monovali[2][1]*monovalk[0][2];
-              grad_grads[start+1][1][0][1] = monovali[2][1]*monovalk[0][1];
-              grad_grads[start+1][1][0][2] = unit_point(1)*monovali[2][2]*monovalk[0][1];
-              grad_grads[start+1][1][1][0] = monovalk[0][1]*monovali[2][1];
-              grad_grads[start+1][1][1][1] = 0.;
-              grad_grads[start+1][1][1][2] = monovalk[0][0]*monovali[2][2];
-              grad_grads[start+1][1][2][0] = unit_point(1)*monovalk[0][1]*monovali[2][2];
-              grad_grads[start+1][1][2][1] = monovalk[0][0]*monovali[2][2];
-              grad_grads[start+1][1][2][2] = unit_point(1)*monovalk[0][0]*monovali[2][3];
-              grad_grads[start+1][2][0][0] = -monovalk[0][2]*monovali[2][0];
-              grad_grads[start+1][2][0][1] = 0.;
-              grad_grads[start+1][2][0][2] = -monovalk[0][1]*monovali[2][1];
-              grad_grads[start+1][2][1][0] = 0.;
-              grad_grads[start+1][2][1][1] = 0.;
-              grad_grads[start+1][2][1][2] = 0.;
-              grad_grads[start+1][2][2][0] = -monovalk[0][1]*monovali[2][1];
-              grad_grads[start+1][2][2][1] = 0.;
-              grad_grads[start+1][2][2][2] = -monovalk[0][0]*monovali[2][2];
-
-              grad_grads[start+2][0][0][0] = -monovali[0][2]*monovalk[1][0];
-              grad_grads[start+2][0][0][1] = -monovali[0][1]*monovalk[1][1];
-              grad_grads[start+2][0][0][2] = 0.;
-              grad_grads[start+2][0][1][0] = -monovali[0][1]*monovalk[1][1];
-              grad_grads[start+2][0][1][1] = -monovali[0][0]*monovalk[1][2];
-              grad_grads[start+2][0][1][2] = 0.;
-              grad_grads[start+2][0][2][0] = 0.;
-              grad_grads[start+2][0][2][1] = 0.;
-              grad_grads[start+2][0][2][2] = 0.;
-              grad_grads[start+2][1][0][0] = 0.;
-              grad_grads[start+2][1][0][1] = 0.;
-              grad_grads[start+2][1][0][2] = 0.;
-              grad_grads[start+2][1][1][0] = 0.;
-              grad_grads[start+2][1][1][1] = 0.;
-              grad_grads[start+2][1][1][2] = 0.;
-              grad_grads[start+2][1][2][0] = 0.;
-              grad_grads[start+2][1][2][1] = 0.;
-              grad_grads[start+2][1][2][2] = 0.;
-              grad_grads[start+2][2][0][0] = unit_point(2)*monovali[0][3]*monovalk[1][0];
-              grad_grads[start+2][2][0][1] = unit_point(2)*monovali[0][2]*monovalk[1][1];
-              grad_grads[start+2][2][0][2] = monovali[0][2]*monovalk[1][0];
-              grad_grads[start+2][2][1][0] = unit_point(2)*monovali[0][2]*monovalk[1][1];
-              grad_grads[start+2][2][1][1] = unit_point(2)*monovali[0][1]*monovalk[1][2];
-              grad_grads[start+2][2][1][2] = monovali[0][1]*monovalk[1][1];
-              grad_grads[start+2][2][2][0] = monovali[0][2]*monovalk[1][0];
-              grad_grads[start+2][2][2][1] = monovali[0][1]*monovalk[1][1];
-              grad_grads[start+2][2][2][2] = 0.;
-
-            }
-        }
-      Assert(start == n_pols, ExcInternalError());
-    }
 }
 
-
-/*
-template <int dim>
-void
-PolynomialsBDM<dim>::compute_node_matrix (Table<2,double>& A) const
-{
-  std::vector<Polynomial<double> > moment_weight(2);
-  for (unsigned int i=0;i<moment_weight.size();++i)
-    moment_weight[i] = Monomial<double>(i);
-
-  QGauss<dim-1> qface(polynomial_space.degree()+1);
-
-  std::vector<Tensor<1,dim> > values(n());
-  std::vector<Tensor<2,dim> > grads;
-  std::vector<Tensor<3,dim> > grad_grads;
-  values.resize(n());
-
-  for (unsigned int face=0;face<2*dim;++face)
-    {
-      double orientation = 1.;
-      if ((face==0) || (face==3))
-        orientation = -1.;
-
-      for (unsigned int k=0;k<qface.size();++k)
-        {
-          const double w = qface.weight(k) * orientation;
-          const double x = qface.point(k)(0);
-          Point<dim> p;
-          switch (face)
-            {
-              case 2:
-                p(1) = 1.;
-              case 0:
-                p(0) = x;
-                break;
-              case 1:
-                p(0) = 1.;
-              case 3:
-                p(1) = x;
-                break;
-            }
-//      std::cerr << p
-//                << '\t' << moment_weight[0].value(x)
-//                << '\t' << moment_weight[1].value(x)
-//        ;
-
-          compute (p, values, grads, grad_grads);
-
-          for (unsigned int i=0;i<n();++i)
-            {
-//          std::cerr << '\t' << std::setw(6) << values[i][1-face%2];
-                                               // Integrate normal component.
-                                               // This is easy on the unit square
-              for (unsigned int j=0;j<moment_weight.size();++j)
-                A(moment_weight.size()*face+j,i)
-                  += w * values[i][1-face%2] * moment_weight[j].value(x);
-            }
-//      std::cerr << std::endl;
-        }
-    }
-
-                                   // Volume integrals are missing
-                                   //
-                                   // This degree is one larger
-  Assert (polynomial_space.degree() <= 2,
-          ExcNotImplemented());
-}
-*/
 
 template <int dim>
 unsigned int
-PolynomialsMacroStokes<dim>::compute_n_pols(unsigned int k)
+PolynomialsMacroStokes<dim>::compute_n_pols(unsigned int degree)
 {
-  if (dim == 1) return k+1;
-  if (dim == 2) return (k+1)*(k+2)+2;
-  if (dim == 3) return ((k+1)*(k+2)*(k+3))/2+3*(k+1);
+  if (dim == 2) return 16;
   Assert(false, ExcNotImplemented());
   return 0;
 }
 
+template <int dim>
+unsigned int
+PolynomialsMacroStokes<dim>::quad_region(const Point<dim> &unit_point) const
+{
+  
+  // Change assert message
+  Assert(unit_point[0]<=1,ExcNotImplemented());
+  Assert(unit_point[1]<=1,ExcNotImplemented());
+  Assert(unit_point[0]>=0,ExcNotImplemented());
+  Assert(unit_point[1]>=0,ExcNotImplemented());
+
+  if (unit_point[0] >= 0.5 & (1-unit_point[0]) <= unit_point[1] &
+      unit_point[1] <= unit_point[0] ) 
+    return 1;
+  else if (unit_point[1] >= 0.5 & (1-unit_point[1]) <= unit_point[0] &
+           unit_point[0] <= unit_point[1] )
+    return 2;
+  else if (unit_point[0] <= 0.5 & (1-unit_point[0]) >= unit_point[1] &
+           unit_point[1] >= unit_point[0] )
+    return 3;
+  else if (unit_point[1] <= 0.5 & (1-unit_point[0]) >= unit_point[1] &
+	   unit_point[1] <= unit_point[0] )
+    return 4;
+
+  return 0;
+}
 
 template class PolynomialsMacroStokes<2>;
 

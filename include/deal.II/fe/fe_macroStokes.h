@@ -34,7 +34,7 @@ DEAL_II_NAMESPACE_OPEN
  *
 **/
 template <int dim>
-class FE_MarcoStokes
+class FE_MacroStokes
   :
   public FE_PolyTensor<PolynomialsMacroStokes<dim>, dim>
 {
@@ -42,7 +42,7 @@ public:
   /**
    * Constructor for the MacroStokes element (degree 2).
    */
-  FE_PolyTensor ();
+  FE_MacroStokes (const unsigned int deg);
 
   /**
    * Return a string that uniquely identifies a finite element. This class
@@ -68,7 +68,7 @@ private:
    * FiniteElementData.
    */
   static std::vector<unsigned int>
-  get_dpo_vector (const unsigned int degree);
+  get_dpo_vector ();
 
   /**
    * Compute the vector used for the @p restriction_is_additive field passed

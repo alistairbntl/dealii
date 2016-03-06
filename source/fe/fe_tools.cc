@@ -36,6 +36,7 @@
 #include <deal.II/fe/fe_nedelec.h>
 #include <deal.II/fe/fe_abf.h>
 #include <deal.II/fe/fe_bdm.h>
+#include <deal.II/fe/fe_macroStokes.h>
 #include <deal.II/fe/fe_raviart_thomas.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_system.h>
