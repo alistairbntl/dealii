@@ -72,8 +72,8 @@ FE_MacroStokes<dim>::FE_MacroStokes (const unsigned int deg)
   FullMatrix<double> M(n_dofs, n_dofs);
   FETools::compute_node_matrix(M, *this);
 
-  std::cout << std::endl;
-  M.print_formatted(std::cout, 2, true);
+  //  std::cout << std::endl;
+  //  M.print_formatted(std::cout, 2, true);
 
   this->inverse_node_matrix.reinit(n_dofs, n_dofs);
   this->inverse_node_matrix.invert(M);
@@ -180,9 +180,6 @@ FE_MacroStokes<dim>::interpolate(
     local_dofs[dbase+2*e + 1] = s1;
   }
 
-  for (unsigned int i = 0; i < local_dofs.size(); ++i)
-    std::cout << "local_dofs [" << i << "] = " << local_dofs[i] << std::endl;
-
   dbase += 2*GeometryInfo<dim>::faces_per_cell;
 
   Assert (dbase == this->dofs_per_cell, ExcInternalError());
@@ -227,11 +224,8 @@ FE_MacroStokes<dim>::get_ria_vector (const unsigned int deg)
     }
 
   const unsigned int dofs_per_cell = PolynomialsMacroStokes<dim>::compute_n_pols(deg);
-  const unsigned int dofs_per_vertex = 2;
-  const unsigned int dofs_per_face = 2;
 
-  Assert(GeometryInfo<dim>::faces_per_cell*dofs_per_face < dofs_per_cell,
-         ExcInternalError());
+  // add an assert here
 
   std::vector<bool> ret_val(dofs_per_cell,true);
 
