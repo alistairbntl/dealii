@@ -27,15 +27,22 @@ DEAL_II_NAMESPACE_OPEN
 template <int dim>
 PolynomialsMacroStokes<dim>::PolynomialsMacroStokes (const unsigned int k)
   :
-  monomials(3),
+  monomials(k),
   n_pols(16),
   p_values(16)
 {
   switch (dim)
     {
     case 2:
-      for (unsigned int i=0; i<monomials.size(); ++i)
-        monomials[i] = Polynomials::Monomial<double> (i);
+      switch (k)
+	{
+	case 2:
+	  for (unsigned int i=0; i<monomials.size(); ++i)
+	    monomials[i] = Polynomials::Monomial<double> (i);
+	  break;
+	default:
+	  Assert(false,ExcNotImplemented());
+	}
       break;
     default:
       Assert(false, ExcNotImplemented());
@@ -51,6 +58,7 @@ PolynomialsMacroStokes<dim>::compute (const Point<dim>            &unit_point,
                               std::vector<Tensor<4,dim> > &third_derivatives,
                               std::vector<Tensor<5,dim> > &fourth_derivatives) const
 {
+
   Assert(values.size()==n_pols || values.size()==0,
          ExcDimensionMismatch(values.size(), n_pols));
   Assert(grads.size()==n_pols|| grads.size()==0,
@@ -61,23 +69,28 @@ PolynomialsMacroStokes<dim>::compute (const Point<dim>            &unit_point,
          ExcDimensionMismatch(third_derivatives.size(), n_pols));
   Assert(fourth_derivatives.size()==n_pols|| fourth_derivatives.size()==0,
          ExcDimensionMismatch(fourth_derivatives.size(), n_pols));
-
+  
+  // TODO - add grads and grad_grads
+  (void)grads;
+  Assert(grads.size()==0,
+	 ExcNotImplemented());
+  (void)grad_grads;
+  Assert(grad_grads.size()==0,
+	 ExcNotImplemented());
   (void)third_derivatives;
   Assert(third_derivatives.size()==0,
          ExcNotImplemented());
   (void)fourth_derivatives;
   Assert(fourth_derivatives.size()==0,
          ExcNotImplemented());
-
-  const unsigned int n_sub = 16;
- 
+  
   // compute values of polynomials and insert into tensors
   std::vector<std::vector<double> > monovalL(dim, std::vector<double>(4));
 
   for (unsigned int d=0; d<dim; ++d) {
      monomials[1].value(unit_point(d),monovalL[d]);
   }  
-
+  
   unsigned int region = 0;
   region = quad_region(unit_point);
 
@@ -234,7 +247,7 @@ template <int dim>
 unsigned int
 PolynomialsMacroStokes<dim>::compute_n_pols(unsigned int degree)
 {
-  if (dim == 2) return 16;
+  if (dim == 2 && degree==2) return 16;
   Assert(false, ExcNotImplemented());
   return 0;
 }

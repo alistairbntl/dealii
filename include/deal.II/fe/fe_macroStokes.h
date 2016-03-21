@@ -30,7 +30,7 @@
 DEAL_II_NAMESPACE_OPEN
 
 /**
- * The Macro Stokes Element.
+ * The Macro Stokes Element.  
  *
 **/
 template <int dim>

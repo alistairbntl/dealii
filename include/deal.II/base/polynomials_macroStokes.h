@@ -31,15 +31,16 @@
 DEAL_II_NAMESPACE_OPEN
 
 /**
- * This is the base class for macro finite elements. 
- * (Possible name changes - PolynomialsMacroDivFree ?)
+ * This polynomial class is used to build a 
+ * vector-valued finite element that produces a point-wise divergence free
+ * vector field for Stokes and Navier-Stokes type problems. 
+ * The concept is similar to Scott-Vergalius elements on triangles.
+ * These functions are composed of continuous quadratic
+ * polynomials on four distinct triangular regions with a 
+ * constant divergence over the entire quadrilateral element. 
+ * Currently, these elements are only implemented in two dimensions.
  *
- * The piecewise basis used to construct the shape 
- * functions is
- * @f{align*}
- * @f}
- * Notice that these functions are peicewise continuous quadratic functions
- * with constant divergence over the entire quadrilateral.
+ * TODO - add grads and gradgrads.  3D?
  * @ingroup Polynomials
  * @author Alistair Bentley / Timo Heister
  * @date 2016
@@ -55,16 +56,11 @@ public:
   PolynomialsMacroStokes (const unsigned int k);
 
   /**
-   * Computes the value and the first and second derivatives of each MacroStokes
-   * polynomial at @p unit_point.
+   * Computes the value of each MacroStokes polynomial at @p unit_point.
    *
    * The size of the vectors must either be zero or equal <tt>n()</tt>.  In
    * the first case, the function will not compute these values.
    *
-   * If you need values or derivatives of all tensor product polynomials then
-   * use this function, rather than using any of the <tt>compute_value</tt>,
-   * <tt>compute_grad</tt> or <tt>compute_grad_grad</tt> functions, see below,
-   * in a loop over all tensor product polynomials.
    */
   void compute (const Point<dim>            &unit_point,
                 std::vector<Tensor<1,dim> > &values,
@@ -75,7 +71,7 @@ public:
 
   /**
    * Returns the number of basis elements for the MacroElement.  (Note: This
-   * will always return 16.)
+   * class will always return 16.)
    */
   unsigned int n () const;
 
@@ -144,12 +140,12 @@ private:
   /**
    * Auxiliary memory.
    */
-  mutable std::vector<Tensor<3,dim> > p_third_derivatives;
+  //  mutable std::vector<Tensor<3,dim> > p_third_derivatives;
 
   /**
    * Auxiliary memory.
    */
-  mutable std::vector<Tensor<4,dim> > p_fourth_derivatives;
+  //  mutable std::vector<Tensor<4,dim> > p_fourth_derivatives;
 
 };
 

@@ -59,16 +59,6 @@ FE_MacroStokes<dim>::FE_MacroStokes (const unsigned int deg)
   // Set up the generalized support
   // points
   initialize_support_points (deg);
-  //Now compute the inverse node
-  //matrix, generating the correct
-  //basis functions from the raw
-  //ones.
-
-  // We use an auxiliary matrix in
-  // this function. Therefore,
-  // inverse_node_matrix is still
-  // empty and shape_value_component
-  // returns the 'raw' shape values.
   FullMatrix<double> M(n_dofs, n_dofs);
   FETools::compute_node_matrix(M, *this);
 
@@ -77,10 +67,6 @@ FE_MacroStokes<dim>::FE_MacroStokes (const unsigned int deg)
 
   this->inverse_node_matrix.reinit(n_dofs, n_dofs);
   this->inverse_node_matrix.invert(M);
-  // From now on, the shape functions
-  // will be the correct ones, not
-  // the raw shape functions anymore.
-
 }
 
 
@@ -96,10 +82,6 @@ FE_MacroStokes<dim>::get_name () const
   // this function returns, so they
   // have to be kept in synch
 
-  // note that this->degree is the maximal
-  // polynomial degree and is thus one higher
-  // than the argument given to the
-  // constructor
   std::ostringstream namebuf;
   namebuf << "MacroStokes<";
 
@@ -161,10 +143,10 @@ FE_MacroStokes<dim>::interpolate(
   dbase += 2*GeometryInfo<dim>::vertices_per_cell;
   // Second, calculate line integrals around edges
 
-  // We need edge points with weights for the integrals (think of a better way to do this)
-  // *** the 3 in the constructor needs to be fixed***
+  // We need edge points with weights for the integrals
   QGauss<dim-1> edge_points (3);
   Quadrature<dim> edges = QProjector<dim>::project_to_all_faces(edge_points);
+  unsigned int num_vertices = GeometryInfo<dim>::vertices_per_cell;
 
   for (unsigned int e = 0; e < GeometryInfo<dim>::faces_per_cell; ++e)
   {
@@ -172,9 +154,8 @@ FE_MacroStokes<dim>::interpolate(
     double s1 = 0;
     for (unsigned int k = 0; k < 3; ++k)
     {
-    // Think about replacing the 4
-      s0 +=  values[0][3*e + 4 + k] * edges.weight(3*e + k) ;
-      s1 += values[1][3*e + 4 + k] * edges.weight(3*e + k) ;
+      s0 +=  values[0][3*e + num_vertices + k] * edges.weight(3*e + k) ;
+      s1 +=  values[1][3*e + num_vertices + k] * edges.weight(3*e + k) ;
     }
     local_dofs[dbase+2*e] = s0;
     local_dofs[dbase+2*e + 1] = s1;
@@ -225,8 +206,6 @@ FE_MacroStokes<dim>::get_ria_vector (const unsigned int deg)
 
   const unsigned int dofs_per_cell = PolynomialsMacroStokes<dim>::compute_n_pols(deg);
 
-  // add an assert here
-
   std::vector<bool> ret_val(dofs_per_cell,true);
 
   return ret_val;
@@ -236,7 +215,7 @@ template <int dim>
 void
 FE_MacroStokes<dim>::initialize_support_points (const unsigned int deg)
 {
-  // AB - support points are vertices and quadrature points on the
+  // Support points are vertices and quadrature points on the
   // edges of the cell.  One the edges, we need to calculate the line
   // integrals which need to be exact for quadratics.
   this->generalized_support_points.resize(GeometryInfo<dim>::vertices_per_cell
