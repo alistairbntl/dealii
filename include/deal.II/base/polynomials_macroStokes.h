@@ -57,7 +57,6 @@ public:
 
   /**
    * Computes the value of each MacroStokes polynomial at @p unit_point.
-   *
    * The size of the vectors must either be zero or equal <tt>n()</tt>.  In
    * the first case, the function will not compute these values.
    *
@@ -141,12 +140,10 @@ private:
    * Auxiliary memory.
    */
   //  mutable std::vector<Tensor<3,dim> > p_third_derivatives;
-
   /**
    * Auxiliary memory.
    */
   //  mutable std::vector<Tensor<4,dim> > p_fourth_derivatives;
-
 };
 
 

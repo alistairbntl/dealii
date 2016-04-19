@@ -42,7 +42,7 @@ FE_MacroStokes<dim>::FE_MacroStokes (const unsigned int deg)
   FE_PolyTensor<PolynomialsMacroStokes<dim>, dim> (
     deg,
     FiniteElementData<dim>(get_dpo_vector(),
-                           dim, deg+1, FiniteElementData<dim>::Hdiv),
+                           dim, deg+1, FiniteElementData<dim>::H1),
     get_ria_vector (deg),
     std::vector<ComponentMask>(PolynomialsMacroStokes<dim>::compute_n_pols(deg),
                                std::vector<bool>(dim,true)))
@@ -67,6 +67,11 @@ FE_MacroStokes<dim>::FE_MacroStokes (const unsigned int deg)
 
   this->inverse_node_matrix.reinit(n_dofs, n_dofs);
   this->inverse_node_matrix.invert(M);
+  //Now compute the inverse node
+  //matrix, generating the correct
+  //basis functions from the raw
+  //ones.
+
 }
 
 

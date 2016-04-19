@@ -58,7 +58,6 @@ PolynomialsMacroStokes<dim>::compute (const Point<dim>            &unit_point,
                               std::vector<Tensor<4,dim> > &third_derivatives,
                               std::vector<Tensor<5,dim> > &fourth_derivatives) const
 {
-
   Assert(values.size()==n_pols || values.size()==0,
          ExcDimensionMismatch(values.size(), n_pols));
   Assert(grads.size()==n_pols|| grads.size()==0,
@@ -70,10 +69,7 @@ PolynomialsMacroStokes<dim>::compute (const Point<dim>            &unit_point,
   Assert(fourth_derivatives.size()==n_pols|| fourth_derivatives.size()==0,
          ExcDimensionMismatch(fourth_derivatives.size(), n_pols));
   
-  // TODO - add grads and grad_grads
-  (void)grads;
-  Assert(grads.size()==0,
-	 ExcNotImplemented());
+  // TODO - add grad_grads
   (void)grad_grads;
   Assert(grad_grads.size()==0,
 	 ExcNotImplemented());
@@ -83,14 +79,14 @@ PolynomialsMacroStokes<dim>::compute (const Point<dim>            &unit_point,
   (void)fourth_derivatives;
   Assert(fourth_derivatives.size()==0,
          ExcNotImplemented());
-  
+
   // compute values of polynomials and insert into tensors
   std::vector<std::vector<double> > monovalL(dim, std::vector<double>(4));
 
   for (unsigned int d=0; d<dim; ++d) {
      monomials[1].value(unit_point(d),monovalL[d]);
   }  
-  
+
   unsigned int region = 0;
   region = quad_region(unit_point);
 
@@ -100,146 +96,425 @@ PolynomialsMacroStokes<dim>::compute (const Point<dim>            &unit_point,
   double x2 = monovalL[0][0]*monovalL[0][0];
   double y2 = monovalL[1][0]*monovalL[1][0];
 
-  switch (region) {
-  case 1:
-    values[0][0] = 1.0-1.0*x-1.0*y; 
-    values[0][1] = -1.0+1.0*x+1.0*y;
-    values[1][0] = 0.5-1.0*y-0.5*x2+0.5*y2; 
-    values[1][1] = -1.0*x+1.0*x2+1.0*xy; 
-    values[2][0] = +2.0*y-2.0*xy-2.0*y2; 
-    values[2][1] = -1.0+2.0*x-1.0*x2+1.0*y2; 
-    values[3][0] = -1.0+1.0*x+1.0*y; 
-    values[3][1] = 1.0-1.0*x-1.0*y; 
-    values[4][0] = -0.5+1.0*y+0.5*x2-0.5*y2; 
-    values[4][1] = 1.0*x-1.0*x2-1.0*xy; 
-    values[5][0] = -2.0*y+2.0*xy+2.0*y2; 
-    values[5][1] = 1.0-2.0*x+1.0*x2-1.0*y2; 
-    values[6][0] = 1.0; 
-    values[6][1] = 0.; 
-    values[7][0] = 1.0*x; 
-    values[7][1] = 0.; 
-    values[8][0] = 1.0*y; 
-    values[8][1] = 0.; 
-    values[9][0] = 1.0*y2; 
-    values[9][1] = 0.; 
-    values[10][0] = 0.; 
-    values[10][1] = 1.0; 
-    values[11][0] = 0.; 
-    values[11][1] = 1.0*x; 
-    values[12][0] = 0.; 
-    values[12][1] = 1.0*y; 
-    values[13][0] = 0.; 
-    values[13][1] = +1.0*x2; 
-    values[14][0] = -0.5*x2; 
-    values[14][1] = 1.0*xy; 
-    values[15][0] = -2.0*xy; 
-    values[15][1] = 1.0*y2; 
-   break;
-  case 2:
-    values[0][0] = 1.0-1.0*x-1.0*y; 
-    values[0][1] = -1.0+1.0*x+1.0*y; 
-    values[1][0] = 0.5-1.0*y-0.5*x2+0.5*y2; 
-    values[1][1] = -1.0*x+1.0*x2+1.0*xy; 
-    values[2][0] = +2.0*y-2.0*xy-2.0*y2; 
-    values[2][1] = -1.0+2.0*x-1.0*x2+1.0*y2; 
-    values[3][0] = -1.0+2.0*y; 
-    values[3][1] = 1.0-2.0*x; 
-    values[4][0] = -0.5+1.0*y; 
-    values[4][1] = +1.0*x-2.0*x2; 
-    values[5][0] = -2.0*y+4.0*y2; 
-    values[5][1] = 1.0-2.0*x; 
-    values[6][0] = 1.0; 
-    values[6][1] = 0.; 
-    values[7][0] = +1.0*x; 
-    values[7][1] = 0.; 
-    values[8][0] = +1.0*y; 
-    values[8][1] = 0.; 
-    values[9][0] = +1.0*y2; 
-    values[9][1] = 0.; 
-    values[10][0] = 0.; 
-    values[10][1] = 1.0; 
-    values[11][0] = 0.; 
-    values[11][1] = +1.0*x; 
-    values[12][0] = +1.0*x-1.0*y; 
-    values[12][1] = +1.0*x; 
-    values[13][0] = 0.; 
-    values[13][1] = +1.0*x2; 
-    values[14][0] = -0.5*y2; 
-    values[14][1] = +1.0*x2; 
-    values[15][0] = -2.0*y2; 
-    values[15][1] = +1.0*x2; 
-    break;
-  case 3:
-    values[0][0] = 0.; 
-    values[0][1] = 0.; 
-    values[1][0] = 0.; 
-    values[1][1] = 0.; 
-    values[2][0] = 0.; 
-    values[2][1] = 0.; 
-    values[3][0] = -1.0*x+1.0*y; 
-    values[3][1] = -1.0*x+1.0*y; 
-    values[4][0] = -0.5*x2+0.5*y2; 
-    values[4][1] = -1.0*x2+1.0*xy; 
-    values[5][0] = -2.0*xy+2.0*y2; 
-    values[5][1] = -1.0*x2+1.0*y2; 
-    values[6][0] = 1.0; 
-    values[6][1] = 0.; 
-    values[7][0] = +1.0*x; 
-    values[7][1] = 0.; 
-    values[8][0] = +1.0*y; 
-    values[8][1] = 0.; 
-    values[9][0] = +1.0*y2; 
-    values[9][1] = 0.; 
-    values[10][0] = 0.; 
-    values[10][1] = 1.0; 
-    values[11][0] = 0.; 
-    values[11][1] = +1.0*x; 
-    values[12][0] = +1.0*x-1.0*y; 
-    values[12][1] = +1.0*x; 
-    values[13][0] = 0.; 
-    values[13][1] = +1.0*x2; 
-    values[14][0] = -0.5*y2; 
-    values[14][1] = +1.0*x2; 
-    values[15][0] = -2.0*y2; 
-    values[15][1] = +1.0*x2; 
-    break;
-  case 4:
-    values[0][0] = 0.; 
-    values[0][1] = 0.; 
-    values[1][0] = 0.; 
-    values[1][1] = 0.; 
-    values[2][0] = 0.; 
-    values[2][1] = 0.; 
-    values[3][0] = 0.; 
-    values[3][1] = 0.; 
-    values[4][0] = 0.; 
-    values[4][1] = 0.; 
-    values[5][0] = 0.; 
-    values[5][1] = 0.; 
-    values[6][0] = 1.0; 
-    values[6][1] = 0.; 
-    values[7][0] = +1.0*x; 
-    values[7][1] = 0.; 
-    values[8][0] = +1.0*y; 
-    values[8][1] = 0.; 
-    values[9][0] = +1.0*y2; 
-    values[9][1] = 0.; 
-    values[10][0] = 0.; 
-    values[10][1] = 1.0; 
-    values[11][0] = 0.; 
-    values[11][1] = +1.0*x; 
-    values[12][0] = 0.; 
-    values[12][1] = +1.0*y; 
-    values[13][0] = 0.; 
-    values[13][1] = +1.0*x2; 
-    values[14][0] = -0.5*x2; 
-    values[14][1] = +1.0*xy; 
-    values[15][0] = -2.0*xy; 
-    values[15][1] = +1.0*y2; 
-    break;
-  default:
-    Assert(false,ExcNotImplemented());
+  if(values.size() !=0 )
+  {
+    switch (region) 
+    {
+    case 1:
+      values[0][0] = 1.0-1.0*x-1.0*y; 
+      values[0][1] = -1.0+1.0*x+1.0*y;
+      values[1][0] = 0.5-1.0*y-0.5*x2+0.5*y2; 
+      values[1][1] = -1.0*x+1.0*x2+1.0*xy; 
+      values[2][0] = +2.0*y-2.0*xy-2.0*y2; 
+      values[2][1] = -1.0+2.0*x-1.0*x2+1.0*y2; 
+      values[3][0] = -1.0+1.0*x+1.0*y; 
+      values[3][1] = 1.0-1.0*x-1.0*y; 
+      values[4][0] = -0.5+1.0*y+0.5*x2-0.5*y2; 
+      values[4][1] = 1.0*x-1.0*x2-1.0*xy; 
+      values[5][0] = -2.0*y+2.0*xy+2.0*y2; 
+      values[5][1] = 1.0-2.0*x+1.0*x2-1.0*y2; 
+      values[6][0] = 1.0; 
+      values[6][1] = 0.; 
+      values[7][0] = 1.0*x; 
+      values[7][1] = 0.; 
+      values[8][0] = 1.0*y; 
+      values[8][1] = 0.; 
+      values[9][0] = 1.0*y2; 
+      values[9][1] = 0.; 
+      values[10][0] = 0.; 
+      values[10][1] = 1.0; 
+      values[11][0] = 0.; 
+      values[11][1] = 1.0*x; 
+      values[12][0] = 0.; 
+      values[12][1] = 1.0*y; 
+      values[13][0] = 0.; 
+      values[13][1] = +1.0*x2; 
+      values[14][0] = -0.5*x2; 
+      values[14][1] = 1.0*xy; 
+      values[15][0] = -2.0*xy; 
+      values[15][1] = 1.0*y2; 
+      break;
+    case 2:
+      values[0][0] = 1.0-1.0*x-1.0*y; 
+      values[0][1] = -1.0+1.0*x+1.0*y; 
+      values[1][0] = 0.5-1.0*y-0.5*x2+0.5*y2; 
+      values[1][1] = -1.0*x+1.0*x2+1.0*xy; 
+      values[2][0] = +2.0*y-2.0*xy-2.0*y2; 
+      values[2][1] = -1.0+2.0*x-1.0*x2+1.0*y2; 
+      values[3][0] = -1.0+2.0*y; 
+      values[3][1] = 1.0-2.0*x; 
+      values[4][0] = -0.5+1.0*y; 
+      values[4][1] = +1.0*x-2.0*x2; 
+      values[5][0] = -2.0*y+4.0*y2; 
+      values[5][1] = 1.0-2.0*x; 
+      values[6][0] = 1.0; 
+      values[6][1] = 0.; 
+      values[7][0] = +1.0*x; 
+      values[7][1] = 0.; 
+      values[8][0] = +1.0*y; 
+      values[8][1] = 0.; 
+      values[9][0] = +1.0*y2; 
+      values[9][1] = 0.; 
+      values[10][0] = 0.; 
+      values[10][1] = 1.0; 
+      values[11][0] = 0.; 
+      values[11][1] = +1.0*x; 
+      values[12][0] = +1.0*x-1.0*y; 
+      values[12][1] = +1.0*x; 
+      values[13][0] = 0.; 
+      values[13][1] = +1.0*x2; 
+      values[14][0] = -0.5*y2; 
+      values[14][1] = +1.0*x2; 
+      values[15][0] = -2.0*y2; 
+      values[15][1] = +1.0*x2; 
+      break;
+    case 3:
+      values[0][0] = 0.; 
+      values[0][1] = 0.; 
+      values[1][0] = 0.; 
+      values[1][1] = 0.; 
+      values[2][0] = 0.; 
+      values[2][1] = 0.; 
+      values[3][0] = -1.0*x+1.0*y; 
+      values[3][1] = -1.0*x+1.0*y; 
+      values[4][0] = -0.5*x2+0.5*y2; 
+      values[4][1] = -1.0*x2+1.0*xy; 
+      values[5][0] = -2.0*xy+2.0*y2; 
+      values[5][1] = -1.0*x2+1.0*y2; 
+      values[6][0] = 1.0; 
+      values[6][1] = 0.; 
+      values[7][0] = +1.0*x; 
+      values[7][1] = 0.; 
+      values[8][0] = +1.0*y; 
+      values[8][1] = 0.; 
+      values[9][0] = +1.0*y2; 
+      values[9][1] = 0.; 
+      values[10][0] = 0.; 
+      values[10][1] = 1.0; 
+      values[11][0] = 0.; 
+      values[11][1] = +1.0*x; 
+      values[12][0] = +1.0*x-1.0*y; 
+      values[12][1] = +1.0*x; 
+      values[13][0] = 0.; 
+      values[13][1] = +1.0*x2; 
+      values[14][0] = -0.5*y2; 
+      values[14][1] = +1.0*x2; 
+      values[15][0] = -2.0*y2; 
+      values[15][1] = +1.0*x2; 
+      break;
+    case 4:
+      values[0][0] = 0.; 
+      values[0][1] = 0.; 
+      values[1][0] = 0.; 
+      values[1][1] = 0.; 
+      values[2][0] = 0.; 
+      values[2][1] = 0.; 
+      values[3][0] = 0.; 
+      values[3][1] = 0.; 
+      values[4][0] = 0.; 
+      values[4][1] = 0.; 
+      values[5][0] = 0.; 
+      values[5][1] = 0.; 
+      values[6][0] = 1.0; 
+      values[6][1] = 0.; 
+      values[7][0] = +1.0*x; 
+      values[7][1] = 0.; 
+      values[8][0] = +1.0*y; 
+      values[8][1] = 0.; 
+      values[9][0] = +1.0*y2; 
+      values[9][1] = 0.; 
+      values[10][0] = 0.; 
+      values[10][1] = 1.0; 
+      values[11][0] = 0.; 
+      values[11][1] = +1.0*x; 
+      values[12][0] = 0.; 
+      values[12][1] = +1.0*y; 
+      values[13][0] = 0.; 
+      values[13][1] = +1.0*x2; 
+      values[14][0] = -0.5*x2; 
+      values[14][1] = +1.0*xy; 
+      values[15][0] = -2.0*xy; 
+      values[15][1] = +1.0*y2; 
+      break;
+    default:
+      Assert(false,ExcNotImplemented());
+    }
   }
+
+  if (grads.size() !=0 )
+  {
+
+    switch (region) 
+    {
+    case 1:
+      grads[0][0][0] = -1.0; 
+      grads[0][0][1] = -1.0; 
+      grads[0][1][0] = +1.0;
+      grads[0][1][1] = +1.0;
+      grads[1][0][0] = -1.0*x; 
+      grads[1][0][1] = -1.0+1.0*y; 
+      grads[1][1][0] = -1.0+2.0*x+1.0*y;
+      grads[1][1][1] = 1.0*x;  
+      grads[2][0][0] = -2.0*y; 
+      grads[2][0][1] = +2.0-2.0*x-4.0*y; 
+      grads[2][1][0] = 2.0-2.0*x; 
+      grads[2][1][1] = 2.0*y; 
+      grads[3][0][0] = 1.0; 
+      grads[3][0][1] = 1.0; 
+      grads[3][1][0] = -1.0; 
+      grads[3][1][1] = -1.0; 
+      grads[4][0][0] = 1.0*x; 
+      grads[4][0][1] = 1.0-1.0*y; 
+      grads[4][1][0] = 1.0-2.0*x-1.0*y; 
+      grads[4][1][1] = -1.0*x;
+      grads[5][0][0] = 2.0*y; 
+      grads[5][0][1] = -2.0+2.0*x+4.0*y;
+      grads[5][1][0] = -2.0+2.0*x; 
+      grads[5][1][1] = -2.0*y; 
+      grads[6][0][0] = 0.0; 
+      grads[6][0][1] = 0.0; 
+      grads[6][1][0] = 0.; 
+      grads[6][1][1] = 0.; 
+      grads[7][0][0] = 1.0; 
+      grads[7][0][1] = 0.0; 
+      grads[7][1][0] = 0.; 
+      grads[7][1][1] = 0.; 
+      grads[8][0][0] = 0.0; 
+      grads[8][0][1] = 1.0; 
+      grads[8][1][0] = 0.; 
+      grads[8][1][1] = 0.; 
+      grads[9][0][0] = 0.0; 
+      grads[9][0][1] = 2.0*y; 
+      grads[9][1][0] = 0.; 
+      grads[9][1][1] = 0.; 
+      grads[10][0][0] = 0.; 
+      grads[10][0][1] = 0.; 
+      grads[10][1][0] = 0.0; 
+      grads[10][1][1] = 0.0; 
+      grads[11][0][0] = 0.; 
+      grads[11][0][1] = 0.; 
+      grads[11][1][0] = 1.0; 
+      grads[11][1][1] = 0.0; 
+      grads[12][0][0] = 0.; 
+      grads[12][0][1] = 0.; 
+      grads[12][1][0] = 0.0;
+      grads[12][1][1] = 1.0; 
+      grads[13][0][0] = 0.; 
+      grads[13][0][1] = 0.; 
+      grads[13][1][0] = 2.0*x; 
+      grads[13][1][1] = 0.0; 
+      grads[14][0][0] = -1.0*x; 
+      grads[14][0][1] = 0.0; 
+      grads[14][1][0] = 1.0*y; 
+      grads[14][1][1] = 1.0*x; 
+      grads[15][0][0] = -2.0*y; 
+      grads[15][0][1] = -2.0*x; 
+      grads[15][1][0] = 0.0; 
+      grads[15][1][1] = 2.0*y; 
+      break;
+    case 2:
+      grads[0][0][0] = -1.0; 
+      grads[0][0][1] = -1.0; 
+      grads[0][1][0] = 1.0; 
+      grads[0][1][1] = 1.0; 
+      grads[1][0][0] = -1.0*x; 
+      grads[1][0][1] = -1.0 + 1.0*y; 
+      grads[1][1][0] = -1.0 + 2.0*x + 1.0*y; 
+      grads[1][1][1] = +1.0*x; 
+      grads[2][0][0] = -2.0*y; 
+      grads[2][0][1] = +2.0-2.0*x-4.0*y; 
+      grads[2][1][0] = 2.0 - 2.0*x; 
+      grads[2][1][1] = 2.0*y; 
+      grads[3][0][0] = 0.0; 
+      grads[3][0][1] = 2.0; 
+      grads[3][1][0] = -2.0; 
+      grads[3][1][1] = 0.0; 
+      grads[4][0][0] = 0.0; 
+      grads[4][0][1] = 1.0; 
+      grads[4][1][0] = 1.0 - 4.0*x; 
+      grads[4][1][1] = 0.0; 
+      grads[5][0][0] = 0.0; 
+      grads[5][0][1] = -2.0 + 8.0*y; 
+      grads[5][1][0] = -2.0; 
+      grads[5][1][1] = 0.0; 
+      grads[6][0][0] = 0.0; 
+      grads[6][0][1] = 0.0; 
+      grads[6][1][0] = 0.; 
+      grads[6][1][1] = 0.; 
+      grads[7][0][0] = 1.0; 
+      grads[7][0][1] = 0.0; 
+      grads[7][1][0] = 0.; 
+      grads[7][1][1] = 0.; 
+      grads[8][0][0] = 0.0; 
+      grads[8][0][1] = 1.0; 
+      grads[8][1][0] = 0.; 
+      grads[8][1][1] = 0.; 
+      grads[9][0][0] = 0.0; 
+      grads[9][0][1] = 2.0*y; 
+      grads[9][1][0] = 0.; 
+      grads[9][1][1] = 0.; 
+      grads[10][0][0] = 0.; 
+      grads[10][0][1] = 0.; 
+      grads[10][1][0] = 0.0; 
+      grads[10][1][1] = 0.0; 
+      grads[11][0][0] = 0.; 
+      grads[11][0][1] = 0.; 
+      grads[11][1][0] = 1.0; 
+      grads[11][1][1] = 0.0; 
+      grads[12][0][0] = +1.0; 
+      grads[12][0][1] = -1.0; 
+      grads[12][1][0] = 1.0; 
+      grads[12][1][1] = 0.0; 
+      grads[13][0][0] = 0.; 
+      grads[13][0][1] = 0.; 
+      grads[13][1][0] = 2.0*x; 
+      grads[13][1][1] = 0.0; 
+      grads[14][0][0] = 0.0; 
+      grads[14][0][1] = -1.0*y; 
+      grads[14][1][0] = 2.0*x; 
+      grads[14][1][1] = 0.0; 
+      grads[15][0][0] = 0.0; 
+      grads[15][0][1] = -4.0*y; 
+      grads[15][1][0] = 2.0*x; 
+      grads[15][1][1] = 0.0; 
+      break;
+    case 3:
+      grads[0][0][0] = 0.; 
+      grads[0][0][1] = 0.; 
+      grads[0][1][0] = 0.; 
+      grads[0][1][1] = 0.; 
+      grads[1][0][0] = 0.; 
+      grads[1][0][1] = 0.; 
+      grads[1][1][0] = 0.; 
+      grads[1][1][1] = 0.; 
+      grads[2][0][0] = 0.; 
+      grads[2][0][1] = 0.; 
+      grads[2][1][0] = 0.; 
+      grads[2][1][1] = 0.; 
+      grads[3][0][0] = -1.0; 
+      grads[3][0][1] = 1.0; 
+      grads[3][1][0] = -1.0; 
+      grads[3][1][1] = 1.0; 
+      grads[4][0][0] = -1.0*x; 
+      grads[4][0][1] = 1.0*y; 
+      grads[4][1][0] = -2.0*x+1.0*y; 
+      grads[4][1][1] = 1.0*x; 
+      grads[5][0][0] = -2.0*y; 
+      grads[5][0][1] = -2.0*x + 4.0*y; 
+      grads[5][1][0] = -2.0*x; 
+      grads[5][1][1] = 2.0*y; 
+      grads[6][0][0] = 0.0; 
+      grads[6][0][1] = 0.0; 
+      grads[6][1][0] = 0.; 
+      grads[6][1][1] = 0.; 
+      grads[7][0][0] = +1.0; 
+      grads[7][0][1] = 0.0; 
+      grads[7][1][0] = 0.; 
+      grads[7][1][1] = 0.; 
+      grads[8][0][0] = 0.0; 
+      grads[8][0][1] = +1.0; 
+      grads[8][1][0] = 0.; 
+      grads[8][1][1] = 0.; 
+      grads[9][0][0] = 0.0; 
+      grads[9][0][1] = 2.0*y; 
+      grads[9][1][0] = 0.; 
+      grads[9][1][1] = 0.; 
+      grads[10][0][0] = 0.; 
+      grads[10][0][1] = 0.; 
+      grads[10][1][0] = 0.0; 
+      grads[10][1][1] = 0.0; 
+      grads[11][0][0] = 0.; 
+      grads[11][0][1] = 0.; 
+      grads[11][1][0] = 1.0; 
+      grads[11][1][1] = 0.0; 
+      grads[12][0][0] = 1.0; 
+      grads[12][0][1] = -1.0; 
+      grads[12][1][0] = 1.0; 
+      grads[12][1][1] = 0.0; 
+      grads[13][0][0] = 0.; 
+      grads[13][0][1] = 0.; 
+      grads[13][1][0] = 2.0*x; 
+      grads[13][1][1] = 0.0; 
+      grads[14][0][0] = 0.0; 
+      grads[14][0][1] = -1.0*y; 
+      grads[14][1][0] = 2.0*x; 
+      grads[14][1][1] = 0.0; 
+      grads[15][0][0] = 0.0; 
+      grads[15][0][1] = -4.0*y; 
+      grads[15][1][0] = 2.0*x; 
+      grads[15][1][1] = 0.0; 
+      break;
+    case 4:
+      grads[0][0][0] = 0.; 
+      grads[0][0][1] = 0.; 
+      grads[0][1][0] = 0.; 
+      grads[0][1][1] = 0.; 
+      grads[1][0][0] = 0.; 
+      grads[1][0][1] = 0.; 
+      grads[1][1][0] = 0.; 
+      grads[1][1][1] = 0.; 
+      grads[2][0][0] = 0.; 
+      grads[2][0][1] = 0.; 
+      grads[2][1][0] = 0.; 
+      grads[2][1][1] = 0.; 
+      grads[3][0][0] = 0.; 
+      grads[3][0][1] = 0.; 
+      grads[3][1][0] = 0.; 
+      grads[3][1][1] = 0.; 
+      grads[4][0][0] = 0.; 
+      grads[4][0][1] = 0.; 
+      grads[4][1][0] = 0.; 
+      grads[4][1][1] = 0.; 
+      grads[5][0][0] = 0.; 
+      grads[5][0][1] = 0.; 
+      grads[5][1][0] = 0.; 
+      grads[5][1][1] = 0.; 
+      grads[6][0][0] = 0.0; 
+      grads[6][0][1] = 0.0; 
+      grads[6][1][0] = 0.0; 
+      grads[6][1][1] = 0.0; 
+      grads[7][0][0] = 1.0; 
+      grads[7][0][1] = 0.0; 
+      grads[7][1][0] = 0.; 
+      grads[7][1][1] = 0.; 
+      grads[8][0][0] = 0.0; 
+      grads[8][0][1] = 1.0; 
+      grads[8][1][0] = 0.; 
+      grads[8][1][1] = 0.; 
+      grads[9][0][0] = 0.; 
+      grads[9][0][1] = 2.0*y; 
+      grads[9][1][0] = 0.; 
+      grads[9][1][1] = 0.; 
+      grads[10][0][0] = 0.; 
+      grads[10][0][1] = 0.; 
+      grads[10][1][0] = 0.0; 
+      grads[10][1][1] = 0.0; 
+      grads[11][0][0] = 0.; 
+      grads[11][0][1] = 0.; 
+      grads[11][1][0] = 1.0; 
+      grads[11][1][1] = 0.0; 
+      grads[12][0][0] = 0.; 
+      grads[12][0][1] = 0.; 
+      grads[12][1][0] = 0.0; 
+      grads[12][1][1] = 1.0; 
+      grads[13][0][0] = 0.; 
+      grads[13][0][1] = 0.; 
+      grads[13][1][0] = 2.0*x; 
+      grads[13][1][1] = 0.0; 
+      grads[14][0][0] = -1.0*x; 
+      grads[14][0][1] = -1.0*x; 
+      grads[14][1][0] = 1.0*y; 
+      grads[14][1][1] = 1.0*x; 
+      grads[15][0][0] = -2.0*y; 
+      grads[15][0][1] = -2.0*x; 
+      grads[15][1][0] = 0.0; 
+      grads[15][1][1] = 2.0*y; 
+      break;
+    default:
+      Assert(false,ExcNotImplemented());
+    }
+  }
+
 }
 
 
