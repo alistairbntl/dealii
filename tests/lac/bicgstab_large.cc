@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,12 +17,7 @@
 // check that bicgstab does not exit early when very large matrices are used
 
 #include "../tests.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
-#include "testmatrix.h"
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/solver_bicgstab.h>
 #include <deal.II/lac/vector.h>
@@ -34,7 +29,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   SparsityPattern sparsity_pattern(4,4);
   sparsity_pattern.compress();

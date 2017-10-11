@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -36,16 +36,16 @@
 //
 // The domain is a distorted cube which will contain non-rectangular faces.
 
+#include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/convergence_table.h>
 
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/sparse_direct.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/constraint_matrix.h>
 
 #include <deal.II/grid/tria.h>
@@ -72,7 +72,6 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 
-#include <fstream>
 #include <iostream>
 #include <sstream>
 
@@ -81,7 +80,7 @@ namespace Maxwell
   using namespace dealii;
 
   // Dirichlet BCs / exact solution:.
-  template<int dim>
+  template <int dim>
   class ExactSolution : public Function<dim>
   {
   public:
@@ -95,7 +94,7 @@ namespace Maxwell
                          std::vector<Vector<double> > &value_list);
   };
 
-  template<int dim>
+  template <int dim>
   ExactSolution<dim>::ExactSolution()
     :
     Function<dim> (dim)
@@ -190,7 +189,7 @@ namespace Maxwell
   {
     dof_handler.clear ();
   }
-  template<int dim>
+  template <int dim>
   double MaxwellProblem<dim>::calcErrorHcurlNorm()
   {
     QGauss<dim>  quadrature_formula(quad_order);
@@ -281,7 +280,7 @@ namespace Maxwell
 
     constraints.close ();
 
-    CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
+    DynamicSparsityPattern c_sparsity(dof_handler.n_dofs());
     DoFTools::make_sparsity_pattern(dof_handler,
                                     c_sparsity,
                                     constraints,false);
@@ -384,7 +383,7 @@ namespace Maxwell
     constraints.distribute (solution);
 
   }
-  template<int dim>
+  template <int dim>
   void MaxwellProblem<dim>::process_solution(const unsigned int cycle)
   {
 
@@ -458,8 +457,7 @@ int main ()
 {
   using namespace Maxwell;
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   for (unsigned int p=0; p<3; ++p)
     {

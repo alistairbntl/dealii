@@ -20,9 +20,7 @@
 #include "../tests.h"
 #include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/base/index_set.h>
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 #include <vector>
 
 
@@ -99,10 +97,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       test();
     }

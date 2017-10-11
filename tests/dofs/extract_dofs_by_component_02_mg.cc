@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,7 +24,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -36,7 +35,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/dofs/dof_tools.h>
 
-#include <fstream>
 
 
 
@@ -45,7 +43,7 @@ template <int dim>
 void
 check ()
 {
-  Triangulation<dim> tr;
+  Triangulation<dim> tr(Triangulation<dim>:: limit_level_difference_at_vertices);
   GridGenerator::hyper_cube(tr, -1,1);
   tr.refine_global (1);
   tr.begin_active()->set_refine_flag();

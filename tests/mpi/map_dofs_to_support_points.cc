@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,8 +18,6 @@
 // Test DoFTools::map_dofs_to_support_points for parallel DoFHandlers
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -27,10 +25,9 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/mapping_q_generic.h>
 
-#include <fstream>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   parallel::distributed::Triangulation<dim> tr(MPI_COMM_WORLD);
@@ -90,9 +87,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

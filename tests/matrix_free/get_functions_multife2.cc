@@ -26,7 +26,6 @@
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
@@ -39,7 +38,6 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <iostream>
 
 
@@ -187,9 +185,8 @@ public:
     // for floats for the relative error size
     for (unsigned int i=0; i<3; ++i)
       {
-        if (types_are_equal<Number,double>::value == true)
+        if (std::is_same<Number,double>::value == true)
           {
-            deallog.threshold_double (4e-14);
             deallog << "Error function values FE " << i << ": "
                     << errors[i*3+0]/total[i*3+0] << std::endl;
             deallog << "Error function gradients FE " << i << ": "
@@ -203,19 +200,16 @@ public:
             // some elements, it might also be zero
             // (linear elements on quadrilaterals), so
             // need to check for division by 0, too.
-            deallog.threshold_double (2e-6);
             const double output2 = total[i*3+2] == 0 ? 0. : errors[i*3+2] / total[i*3+2];
             deallog << "Error function Laplacians FE " << i << ": " << output2 << std::endl;
           }
-        else if (types_are_equal<Number,float>::value == true)
+        else if (std::is_same<Number,float>::value == true)
           {
-            deallog.threshold_double (1e-6);
             deallog << "Error function values FE " << i << ": "
                     << errors[i*3+0]/total[i*3+0] << std::endl;
             deallog << "Error function gradients FE " << i << ": "
                     << errors[i*3+1]/total[i*3+1] << std::endl;
             const double output2 = total[i*3+2] == 0 ? 0. : errors[i*3+2] / total[i*3+2];
-            deallog.threshold_double (1e-6);
             deallog << "Error function Laplacians FE " << i << ": " << output2 << std::endl;
           }
       }
@@ -314,8 +308,7 @@ void test ()
     quad.push_back (QGauss<1>(fe_degree+1));
     mf_data.reinit (dof, constraints, quad,
                     typename MatrixFree<dim,number>::AdditionalData
-                    (MPI_COMM_SELF,
-                     MatrixFree<dim,number>::AdditionalData::none));
+                    (MatrixFree<dim,number>::AdditionalData::none));
   }
 
   MatrixFreeTest<dim,fe_degree,fe_degree+1,number> mf (mf_data);
@@ -330,7 +323,6 @@ int main ()
   // need to set quite a loose tolerance because
   // FEValues approximates Hessians with finite
   // differences, which are not so accurate
-  deallog.threshold_double(2.e-5);
   deallog << std::setprecision (3);
 
   {
@@ -347,4 +339,3 @@ int main ()
     deallog.pop();
   }
 }
-

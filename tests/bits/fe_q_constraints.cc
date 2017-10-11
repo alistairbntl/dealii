@@ -27,7 +27,6 @@
 #include "../tests.h"
 #include <deal.II/fe/fe_q.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/base/polynomial.h>
@@ -50,8 +49,6 @@
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
 
-#include <fstream>
-#include <iomanip>
 
 template <int dim>
 class TestFunction : public Function<dim>
@@ -192,7 +189,7 @@ void TestFEQConstraints<dim>::test ()
   // First error check. Simply the interpolation error of the used FE-Space
   // on the given triangulation.
   VectorTools::integrate_difference (dof_handler, solution,
-                                     ZeroFunction<dim>(1),
+                                     Functions::ZeroFunction<dim>(1),
                                      norm_per_cell,
                                      quadrature,
                                      VectorTools::L2_norm);
@@ -239,9 +236,7 @@ void TestFEQConstraints<dim>::run ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   unsigned int ref_level[] = {4,3,2};
 

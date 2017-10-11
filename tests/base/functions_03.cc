@@ -18,14 +18,11 @@
 
 #include "../tests.h"
 #include <deal.II/base/data_out_base.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/lac/vector.h>
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 #include <string>
 
 
@@ -139,9 +136,7 @@ void check_laplacian_list (const Function<dim> &f)
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   deallog << "Functions PillowFunction" << std::endl;
   check_value (Functions::PillowFunction<1>());

@@ -20,7 +20,6 @@
  */
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/grid_generator.h>
@@ -32,7 +31,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/mapping_q1.h>
 
-#include <fstream>
 
 
 template <int dim>
@@ -121,7 +119,6 @@ int main ()
   deallog << std::setprecision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check<1> ();
   check<2> ();

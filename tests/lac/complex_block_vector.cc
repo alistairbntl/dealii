@@ -16,12 +16,9 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
 #include <deal.II/lac/block_sparse_matrix.h>
 #include <deal.II/lac/block_vector.h>
-#include <fstream>
-#include <iomanip>
 #include <vector>
 #include <list>
 
@@ -189,7 +186,6 @@ int main ()
   deallog << std::fixed;
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // do the same weird stuff as in
   // tests/base/reference.cc

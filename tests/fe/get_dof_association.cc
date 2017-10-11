@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------
-// $Id$
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +18,6 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_nedelec.h>
@@ -55,9 +53,7 @@ void test (const FiniteElement<dim> &fe)
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test(FE_Q<1>(2));
   test(FE_Q<2>(2));

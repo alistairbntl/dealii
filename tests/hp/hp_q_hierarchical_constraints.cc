@@ -1,6 +1,5 @@
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_generator.h>
@@ -15,7 +14,6 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/lac/constraint_matrix.h>
 
-#include <fstream>
 #include <iostream>
 
 /* A test to check that the resulting FE space is continuous
@@ -28,7 +26,7 @@
 
 using namespace dealii;
 
-template<int dim>
+template <int dim>
 void test(const bool apply_constrains, const unsigned int hp)
 {
   Triangulation<dim>   triangulation;
@@ -123,7 +121,6 @@ int main (int argc, char *argv[])
 {
   std::ofstream logfile ("output");
   deallog.attach(logfile);
-  deallog.threshold_double(2.e-15);
 
   test<2>(true,0);
   test<2>(true,1);

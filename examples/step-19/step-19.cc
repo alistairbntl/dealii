@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2005 - 2014 by the deal.II authors
+ * Copyright (C) 2005 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -270,7 +270,7 @@ namespace Step19
             args.pop_front ();
 
             // Now read the input file:
-            prm.read_input (parameter_file);
+            prm.parse_input (parameter_file);
 
             // Both the output file name as well as the format can be
             // specified on the command line. We have therefore given them
@@ -456,6 +456,7 @@ namespace Step19
             return;
           }
         AssertThrow (false, ExcNotImplemented());
+        break;
 
       case 2:
         switch (dimensions.second)
@@ -469,6 +470,7 @@ namespace Step19
             return;
           }
         AssertThrow (false, ExcNotImplemented());
+        break;
 
       case 3:
         switch (dimensions.second)

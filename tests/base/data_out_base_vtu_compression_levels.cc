@@ -17,7 +17,6 @@
 #include "../tests.h"
 #include <deal.II/base/data_out_base.h>
 
-#include <fstream>
 #include <string>
 #include <vector>
 
@@ -42,12 +41,12 @@ void check(DataOutBase::VtkFlags flags,
   names[2] = "x3";
   names[3] = "x4";
   names[4] = "i";
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > vectors;
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> > vectors;
   DataOutBase::write_vtu(patches, names, vectors, flags, out);
 }
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void check_all(std::ostream &log)
 {
   for (unsigned int i = 0; i < 4; ++i)

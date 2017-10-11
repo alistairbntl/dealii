@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2016 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__full_matrix_h
-#define dealii__full_matrix_h
+#ifndef dealii_full_matrix_h
+#define dealii_full_matrix_h
 
 
 #include <deal.II/base/config.h>
@@ -52,11 +52,11 @@ template <typename number> class LAPACKFullMatrix;
  * matrix number type is used.
  *
  * @note Instantiations for this template are provided for <tt>@<float@>,
- * @<double@>, @<long double@>, @<std::complex@<float@>@>,
- * @<std::complex@<double@>@>, @<std::complex@<long double@>@></tt>; others
- * can be generated in application programs (see the section on
+ * @<double@>, @<std::complex@<float@>@>,
+ * @<std::complex@<double@>@></tt>. Others can be generated in application
+ * programs, see
  * @ref Instantiations
- * in the manual).
+ * for details.
  *
  * @author Guido Kanschat, Franz-Theo Suttmeier, Wolfgang Bangerth, 1993-2004
  */
@@ -227,17 +227,6 @@ public:
               const size_type cols);
 
   /**
-   * Copy constructor. This constructor does a deep copy of the matrix.
-   * Therefore, it poses a possible efficiency problem, if for example,
-   * function arguments are passed by value rather than by reference.
-   * Unfortunately, we can't mark this copy constructor <tt>explicit</tt>,
-   * since that prevents the use of this class in containers, such as
-   * <tt>std::vector</tt>. The responsibility to check performance of programs
-   * must therefore remain with the user of this class.
-   */
-  FullMatrix (const FullMatrix &);
-
-  /**
    * Constructor initializing from an array of numbers. The array is arranged
    * line by line. No range checking is performed.
    */
@@ -264,14 +253,6 @@ public:
   /**
    * @{
    */
-
-  /**
-   * Assignment operator.
-   *
-   * @dealiiOperationIsMultithreaded
-   */
-  FullMatrix<number> &
-  operator = (const FullMatrix<number> &);
 
   /**
    * Variable assignment operator.
@@ -466,14 +447,14 @@ public:
   bool operator == (const FullMatrix<number> &) const;
 
   /**
-   * Number of rows of this matrix.  To remember: this matrix is an <i>m x
-   * n</i>-matrix.
+   * Number of rows of this matrix.  Note that the matrix is of dimension <i>m
+   * x n</i>.
    */
   size_type m () const;
 
   /**
-   * Number of columns of this matrix.  To remember: this matrix is an <i>m x
-   * n</i>-matrix.
+   * Number of columns of this matrix.  Note that the matrix is of dimension
+   * <i>m x n</i>.
    */
   size_type n () const;
 
@@ -547,7 +528,7 @@ public:
   real_type relative_symmetry_norm2 () const;
 
   /**
-   * Computes the determinant of a matrix.  This is only implemented for one,
+   * Compute the determinant of a matrix.  This is only implemented for one,
    * two, and three dimensions, since for higher dimensions the numerical work
    * explodes.  Obviously, the matrix needs to be quadratic for this function.
    */
@@ -865,7 +846,8 @@ public:
   void invert (const FullMatrix<number2> &M);
 
   /**
-   * Assign the Cholesky decomposition of the given matrix to <tt>*this</tt>.
+   * Assign the Cholesky decomposition $A=:L L^T$ of the given matrix $A$ to <tt>*this</tt>,
+   * where $L$ is lower triangular matrix.
    * The given matrix must be symmetric positive definite.
    *
    * ExcMatrixNotPositiveDefinite will be thrown in the case that the matrix

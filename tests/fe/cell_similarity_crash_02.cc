@@ -22,14 +22,12 @@
 // doing anything with it any more
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
 
 
 
@@ -61,7 +59,6 @@ int main()
 {
   initlog();
   deallog << std::setprecision (4);
-  deallog.threshold_double(1.e-7);
 
   test<1>();
   test<2>();

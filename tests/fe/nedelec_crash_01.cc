@@ -20,7 +20,6 @@
 #include "../tests.h"
 #include "../test_grids.h"
 
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_tools.h>
@@ -33,7 +32,6 @@ int main()
   const std::string logname = "output";
   std::ofstream logfile(logname.c_str());
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // generate a version of the
   // Nedelec element but force it to

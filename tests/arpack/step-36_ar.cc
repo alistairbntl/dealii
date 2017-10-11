@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2009 - 2015 by the deal.II authors
+ * Copyright (C) 2009 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -16,13 +16,18 @@
  *
  * Authors: Toby D. Young, Polish Academy of Sciences,
  *          Wolfgang Bangerth, Texas A&M University
+ *
+ * This file tests the ARPACK interface for a symmetric operator taken from step-36.
+ *
+ * We test that the computed vectors are eigenvectors and mass-orthonormal, i.e.
+ * a) (A*x_i-\lambda*B*x_i).L2() == 0
+ * b) x_j*B*x_i = \delta_{i,j}
+ *
  */
 
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/function_parser.h>
@@ -49,7 +54,6 @@
 
 #include <complex>
 
-#include <fstream>
 #include <iostream>
 #include <algorithm>
 
@@ -140,10 +144,7 @@ namespace Step36
 
     std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
 
-    FunctionParser<dim> potential;
-    potential.initialize (FunctionParser<dim>::default_variable_names (),
-                          "0",
-                          typename FunctionParser<dim>::ConstMap());
+    Functions::ZeroFunction<dim> potential;
 
     std::vector<double> potential_values (n_q_points);
 
@@ -217,7 +218,8 @@ namespace Step36
     inverse.initialize (stiffness_matrix);
     const unsigned int num_arnoldi_vectors = 2*eigenvalues.size() + 2;
     ArpackSolver::AdditionalData additional_data(num_arnoldi_vectors,
-                                                 ArpackSolver::largest_real_part);
+                                                 ArpackSolver::largest_magnitude,
+                                                 true);
     ArpackSolver eigensolver (solver_control, additional_data);
     eigensolver.solve (stiffness_matrix,
                        mass_matrix,
@@ -236,27 +238,25 @@ namespace Step36
           mass_matrix.vmult(Bx,eigenfunctions[i]);
 
           for (unsigned int j=0; j < eigenfunctions.size(); j++)
-            Assert( std::abs( eigenfunctions[j] * Bx - (i==j))< 1e-8,
-                    ExcMessage("Eigenvectors " +
-                               Utilities::int_to_string(i) +
-                               " and " +
-                               Utilities::int_to_string(j) +
-                               " are not orthonormal!"
-                               " failing norm is " +
-                               Utilities::to_string(
-                                 std::abs( eigenfunctions[j] * Bx - (i==j) )
-                               )
-                              ));
+            if ( std::abs( eigenfunctions[j] * Bx - (i==j))> 1e-8)
+              deallog << "Eigenvectors " +
+                      Utilities::int_to_string(i) +
+                      " and " +
+                      Utilities::int_to_string(j) +
+                      " are not orthonormal!"
+                      " failing norm is " +
+                      Utilities::to_string(std::abs( eigenfunctions[j] * Bx - (i==j)))
+                      << std::endl;
 
           stiffness_matrix.vmult(Ax,eigenfunctions[i]);
           Ax.add(-1.0*std::real(eigenvalues[i]),Bx);
-          Assert (Ax.l2_norm() < 1e-8,
-                  ExcMessage("Returned vector " +
-                             Utilities::int_to_string(i) +
-                             " is not an eigenvector!"
-                             " L2 norm of the residual is " +
-                             Utilities::to_string(Ax.l2_norm())
-                            ));
+          if (Ax.l2_norm() > 1e-8)
+            deallog << "Returned vector " +
+                    Utilities::int_to_string(i) +
+                    " is not an eigenvector!"
+                    " L2 norm of the residual is " +
+                    Utilities::to_string(Ax.l2_norm())
+                    << std::endl;
         }
     }
     for (unsigned int i=0; i<eigenfunctions.size(); ++i)
@@ -328,9 +328,7 @@ int main (int argc, char **argv)
       using namespace dealii;
       using namespace Step36;
 
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
 
       EigenvalueProblem<2> problem ("");

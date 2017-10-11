@@ -22,7 +22,6 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/utilities.h>
-#include <stdio.h>
 
 #if defined(__linux__)
 #include <sched.h>
@@ -60,7 +59,7 @@ bool getaffinity(unsigned int &bits_set,unsigned int &mask)
 int get_num_thread_env()
 {
   const char *penv = getenv ("DEAL_II_NUM_THREADS");
-  if (penv!=NULL)
+  if (penv!=nullptr)
     {
       int max_threads_env = -1;
       try

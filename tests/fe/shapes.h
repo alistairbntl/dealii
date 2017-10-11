@@ -26,7 +26,7 @@ char fname[50];
 //
 // x (y) (z) value[0]+1 value[1]+1 ...
 ////////////////////////////////////////////////////////////////////////////
-template<int dim>
+template <int dim>
 inline void
 plot_shape_functions(Mapping<dim> &mapping,
                      FiniteElement<dim> &finel,
@@ -44,7 +44,7 @@ plot_shape_functions(Mapping<dim> &mapping,
   QIterated<dim> q(q_trapez, div);
   FEValues<dim> fe(mapping, finel, q, UpdateFlags(update_values
                                                   | update_gradients
-                                                  | update_second_derivatives));
+                                                  | update_hessians));
 
   sprintf(fname, "Cell%dd-%s", dim, name);
 //  cerr << "\n" << fname << "\n";
@@ -98,7 +98,7 @@ plot_shape_functions(Mapping<dim> &mapping,
 
 
 
-template<int dim>
+template <int dim>
 inline void
 plot_face_shape_functions(
   Mapping<dim> &mapping,
@@ -106,7 +106,7 @@ plot_face_shape_functions(
   const char *name,
   UpdateFlags uflags = UpdateFlags(update_values
                                    | update_gradients
-                                   | update_second_derivatives))
+                                   | update_hessians))
 {
   Triangulation<dim> tr;
   DoFHandler<dim> dof(tr);
@@ -124,8 +124,8 @@ plot_face_shape_functions(
 
   QTrapez<1> q_trapez;
   QIterated<dim-1> q(q_trapez, div);
-  FEFaceValues<dim> fe(mapping, finel, q, UpdateFlags(uflags | update_q_points));
-  FESubfaceValues<dim> sub(mapping, finel, q, UpdateFlags(uflags | update_q_points));
+  FEFaceValues<dim> fe(mapping, finel, q, UpdateFlags(uflags | update_quadrature_points));
+  FESubfaceValues<dim> sub(mapping, finel, q, UpdateFlags(uflags | update_quadrature_points));
 
   sprintf(fname, "Face%dd-%s", dim, name);
   deallog.push(fname);
@@ -270,7 +270,7 @@ plot_face_shape_functions(
 }
 
 
-template<>
+template <>
 void plot_face_shape_functions (Mapping<1> &, FiniteElement<1> &, const char *, UpdateFlags)
 {}
 
@@ -370,7 +370,7 @@ check_values_and_derivatives (const FiniteElement<dim> &fe,
 
 
 
-template<int dim>
+template <int dim>
 void test_compute_functions (const Mapping<dim> &mapping,
                              const FiniteElement<dim> &fe,
                              const char *)
@@ -389,7 +389,7 @@ void test_compute_functions (const Mapping<dim> &mapping,
   dof.distribute_dofs(fe);
 
   const UpdateFlags update_all = (update_values | update_gradients |
-                                  update_second_derivatives);
+                                  update_hessians);
 
   // first check this for FEValues
   // objects

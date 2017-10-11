@@ -14,13 +14,26 @@
 ##
 ## ---------------------------------------------------------------------
 
+#
+# This script indents all source files of deal.II according to our
+# usual code formatting standards. It is used to ensure that our
+# code base looks uniform, as uniformity helps make code easier to
+# read.
+#
+# The script needs to be executed as 
+#   ./contrib/utilities/indent
+# from the top-level directory of the source tree, or via
+#   make indent
+# from a build directory.
+#
+
 if test ! -d source -o ! -d include -o ! -d examples ; then
   echo "*** This script must be run from the top-level directory of deal.II."
   exit 1
 fi
 
-if test ! -f contrib/utilities/astyle.rc ; then
-  echo "*** No style file contrib/utilities/astyle.rc found."
+if test ! -f contrib/styles/astyle.rc ; then
+  echo "*** No style file contrib/styles/astyle.rc found."
   exit 1
 fi
 
@@ -42,5 +55,26 @@ fi
 
 # collect all header and source files and process them in batches of 50 files
 # with up to 10 in parallel
-find tests include source examples \( -name '*.cc' -o -name '*.h' \) -print | xargs -n 50 -P 10 astyle --options=contrib/utilities/astyle.rc
+find tests include source examples \( -name '*.cc' -o -name '*.h' -o -name '*.cu' -o -name '*.cuh' \) -print | xargs -n 50 -P 10 astyle --options=contrib/styles/astyle.rc
 
+# format .inst.in files. We need to replace \{ and \} because it confuses
+# astyle.
+format_inst()
+{
+    f=$1
+    cp $f $f.tmp
+    sed -i.orig 's#\\{#{ //#g' $f.tmp
+    sed -i.orig 's#\\}#} //#g' $f.tmp
+    astyle --options=none --quiet $f.tmp
+    sed -i.orig 's#{ //#\\{#g' $f.tmp
+    sed -i.orig 's#} //#\\}#g' $f.tmp
+    if ! diff -q $f $f.tmp >/dev/null
+    then
+	cp $f.tmp $f
+    fi
+    rm $f.tmp $f.tmp.orig
+}
+
+for i in `find source -name '*.inst.in'` ; do
+  format_inst $i
+done

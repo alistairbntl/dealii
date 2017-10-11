@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,9 +15,9 @@
 
 
 for (deal_II_dimension, deal_II_space_dimension : DIMENSIONS)
-  {
+{
 #if deal_II_dimension <= deal_II_space_dimension
     template class GridIn<deal_II_dimension, deal_II_space_dimension>;
 #endif
-  }
+}
 

@@ -100,8 +100,8 @@ void test ()
     pair_1.first.c = c;
     pair_1.second.c = c;
 
-    pair_2.first.c = 0;
-    pair_2.second.c = 0;
+    pair_2.first.c = nullptr;
+    pair_2.second.c = nullptr;
 
     verify (pair_1, pair_2);
 
@@ -130,7 +130,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

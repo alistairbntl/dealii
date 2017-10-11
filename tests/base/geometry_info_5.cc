@@ -18,11 +18,8 @@
 // check GeometryInfo::d_linear_shape_function_gradient
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/geometry_info.h>
 
-#include <fstream>
-#include <cstdlib>
 
 
 template <int dim>
@@ -73,9 +70,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<1> ();
   test<2> ();

@@ -20,8 +20,6 @@
 #include "../tests.h"
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <fstream>
-#include <iomanip>
 #include <vector>
 
 
@@ -67,9 +65,7 @@ void test (Vector<double> &v)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

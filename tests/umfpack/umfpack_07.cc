@@ -19,9 +19,6 @@
 // for a SparseMatrix<float> instead of SparseMatrix<double> matrix
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cstdlib>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
@@ -125,9 +122,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-9);
+  initlog();
 
   test<1> ();
   test<2> ();

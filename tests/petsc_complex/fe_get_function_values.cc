@@ -19,7 +19,6 @@
 
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -43,7 +42,7 @@
 #include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/lac/petsc_parallel_sparse_matrix.h>
 
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 
 #include <deal.II/distributed/tria.h>
 #include <deal.II/distributed/grid_refinement.h>
@@ -84,8 +83,8 @@ void test ()
   DoFTools::extract_locally_relevant_dofs (dof_handler,locally_relevant_dofs);
 
   PETScWrappers::MPI::Vector vector, vector_locally_relevant;
-  parallel::distributed::Vector< double > vector_Re, vector_Re_locally_relevant,
-           vector_Im, vector_Im_locally_relevant;
+  LinearAlgebra::distributed::Vector< double > vector_Re, vector_Re_locally_relevant,
+                vector_Im, vector_Im_locally_relevant;
   vector.reinit(locally_owned_dofs, mpi_communicator);
   vector_locally_relevant.reinit (locally_owned_dofs,
                                   locally_relevant_dofs,mpi_communicator);
@@ -164,10 +163,8 @@ void test ()
 
 int main (int argc, char *argv[])
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   {

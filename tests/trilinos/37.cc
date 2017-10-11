@@ -15,17 +15,16 @@
 
 
 
-// check TrilinosWrappers::Vector::add (scalar)
+// check TrilinosWrappers::MPI::Vector::add (scalar)
 
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
 
-void test (TrilinosWrappers::Vector &v)
+void test (TrilinosWrappers::MPI::Vector &v)
 {
   for (unsigned int i=0; i<v.size(); ++i)
     v(i) = i;
@@ -45,9 +44,7 @@ void test (TrilinosWrappers::Vector &v)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 
@@ -55,7 +52,8 @@ int main (int argc,char **argv)
   try
     {
       {
-        TrilinosWrappers::Vector v (100);
+        TrilinosWrappers::MPI::Vector v;
+        v.reinit(complete_index_set(100), MPI_COMM_WORLD);
         test (v);
       }
     }

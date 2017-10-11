@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,7 @@
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/index_set.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -28,7 +28,6 @@
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/base/function.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -52,13 +51,13 @@ void test ()
   DoFTools::extract_locally_relevant_dofs (dof2,
                                            locally_relevant_dofs2);
 
-  parallel::distributed::Vector<double> v1(dof1.locally_owned_dofs(),
-                                           locally_relevant_dofs1,
-                                           MPI_COMM_WORLD),
-                                           v2(dof2.locally_owned_dofs(), locally_relevant_dofs2, MPI_COMM_WORLD);
+  LinearAlgebra::distributed::Vector<double> v1(dof1.locally_owned_dofs(),
+                                                locally_relevant_dofs1,
+                                                MPI_COMM_WORLD),
+                                                v2(dof2.locally_owned_dofs(), locally_relevant_dofs2, MPI_COMM_WORLD);
 
   // set first vector to 1
-  VectorTools::interpolate(dof1, ConstantFunction<dim>(1.), v1);
+  VectorTools::interpolate(dof1, Functions::ConstantFunction<dim>(1.), v1);
   for (unsigned int i=0; i<v1.local_size(); ++i)
     Assert(v1.local_element(i) == 1., ExcInternalError());
 
@@ -83,10 +82,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       test();
     }

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,8 +21,7 @@
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/index_set.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <fstream>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
@@ -44,7 +43,7 @@ void test ()
   local_relevant.add_range(1,2);
   local_relevant.add_range(4,5);
 
-  parallel::distributed::Vector<double> v(local_owned, local_relevant, MPI_COMM_WORLD);
+  LinearAlgebra::distributed::Vector<double> v(local_owned, local_relevant, MPI_COMM_WORLD);
 
   // set local values and check them
   v(myid*2)=myid*2.0;
@@ -101,10 +100,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       test();
     }

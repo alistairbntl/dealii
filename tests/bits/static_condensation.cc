@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,19 +19,16 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/grid/tria.h>
@@ -56,8 +53,6 @@ std::ofstream logfile("output");
 #include <deal.II/hp/fe_values.h>
 
 #include <typeinfo>
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -268,7 +263,7 @@ void HelmholtzProblem<dim>::setup_system ()
   constraints.close ();
 
   {
-    CompressedSimpleSparsityPattern csp (dof_handler.n_dofs());
+    DynamicSparsityPattern csp (dof_handler.n_dofs());
     DoFTools::make_sparsity_pattern (dof_handler, csp, constraints, false);
     sparsity_pattern.copy_from(csp);
   }
@@ -291,7 +286,7 @@ void HelmholtzProblem<dim>::setup_system ()
   constraints_trace.close ();
 
   {
-    CompressedSimpleSparsityPattern csp (dof_handler_trace.n_dofs());
+    DynamicSparsityPattern csp (dof_handler_trace.n_dofs());
     DoFTools::make_sparsity_pattern (dof_handler_trace, csp, constraints_trace, false);
     sparsity_pattern_trace.copy_from(csp);
   }
@@ -338,10 +333,10 @@ void HelmholtzProblem<dim>::assemble_system (const bool do_reconstruct)
 
   FEValues<dim>  x_fe_values (fe, quadrature_formula,
                               update_values   | update_gradients |
-                              update_q_points | update_JxW_values);
+                              update_quadrature_points | update_JxW_values);
 
   FEFaceValues<dim> x_fe_face_values (fe, face_quadrature_formula,
-                                      update_values         | update_q_points  |
+                                      update_values         | update_quadrature_points  |
                                       update_normal_vectors | update_JxW_values);
 
   const RightHandSide<dim> right_hand_side;
@@ -665,7 +660,6 @@ int main ()
   logfile << std::setprecision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   try
     {

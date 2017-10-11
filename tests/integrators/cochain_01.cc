@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 #include "../tests.h"
 #include "../test_grids.h"
 
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/lac/matrix_block.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -47,6 +46,7 @@
 
 #include <deal.II/integrators/l2.h>
 #include <deal.II/integrators/divergence.h>
+#include <deal.II/integrators/grad_div.h>
 #include <deal.II/integrators/laplace.h>
 #include <deal.II/integrators/maxwell.h>
 #include <deal.II/integrators/elasticity.h>
@@ -77,7 +77,7 @@ void cell_matrix(
     {
       ++de;
       L2::mass_matrix(dinfo.matrix(dm++,false).matrix, info.fe_values(de));
-      Divergence::grad_div_matrix(dinfo.matrix(dm++,false).matrix, info.fe_values(de));
+      GradDiv::cell_matrix(dinfo.matrix(dm++,false).matrix, info.fe_values(de));
       Divergence::cell_matrix(dinfo.matrix(dm++,false).matrix, info.fe_values(de), info.fe_values(de+1));
     }
 
@@ -165,7 +165,7 @@ test_cochain(const Triangulation<dim> &tr, const FiniteElement<dim> &fe)
 
   MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >(
     dof.begin_active(), dof.end(), dof_info, info_box,
-    cell_matrix<dim>, 0, 0, assembler);
+    cell_matrix<dim>, nullptr, nullptr, assembler);
 
   for (unsigned int b=0; b<matrices.size(); ++b)
     if (b%3 == 0)
@@ -296,14 +296,7 @@ void run3d (unsigned int degree)
 
 int main()
 {
-  const std::string logname = "output";
-  std::ofstream logfile(logname.c_str());
-  deallog.attach(logfile);
-  deallog.log_execution_time(false);
-  if (!debugging)
-    {
-      deallog.threshold_double(1.e-10);
-    }
+  initlog();
 
   run2d(0);
   run2d(1);

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2016 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_parallel_block_vector_h
-#define dealii__petsc_parallel_block_vector_h
+#ifndef dealii_petsc_parallel_block_vector_h
+#define dealii_petsc_parallel_block_vector_h
 
 
 #include <deal.II/base/config.h>
@@ -25,6 +25,7 @@
 #  include <deal.II/lac/block_indices.h>
 #  include <deal.II/lac/block_vector_base.h>
 #  include <deal.II/lac/exceptions.h>
+#  include <deal.II/lac/vector_type_traits.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -86,7 +87,7 @@ namespace PETScWrappers
       /**
        * Default constructor. Generate an empty vector without any blocks.
        */
-      BlockVector ();
+      BlockVector () = default;
 
       /**
        * Constructor. Generate a block vector with @p n_blocks blocks, each of
@@ -135,7 +136,7 @@ namespace PETScWrappers
       /**
        * Destructor. Clears memory
        */
-      ~BlockVector ();
+      ~BlockVector () = default;
 
       /**
        * Copy operator: fill all components of the vector that are locally
@@ -148,25 +149,6 @@ namespace PETScWrappers
        */
       BlockVector &
       operator= (const BlockVector &V);
-
-      /**
-       * Copy the given sequential (non-distributed) block vector into the
-       * present parallel block vector. It is assumed that they have the same
-       * size, and this operation does not change the partitioning of the
-       * parallel vectors by which its elements are distributed across several
-       * MPI processes. What this operation therefore does is to copy that
-       * chunk of the given vector @p v that corresponds to elements of the
-       * target vector that are stored locally, and copies them, for each of
-       * the individual blocks of this object. Elements that are not stored
-       * locally are not touched.
-       *
-       * This being a parallel vector, you must make sure that @em all
-       * processes call this function at the same time. It is not possible to
-       * change the local part of a parallel vector on only one process,
-       * independent of what other processes do, with this function.
-       */
-      BlockVector &
-      operator= (const PETScWrappers::BlockVector &v);
 
       /**
        * Reinitialize the BlockVector to contain @p n_blocks of size @p
@@ -248,7 +230,7 @@ namespace PETScWrappers
       void reinit (const unsigned int num_blocks);
 
       /**
-       * Returns if this vector is a ghosted vector (and thus read-only).
+       * Return if this vector is a ghosted vector (and thus read-only).
        */
       bool has_ghost_elements() const;
 
@@ -270,7 +252,7 @@ namespace PETScWrappers
        * the same number of blocks. If needed, the numbers of blocks should be
        * exchanged, too.
        *
-       * This function is analog to the the swap() function of all C++
+       * This function is analogous to the swap() function of all C++
        * standard containers. Also, there is a global function swap(u,v) that
        * simply calls <tt>u.swap(v)</tt>, again in analogy to standard
        * functions.
@@ -298,13 +280,6 @@ namespace PETScWrappers
     /*@}*/
 
     /*----------------------- Inline functions ----------------------------------*/
-
-
-    inline
-    BlockVector::BlockVector ()
-    {}
-
-
 
     inline
     BlockVector::BlockVector (const unsigned int  n_blocks,
@@ -381,9 +356,6 @@ namespace PETScWrappers
       return *this;
     }
 
-    inline
-    BlockVector::~BlockVector ()
-    {}
 
 
     inline
@@ -548,7 +520,7 @@ namespace internal
      * A helper class used internally in linear_operator.h. Specialization for
      * PETScWrappers::MPI::BlockVector.
      */
-    template<>
+    template <>
     class ReinitHelper<PETScWrappers::MPI::BlockVector>
     {
     public:
@@ -556,7 +528,7 @@ namespace internal
       static
       void reinit_range_vector (const Matrix &matrix,
                                 PETScWrappers::MPI::BlockVector &v,
-                                bool omit_zeroing_entries)
+                                bool /*omit_zeroing_entries*/)
       {
         v.reinit(matrix.locally_owned_range_indices(), matrix.get_mpi_communicator());
       }
@@ -565,7 +537,7 @@ namespace internal
       static
       void reinit_domain_vector(const Matrix &matrix,
                                 PETScWrappers::MPI::BlockVector &v,
-                                bool omit_zeroing_entries)
+                                bool /*omit_zeroing_entries*/)
       {
         v.reinit(matrix.locally_owned_domain_indices(), matrix.get_mpi_communicator());
       }
@@ -573,6 +545,18 @@ namespace internal
 
   } /* namespace LinearOperator */
 } /* namespace internal */
+
+
+/**
+ * Declare dealii::PETScWrappers::MPI::BlockVector as distributed vector.
+ *
+ * @author Uwe Koecher, 2017
+ */
+template <>
+struct is_serial_vector< PETScWrappers::MPI::BlockVector > : std::false_type
+{
+};
+
 
 DEAL_II_NAMESPACE_CLOSE
 

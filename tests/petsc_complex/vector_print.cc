@@ -19,8 +19,7 @@
 // restores the previous value of the stream precision
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
@@ -30,13 +29,12 @@ int main (int argc, char **argv)
   std::ofstream logfile("output");
   deallog.attach(logfile);
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        PETScWrappers::Vector v (5);
+        PETScWrappers::MPI::Vector v (MPI_COMM_WORLD, 5, 5);
         for (unsigned int k=0; k<v.size(); ++k)
           v(k) = PetscScalar (k*1.2345678901234567,2.*k*1.2345678901234567);
 

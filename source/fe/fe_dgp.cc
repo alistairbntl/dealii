@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,6 +18,8 @@
 #include <deal.II/fe/fe_tools.h>
 
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
+
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -48,7 +50,7 @@ template <int dim, int spacedim>
 std::string
 FE_DGP<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in sync
 
@@ -63,10 +65,10 @@ FE_DGP<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_DGP<dim,spacedim>::clone() const
 {
-  return new FE_DGP<dim,spacedim>(*this);
+  return std_cxx14::make_unique<FE_DGP<dim,spacedim>>(*this);
 }
 
 
@@ -107,7 +109,7 @@ get_face_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe,
   typedef FE_DGP<dim,spacedim> FEDGP;
   AssertThrow ((x_source_fe.get_name().find ("FE_DGP<") == 0)
                ||
-               (dynamic_cast<const FEDGP *>(&x_source_fe) != 0),
+               (dynamic_cast<const FEDGP *>(&x_source_fe) != nullptr),
                typename FE::
                ExcInterpolationNotImplemented());
 
@@ -125,7 +127,7 @@ template <int dim, int spacedim>
 void
 FE_DGP<dim,spacedim>::
 get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe,
-                                  const unsigned int ,
+                                  const unsigned int,
                                   FullMatrix<double>           &interpolation_matrix) const
 {
   // this is only implemented, if the source FE is also a DGP element. in that
@@ -137,7 +139,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe
   typedef FE_DGP<dim,spacedim> FEDGP;
   AssertThrow ((x_source_fe.get_name().find ("FE_DGP<") == 0)
                ||
-               (dynamic_cast<const FEDGP *>(&x_source_fe) != 0),
+               (dynamic_cast<const FEDGP *>(&x_source_fe) != nullptr),
                typename FE::
                ExcInterpolationNotImplemented());
 
@@ -166,7 +168,7 @@ FE_DGP<dim,spacedim>::
 hp_vertex_dof_identities (const FiniteElement<dim,spacedim> &fe_other) const
 {
   // there are no such constraints for DGP elements at all
-  if (dynamic_cast<const FE_DGP<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_DGP<dim,spacedim>*>(&fe_other) != nullptr)
     return
       std::vector<std::pair<unsigned int, unsigned int> > ();
   else
@@ -184,7 +186,7 @@ FE_DGP<dim,spacedim>::
 hp_line_dof_identities (const FiniteElement<dim,spacedim> &fe_other) const
 {
   // there are no such constraints for DGP elements at all
-  if (dynamic_cast<const FE_DGP<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_DGP<dim,spacedim>*>(&fe_other) != nullptr)
     return
       std::vector<std::pair<unsigned int, unsigned int> > ();
   else
@@ -202,7 +204,7 @@ FE_DGP<dim,spacedim>::
 hp_quad_dof_identities (const FiniteElement<dim,spacedim>        &fe_other) const
 {
   // there are no such constraints for DGP elements at all
-  if (dynamic_cast<const FE_DGP<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_DGP<dim,spacedim>*>(&fe_other) != nullptr)
     return
       std::vector<std::pair<unsigned int, unsigned int> > ();
   else
@@ -220,7 +222,7 @@ FE_DGP<dim,spacedim>::compare_for_face_domination (const FiniteElement<dim,space
 {
   // check whether both are discontinuous elements, see the description of
   // FiniteElementDomination::Domination
-  if (dynamic_cast<const FE_DGP<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_DGP<dim,spacedim>*>(&fe_other) != nullptr)
     return FiniteElementDomination::no_requirements;
 
   Assert (false, ExcNotImplemented());

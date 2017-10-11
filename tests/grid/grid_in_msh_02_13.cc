@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -34,10 +34,7 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
-#include <iomanip>
 #include <string>
 
 std::ofstream logfile("output");
@@ -69,7 +66,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check_file ();
 }

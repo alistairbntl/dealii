@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__config_h
-#define dealii__config_h
+#ifndef dealii_config_h
+#define dealii_config_h
 
 
 /***********************************************************************
@@ -35,25 +35,33 @@
  */
 
 #cmakedefine DEAL_II_WITH_64BIT_INDICES
+#cmakedefine DEAL_II_WITH_ADOLC
 #cmakedefine DEAL_II_WITH_ARPACK
+#cmakedefine DEAL_II_WITH_ASSIMP
 #cmakedefine DEAL_II_WITH_BZIP2
-#cmakedefine DEAL_II_WITH_CXX11
+#cmakedefine DEAL_II_WITH_CUDA
 #cmakedefine DEAL_II_WITH_CXX14
+#cmakedefine DEAL_II_WITH_GSL
 #cmakedefine DEAL_II_WITH_HDF5
 #cmakedefine DEAL_II_WITH_LAPACK
 #cmakedefine DEAL_II_WITH_METIS
 #cmakedefine DEAL_II_WITH_MPI
 #cmakedefine DEAL_II_WITH_MUPARSER
+#cmakedefine DEAL_II_WITH_NANOFLANN
 #cmakedefine DEAL_II_WITH_NETCDF
 #cmakedefine DEAL_II_WITH_OPENCASCADE
 #cmakedefine DEAL_II_WITH_P4EST
 #cmakedefine DEAL_II_WITH_PETSC
 #cmakedefine DEAL_II_WITH_SLEPC
+#cmakedefine DEAL_II_WITH_SUNDIALS
 #cmakedefine DEAL_II_WITH_THREADS
 #cmakedefine DEAL_II_WITH_TRILINOS
 #cmakedefine DEAL_II_WITH_UMFPACK
 #cmakedefine DEAL_II_WITH_ZLIB
 
+// defined for backwards compatibility with pre-C++11
+#define DEAL_II_WITH_CXX11
+#define DEAL_II_NOEXCEPT noexcept
 
 /***********************************************************************
  * Compiler bugs:
@@ -63,13 +71,9 @@
 
 #cmakedefine DEAL_II_TEMPL_SPEC_FRIEND_BUG
 #cmakedefine DEAL_II_MEMBER_ARRAY_SPECIALIZATION_BUG
-#cmakedefine DEAL_II_MEMBER_VAR_SPECIALIZATION_BUG
-#cmakedefine DEAL_II_EXPLICIT_CONSTRUCTOR_BUG
 #cmakedefine DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-#cmakedefine DEAL_II_BOOST_BIND_COMPILER_BUG
 #cmakedefine DEAL_II_BIND_NO_CONST_OP_PARENTHESES
 #cmakedefine DEAL_II_CONSTEXPR_BUG
-#cmakedefine DEAL_II_ICC_SFINAE_BUG
 
 
 /***********************************************************************
@@ -108,12 +112,9 @@
  */
 
 #cmakedefine DEAL_II_HAVE_CXX11_IS_TRIVIALLY_COPYABLE
-#cmakedefine DEAL_II_HAVE_ISNAN
-#cmakedefine DEAL_II_HAVE_STD_ISNAN
-#cmakedefine DEAL_II_HAVE_UNDERSCORE_ISNAN
-#cmakedefine DEAL_II_HAVE_ISFINITE
 #cmakedefine DEAL_II_HAVE_FP_EXCEPTIONS
 #cmakedefine DEAL_II_HAVE_COMPLEX_OPERATOR_OVERLOADS
+#cmakedefine DEAL_II_FALLTHROUGH @DEAL_II_FALLTHROUGH@
 
 
 /***********************************************************************
@@ -123,13 +124,9 @@
  */
 
 #cmakedefine DEAL_II_HAVE_SYS_RESOURCE_H
-#cmakedefine DEAL_II_HAVE_SYS_TIME_H
-#cmakedefine DEAL_II_HAVE_SYS_TIMES_H
-#cmakedefine DEAL_II_HAVE_SYS_TYPES_H
 #cmakedefine DEAL_II_HAVE_UNISTD_H
 #cmakedefine DEAL_II_HAVE_GETHOSTNAME
 #cmakedefine DEAL_II_HAVE_GETPID
-#cmakedefine DEAL_II_HAVE_TIMES
 #cmakedefine DEAL_II_HAVE_JN
 
 #cmakedefine DEAL_II_MSVC
@@ -142,8 +139,16 @@
  * cmake/modules/Find*.cmake
  */
 
+/* cmake/modules/FindADOLC.cmake */
+#cmakedefine DEAL_II_ADOLC_WITH_ATRIG_ERF
+#cmakedefine DEAL_II_ADOLC_WITH_ADVANCED_BRANCHING
+
 /* cmake/modules/FindARPACK.cmake */
 #cmakedefine DEAL_II_ARPACK_WITH_PARPACK
+
+/* cmake/modules/FindPETSC.cmake */
+#cmakedefine DEAL_II_PETSC_WITH_HYPRE
+#cmakedefine DEAL_II_PETSC_WITH_MUMPS
 
 /* cmake/configure/configure_1_threads.cmake */
 #cmakedefine DEAL_II_USE_MT_POSIX
@@ -153,6 +158,9 @@
  * Depending on the use of threads, we will have to make some variables
  * volatile. We do this here in a very old-fashioned C-style, but still
  * convenient way.
+ *
+ * @deprecated This macro is deprecated in favor of using the
+ * <code>std::atomic</code> template class.
  */
 #ifdef DEAL_II_WITH_THREADS
 #  define DEAL_VOLATILE volatile
@@ -263,7 +271,6 @@
 #define DEAL_II_NAMESPACE_OPEN namespace dealii {
 #define DEAL_II_NAMESPACE_CLOSE }
 
-
 /***********************************************************************
  * Two macros to guard external header includes.
  *
@@ -274,27 +281,42 @@
 
 #ifdef DEAL_II_COMPILER_HAS_DIAGNOSTIC_PRAGMA
 
-#  define DEAL_II_DISABLE_EXTRA_DIAGNOSTICS                      \
-_Pragma("GCC diagnostic push")                                   \
-_Pragma("GCC diagnostic ignored \"-Wunknown-pragmas\"")          \
-_Pragma("GCC diagnostic ignored \"-Wpragmas\"")                  \
-_Pragma("GCC diagnostic ignored \"-Wextra\"")                    \
-_Pragma("GCC diagnostic ignored \"-Woverloaded-virtual\"")       \
-_Pragma("GCC diagnostic ignored \"-Wunused-function\"")          \
-_Pragma("GCC diagnostic ignored \"-Wunused-parameter\"")         \
-_Pragma("GCC diagnostic ignored \"-Wunused-variable\"")          \
-_Pragma("GCC diagnostic ignored \"-Wtype-limits\"")              \
+/* keep pragmas with an exclamation mark in order.. */
+#  define DEAL_II_DISABLE_EXTRA_DIAGNOSTICS                             \
+_Pragma("GCC diagnostic push")                                    /*!*/ \
+_Pragma("GCC diagnostic ignored \"-Wunknown-pragmas\"")           /*!*/ \
+_Pragma("GCC diagnostic ignored \"-Wpragmas\"")                   /*!*/ \
+_Pragma("GCC diagnostic ignored \"-Wunknown-warning-option\"")    /*!*/ \
+_Pragma("GCC diagnostic ignored \"-Wunknown-warning\"")           /*!*/ \
+_Pragma("GCC diagnostic ignored \"-Wextra\"")                     /*!*/ \
+_Pragma("GCC diagnostic ignored \"-Waddress-of-packed-member\"")        \
+_Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")         \
+_Pragma("GCC diagnostic ignored \"-Wexpansion-to-defined\"")            \
+_Pragma("GCC diagnostic ignored \"-Wexpansion-to-defined\"")            \
+_Pragma("GCC diagnostic ignored \"-Wignored-attributes\"")              \
+_Pragma("GCC diagnostic ignored \"-Wignored-qualifiers\"")              \
+_Pragma("GCC diagnostic ignored \"-Wimplicit-fallthrough\"")            \
+_Pragma("GCC diagnostic ignored \"-Winfinite-recursion\"")              \
+_Pragma("GCC diagnostic ignored \"-Wint-in-bool-context\"")             \
+_Pragma("GCC diagnostic ignored \"-Wmisleading-indentation\"")          \
+_Pragma("GCC diagnostic ignored \"-Wmissing-field-initializers\"")      \
+_Pragma("GCC diagnostic ignored \"-Wnested-anon-types\"")               \
+_Pragma("GCC diagnostic ignored \"-Wnon-virtual-dtor\"")                \
+_Pragma("GCC diagnostic ignored \"-Woverflow\"")                        \
+_Pragma("GCC diagnostic ignored \"-Woverloaded-virtual\"")              \
+_Pragma("GCC diagnostic ignored \"-Wpedantic\"")                        \
 _Pragma("GCC diagnostic ignored \"-Wtautological-constant-out-of-range-compare\"") \
-_Pragma("GCC diagnostic ignored \"-Wmissing-field-initializers\"") \
-_Pragma("GCC diagnostic ignored \"-Winfinite-recursion\"")       \
-_Pragma("GCC diagnostic ignored \"-Wunused-but-set-parameter\"") \
-_Pragma("GCC diagnostic ignored \"-Wnested-anon-types\"")        \
-_Pragma("GCC diagnostic ignored \"-Wunused-private-field\"")     \
-_Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")  \
-_Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"")  \
-_Pragma("GCC diagnostic warning \"-Wpragmas\"")
+_Pragma("GCC diagnostic ignored \"-Wtype-limits\"")                     \
+_Pragma("GCC diagnostic ignored \"-Wundef\"")                           \
+_Pragma("GCC diagnostic ignored \"-Wunused-but-set-parameter\"")        \
+_Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"")         \
+_Pragma("GCC diagnostic ignored \"-Wunused-function\"")                 \
+_Pragma("GCC diagnostic ignored \"-Wunused-parameter\"")                \
+_Pragma("GCC diagnostic ignored \"-Wunused-private-field\"")            \
+_Pragma("GCC diagnostic ignored \"-Wunused-variable\"")                 \
+_Pragma("GCC diagnostic warning \"-Wpragmas\"")                   /*!*/
 
-#  define DEAL_II_ENABLE_EXTRA_DIAGNOSTICS                       \
+#  define DEAL_II_ENABLE_EXTRA_DIAGNOSTICS                              \
 _Pragma("GCC diagnostic pop")
 
 #else
@@ -302,16 +324,6 @@ _Pragma("GCC diagnostic pop")
 #  define DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #  define DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
-#endif
-
-
-/**
- * BOOST can falsely detect cxx11 support and will try to use
- * variadic templates even when we disable cxx11. This would create
- * a ton of warnings, so we tell boost to not use them in this case.
- */
-#ifndef DEAL_II_WITH_CXX11
-#define BOOST_NO_CXX11_VARIADIC_TEMPLATES
 #endif
 
 
@@ -331,4 +343,3 @@ _Pragma("GCC diagnostic pop")
 #include <deal.II/base/types.h>
 
 #endif
-

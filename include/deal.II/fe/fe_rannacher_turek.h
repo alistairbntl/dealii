@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 - 2016 by the deal.II authors
+// Copyright (C) 2015 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__fe_rannacher_turek_h
-#define dealii__fe_rannacher_turek_h
+#ifndef dealii_fe_rannacher_turek_h
+#define dealii_fe_rannacher_turek_h
 
 #include <deal.II/base/polynomials_rannacher_turek.h>
 #include <deal.II/fe/fe_poly.h>
@@ -55,38 +55,39 @@ class FE_RannacherTurek : public FE_Poly<PolynomialsRannacherTurek<dim>, dim>
 {
 public:
   /**
-   * Constructor for Rannacher-Turek element of degree @p degree, using @p
+   * Constructor for Rannacher-Turek element of given @p order, using @p
    * n_face_support_points quadrature points on each face for interpolation.
-   * Notice that the element of degree 0 contains polynomials of degree 2.
+   * Notice that the element of order 0 contains polynomials of degree 2.
    *
-   * Only implemented for degree 0 in 2D.
+   * The element is currently only implemented for order 0 in 2D.
    */
-  FE_RannacherTurek(const unsigned int degree = 0,
+  FE_RannacherTurek(const unsigned int order = 0,
                     const unsigned int n_face_support_points = 2);
 
   virtual std::string get_name() const;
-  virtual FiniteElement<dim> *clone() const;
 
-  virtual void interpolate(
-    std::vector<double> &local_dofs,
-    const std::vector<double> &values) const;
-  virtual void interpolate(
-    std::vector<double> &local_dofs,
-    const std::vector<Vector<double> > &values,
-    unsigned int offset) const;
-  virtual void interpolate(
-    std::vector<double> &local_dofs,
-    const VectorSlice<const std::vector<std::vector<double> > > &values) const;
+  virtual
+  std::unique_ptr<FiniteElement<dim,dim> >
+  clone() const;
+
+  // documentation inherited from the base class
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
+
 private:
   /**
-   * Degree of this element.
+   * Order of this element.
    */
-  const unsigned int degree;
+  const unsigned int order;
+
   /**
    * The number of quadrature points used on each face to evaluate node
    * functionals during interpolation.
    */
   const unsigned int n_face_support_points;
+
   /**
    * The weights used on the faces to evaluate node functionals.
    */

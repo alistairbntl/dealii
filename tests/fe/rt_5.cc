@@ -18,17 +18,15 @@
 // Just output the restriction matrices of the RT element
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_raviart_thomas.h>
 
-#include <fstream>
 #include <string>
 
 #define PRECISION 8
 
 
 
-template<int dim>
+template <int dim>
 void
 test(const unsigned int degree)
 {
@@ -60,7 +58,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   for (unsigned int degree=0; degree<3; ++degree)
     {

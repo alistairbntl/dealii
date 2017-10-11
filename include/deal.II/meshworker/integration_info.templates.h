@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,6 +13,10 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_integration_info_templates_h
+#define dealii_integration_info_templates_h
+
+
 #include <deal.II/meshworker/dof_info.h>
 #include <deal.II/meshworker/integration_info.h>
 #include <deal.II/base/quadrature_lib.h>
@@ -22,10 +26,10 @@ DEAL_II_NAMESPACE_OPEN
 
 namespace MeshWorker
 {
-  template<int dim, int sdim>
+  template <int dim, int sdim>
   void
   IntegrationInfo<dim,sdim>::initialize_data(
-    const std_cxx11::shared_ptr<VectorDataBase<dim,sdim> > &data)
+    const std::shared_ptr<VectorDataBase<dim,sdim> > &data)
   {
     global_data = data;
     const unsigned int nqp = fevalv[0]->n_quadrature_points;
@@ -71,7 +75,7 @@ namespace MeshWorker
   }
 
 
-  template<int dim, int sdim>
+  template <int dim, int sdim>
   void
   IntegrationInfo<dim,sdim>::clear()
   {
@@ -80,7 +84,7 @@ namespace MeshWorker
 
 
 
-  template<int dim, int sdim>
+  template <int dim, int sdim>
   template <typename number>
   void
   IntegrationInfo<dim,sdim>::fill_local_data(const DoFInfo<dim, sdim, number> &info, bool split_fevalues)
@@ -120,7 +124,7 @@ namespace MeshWorker
   }
 
 
-  template<int dim, int sdim>
+  template <int dim, int sdim>
   std::size_t
   IntegrationInfo<dim,sdim>::memory_consumption () const
   {
@@ -134,7 +138,7 @@ namespace MeshWorker
 
 //----------------------------------------------------------------------//
 
-  template<int dim, int sdim>
+  template <int dim, int sdim>
   IntegrationInfoBox<dim,sdim>::IntegrationInfoBox()
   {
     cell_flags = update_default;
@@ -144,7 +148,7 @@ namespace MeshWorker
   }
 
 
-  template<int dim, int sdim>
+  template <int dim, int sdim>
   void
   IntegrationInfoBox<dim,sdim>::initialize_update_flags (bool neighbor_geometry)
   {
@@ -189,7 +193,7 @@ namespace MeshWorker
   }
 
 
-  template<int dim, int sdim>
+  template <int dim, int sdim>
   std::size_t
   IntegrationInfoBox<dim,sdim>::memory_consumption () const
   {
@@ -229,3 +233,5 @@ namespace MeshWorker
 
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

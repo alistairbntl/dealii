@@ -24,17 +24,11 @@
 
 #include "../tests.h"
 #include <deal.II/base/std_cxx11/shared_ptr.h>
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <cmath>
-#include <iomanip>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   std_cxx1x::shared_ptr<int> p;
   deallog << "OK" << std::endl;

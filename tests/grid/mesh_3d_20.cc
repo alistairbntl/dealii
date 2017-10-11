@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,7 +21,6 @@
 #include "../tests.h"
 #include "../grid/mesh_3d.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -34,17 +33,15 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
-#include <iomanip>
 
 void check_this (Triangulation<3> &tria)
 {
   QTrapez<2> quadrature;
   FE_Q<3> fe(1);
   FEFaceValues<3> fe_face_values1 (fe, quadrature,
-                                   update_q_points | update_JxW_values);
+                                   update_quadrature_points | update_JxW_values);
   FEFaceValues<3> fe_face_values2 (fe, quadrature,
-                                   update_q_points | update_JxW_values);
+                                   update_quadrature_points | update_JxW_values);
 
   DoFHandler<3> dof_handler (tria);
   dof_handler.distribute_dofs (fe);
@@ -121,9 +118,7 @@ void check (Triangulation<3> &tria)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   {
     Triangulation<3> coarse_grid;

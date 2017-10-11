@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_dgp_h
-#define dealii__fe_dgp_h
+#ifndef dealii_fe_dgp_h
+#define dealii_fe_dgp_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/polynomial_space.h>
@@ -385,8 +385,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -447,39 +447,15 @@ public:
 
 
   /**
-   * Declare a nested class which will hold static definitions of various
-   * matrices such as constraint and embedding matrices. The definition of the
-   * various static fields are in the files <tt>fe_dgp_[123]d.cc</tt> in the
-   * source directory.
-   */
-  struct Matrices
-  {
-    /**
-     * As @p embedding but for projection matrices.
-     */
-    static const double *const projection_matrices[][GeometryInfo<dim>::max_children_per_cell];
-
-    /**
-     * As @p n_embedding_matrices but for projection matrices.
-     */
-    static const unsigned int n_projection_matrices;
-  };
-
-  /**
-   * Returns a list of constant modes of the element. For this element, the
+   * Return a list of constant modes of the element. For this element, the
    * first entry is true, all other are false.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
   get_constant_modes () const;
 
-protected:
-
-  /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim,spacedim> *clone() const;
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
 private:
 
@@ -493,46 +469,6 @@ private:
 };
 
 /* @} */
-#ifndef DOXYGEN
-
-
-// declaration of explicit specializations of member variables, if the
-// compiler allows us to do that (the standard says we must)
-#ifndef DEAL_II_MEMBER_VAR_SPECIALIZATION_BUG
-template <>
-const double *const FE_DGP<1>::Matrices::projection_matrices[][GeometryInfo<1>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGP<1>::Matrices::n_projection_matrices;
-
-template <>
-const double *const FE_DGP<2>::Matrices::projection_matrices[][GeometryInfo<2>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGP<2>::Matrices::n_projection_matrices;
-
-template <>
-const double *const FE_DGP<3>::Matrices::projection_matrices[][GeometryInfo<3>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGP<3>::Matrices::n_projection_matrices;
-
-//codimension 1
-template <>
-const double *const FE_DGP<1,2>::Matrices::projection_matrices[][GeometryInfo<1>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGP<1,2>::Matrices::n_projection_matrices;
-
-template <>
-const double *const FE_DGP<2,3>::Matrices::projection_matrices[][GeometryInfo<2>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGP<2,3>::Matrices::n_projection_matrices;
-
-#endif
-
-#endif // DOXYGEN
 
 DEAL_II_NAMESPACE_CLOSE
 

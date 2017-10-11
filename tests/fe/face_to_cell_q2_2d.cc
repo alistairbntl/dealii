@@ -20,12 +20,10 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_q.h>
 
-template<int dim>
+template <int dim>
 void test()
 {
   FE_Q<dim> fe(2);
@@ -52,9 +50,7 @@ void test()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<2>();
 }

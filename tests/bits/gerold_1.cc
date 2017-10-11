@@ -42,10 +42,7 @@
 #include <deal.II/lac/precondition.h>
 
 #include <deal.II/numerics/data_out.h>
-#include <fstream>
-#include <iomanip>
 
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -107,9 +104,7 @@ void LaplaceProblem<dim>::run ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

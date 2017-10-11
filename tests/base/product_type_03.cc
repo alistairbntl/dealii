@@ -18,10 +18,6 @@
 // results a result type as expected
 
 #include "../tests.h"
-#include <iomanip>
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 #include <typeinfo>
 #include <complex>
 
@@ -41,9 +37,7 @@ void check()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   // check product of scalars
   check<Tensor<2,1,double>,double,Tensor<2,1,double> >();

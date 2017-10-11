@@ -12,8 +12,6 @@
 // Test direction vector on a cylinder surface
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/manifold.h>
 
 
@@ -153,9 +151,7 @@ void test()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test();
 

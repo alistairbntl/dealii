@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2008 - 2015 by the deal.II authors
+ * Copyright (C) 2008 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -149,7 +149,7 @@ namespace Step22
     // in how many places a preconditioner object is still referenced, it can
     // never create a memory leak, and can never produce a dangling pointer to
     // an already destroyed object:
-    std_cxx11::shared_ptr<typename InnerPreconditioner<dim>::type> A_preconditioner;
+    std::shared_ptr<typename InnerPreconditioner<dim>::type> A_preconditioner;
   };
 
   // @sect3{Boundary values and right hand side}
@@ -595,16 +595,15 @@ namespace Step22
     const FEValuesExtractors::Vector velocities (0);
     const FEValuesExtractors::Scalar pressure (dim);
 
-    // As an extension over step-20 and step-21, we include a few
-    // optimizations that make assembly much faster for this particular
-    // problem.  The improvements are based on the observation that we do a
-    // few calculations too many times when we do as in step-20: The symmetric
-    // gradient actually has <code>dofs_per_cell</code> different values per
-    // quadrature point, but we extract it
-    // <code>dofs_per_cell*dofs_per_cell</code> times from the FEValues object
-    // - for both the loop over <code>i</code> and the inner loop over
-    // <code>j</code>. In 3d, that means evaluating it $89^2=7921$ instead of
-    // $89$ times, a not insignificant difference.
+    // As an extension over step-20 and step-21, we include a few optimizations
+    // that make assembly much faster for this particular problem. The
+    // improvements are based on the observation that we do a few calculations
+    // too many times when we do as in step-20: The symmetric gradient actually
+    // has <code>dofs_per_cell</code> different values per quadrature point, but
+    // we extract it <code>dofs_per_cell*dofs_per_cell</code> times from the
+    // FEValues object - for both the loop over <code>i</code> and the inner
+    // loop over <code>j</code>. In 3d, that means evaluating it $89^2=7921$
+    // instead of $89$ times, a not insignificant difference.
     //
     // So what we're going to do here is to avoid such repeated calculations
     // by getting a vector of rank-2 tensors (and similarly for the divergence
@@ -660,8 +659,8 @@ namespace Step22
                 // elements are primitive).  Instead of multiplying the tensor
                 // representing the dim+1 values of shape function i with the
                 // whole right-hand side vector, we only look at the only
-                // non-zero component. The Function
-                // FiniteElement::system_to_component_index(i) will return
+                // non-zero component. The function
+                // FiniteElement::system_to_component_index will return
                 // which component this shape function lives in (0=x velocity,
                 // 1=y velocity, 2=pressure in 2d), which we use to pick out
                 // the correct component of the right-hand side vector to
@@ -716,7 +715,7 @@ namespace Step22
     std::cout << "   Computing preconditioner..." << std::endl << std::flush;
 
     A_preconditioner
-      = std_cxx11::shared_ptr<typename InnerPreconditioner<dim>::type>(new typename InnerPreconditioner<dim>::type());
+      = std::shared_ptr<typename InnerPreconditioner<dim>::type>(new typename InnerPreconditioner<dim>::type());
     A_preconditioner->initialize (system_matrix.block(0,0),
                                   typename InnerPreconditioner<dim>::type::AdditionalData());
 

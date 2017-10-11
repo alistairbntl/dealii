@@ -17,7 +17,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 
 #include <deal.II/grid/tria.h>
@@ -36,13 +35,12 @@
 #include <deal.II/hp/fe_values.h>
 #include <deal.II/hp/dof_handler.h>
 #include <deal.II/hp/fe_collection.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
 // a linear function that should be transferred exactly with Q1 and Q2
 // elements
-template<int dim>
+template <int dim>
 class MyFunction : public Function<dim>
 {
 public:
@@ -232,7 +230,6 @@ int main()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog << "   1D solution transfer" << std::endl;
   transfer<1>(logfile);

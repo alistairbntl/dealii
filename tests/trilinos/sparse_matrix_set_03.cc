@@ -22,7 +22,6 @@
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
-#include <fstream>
 #include <iostream>
 
 
@@ -142,7 +141,6 @@ int main (int argc,char **argv)
     {
       std::ofstream logfile ("output");
       deallog.attach (logfile);
-      deallog.threshold_double (1.e-10);
 
       test();
     }

@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2017 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -15,7 +15,7 @@
 
 INCLUDE_DIRECTORIES(BEFORE ${CMAKE_CURRENT_BINARY_DIR})
 
-SET(_src
+SET(_unity_include_src
   block_matrix_array.cc
   block_sparse_matrix.cc
   block_sparse_matrix_ez.cc
@@ -23,14 +23,16 @@ SET(_src
   block_vector.cc
   chunk_sparse_matrix.cc
   chunk_sparsity_pattern.cc
-  dynamic_sparsity_pattern.cc
   constraint_matrix.cc
+  dynamic_sparsity_pattern.cc
+  exceptions.cc
   full_matrix.cc
   lapack_full_matrix.cc
   la_vector.cc
+  la_parallel_vector.cc
+  la_parallel_block_vector.cc
   matrix_lib.cc
   matrix_out.cc
-  parallel_vector.cc
   precondition_block.cc
   precondition_block_ez.cc
   relaxation_block.cc
@@ -40,8 +42,6 @@ SET(_src
   sparse_decomposition.cc
   sparse_direct.cc
   sparse_ilu.cc
-  sparse_matrix.cc
-  sparse_matrix_inst2.cc
   sparse_matrix_ez.cc
   sparse_mic.cc
   sparse_vanka.cc
@@ -54,6 +54,11 @@ SET(_src
   vector_view.cc
   )
 
+SET(_separate_src
+  sparse_matrix.cc
+  sparse_matrix_inst2.cc
+  )
+
 SET(_inst
   block_sparse_matrix.inst.in
   block_vector.inst.in
@@ -62,7 +67,8 @@ SET(_inst
   full_matrix.inst.in
   lapack_full_matrix.inst.in
   la_vector.inst.in
-  parallel_vector.inst.in
+  la_parallel_vector.inst.in
+  la_parallel_block_vector.inst.in
   precondition_block.inst.in
   relaxation_block.inst.in
   read_write_vector.inst.in
@@ -71,16 +77,17 @@ SET(_inst
   sparse_matrix.inst.in
   vector.inst.in
   vector_memory.inst.in
+  vector_memory_release.inst.in
   vector_view.inst.in
   )
+
 
 # Add PETSc wrapper files. If PETSc has not been found,
 # then these files should be empty and there is no need
 # to even look at them
 IF(DEAL_II_WITH_PETSC)
-  SET(_src
-    ${_src}
-    petsc_block_sparse_matrix.cc
+  SET(_unity_include_src
+    ${_unity_include_src}
     petsc_full_matrix.cc
     petsc_matrix_base.cc
     petsc_matrix_free.cc
@@ -92,14 +99,13 @@ IF(DEAL_II_WITH_PETSC)
     petsc_solver.cc
     petsc_sparse_matrix.cc
     petsc_vector_base.cc
-    petsc_vector.cc
   )
 ENDIF()
 
 # Same for SLEPc
 IF(DEAL_II_WITH_SLEPC)
-  SET(_src
-    ${_src}
+  SET(_unity_include_src
+    ${_unity_include_src}
     slepc_solver.cc
     slepc_spectral_transformation.cc
   )
@@ -107,30 +113,53 @@ ENDIF()
 
 # Also add Trilinos wrapper files
 IF(DEAL_II_WITH_TRILINOS)
-  SET(_src
-    ${_src}
+  SET(_unity_include_src
+    ${_unity_include_src}
     trilinos_block_sparse_matrix.cc
     trilinos_block_vector.cc
     trilinos_epetra_communication_pattern.cc
     trilinos_epetra_vector.cc
-    trilinos_parallel_block_vector.cc
     trilinos_precondition.cc
     trilinos_precondition_ml.cc
-    trilinos_precondition_muelu.cc
     trilinos_solver.cc
     trilinos_sparse_matrix.cc
     trilinos_sparsity_pattern.cc
-    trilinos_vector_base.cc
     trilinos_vector.cc
   )
+
+  SET(_separate_src
+    ${_separate_src}
+    trilinos_precondition_muelu.cc
+    )
+
   SET(_inst
     ${_inst}
     trilinos_sparse_matrix.inst.in
-    trilinos_vector_base.inst.in
+    trilinos_vector.inst.in
   )
 ENDIF()
 
+# Add CUDA wrapper files
+IF(DEAL_II_WITH_CUDA)
+  SET(_separate_src
+    ${_separate_src}
+    cuda_vector.cu
+  )
+ENDIF()
 
+# determined by profiling
+SET(_n_includes_per_unity_file 30)
+
+IF(DEAL_II_UNITY_BUILD)
+  # sort files so that the petsc and trilinos files are not together
+  LIST(SORT _unity_include_src)
+ENDIF()
+
+SETUP_SOURCE_LIST("${_unity_include_src}"
+  "${_separate_src}"
+  ${_n_includes_per_unity_file}
+  _src
+  )
 
 FILE(GLOB _header
   ${CMAKE_SOURCE_DIR}/include/deal.II/lac/*.h

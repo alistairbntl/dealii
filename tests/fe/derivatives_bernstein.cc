@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,7 +16,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -26,13 +25,12 @@
 #include <deal.II/fe/mapping_q1.h>
 #include <deal.II/fe/fe_values.h>
 #include <vector>
-#include <fstream>
 #include <string>
 
 #include <deal.II/fe/fe_bernstein.h>
 //#include "../../include/fe_bernstein.h"
 
-template<int dim>
+template <int dim>
 inline void
 plot_derivatives(Mapping<dim> &mapping,
                  FiniteElement<dim> &finel,
@@ -51,7 +49,7 @@ plot_derivatives(Mapping<dim> &mapping,
   QTrapez<dim> q;
 //  QIterated<dim> q(q_trapez, div);
   FEValues<dim> fe(mapping, finel, q, UpdateFlags(update_gradients
-                                                  | update_second_derivatives));
+                                                  | update_hessians));
   fe.reinit(c);
 
   unsigned int k=0;
@@ -78,7 +76,7 @@ plot_derivatives(Mapping<dim> &mapping,
 
 
 
-template<int dim>
+template <int dim>
 void plot_FE_Bernstein_shape_functions()
 {
   MappingQGeneric<dim> m(1);

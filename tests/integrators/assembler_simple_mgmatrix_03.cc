@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
  */
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/block_indices.h>
@@ -62,7 +61,7 @@ void test(FiniteElement<dim> &fe)
 {
   deallog << fe.get_name() << std::endl;
 
-  Triangulation<dim> tr;
+  Triangulation<dim> tr(Triangulation<dim>:: limit_level_difference_at_vertices);
   GridGenerator::hyper_cube(tr);
   tr.refine_global(1);
 
@@ -84,7 +83,7 @@ void test(FiniteElement<dim> &fe)
 
   for (unsigned int level=0; level<tr.n_levels(); ++level)
     {
-      CompressedSparsityPattern csp(dof.n_dofs(level),dof.n_dofs(level));
+      DynamicSparsityPattern csp(dof.n_dofs(level),dof.n_dofs(level));
       MGTools::make_flux_sparsity_pattern(dof, csp, level);
       sparsity[level].copy_from(csp);
       matrix[level].reinit(sparsity[level]);

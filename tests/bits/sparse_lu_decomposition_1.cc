@@ -23,18 +23,14 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/smartpointer.h>
 #include <deal.II/lac/sparse_ilu.h>
-#include <fstream>
 
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   SmartPointer<SparseLUDecomposition<double> > sparse_decomp;
 

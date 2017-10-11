@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tensor_deprecated_h
-#define dealii__tensor_deprecated_h
+#ifndef dealii_tensor_deprecated_h
+#define dealii_tensor_deprecated_h
 
 #include <deal.II/base/tensor.h>
 
@@ -132,8 +132,8 @@ void contract (Tensor<3,dim,Number>       &dest,
 template <int rank_1, int rank_2, int dim, typename Number>
 inline
 void contract (Tensor<rank_1 + rank_2 - 2, dim, Number> &dest,
-               const Tensor<rank_1 ,dim, Number>        &src1,
-               const Tensor<rank_2 ,dim, Number>        &src2) DEAL_II_DEPRECATED;
+               const Tensor<rank_1, dim, Number>        &src1,
+               const Tensor<rank_2, dim, Number>        &src2) DEAL_II_DEPRECATED;
 
 /**
  * Contract a tensor of rank 1 with a tensor of rank 1 and return the result.
@@ -236,7 +236,7 @@ inline
 Number double_contract (const Tensor<2, dim, Number> &src1,
                         const Tensor<2, dim, Number> &src2)
 {
-  Number res = 0.;
+  Number res = internal::NumberType<Number>::value(0.0);
   for (unsigned int i=0; i<dim; ++i)
     res += src1[i] * src2[i];
 
@@ -433,8 +433,8 @@ void contract (Tensor<3,dim,Number>       &dest,
 template <int rank_1, int rank_2, int dim, typename Number>
 inline
 void contract (Tensor<rank_1 + rank_2 - 2, dim, Number> &dest,
-               const Tensor<rank_1 ,dim, Number>        &src1,
-               const Tensor<rank_2 ,dim, Number>        &src2)
+               const Tensor<rank_1, dim, Number>        &src1,
+               const Tensor<rank_2, dim, Number>        &src2)
 {
   TensorAccessors::internal::ReorderedIndexView<0, rank_2, const Tensor<rank_2, dim, Number> >
   reordered = TensorAccessors::reordered_index_view<0, rank_2>(src2);

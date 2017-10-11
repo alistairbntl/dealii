@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,12 +13,13 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__time_stepping_templates_h
-#define dealii__time_stepping_templates_h
+#ifndef dealii_time_stepping_templates_h
+#define dealii_time_stepping_templates_h
 
-#include <deal.II/base/std_cxx11/bind.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/time_stepping.h>
+
+#include <functional>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -30,8 +31,8 @@ namespace TimeStepping
 
   template <typename VectorType>
   double RungeKutta<VectorType>::evolve_one_time_step(
-    std::vector<std_cxx11::function<VectorType (const double, const VectorType &)> > &F,
-    std::vector<std_cxx11::function<VectorType (const double, const double, const VectorType &)> > &J_inverse,
+    std::vector<std::function<VectorType (const double, const VectorType &)> > &F,
+    std::vector<std::function<VectorType (const double, const double, const VectorType &)> > &J_inverse,
 
     double t,
     double delta_t,
@@ -52,7 +53,7 @@ namespace TimeStepping
   // ----------------------------------------------------------------------
 
   template <typename VectorType>
-  ExplicitRungeKutta<VectorType>::ExplicitRungeKutta(runge_kutta_method method)
+  ExplicitRungeKutta<VectorType>::ExplicitRungeKutta(const runge_kutta_method method)
   {
     initialize(method);
   }
@@ -60,7 +61,7 @@ namespace TimeStepping
 
 
   template <typename VectorType>
-  void ExplicitRungeKutta<VectorType>::initialize(runge_kutta_method method)
+  void ExplicitRungeKutta<VectorType>::initialize(const runge_kutta_method method)
   {
     status.method = method;
 
@@ -137,8 +138,8 @@ namespace TimeStepping
 
   template <typename VectorType>
   double ExplicitRungeKutta<VectorType>::evolve_one_time_step
-  (std_cxx11::function<VectorType (const double, const VectorType &)> f,
-   std_cxx11::function<VectorType (const double, const double, const VectorType &)> /*id_minus_tau_J_inverse*/,
+  (std::function<VectorType (const double, const VectorType &)> f,
+   std::function<VectorType (const double, const double, const VectorType &)> /*id_minus_tau_J_inverse*/,
    double                                                             t,
    double                                                             delta_t,
    VectorType                                                         &y)
@@ -150,7 +151,7 @@ namespace TimeStepping
 
   template <typename VectorType>
   double ExplicitRungeKutta<VectorType>::evolve_one_time_step
-  (std_cxx11::function<VectorType (const double, const VectorType &)> f,
+  (std::function<VectorType (const double, const VectorType &)> f,
    double                                                             t,
    double                                                             delta_t,
    VectorType                                                         &y)
@@ -178,7 +179,7 @@ namespace TimeStepping
 
   template <typename VectorType>
   void ExplicitRungeKutta<VectorType>::compute_stages
-  (std_cxx11::function<VectorType (const double, const VectorType &)> f,
+  (std::function<VectorType (const double, const VectorType &)> f,
    const double                                                       t,
    const double                                                       delta_t,
    const VectorType                                                   &y,
@@ -201,9 +202,9 @@ namespace TimeStepping
   // ----------------------------------------------------------------------
 
   template <typename VectorType>
-  ImplicitRungeKutta<VectorType>::ImplicitRungeKutta(runge_kutta_method method,
-                                                     unsigned int max_it,
-                                                     double tolerance)
+  ImplicitRungeKutta<VectorType>::ImplicitRungeKutta(const runge_kutta_method method,
+                                                     const unsigned int max_it,
+                                                     const double tolerance)
     :
     RungeKutta<VectorType> (),
     skip_linear_combi(false),
@@ -216,7 +217,7 @@ namespace TimeStepping
 
 
   template <typename VectorType>
-  void ImplicitRungeKutta<VectorType>::initialize(runge_kutta_method method)
+  void ImplicitRungeKutta<VectorType>::initialize(const runge_kutta_method method)
   {
     status.method = method;
 
@@ -280,8 +281,8 @@ namespace TimeStepping
 
   template <typename VectorType>
   double ImplicitRungeKutta<VectorType>::evolve_one_time_step
-  (std_cxx11::function<VectorType (const double, const VectorType &)> f,
-   std_cxx11::function<VectorType (const double, const double, const VectorType &)> id_minus_tau_J_inverse,
+  (std::function<VectorType (const double, const VectorType &)> f,
+   std::function<VectorType (const double, const double, const VectorType &)> id_minus_tau_J_inverse,
    double                                                             t,
    double                                                             delta_t,
    VectorType                                                         &y)
@@ -323,8 +324,8 @@ namespace TimeStepping
 
   template <typename VectorType>
   void ImplicitRungeKutta<VectorType>::compute_stages(
-    std_cxx11::function<VectorType (const double, const VectorType &)> f,
-    std_cxx11::function<VectorType (const double, const double, const VectorType &)> id_minus_tau_J_inverse,
+    std::function<VectorType (const double, const VectorType &)> f,
+    std::function<VectorType (const double, const double, const VectorType &)> id_minus_tau_J_inverse,
     double t,
     double delta_t,
     VectorType &y,
@@ -340,9 +341,9 @@ namespace TimeStepping
         // Solve the nonlinear system using Newton's method
         const double new_t = t+this->c[i]*delta_t;
         const double new_delta_t = this->a[i][i]*delta_t;
-        newton_solve(std_cxx11::bind(&ImplicitRungeKutta<VectorType>::compute_residual,this,f,new_t,new_delta_t,
-                                     std_cxx11::cref(old_y),std_cxx11::_1,std_cxx11::ref(f_stages[i]),std_cxx11::_2),
-                     std_cxx11::bind(id_minus_tau_J_inverse,new_t,new_delta_t,std_cxx11::_1),y);
+        newton_solve(std::bind(&ImplicitRungeKutta<VectorType>::compute_residual,this,f,new_t,new_delta_t,
+                               std::cref(old_y),std::placeholders::_1,std::ref(f_stages[i]),std::placeholders::_2),
+                     std::bind(id_minus_tau_J_inverse,new_t,new_delta_t,std::placeholders::_1),y);
       }
   }
 
@@ -350,8 +351,8 @@ namespace TimeStepping
 
   template <typename VectorType>
   void ImplicitRungeKutta<VectorType>::newton_solve(
-    std_cxx11::function<void (const VectorType &,VectorType &)> get_residual,
-    std_cxx11::function<VectorType (const VectorType &)> id_minus_tau_J_inverse,
+    std::function<void (const VectorType &,VectorType &)> get_residual,
+    std::function<VectorType (const VectorType &)> id_minus_tau_J_inverse,
     VectorType &y)
   {
     VectorType residual(y);
@@ -376,7 +377,7 @@ namespace TimeStepping
 
   template <typename VectorType>
   void ImplicitRungeKutta<VectorType>::compute_residual
-  (std_cxx11::function<VectorType (const double, const VectorType &)> f,
+  (std::function<VectorType (const double, const VectorType &)> f,
    double                                                             t,
    double                                                             delta_t,
    const VectorType                                                   &old_y,
@@ -399,13 +400,13 @@ namespace TimeStepping
 
   template <typename VectorType>
   EmbeddedExplicitRungeKutta<VectorType>::EmbeddedExplicitRungeKutta
-  (runge_kutta_method method,
-   double             coarsen_param,
-   double             refine_param,
-   double             min_delta,
-   double             max_delta,
-   double             refine_tol,
-   double             coarsen_tol)
+  (const runge_kutta_method method,
+   const double             coarsen_param,
+   const double             refine_param,
+   const double             min_delta,
+   const double             max_delta,
+   const double             refine_tol,
+   const double             coarsen_tol)
     :
     coarsen_param(coarsen_param),
     refine_param(refine_param),
@@ -414,7 +415,7 @@ namespace TimeStepping
     refine_tol(refine_tol),
     coarsen_tol(coarsen_tol),
     last_same_as_first(false),
-    last_stage(NULL)
+    last_stage(nullptr)
   {
     initialize(method);
   }
@@ -422,7 +423,7 @@ namespace TimeStepping
 
 
   template <typename VectorType>
-  void EmbeddedExplicitRungeKutta<VectorType>::initialize(runge_kutta_method method)
+  void EmbeddedExplicitRungeKutta<VectorType>::initialize(const runge_kutta_method method)
   {
     status.method = method;
 
@@ -664,18 +665,18 @@ namespace TimeStepping
   template <typename VectorType>
   void EmbeddedExplicitRungeKutta<VectorType>::free_memory()
   {
-    if (last_stage!=NULL)
+    if (last_stage!=nullptr)
       delete last_stage;
 
-    last_stage = NULL;
+    last_stage = nullptr;
   }
 
 
 
   template <typename VectorType>
   double EmbeddedExplicitRungeKutta<VectorType>::evolve_one_time_step(
-    std_cxx11::function<VectorType (const double, const VectorType &)> f,
-    std_cxx11::function<VectorType (const double, const double, const VectorType &)> /*id_minus_tau_J_inverse*/,
+    std::function<VectorType (const double, const VectorType &)> f,
+    std::function<VectorType (const double, const double, const VectorType &)> /*id_minus_tau_J_inverse*/,
     double t,
     double delta_t,
     VectorType &y)
@@ -687,7 +688,7 @@ namespace TimeStepping
 
   template <typename VectorType>
   double EmbeddedExplicitRungeKutta<VectorType>::evolve_one_time_step(
-    std_cxx11::function<VectorType (const double, const VectorType &)> f,
+    std::function<VectorType (const double, const VectorType &)> f,
     double t, double delta_t, VectorType &y)
   {
     bool done = false;
@@ -727,7 +728,7 @@ namespace TimeStepping
             else
               {
                 status.exit_delta_t = DELTA_T;
-                status.delta_t_guess = delta_t;
+                status.delta_t_guess = new_delta_t;
               }
           }
         // Check if the norm of error is less than the refining tolerance
@@ -761,7 +762,7 @@ namespace TimeStepping
     // Save the last stage if necessary
     if (last_same_as_first==true)
       {
-        if (last_stage==NULL)
+        if (last_stage==nullptr)
           last_stage = new VectorType(f_stages.back());
         else
           *last_stage = f_stages.back();
@@ -776,12 +777,13 @@ namespace TimeStepping
 
 
   template <typename VectorType>
-  void EmbeddedExplicitRungeKutta<VectorType>::set_time_adaptation_parameters(double coarsen_param_,
-      double refine_param_,
-      double min_delta_,
-      double max_delta_,
-      double refine_tol_,
-      double coarsen_tol_)
+  void EmbeddedExplicitRungeKutta<VectorType>::set_time_adaptation_parameters(
+    const double coarsen_param_,
+    const double refine_param_,
+    const double min_delta_,
+    const double max_delta_,
+    const double refine_tol_,
+    const double coarsen_tol_)
   {
     coarsen_param = coarsen_param_;
     refine_param = refine_param_;
@@ -802,7 +804,7 @@ namespace TimeStepping
 
   template <typename VectorType>
   void EmbeddedExplicitRungeKutta<VectorType>::compute_stages(
-    std_cxx11::function<VectorType (const double, const VectorType &)> f,
+    std::function<VectorType (const double, const VectorType &)> f,
     const double t,
     const double delta_t,
     const VectorType &y,
@@ -815,7 +817,7 @@ namespace TimeStepping
     // of the first stage.
     if (last_same_as_first==true)
       {
-        if (last_stage!=NULL)
+        if (last_stage!=nullptr)
           {
             f_stages[0] = *last_stage;
             i = 1;

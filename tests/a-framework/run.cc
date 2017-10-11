@@ -19,15 +19,11 @@
 // successfully but not run
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <cstdlib>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   std::abort ();
 

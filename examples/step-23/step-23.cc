@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2006 - 2015 by the deal.II authors
+ * Copyright (C) 2006 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -140,7 +140,7 @@ namespace Step23
     Vector<double>       old_solution_u, old_solution_v;
     Vector<double>       system_rhs;
 
-    double time, time_step;
+    double time_step, time;
     unsigned int timestep_number;
     const double theta;
   };
@@ -185,7 +185,8 @@ namespace Step23
   double InitialValuesU<dim>::value (const Point<dim>  &/*p*/,
                                      const unsigned int component) const
   {
-    Assert (component == 0, ExcInternalError());
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
     return 0;
   }
 
@@ -195,7 +196,8 @@ namespace Step23
   double InitialValuesV<dim>::value (const Point<dim>  &/*p*/,
                                      const unsigned int component) const
   {
-    Assert (component == 0, ExcInternalError());
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
     return 0;
   }
 
@@ -219,7 +221,8 @@ namespace Step23
   double RightHandSide<dim>::value (const Point<dim>  &/*p*/,
                                     const unsigned int component) const
   {
-    Assert (component == 0, ExcInternalError());
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
     return 0;
   }
 
@@ -257,7 +260,8 @@ namespace Step23
   double BoundaryValuesU<dim>::value (const Point<dim> &p,
                                       const unsigned int component) const
   {
-    Assert (component == 0, ExcInternalError());
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
 
     if ((this->get_time() <= 0.5) &&
         (p[0] < 0) &&
@@ -274,7 +278,8 @@ namespace Step23
   double BoundaryValuesV<dim>::value (const Point<dim> &p,
                                       const unsigned int component) const
   {
-    Assert (component == 0, ExcInternalError());
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
 
     if ((this->get_time() <= 0.5) &&
         (p[0] < 0) &&
@@ -306,6 +311,8 @@ namespace Step23
     fe (1),
     dof_handler (triangulation),
     time_step (1./64),
+    time (time_step),
+    timestep_number (1),
     theta (0.5)
   {}
 
@@ -506,9 +513,7 @@ namespace Step23
     Vector<double> tmp (solution_u.size());
     Vector<double> forcing_terms (solution_u.size());
 
-    for (timestep_number=1, time=time_step;
-         time<=5;
-         time+=time_step, ++timestep_number)
+    for (; time<=5; time+=time_step, ++timestep_number)
       {
         std::cout << "Time step " << timestep_number
                   << " at t=" << time

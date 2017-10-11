@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_sparse_matrix_ez_templates_h
-#define dealii__block_sparse_matrix_ez_templates_h
+#ifndef dealii_block_sparse_matrix_ez_templates_h
+#define dealii_block_sparse_matrix_ez_templates_h
 
 
 #include <deal.II/base/config.h>
@@ -22,13 +22,6 @@
 #include <deal.II/lac/block_sparse_matrix_ez.h>
 
 DEAL_II_NAMESPACE_OPEN
-
-
-template <typename number>
-BlockSparseMatrixEZ<number>::BlockSparseMatrixEZ ()
-{}
-
-
 
 template <typename number>
 BlockSparseMatrixEZ<number>::

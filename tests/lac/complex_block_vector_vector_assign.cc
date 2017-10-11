@@ -17,15 +17,11 @@
 // check assignment between block vectors and regular vectors
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/block_vector.h>
-#include <fstream>
-#include <iomanip>
 #include <vector>
 #include <algorithm>
 #include <numeric>
 #include <utility>
-#include <cmath>
 
 template <typename Vector1, typename Vector2>
 bool operator == (const Vector1 &v1,
@@ -75,7 +71,6 @@ int main ()
   logfile.setf(std::ios::fixed);
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   try
     {

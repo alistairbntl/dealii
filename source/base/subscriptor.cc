@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,30 +24,13 @@
 DEAL_II_NAMESPACE_OPEN
 
 
-#ifdef DEBUG
-namespace
-{
-// create a lock that might be used to control subscription to and
-// unsubscription from objects, as that might happen in parallel.
-// since it should happen rather seldom that several threads try to
-// operate on different objects at the same time (the usual case is
-// that they subscribe to the same object right after thread
-// creation), a global lock should be sufficient, rather than one that
-// operates on a per-object base (in which case we would have to
-// include the huge <thread_management.h> file into the
-// <subscriptor.h> file).
-  Threads::Mutex subscription_lock;
-}
-#endif
-
-
 static const char *unknown_subscriber = "unknown subscriber";
 
 
 Subscriptor::Subscriptor ()
   :
   counter (0),
-  object_info (0)
+  object_info (nullptr)
 {
   // this has to go somewhere to avoid an extra warning.
   (void)unknown_subscriber;
@@ -58,12 +41,11 @@ Subscriptor::Subscriptor ()
 Subscriptor::Subscriptor (const Subscriptor &)
   :
   counter (0),
-  object_info (0)
+  object_info (nullptr)
 {}
 
 
 
-#ifdef DEAL_II_WITH_CXX11
 Subscriptor::Subscriptor (Subscriptor &&subscriptor)
   :
   counter(0),
@@ -71,19 +53,13 @@ Subscriptor::Subscriptor (Subscriptor &&subscriptor)
 {
   subscriptor.check_no_subscribers();
 }
-#endif
 
 
 
 Subscriptor::~Subscriptor ()
 {
   check_no_subscribers();
-
-#ifdef DEAL_II_WITH_CXX11
   object_info = nullptr;
-#else
-  object_info = 0;
-#endif
 }
 
 
@@ -159,25 +135,25 @@ Subscriptor &Subscriptor::operator = (const Subscriptor &s)
 
 
 
-#ifdef DEAL_II_WITH_CXX11
 Subscriptor &Subscriptor::operator = (Subscriptor &&s)
 {
   s.check_no_subscribers();
   object_info = s.object_info;
   return *this;
 }
-#endif
+
 
 
 void
 Subscriptor::subscribe(const char *id) const
 {
 #ifdef DEBUG
-  if (object_info == 0)
+  if (object_info == nullptr)
     object_info = &typeid(*this);
-  Threads::Mutex::ScopedLock lock (subscription_lock);
   ++counter;
 
+  // This feature is disabled when we compile with threads: see the
+  // documentation of this class.
 #  ifndef DEAL_II_WITH_THREADS
   const char *const name = (id != 0) ? id : unknown_subscriber;
 
@@ -200,16 +176,17 @@ void
 Subscriptor::unsubscribe(const char *id) const
 {
 #ifdef DEBUG
-  const char *name = (id != 0) ? id : unknown_subscriber;
+  const char *name = (id != nullptr) ? id : unknown_subscriber;
   AssertNothrow (counter>0, ExcNoSubscriber(object_info->name(), name));
   // This is for the case that we do
   // not abort after the exception
   if (counter == 0)
     return;
 
-  Threads::Mutex::ScopedLock lock (subscription_lock);
   --counter;
 
+  // This feature is disabled when we compile with threads: see the
+  // documentation of this class.
 #  ifndef DEAL_II_WITH_THREADS
   map_iterator it = counter_map.find(name);
   AssertNothrow (it != counter_map.end(), ExcNoSubscriber(object_info->name(), name));

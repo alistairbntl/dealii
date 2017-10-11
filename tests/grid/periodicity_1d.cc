@@ -22,9 +22,7 @@
 #include <deal.II/grid/grid_tools.h>
 
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
 #include <string>
 
 
@@ -59,9 +57,7 @@ void check()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   check<1>();
   check<2>();

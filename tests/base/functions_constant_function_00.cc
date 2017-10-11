@@ -19,7 +19,7 @@
 #include "../tests.h"
 #include <deal.II/base/function.h>
 #include <deal.II/lac/vector.h>
-#include <deal.II/base/std_cxx11/array.h>
+#include <array>
 #include <vector>
 
 #define MAX_DIM 3
@@ -27,7 +27,7 @@
 #define LOG_FILE "output"
 #define NUMBER double
 
-#define TESTEE ConstantFunction
+#define TESTEE Functions::ConstantFunction
 
 // Test a given TESTEE object f on n_points points
 template <int dim, typename Number>
@@ -171,7 +171,7 @@ void test_constructor(const unsigned int n_component,
 }
 
 // test different number of vector components
-template<int dim, typename Number>
+template <int dim, typename Number>
 void test_n_components(const std::vector<NUMBER> &component_data)
 {
 #define N_COMPONENT_CASE 3
@@ -197,7 +197,6 @@ int main()
 
   std::ofstream logfile(LOG_FILE);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test_n_components<1,NUMBER> (component_data);
   test_n_components<2,NUMBER> (component_data);

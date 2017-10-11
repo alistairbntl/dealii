@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,7 @@
 
 #include "../tests.h"
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/precondition_block.h>
@@ -56,7 +56,6 @@
 #include <deal.II/numerics/data_out.h>
 
 #include <iostream>
-#include <fstream>
 
 
 typedef parallel::distributed::Triangulation<2,3>::cell_iterator cell_iterator;
@@ -74,7 +73,6 @@ int main(int argc, char *argv[])
     {
       static std::ofstream logfile("output");
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
     }
 
   parallel::distributed::Triangulation<2,3> triangulation(MPI_COMM_WORLD,

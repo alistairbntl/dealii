@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,8 +22,6 @@
 // same mesh as if there had been no weights at all to begin with
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -33,7 +31,6 @@
 #include <deal.II/base/utilities.h>
 
 
-#include <fstream>
 
 unsigned int current_cell_weight;
 
@@ -54,7 +51,7 @@ cell_weight_2(const typename parallel::distributed::Triangulation<dim>::cell_ite
 }
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -71,16 +68,16 @@ void test()
 
   // repartition the mesh as described above, first in some arbitrary
   // way, and then with all equal weights
-  tr.signals.cell_weight.connect(std_cxx11::bind(&cell_weight_1<dim>,
-                                                 std_cxx11::_1,
-                                                 std_cxx11::_2));
+  tr.signals.cell_weight.connect(std::bind(&cell_weight_1<dim>,
+                                           std::placeholders::_1,
+                                           std::placeholders::_2));
   tr.repartition();
 
   tr.signals.cell_weight.disconnect_all_slots();
 
-  tr.signals.cell_weight.connect(std_cxx11::bind(&cell_weight_2<dim>,
-                                                 std_cxx11::_1,
-                                                 std_cxx11::_2));
+  tr.signals.cell_weight.connect(std::bind(&cell_weight_2<dim>,
+                                           std::placeholders::_1,
+                                           std::placeholders::_2));
   tr.repartition();
 
 
@@ -102,9 +99,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

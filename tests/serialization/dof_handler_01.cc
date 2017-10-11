@@ -169,7 +169,7 @@ void test ()
   dof_1.distribute_dofs (fe);
   dof_2.distribute_dofs (fe);
 
-  // right now, both DoFHandlers are the same. Renumber one of the them
+  // right now, both DoFHandlers are the same. Renumber one of them
   DoFRenumbering::Cuthill_McKee (dof_1);
 
   verify (dof_1, dof_2);
@@ -181,7 +181,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1,1> ();
   test<1,2> ();

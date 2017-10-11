@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,14 +19,10 @@
 
 
 #include "../tests.h"
-#include "../lac/testmatrix.h"
-#include <cmath>
-#include <fstream>
+#include "../testmatrix.h"
 #include <iostream>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
-#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/solver_gmres.h>
@@ -38,39 +34,11 @@
 #include <deal.II/lac/vector_memory.h>
 #include <typeinfo>
 
-template<typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
-void
-check_solve(SolverType          &solver,
-            const SolverControl &solver_control,
-            const MatrixType    &A,
-            VectorType          &u,
-            VectorType          &f,
-            const PRECONDITION  &P)
-{
-  deallog << "Solver type: " << typeid(solver).name() << std::endl;
-
-  u = 0.;
-  f = 1.;
-  try
-    {
-      check_solver_within_range(
-        solver.solve(A,u,f,P),
-        solver_control.last_step(), 48, 51);
-    }
-  catch (std::exception &e)
-    {
-      deallog << e.what() << std::endl;
-      abort ();
-    }
-}
-
 
 int main(int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog << std::setprecision(4);
-  deallog.threshold_double(1.e-10);
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, 1);
   {
@@ -87,15 +55,19 @@ int main(int argc, char **argv)
     testproblem.five_point(A);
     A.compress (VectorOperation::insert);
 
-    PETScWrappers::Vector  f(dim);
-    PETScWrappers::Vector  u(dim);
+    IndexSet indices(dim);
+    indices.add_range(0, dim);
+    PETScWrappers::MPI::Vector  f(indices, MPI_COMM_WORLD);
+    PETScWrappers::MPI::Vector  u(indices, MPI_COMM_WORLD);
     f = 1.;
 
-    GrowingVectorMemory<PETScWrappers::Vector> mem;
-    SolverBicgstab<PETScWrappers::Vector> solver(control,mem);
+    GrowingVectorMemory<PETScWrappers::MPI::Vector> mem;
+    SolverBicgstab<PETScWrappers::MPI::Vector> solver(control,mem);
     PreconditionIdentity preconditioner;
-    check_solve (solver, control, A,u,f, preconditioner);
+    deallog << "Solver type: " << typeid(solver).name() << std::endl;
+    check_solver_within_range(solver.solve(A,u,f,preconditioner),
+                              control.last_step(), 48, 51);
   }
-  GrowingVectorMemory<PETScWrappers::Vector>::release_unused_memory ();
+  GrowingVectorMemory<PETScWrappers::MPI::Vector>::release_unused_memory ();
 
 }

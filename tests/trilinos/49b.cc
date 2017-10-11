@@ -22,9 +22,8 @@
 
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -48,7 +47,6 @@ void test (TrilinosWrappers::MPI::BlockVector &v)
     }
 
   // now also check the reverse assignment
-  w = 0;
   w = v;
   for (unsigned int i=0; i<v.size(); ++i)
     {
@@ -64,9 +62,7 @@ void test (TrilinosWrappers::MPI::BlockVector &v)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 
@@ -74,15 +70,10 @@ int main (int argc,char **argv)
   try
     {
       {
-        std::vector<Epetra_Map> sizes;
-        Epetra_Map map(TrilinosWrappers::types::int_type(3),
-                       TrilinosWrappers::types::int_type(3),
-                       0,
-                       Utilities::Trilinos::comm_world());
-        sizes.push_back (map);
-        sizes.push_back (map);
+        std::vector<IndexSet> sizes(2, complete_index_set(3));
 
-        TrilinosWrappers::MPI::BlockVector v (sizes);
+        TrilinosWrappers::MPI::BlockVector v;
+        v.reinit(sizes, MPI_COMM_WORLD);
         test (v);
       }
     }

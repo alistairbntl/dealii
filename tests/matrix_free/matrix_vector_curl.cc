@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -28,12 +28,11 @@ std::ofstream logfile("output");
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria_boundary_lib.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_renumbering.h>
@@ -45,7 +44,6 @@ std::ofstream logfile("output");
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -104,10 +102,17 @@ private:
 template <int dim, int fe_degree>
 void test ()
 {
-  Triangulation<dim>   tria;
+  const SphericalManifold<dim> manifold;
+  Triangulation<dim> tria;
   GridGenerator::hyper_ball (tria);
-  static const HyperBallBoundary<dim> boundary;
-  tria.set_boundary (0, boundary);
+  typename Triangulation<dim>::active_cell_iterator
+  cell = tria.begin_active (),
+  endc = tria.end();
+  for (; cell!=endc; ++cell)
+    for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+      if (cell->at_boundary(f))
+        cell->face(f)->set_all_manifold_ids(0);
+  tria.set_manifold (0, manifold);
   tria.refine_global(4-dim);
 
   // refine a few cells
@@ -148,7 +153,7 @@ void test ()
 
   const unsigned int dofs_per_block = dof_handler_sca.n_dofs();
   {
-    BlockCompressedSimpleSparsityPattern csp (dim,dim);
+    BlockDynamicSparsityPattern csp (dim,dim);
     for (unsigned int d=0; d<dim; ++d)
       for (unsigned int e=0; e<dim; ++e)
         csp.block(d,e).reinit (dofs_per_block, dofs_per_block);
@@ -248,8 +253,7 @@ void test ()
     QGauss<1> quad(fe_degree+1);
     mf_data.reinit (dof_handler_sca, constraints, quad,
                     typename MatrixFree<dim>::AdditionalData
-                    (MPI_COMM_WORLD,
-                     MatrixFree<dim>::AdditionalData::none));
+                    (MatrixFree<dim>::AdditionalData::none));
   }
 
   system_matrix.vmult (solution, system_rhs);
@@ -275,7 +279,6 @@ int main ()
 
   {
     deallog << std::endl << "Test with doubles" << std::endl << std::endl;
-    deallog.threshold_double(1.e-12);
     deallog.push("2d");
     test<2,1>();
     test<2,2>();
@@ -286,4 +289,3 @@ int main ()
     deallog.pop();
   }
 }
-

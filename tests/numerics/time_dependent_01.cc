@@ -21,9 +21,7 @@
 #include "../tests.h"
 #include <deal.II/numerics/time_dependent.h>
 
-#include <fstream>
 #include <algorithm>
-#include <cmath>
 
 
 std::ofstream logfile("output");
@@ -80,7 +78,6 @@ int main ()
 {
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

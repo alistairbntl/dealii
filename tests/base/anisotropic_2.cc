@@ -19,11 +19,7 @@
 
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor_product_polynomials.h>
 
 
@@ -157,18 +153,7 @@ void check ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog << std::setprecision(2);
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
-
-//   deallog.push("Lagrange");
-//   check<LagrangeEquidistant> ();
-//   deallog.pop();
-
-//   deallog.push("Legendre");
-//   check<Legendre> ();
-//   deallog.pop();
+  initlog();
 
   deallog.push("Hierarchical");
   check<Hierarchical> ();

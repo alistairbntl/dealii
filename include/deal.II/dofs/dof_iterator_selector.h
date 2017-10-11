@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,15 +13,15 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__dof_iterators_h
-#define dealii__dof_iterators_h
+#ifndef dealii_dof_iterators_h
+#define dealii_dof_iterators_h
 
 #include <deal.II/base/config.h>
 
 
 DEAL_II_NAMESPACE_OPEN
 
-template <int, int, int> class InvalidAccessor;
+template <int, int, int> class DoFInvalidAccessor;
 
 template <int structdim, typename DoFHandlerType, bool lda> class DoFAccessor;
 template <typename DoFHandlerType, bool lda> class DoFCellAccessor;
@@ -61,13 +61,13 @@ namespace internal
       typedef TriaIterator      <CellAccessor> line_iterator;
       typedef TriaActiveIterator<CellAccessor> active_line_iterator;
 
-      typedef TriaRawIterator   <InvalidAccessor<2,1,spacedim> > raw_quad_iterator;
-      typedef TriaIterator      <InvalidAccessor<2,1,spacedim> > quad_iterator;
-      typedef TriaActiveIterator<InvalidAccessor<2,1,spacedim> > active_quad_iterator;
+      typedef TriaRawIterator   <DoFInvalidAccessor<2,1,spacedim> > raw_quad_iterator;
+      typedef TriaIterator      <DoFInvalidAccessor<2,1,spacedim> > quad_iterator;
+      typedef TriaActiveIterator<DoFInvalidAccessor<2,1,spacedim> > active_quad_iterator;
 
-      typedef TriaRawIterator   <InvalidAccessor<3,1,spacedim> > raw_hex_iterator;
-      typedef TriaIterator      <InvalidAccessor<3,1,spacedim> > hex_iterator;
-      typedef TriaActiveIterator<InvalidAccessor<3,1,spacedim> > active_hex_iterator;
+      typedef TriaRawIterator   <DoFInvalidAccessor<3,1,spacedim> > raw_hex_iterator;
+      typedef TriaIterator      <DoFInvalidAccessor<3,1,spacedim> > hex_iterator;
+      typedef TriaActiveIterator<DoFInvalidAccessor<3,1,spacedim> > active_hex_iterator;
 
       typedef raw_line_iterator    raw_cell_iterator;
       typedef line_iterator        cell_iterator;
@@ -108,9 +108,9 @@ namespace internal
       typedef TriaIterator      <CellAccessor> quad_iterator;
       typedef TriaActiveIterator<CellAccessor> active_quad_iterator;
 
-      typedef TriaRawIterator   <InvalidAccessor<3,2,spacedim> > raw_hex_iterator;
-      typedef TriaIterator      <InvalidAccessor<3,2,spacedim> > hex_iterator;
-      typedef TriaActiveIterator<InvalidAccessor<3,2,spacedim> > active_hex_iterator;
+      typedef TriaRawIterator   <DoFInvalidAccessor<3,2,spacedim> > raw_hex_iterator;
+      typedef TriaIterator      <DoFInvalidAccessor<3,2,spacedim> > hex_iterator;
+      typedef TriaActiveIterator<DoFInvalidAccessor<3,2,spacedim> > active_hex_iterator;
 
       typedef raw_quad_iterator    raw_cell_iterator;
       typedef quad_iterator        cell_iterator;
@@ -168,4 +168,4 @@ namespace internal
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif // dealii__dof_iterator_selector_h
+#endif // dealii_dof_iterator_selector_h

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,12 +19,10 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/hp/fe_collection.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/base/quadrature_lib.h>
 
-#include <fstream>
 
 
 template <int dim>
@@ -68,7 +66,6 @@ int main ()
   logfile.precision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1> ();
   test<2> ();

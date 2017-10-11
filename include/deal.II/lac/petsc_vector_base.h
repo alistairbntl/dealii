@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_vector_base_h
-#define dealii__petsc_vector_base_h
+#ifndef dealii_petsc_vector_base_h
+#define dealii_petsc_vector_base_h
 
 
 #include <deal.II/base/config.h>
@@ -154,14 +154,6 @@ namespace PETScWrappers
        * the referenced element of the vector.
        */
       operator PetscScalar () const;
-
-      /**
-       * Exception
-       */
-      DeclException1 (ExcPETScError,
-                      int,
-                      << "An error with error number " << arg1
-                      << " occurred while calling a PETSc function");
       /**
        * Exception
        */
@@ -217,8 +209,10 @@ namespace PETScWrappers
    * parallel ones) are built by filling the contents of an abstract object
    * that is only referenced through a pointer of a type that is independent
    * of the actual vector type, we can implement almost all functionality of
-   * vectors in this base class. Derived classes will then only have to
-   * provide the functionality to create one or the other kind of vector.
+   * vectors in this base class. As such, this class can also be used as a
+   * deal.II-compatible wrapper for a PETSc <code>Vec</code> object of any
+   * type. Derived classes will then only have to provide the functionality to
+   * create one or the other kind of vector.
    *
    * The interface of this class is modeled after the existing Vector class in
    * deal.II. It has almost the same member functions, and is often
@@ -263,7 +257,7 @@ namespace PETScWrappers
 
     /**
      * Initialize a Vector from a PETSc Vec object. Note that we do not copy
-     * the vector and we do not attain ownership, so we do not destroy the
+     * the vector and we do not obtain ownership, so we do not destroy the
      * PETSc object in the destructor.
      */
     explicit VectorBase (const Vec &v);
@@ -376,6 +370,14 @@ namespace PETScWrappers
     bool has_ghost_elements() const;
 
     /**
+     * This function only exists for compatibility with the @p
+     * LinearAlgebra::distributed::Vector class and does nothing: this class
+     * implements ghost value updates in a different way that is a better fit
+     * with the underlying PETSc vector object.
+     */
+    void update_ghost_values () const;
+
+    /**
      * Provide access to a given element, both read and write.
      */
     reference
@@ -413,17 +415,49 @@ namespace PETScWrappers
               const std::vector<PetscScalar>  &values);
 
     /**
-     * A collective get operation: instead of getting individual elements of a
-     * vector, this function allows to get a whole set of elements at once.
-     * The indices of the elements to be read are stated in the first
-     * argument, the corresponding values are returned in the second.
+     * Instead of getting individual elements of a vector via operator(),
+     * this function allows getting a whole set of elements at once. The
+     * indices of the elements to be read are stated in the first argument, the
+     * corresponding values are returned in the second.
+     *
+     * If the current vector is called @p v, then this function is the equivalent
+     * to the code
+     * @code
+     *   for (unsigned int i=0; i<indices.size(); ++i)
+     *     values[i] = v[indices[i]];
+     * @endcode
+     *
+     * @pre The sizes of the @p indices and @p values arrays must be identical.
      */
     void extract_subvector_to (const std::vector<size_type> &indices,
                                std::vector<PetscScalar> &values) const;
 
     /**
-     * Just as the above, but with pointers. Useful in minimizing copying of
-     * data around.
+     * Instead of getting individual elements of a vector via operator(),
+     * this function allows getting a whole set of elements at once. In
+     * contrast to the previous function, this function obtains the
+     * indices of the elements by dereferencing all elements of the iterator
+     * range provided by the first two arguments, and puts the vector
+     * values into memory locations obtained by dereferencing a range
+     * of iterators starting at the location pointed to by the third
+     * argument.
+     *
+     * If the current vector is called @p v, then this function is the equivalent
+     * to the code
+     * @code
+     *   ForwardIterator indices_p = indices_begin;
+     *   OutputIterator  values_p  = values_begin;
+     *   while (indices_p != indices_end)
+     *   {
+     *     *values_p = v[*indices_p];
+     *     ++indices_p;
+     *     ++values_p;
+     *   }
+     * @endcode
+     *
+     * @pre It must be possible to write into as many memory locations
+     *   starting at @p values_begin as there are iterators between
+     *   @p indices_begin and @p indices_end.
      */
     template <typename ForwardIterator, typename OutputIterator>
     void extract_subvector_to (const ForwardIterator    indices_begin,
@@ -473,6 +507,10 @@ namespace PETScWrappers
 
     /**
      * $l_1$-norm of the vector. The sum of the absolute values.
+     *
+     * @note In complex-valued PETSc priori to 3.7.0 this norm is implemented
+     * as the sum of absolute values of real and imaginary parts of elements
+     * of a complex vector.
      */
     real_type l1_norm () const;
 
@@ -514,14 +552,6 @@ namespace PETScWrappers
                              const VectorBase &W);
 
     /**
-     * Normalize vector by dividing by the $l_2$-norm of the vector. Return
-     * the vector norm before normalization.
-     *
-     * This function is deprecated.
-     */
-    real_type normalize () const DEAL_II_DEPRECATED;
-
-    /**
      * Return the value of the vector element with the largest negative value.
      */
     real_type min () const;
@@ -530,46 +560,6 @@ namespace PETScWrappers
      * Return the value of the vector element with the largest positive value.
      */
     real_type max () const;
-
-    /**
-     * Replace every element in a vector with its absolute value.
-     *
-     * This function is deprecated.
-     */
-    VectorBase &abs () DEAL_II_DEPRECATED;
-
-    /**
-     * Conjugate a vector.
-     *
-     * This function is deprecated.
-     */
-    VectorBase &conjugate () DEAL_II_DEPRECATED;
-
-    /**
-     * A collective piecewise multiply operation on <code>this</code> vector
-     * with itself. TODO: The model for this function should be similar to add
-     * ().
-     *
-     * This function is deprecated.
-     */
-    VectorBase &mult () DEAL_II_DEPRECATED;
-
-    /**
-     * Same as above, but a collective piecewise multiply operation of
-     * <code>this</code> vector with <b>v</b>.
-     *
-     * This function is deprecated.
-     */
-    VectorBase &mult (const VectorBase &v) DEAL_II_DEPRECATED;
-
-    /**
-     * Same as above, but a collective piecewise multiply operation of
-     * <b>u</b> with <b>v</b>.
-     *
-     * This function is deprecated.
-     */
-    VectorBase &mult (const VectorBase &u,
-                      const VectorBase &v) DEAL_II_DEPRECATED;
 
     /**
      * Return whether the vector contains only elements with value zero. This
@@ -612,13 +602,6 @@ namespace PETScWrappers
     void add (const PetscScalar s);
 
     /**
-     * Simple vector addition, equal to the <tt>operator +=</tt>.
-     *
-     * @deprecated Use the <tt>operator +=</tt> instead.
-     */
-    void add (const VectorBase &V) DEAL_II_DEPRECATED;
-
-    /**
      * Simple addition of a multiple of a vector, i.e. <tt>*this += a*V</tt>.
      */
     void add (const PetscScalar a, const VectorBase &V);
@@ -643,31 +626,6 @@ namespace PETScWrappers
                const VectorBase     &V);
 
     /**
-     * Scaling and multiple addition.
-     *
-     * This function is deprecated.
-     */
-    void sadd (const PetscScalar s,
-               const PetscScalar a,
-               const VectorBase     &V,
-               const PetscScalar b,
-               const VectorBase     &W) DEAL_II_DEPRECATED;
-
-    /**
-     * Scaling and multiple addition. <tt>*this = s*(*this)+a*V + b*W +
-     * c*X</tt>.
-     *
-     * This function is deprecated.
-     */
-    void sadd (const PetscScalar s,
-               const PetscScalar a,
-               const VectorBase     &V,
-               const PetscScalar b,
-               const VectorBase     &W,
-               const PetscScalar c,
-               const VectorBase     &X) DEAL_II_DEPRECATED;
-
-    /**
      * Scale each element of this vector by the corresponding element in the
      * argument. This function is mostly meant to simulate multiplication (and
      * immediate re-assignment) by a diagonal scaling matrix.
@@ -678,14 +636,6 @@ namespace PETScWrappers
      * Assignment <tt>*this = a*V</tt>.
      */
     void equ (const PetscScalar a, const VectorBase &V);
-
-    /**
-     * Assignment <tt>*this = a*V + b*W</tt>.
-     *
-     * This function is deprecated.
-     */
-    void equ (const PetscScalar a, const VectorBase &V,
-              const PetscScalar b, const VectorBase &W) DEAL_II_DEPRECATED;
 
     /**
      * Compute the elementwise ratio of the two given vectors, that is let
@@ -704,8 +654,8 @@ namespace PETScWrappers
      * Prints the PETSc vector object values using PETSc internal vector
      * viewer function <tt>VecView</tt>. The default format prints the
      * vector's contents, including indices of vector elements. For other
-     * valid view formats, consult http://www.mcs.anl.gov/petsc/petsc-
-     * current/docs/manualpages/Vec/VecView.html
+     * valid view formats, consult
+     * http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/Vec/VecView.html
      */
     void write_ascii (const PetscViewerFormat format = PETSC_VIEWER_DEFAULT) ;
 
@@ -728,10 +678,10 @@ namespace PETScWrappers
      * only swaps the pointers to the data of the two vectors and therefore
      * does not need to allocate temporary storage and move data around.
      *
-     * This function is analog to the the @p swap function of all C++ standard
-     * containers. Also, there is a global function <tt>swap(u,v)</tt> that
-     * simply calls <tt>u.swap(v)</tt>, again in analogy to standard
-     * functions.
+     * This function is analogous to the @p swap function of all C++
+     * standard containers. Also, there is a global function
+     * <tt>swap(u,v)</tt> that simply calls <tt>u.swap(v)</tt>, again in
+     * analogy to standard functions.
      */
     void swap (VectorBase &v);
 
@@ -790,10 +740,10 @@ namespace PETScWrappers
 
     /**
      * Specifies if the vector is the owner of the PETSc Vec. This is true if
-     * it got created by this class and determines if it gets destructed in
+     * it got created by this class and determines if it gets destroyed in
      * the destructor.
      */
-    bool attained_ownership;
+    bool obtained_ownership;
 
     /**
      * Collective set or add operation: This function is invoked by the
@@ -805,7 +755,13 @@ namespace PETScWrappers
                                const PetscScalar  *values,
                                const bool         add_values);
 
-
+  private:
+    /**
+     * Assignment operator. This is currently not implemented, so it is
+     * deliberately left as private (and undefined) to prevent accidental
+     * usage.
+     */
+    VectorBase &operator=(const VectorBase &) = delete;
   };
 
 
@@ -882,8 +838,8 @@ namespace PETScWrappers
 
       const PetscInt petsc_i = index;
 
-      const int ierr
-        = VecSetValues (vector, 1, &petsc_i, &value, INSERT_VALUES);
+      const PetscErrorCode ierr = VecSetValues (vector, 1, &petsc_i, &value,
+                                                INSERT_VALUES);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       vector.last_action = VectorOperation::insert;
@@ -919,8 +875,8 @@ namespace PETScWrappers
 
       // use the PETSc function to add something
       const PetscInt petsc_i = index;
-      const int ierr
-        = VecSetValues (vector, 1, &petsc_i, &value, ADD_VALUES);
+      const PetscErrorCode ierr = VecSetValues (vector, 1, &petsc_i, &value,
+                                                ADD_VALUES);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
 
@@ -957,8 +913,8 @@ namespace PETScWrappers
       // add something
       const PetscInt petsc_i = index;
       const PetscScalar subtractand = -value;
-      const int ierr
-        = VecSetValues (vector, 1, &petsc_i, &subtractand, ADD_VALUES);
+      const PetscErrorCode ierr = VecSetValues (vector, 1, &petsc_i, &subtractand,
+                                                ADD_VALUES);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       return *this;
@@ -994,8 +950,8 @@ namespace PETScWrappers
       const PetscScalar new_value
         = static_cast<PetscScalar>(*this) * value;
 
-      const int ierr
-        = VecSetValues (vector, 1, &petsc_i, &new_value, INSERT_VALUES);
+      const PetscErrorCode ierr = VecSetValues (vector, 1, &petsc_i, &new_value,
+                                                INSERT_VALUES);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       return *this;
@@ -1031,8 +987,8 @@ namespace PETScWrappers
       const PetscScalar new_value
         = static_cast<PetscScalar>(*this) / value;
 
-      const int ierr
-        = VecSetValues (vector, 1, &petsc_i, &new_value, INSERT_VALUES);
+      const PetscErrorCode ierr = VecSetValues (vector, 1, &petsc_i, &new_value,
+                                                INSERT_VALUES);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       return *this;
@@ -1071,8 +1027,8 @@ namespace PETScWrappers
   VectorBase::in_local_range (const size_type index) const
   {
     PetscInt begin, end;
-    const int ierr = VecGetOwnershipRange (static_cast<const Vec &>(vector),
-                                           &begin, &end);
+    const PetscErrorCode ierr = VecGetOwnershipRange (static_cast<const Vec &>(vector),
+                                                      &begin, &end);
     AssertThrow (ierr == 0, ExcPETScError(ierr));
 
     return ((index >= static_cast<size_type>(begin)) &&
@@ -1100,6 +1056,13 @@ namespace PETScWrappers
   {
     return ghosted;
   }
+
+
+
+  inline
+  void
+  VectorBase::update_ghost_values () const
+  {}
 
 
 
@@ -1167,9 +1130,6 @@ namespace PETScWrappers
     // with a parallel vector
     if (ghosted )
       {
-
-        int ierr;
-
         // there is the possibility
         // that the vector has
         // ghost elements. in that
@@ -1188,10 +1148,10 @@ namespace PETScWrappers
         // position we can get from
         // an index set
         PetscInt begin, end;
-        ierr = VecGetOwnershipRange (vector, &begin, &end);
+        PetscErrorCode ierr = VecGetOwnershipRange (vector, &begin, &end);
         AssertThrow (ierr == 0, ExcPETScError(ierr));
 
-        Vec locally_stored_elements = PETSC_NULL;
+        Vec locally_stored_elements = nullptr;
         ierr = VecGhostGetLocalForm(vector, &locally_stored_elements);
         AssertThrow (ierr == 0, ExcPETScError(ierr));
 
@@ -1235,10 +1195,8 @@ namespace PETScWrappers
     // element we are interested in
     else
       {
-        int ierr;
-
         PetscInt begin, end;
-        ierr = VecGetOwnershipRange (vector, &begin, &end);
+        PetscErrorCode ierr = VecGetOwnershipRange (vector, &begin, &end);
         AssertThrow (ierr == 0, ExcPETScError(ierr));
 
         PetscScalar *ptr;

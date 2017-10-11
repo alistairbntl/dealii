@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2016 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparse_matrix_h
-#define dealii__sparse_matrix_h
+#ifndef dealii_sparse_matrix_h
+#define dealii_sparse_matrix_h
 
 
 #include <deal.II/base/config.h>
@@ -24,6 +24,9 @@
 #include <deal.II/lac/identity_matrix.h>
 #include <deal.II/lac/exceptions.h>
 #include <deal.II/lac/vector.h>
+
+#include <memory>
+
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -281,12 +284,6 @@ namespace SparseMatrixIterators
      */
     template <typename, bool>
     friend class Iterator;
-
-    /**
-     * Make the SparseMatrix class a friend so that it, in turn, can declare
-     * the Reference class a friend.
-     */
-    template <typename> friend class dealii::SparseMatrix;
   };
 
 
@@ -543,19 +540,14 @@ public:
    */
   SparseMatrix (const SparseMatrix &);
 
-#ifdef DEAL_II_WITH_CXX11
   /**
    * Move constructor. Construct a new sparse matrix by transferring the
    * internal data of the matrix @p m into a new object.
    *
    * Move construction allows an object to be returned from a function or
    * packed into a tuple even when the class cannot be copy-constructed.
-   *
-   * @note this constructor is only available if deal.II is configured with
-   * C++11 support.
    */
   SparseMatrix (SparseMatrix<number> &&m);
-#endif
 
   /**
    * Constructor. Takes the given matrix sparsity structure to represent the
@@ -602,9 +594,6 @@ public:
   /**
    * Move assignment operator. This operator replaces the present matrix with
    * @p m by transferring the internal data of @p m.
-   *
-   * @note This operator is only available if deal.II is configured with C++11
-   * support.
    */
   SparseMatrix<number> &operator = (SparseMatrix<number> &&m);
 #endif
@@ -664,13 +653,13 @@ public:
   bool empty () const;
 
   /**
-   * Return the dimension of the codomain (or range) space. To remember: the
+   * Return the dimension of the codomain (or range) space. Note that the
    * matrix is of dimension $m \times n$.
    */
   size_type m () const;
 
   /**
-   * Return the dimension of the domain space. To remember: the matrix is of
+   * Return the dimension of the domain space. Note that the matrix is of
    * dimension $m \times n$.
    */
   size_type n () const;
@@ -685,7 +674,7 @@ public:
    * returns the number of entries in the sparsity pattern; if any of the
    * entries should happen to be zero, it is counted anyway.
    */
-  size_type n_nonzero_elements () const;
+  std::size_t n_nonzero_elements () const;
 
   /**
    * Return the number of actually nonzero elements of this matrix. It is
@@ -696,7 +685,7 @@ public:
    * count all entries of the sparsity pattern but only the ones that are
    * nonzero (or whose absolute value is greater than threshold).
    */
-  size_type n_actually_nonzero_elements (const double threshold = 0.) const;
+  std::size_t n_actually_nonzero_elements (const double threshold = 0.) const;
 
   /**
    * Return a (constant) reference to the underlying sparsity pattern of this
@@ -750,8 +739,8 @@ public:
    */
   template <typename number2>
   void set (const std::vector<size_type> &indices,
-            const FullMatrix<number2>       &full_matrix,
-            const bool                       elide_zero_values = false);
+            const FullMatrix<number2>    &full_matrix,
+            const bool                    elide_zero_values = false);
 
   /**
    * Same function as before, but now including the possibility to use
@@ -1007,8 +996,7 @@ public:
 
   /**
    * Return the main diagonal element in the <i>i</i>th row. This function
-   * throws an error if the matrix is not quadratic (see
-   * SparsityPattern::optimize_diagonal()).
+   * throws an error if the matrix is not quadratic.
    *
    * This function is considerably faster than the operator()(), since for
    * quadratic matrices, the diagonal entry may be the first to be stored in
@@ -1045,7 +1033,7 @@ public:
    * @dealiiOperationIsMultithreaded
    */
   template <class OutVector, class InVector>
-  void vmult (OutVector &dst,
+  void vmult (OutVector      &dst,
               const InVector &src) const;
 
   /**
@@ -1064,7 +1052,7 @@ public:
    * Source and destination must not be the same vector.
    */
   template <class OutVector, class InVector>
-  void Tvmult (OutVector &dst,
+  void Tvmult (OutVector      &dst,
                const InVector &src) const;
 
   /**
@@ -1084,7 +1072,7 @@ public:
    * @dealiiOperationIsMultithreaded
    */
   template <class OutVector, class InVector>
-  void vmult_add (OutVector &dst,
+  void vmult_add (OutVector      &dst,
                   const InVector &src) const;
 
   /**
@@ -1103,7 +1091,7 @@ public:
    * Source and destination must not be the same vector.
    */
   template <class OutVector, class InVector>
-  void Tvmult_add (OutVector &dst,
+  void Tvmult_add (OutVector      &dst,
                    const InVector &src) const;
 
   /**
@@ -1154,23 +1142,35 @@ public:
    * optional vector argument is given, <tt>C = A * diag(V) * B</tt>, where
    * <tt>diag(V)</tt> defines a diagonal matrix with the vector entries.
    *
-   * This function assumes that the calling matrix <tt>A</tt> and <tt>B</tt>
-   * have compatible sizes. The size of <tt>C</tt> will be set within this
-   * function.
+   * This function assumes that the calling matrix @p A and the argument @p B
+   * have compatible sizes. By default, the output matrix @p C will be
+   * resized appropriately.
    *
-   * The content as well as the sparsity pattern of the matrix C will be
-   * changed by this function, so make sure that the sparsity pattern is not
-   * used somewhere else in your program. This is an expensive operation, so
-   * think twice before you use this function.
+   * By default, i.e., if the optional argument @p rebuild_sparsity_pattern
+   * is @p true, the sparsity pattern of the matrix C will be
+   * changed to ensure that all entries that result from the product $AB$
+   * can be stored in $C$. This is an expensive operation, and if there is
+   * a way to predict the sparsity pattern up front, you should probably
+   * build it yourself before calling this function with @p false as last
+   * argument. In this case, the rebuilding of the sparsity pattern is
+   * bypassed.
    *
-   * There is an optional flag <tt>rebuild_sparsity_pattern</tt> that can be
-   * used to bypass the creation of a new sparsity pattern and instead uses
-   * the sparsity pattern stored in <tt>C</tt>. In that case, make sure that
-   * it really fits. The default is to rebuild the sparsity pattern.
+   * When setting @p rebuild_sparsity_pattern to @p true (i.e., leaving it
+   * at the default value), it is important to realize that the matrix
+   * @p C passed as first argument still has to be initialized with a
+   * sparsity pattern (either at the time of creation of the SparseMatrix
+   * object, or via the SparseMatrix::reinit() function). This is because
+   * we could create a sparsity pattern inside the current function, and
+   * then associate @p C with it, but there would be no way to transfer
+   * ownership of this sparsity pattern to anyone once the current function
+   * finishes. Consequently, the function requires that @p C be already
+   * associated with a sparsity pattern object, and this object is then
+   * reset to fit the product of @p A and @p B.
    *
-   * @note Rebuilding the sparsity pattern requires changing it. This means
-   * that all other matrices that are associated with this sparsity pattern
-   * will then have invalid entries.
+   * As a consequence of this, however, it is also important to realize
+   * that the sparsity pattern of @p C is modified and that this would
+   * render invalid <i>all other SparseMatrix objects</i> that happen
+   * to <i>also</i> use that sparsity pattern object.
    */
   template <typename numberB, typename numberC>
   void mmult (SparseMatrix<numberC>       &C,
@@ -1596,12 +1596,13 @@ private:
   SmartPointer<const SparsityPattern,SparseMatrix<number> > cols;
 
   /**
-   * Array of values for all the nonzero entries. The position within the
-   * matrix, i.e.  the row and column number for a given entry can only be
-   * deduced using the sparsity pattern. The same holds for the more common
-   * operation of finding an entry by its coordinates.
+   * Array of values for all the nonzero entries. The position of an
+   * entry within the matrix, i.e., the row and column number for a
+   * given value in this array can only be deduced using the sparsity
+   * pattern. The same holds for the more common operation of finding
+   * an entry by its coordinates.
    */
-  number *val;
+  std::unique_ptr<number[]> val;
 
   /**
    * Allocated size of #val. This can be larger than the actually used part if
@@ -1626,13 +1627,6 @@ private:
    */
   template <typename,bool> friend class SparseMatrixIterators::Iterator;
   template <typename,bool> friend class SparseMatrixIterators::Accessor;
-
-#ifndef DEAL_II_MSVC
-  // Visual studio is choking on the following friend declaration, probably
-  // because Reference is only defined in a specialization. It looks like
-  // the library is compiling without this line, though.
-  template <typename number2> friend class SparseMatrixIterators::Accessor<number2, false>::Reference;
-#endif
 };
 
 #ifndef DOXYGEN
@@ -1644,7 +1638,7 @@ template <typename number>
 inline
 typename SparseMatrix<number>::size_type SparseMatrix<number>::m () const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   return cols->rows;
 }
 
@@ -1653,7 +1647,7 @@ template <typename number>
 inline
 typename SparseMatrix<number>::size_type SparseMatrix<number>::n () const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   return cols->cols;
 }
 
@@ -1835,8 +1829,8 @@ inline
 SparseMatrix<number> &
 SparseMatrix<number>::operator *= (const number factor)
 {
-  Assert (cols != 0, ExcNotInitialized());
-  Assert (val != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
+  Assert (val != nullptr, ExcNotInitialized());
 
   number             *val_ptr    = &val[0];
   const number *const end_ptr    = &val[cols->n_nonzero_elements()];
@@ -1854,8 +1848,8 @@ inline
 SparseMatrix<number> &
 SparseMatrix<number>::operator /= (const number factor)
 {
-  Assert (cols != 0, ExcNotInitialized());
-  Assert (val != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
+  Assert (val != nullptr, ExcNotInitialized());
   Assert (factor != number(), ExcDivideByZero());
 
   const number factor_inv = number(1.) / factor;
@@ -1876,7 +1870,7 @@ inline
 number SparseMatrix<number>::operator () (const size_type i,
                                           const size_type j) const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   Assert (cols->operator()(i,j) != SparsityPattern::invalid_entry,
           ExcInvalidIndex(i,j));
   return val[cols->operator()(i,j)];
@@ -1889,7 +1883,7 @@ inline
 number SparseMatrix<number>::el (const size_type i,
                                  const size_type j) const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   const size_type index = cols->operator()(i,j);
 
   if (index != SparsityPattern::invalid_entry)
@@ -1904,7 +1898,7 @@ template <typename number>
 inline
 number SparseMatrix<number>::diag_element (const size_type i) const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   Assert (m() == n(),  ExcNotQuadratic());
   AssertIndexRange(i, m());
 
@@ -1919,7 +1913,7 @@ template <typename number>
 inline
 number &SparseMatrix<number>::diag_element (const size_type i)
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   Assert (m() == n(),  ExcNotQuadratic());
   AssertIndexRange(i, m());
 
@@ -2374,8 +2368,8 @@ void SparseMatrix<number>::print (StreamType &out,
                                   const bool  across,
                                   const bool  diagonal_first) const
 {
-  Assert (cols != 0, ExcNotInitialized());
-  Assert (val != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
+  Assert (val != nullptr, ExcNotInitialized());
 
   bool hanging_diagonal = false;
   number diagonal = number();

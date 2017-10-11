@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------
-// $Id$
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +18,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
@@ -27,8 +25,6 @@
 #include <deal.II/distributed/tria.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -90,7 +86,6 @@ int main (int argc, char *argv[])
       deallog << std::setprecision(4);
       logfile << std::setprecision(4);
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       test1<2> (true);
       test1<2> (false);

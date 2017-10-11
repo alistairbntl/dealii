@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,12 +15,12 @@
 
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
+#include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/petsc_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/multigrid/mg_base.h>
 
 
@@ -28,23 +28,14 @@ DEAL_II_NAMESPACE_OPEN
 
 
 template <typename VectorType>
-MGTransferBase<VectorType>::~MGTransferBase()
-{}
-
-
-template <typename VectorType>
-MGMatrixBase<VectorType>::~MGMatrixBase()
-{}
-
-
-template <typename VectorType>
-MGSmootherBase<VectorType>::~MGSmootherBase()
-{}
-
-
-template <typename VectorType>
-MGCoarseGridBase<VectorType>::~MGCoarseGridBase()
-{}
+void
+MGSmootherBase<VectorType>::apply (const unsigned int level,
+                                   VectorType         &u,
+                                   const VectorType   &rhs) const
+{
+  u = 0;
+  smooth(level, u, rhs);
+}
 
 
 // Explicit instantiations

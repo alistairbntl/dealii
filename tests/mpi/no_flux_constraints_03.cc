@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 // of the number of CPUs
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
@@ -37,10 +36,9 @@
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <sstream>
 
-template<int dim>
+template <int dim>
 void test()
 {
   Assert (dim == 3, ExcNotImplemented());
@@ -108,24 +106,19 @@ void test()
   sleep(1);
   if (myid==0)
     {
+
       //sort and merge the constraint matrices on proc 0, generate a checksum
       //and output that into the deallog
       system((std::string("cat ") + base + "cm_*.dot | sort -n | uniq > " + base + "cm").c_str());
-      system((std::string("md5sum ") + base + "cm > " + base + "cm.check").c_str());
       {
-        std::ifstream file((base+"cm.check").c_str());
-        std::string str;
-        while (!file.eof())
-          {
-            std::getline(file, str);
-            deallog << str << std::endl;
-          }
+        std::ifstream file((base+"cm").c_str());
+        std::stringstream ss;
+        ss << file.rdbuf();
+        std::string str = ss.str();
+        deallog << "checksum: " << checksum(str.begin(), str.end()) << std::endl;
       }
-
-      // delete the files created
-      // by processor 0
+      // delete the file created by processor 0
       std::remove ((base + "cm").c_str());
-      std::remove ((base + "cm.check").c_str());
     }
 
   // remove tmp files again. wait
@@ -195,9 +188,7 @@ int main(int argc, char *argv[])
 
     if (myid == 0)
       {
-        std::ofstream logfile("output");
-        deallog.attach(logfile);
-        deallog.threshold_double(1.e-10);
+        initlog();
 
         deallog.push("3d");
         test<3>();

@@ -26,7 +26,6 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -46,7 +45,6 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <fstream>
 #include <sstream>
 
 std::ofstream logfile("output");
@@ -145,7 +143,7 @@ void LaplaceProblem<dim>::setup_system ()
   constraints.clear();
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ConstantFunction<dim>(1),
+                                            Functions::ConstantFunction<dim>(1),
                                             constraints);
   constraints.close();
   sparsity_pattern.reinit (dof_handler.n_dofs(),
@@ -307,7 +305,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   LaplaceProblem<2> laplace_problem_2d;
   laplace_problem_2d.run ();

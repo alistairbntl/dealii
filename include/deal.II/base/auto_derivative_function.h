@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__auto_derivative_function_h
-#define dealii__auto_derivative_function_h
+#ifndef dealii_auto_derivative_function_h
+#define dealii_auto_derivative_function_h
 
 
 #include <deal.II/base/exceptions.h>
@@ -132,7 +132,7 @@ public:
   /**
    * Virtual destructor; absolutely necessary in this case.
    */
-  virtual ~AutoDerivativeFunction ();
+  virtual ~AutoDerivativeFunction () = default;
 
   /**
    * Choose the difference formula. See the enum #DifferenceFormula for
@@ -154,7 +154,7 @@ public:
    * Return the gradient of the specified component of the function at the
    * given point.
    *
-   * Computes numerical difference quotients using the preset
+   * Compute numerical difference quotients using the preset
    * #DifferenceFormula.
    */
   virtual Tensor<1,dim> gradient (const Point<dim>   &p,
@@ -163,7 +163,7 @@ public:
   /**
    * Return the gradient of all components of the function at the given point.
    *
-   * Computes numerical difference quotients using the preset
+   * Compute numerical difference quotients using the preset
    * #DifferenceFormula.
    */
   virtual void vector_gradient (const Point<dim>            &p,
@@ -175,7 +175,7 @@ public:
    * already has the right size, i.e.  the same size as the <tt>points</tt>
    * array.
    *
-   * Computes numerical difference quotients using the preset
+   * Compute numerical difference quotients using the preset
    * #DifferenceFormula.
    */
   virtual void gradient_list (const std::vector<Point<dim> > &points,
@@ -191,23 +191,19 @@ public:
    * The outer loop over <tt>gradients</tt> is over the points in the list,
    * the inner loop over the different components of the function.
    *
-   * Computes numerical difference quotients using the preset
+   * Compute numerical difference quotients using the preset
    * #DifferenceFormula.
    */
   virtual void vector_gradient_list (const std::vector<Point<dim> > &points,
                                      std::vector<std::vector<Tensor<1,dim> > > &gradients) const;
 
   /**
-   * Returns a #DifferenceFormula of the order <tt>ord</tt> at minimum.
+   * Return a #DifferenceFormula of the order <tt>ord</tt> at minimum.
    */
   static
   DifferenceFormula
   get_formula_of_order (const unsigned int ord);
 
-  /**
-   * Exception.
-   */
-  DeclException0(ExcInvalidFormula);
 
 private:
 

@@ -31,7 +31,6 @@ While distributing the constraint for DoF 41, it turns out that one of the proce
  */
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/grid/tria.h>
@@ -44,7 +43,6 @@ While distributing the constraint for DoF 41, it turns out that one of the proce
 #include <deal.II/base/function.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <sstream>
 
 
@@ -87,7 +85,7 @@ void test()
   DoFTools::make_hanging_node_constraints (dofh, cm);
 
   typename FunctionMap<dim>::type      dirichlet_boundary;
-  ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
+  Functions::ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
   dirichlet_boundary[0] = &homogeneous_dirichlet_bc;
   VectorTools::interpolate_boundary_values (dofh,
                                             dirichlet_boundary,
@@ -128,9 +126,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       test<2>();
     }

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2016 by the deal.II authors
+// Copyright (C) 2010 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__mesh_worker_assembler_h
-#define dealii__mesh_worker_assembler_h
+#ifndef dealii_mesh_worker_assembler_h
+#define dealii_mesh_worker_assembler_h
 
 #include <deal.II/base/smartpointer.h>
 #include <deal.II/base/mg_level_object.h>
@@ -130,13 +130,13 @@ namespace MeshWorker
       /**
        * Assemble the local residuals into the global residuals.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info);
 
       /**
        * Assemble both local residuals into the global residuals.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info1,
                     const DOFINFO &info2);
     private:
@@ -227,13 +227,13 @@ namespace MeshWorker
       /**
        * Assemble the local matrices into the global matrices.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info);
 
       /**
        * Assemble all local matrices into the global matrices.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info1,
                     const DOFINFO &info2);
 
@@ -351,13 +351,13 @@ namespace MeshWorker
       /**
        * Assemble the local matrices into the global matrices.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info);
 
       /**
        * Assemble all local matrices into the global matrices.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info1,
                     const DOFINFO &info2);
 
@@ -549,7 +549,7 @@ namespace MeshWorker
     (const DOFINFO &info)
     {
       for (unsigned int i=0; i<residuals.size(); ++i)
-        assemble(*residuals(i), info.vector(i), info.indices);
+        assemble(*(residuals.entry<VectorType>(i)), info.vector(i), info.indices);
     }
 
 
@@ -562,8 +562,8 @@ namespace MeshWorker
     {
       for (unsigned int i=0; i<residuals.size(); ++i)
         {
-          assemble(*residuals(i), info1.vector(i), info1.indices);
-          assemble(*residuals(i), info2.vector(i), info2.indices);
+          assemble(*(residuals.entry<VectorType>(i)), info1.vector(i), info1.indices);
+          assemble(*(residuals.entry<VectorType>(i)), info2.vector(i), info2.indices);
         }
     }
 
@@ -601,7 +601,7 @@ namespace MeshWorker
 
 
 
-    template <typename MatrixType ,typename number>
+    template <typename MatrixType,typename number>
     template <class DOFINFO>
     inline void
     MatrixLocalBlocksToGlobalBlocks<MatrixType, number>::initialize_info
@@ -623,7 +623,7 @@ namespace MeshWorker
      const std::vector<types::global_dof_index> &dof1,
      const std::vector<types::global_dof_index> &dof2)
     {
-      if (constraints == 0)
+      if (constraints == nullptr)
         {
           for (unsigned int j=0; j<local.n_rows(); ++j)
             for (unsigned int k=0; k<local.n_cols(); ++k)
@@ -730,7 +730,7 @@ namespace MeshWorker
     }
 
 
-    template <typename MatrixType ,typename number>
+    template <typename MatrixType,typename number>
     template <class DOFINFO>
     inline void
     MGMatrixLocalBlocksToGlobalBlocks<MatrixType, number>::initialize_info

@@ -17,7 +17,6 @@
 // test for arithmetic operations on VectorizedArray
 
 #include "../tests.h"
-#include <iomanip>
 #include <limits>
 
 #include <deal.II/base/vectorization.h>
@@ -150,9 +149,7 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   deallog.push("double");
   test<double> ();

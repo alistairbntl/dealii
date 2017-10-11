@@ -19,11 +19,7 @@
 // so the test passes.
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 #include <deal.II/base/parallel.h>
 
 typedef int size_type;
@@ -91,7 +87,6 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check();
 }

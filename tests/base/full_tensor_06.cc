@@ -20,9 +20,6 @@
 #include "../tests.h"
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <iomanip>
 
 
 template <int dim>
@@ -86,7 +83,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<2> ();
   test<3> ();

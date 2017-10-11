@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,9 +17,6 @@
 // test by Brian: check some of the scaling operations on matrices
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cstdlib>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
@@ -54,9 +51,7 @@
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<2> tria;
   GridGenerator::hyper_cube (tria,0,1);
@@ -101,7 +96,7 @@ int main()
   FEValues<2> fe_values (dof_handler.get_fe(),
                          qr, UpdateFlags(update_values    |
                                          update_gradients |
-                                         update_q_points  |
+                                         update_quadrature_points  |
                                          update_JxW_values));
 
   MatrixTools::create_laplace_matrix (dof_handler, qr, B.block(0,0));

@@ -15,15 +15,14 @@
 
 
 
-// check PETScWrappers::Vector::size()
+// check PETScWrappers::MPI::Vector::size()
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 
 
-void test (PETScWrappers::Vector &v)
+void test (PETScWrappers::MPI::Vector &v)
 {
   // set only certain elements of the vector
   for (unsigned int k=0; k<v.size(); k+=1+k)
@@ -39,16 +38,14 @@ void test (PETScWrappers::Vector &v)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        PETScWrappers::Vector v(100);
+        PETScWrappers::MPI::Vector v(MPI_COMM_WORLD, 100, 100);
         test (v);
       }
     }

@@ -18,9 +18,7 @@
 // check Utilities::MPI::min_max_avg()
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
-#include <fstream>
 
 void print_it(Utilities::MPI::MinMaxAvg &result)
 {
@@ -91,9 +89,7 @@ int main(int argc, char *argv[])
 
   if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("mpi");
       test();

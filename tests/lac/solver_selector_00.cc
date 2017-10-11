@@ -20,7 +20,6 @@
 
 #include "../tests.h"
 #include <deal.II/lac/solver_selector.h>
-#include <fstream>
 
 DEAL_II_NAMESPACE_OPEN
 // instantiation here
@@ -29,9 +28,7 @@ DEAL_II_NAMESPACE_CLOSE
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   deallog << "OK" << std::endl;
 }

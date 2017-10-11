@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2013 - 2015 by the deal.II authors
+ * Copyright (C) 2013 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -1034,10 +1034,10 @@ namespace Step51
 
       WorkStream::run(dof_handler_u_post.begin_active(),
                       dof_handler_u_post.end(),
-                      std_cxx11::bind (&HDG<dim>::postprocess_one_cell,
-                                       std_cxx11::ref(*this),
-                                       std_cxx11::_1, std_cxx11::_2, std_cxx11::_3),
-                      std_cxx11::function<void(const unsigned int &)>(),
+                      std::bind (&HDG<dim>::postprocess_one_cell,
+                                 std::ref(*this),
+                                 std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+                      std::function<void(const unsigned int &)>(),
                       scratch,
                       0U);
     }
@@ -1052,7 +1052,9 @@ namespace Step51
                                        QGauss<dim>(fe.degree+2),
                                        VectorTools::L2_norm,
                                        &value_select);
-    const double L2_error = difference_per_cell.l2_norm();
+    const double L2_error = VectorTools::compute_global_error(triangulation,
+                                                              difference_per_cell,
+                                                              VectorTools::L2_norm);
 
     ComponentSelectFunction<dim> gradient_select (std::pair<unsigned int,unsigned int>(0, dim),
                                                   dim+1);
@@ -1063,7 +1065,9 @@ namespace Step51
                                        QGauss<dim>(fe.degree+2),
                                        VectorTools::L2_norm,
                                        &gradient_select);
-    const double grad_error = difference_per_cell.l2_norm();
+    const double grad_error = VectorTools::compute_global_error(triangulation,
+                                                                difference_per_cell,
+                                                                VectorTools::L2_norm);
 
     VectorTools::integrate_difference (dof_handler_u_post,
                                        solution_u_post,
@@ -1071,7 +1075,9 @@ namespace Step51
                                        difference_per_cell,
                                        QGauss<dim>(fe.degree+3),
                                        VectorTools::L2_norm);
-    const double post_error = difference_per_cell.l2_norm();
+    const double post_error = VectorTools::compute_global_error(triangulation,
+                                                                difference_per_cell,
+                                                                VectorTools::L2_norm);
 
     convergence_table.add_value("cells",     triangulation.n_active_cells());
     convergence_table.add_value("dofs",      dof_handler.n_dofs());

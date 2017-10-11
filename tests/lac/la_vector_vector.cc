@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,11 +16,7 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/la_vector.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -138,11 +134,9 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   LinearAlgebra::Vector<double>      d1(N), d2(N);
   LinearAlgebra::Vector<float>       f1(N), f2(N);
-  LinearAlgebra::Vector<long double> l1(N), l2(N);
 
   // cross-tests with double/float
   // vectors at the same time are not
@@ -152,7 +146,4 @@ int main()
   // arguments
   check_vectors (d1, d2);
   check_vectors (f1, f2);
-  check_vectors (l1, l2);
 }
-
-

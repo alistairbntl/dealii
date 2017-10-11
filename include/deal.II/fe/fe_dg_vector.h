@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2016 by the deal.II authors
+// Copyright (C) 2010 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_dg_vector_h
-#define dealii__fe_dg_vector_h
+#ifndef dealii_fe_dg_vector_h
+#define dealii_fe_dg_vector_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/table.h>
@@ -59,9 +59,6 @@ public:
    * Constructor for the vector element of degree @p p.
    */
   FE_DGVector (const unsigned int p, MappingType m);
-public:
-
-  FiniteElement<dim, spacedim> *clone() const;
 
   /**
    * Return a string that uniquely identifies a finite element. This class
@@ -70,6 +67,9 @@ public:
    */
   virtual std::string get_name () const;
 
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
   /**
    * This function returns @p true, if the shape function @p shape_index has
@@ -80,14 +80,6 @@ public:
   virtual bool has_support_on_face (const unsigned int shape_index,
                                     const unsigned int face_index) const;
 
-  virtual void interpolate(std::vector<double>                &local_dofs,
-                           const std::vector<double> &values) const;
-  virtual void interpolate(std::vector<double>                &local_dofs,
-                           const std::vector<Vector<double> > &values,
-                           unsigned int offset = 0) const;
-  virtual void interpolate(
-    std::vector<double> &local_dofs,
-    const VectorSlice<const std::vector<std::vector<double> > > &values) const;
   virtual std::size_t memory_consumption () const;
 
 private:

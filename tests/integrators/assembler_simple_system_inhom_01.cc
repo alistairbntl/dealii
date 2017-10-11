@@ -38,7 +38,7 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 
@@ -59,7 +59,6 @@
 #include <deal.II/meshworker/loop.h>
 
 #include <iostream>
-#include <fstream>
 
 #include <deal.II/lac/constraint_matrix.h>
 
@@ -441,7 +440,7 @@ void RHSIntegrator<dim>::face(MeshWorker::DoFInfo<dim> &,
 /*
  * Main class
  */
-template<int dim>
+template <int dim>
 class MeshWorkerConstraintMatrixTest
 {
 public:
@@ -476,7 +475,7 @@ private:
 };
 
 
-template<int dim>
+template <int dim>
 MeshWorkerConstraintMatrixTest<dim>::MeshWorkerConstraintMatrixTest(const FiniteElement<dim> &fe) :
   mapping(),
   dof_handler(triangulation),
@@ -499,7 +498,7 @@ MeshWorkerConstraintMatrixTest<dim>::~MeshWorkerConstraintMatrixTest ()
 }
 
 
-template<int dim>
+template <int dim>
 void MeshWorkerConstraintMatrixTest<dim>::setup_system()
 {
   dof_handler.distribute_dofs(fe);
@@ -534,7 +533,7 @@ void MeshWorkerConstraintMatrixTest<dim>::setup_system()
 /*
  * Assemble with SystemSimple
  */
-template<int dim>
+template <int dim>
 void MeshWorkerConstraintMatrixTest<dim>::assemble_system_MeshWorker()
 {
 
@@ -567,7 +566,7 @@ void MeshWorkerConstraintMatrixTest<dim>::assemble_system_MeshWorker()
 /*
  * Assemble matrix and vector seperately
  */
-template<int dim>
+template <int dim>
 void MeshWorkerConstraintMatrixTest<dim>::assemble_MeshWorker()
 {
 
@@ -634,7 +633,7 @@ void MeshWorkerConstraintMatrixTest<dim>::createInhomConstraints()
 }
 
 
-template<int dim>
+template <int dim>
 void MeshWorkerConstraintMatrixTest<dim>::run()
 {
   setup_system();
@@ -673,7 +672,6 @@ void MeshWorkerConstraintMatrixTest<dim>::run()
 int main()
 {
   initlog();
-  deallog.threshold_double(1.e-10);
 
   FE_Q<2> fe(1);
   deallog.push(fe.get_name());

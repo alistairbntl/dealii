@@ -19,7 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/grid_generator.h>
@@ -46,8 +45,6 @@
 #include <deal.II/lac/precondition.h>
 
 #include <deal.II/numerics/data_out.h>
-#include <fstream>
-#include <iomanip>
 
 std::ofstream logfile("output");
 
@@ -171,7 +168,7 @@ void LaplaceProblem::assemble_system ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<2>(),
+                                            Functions::ZeroFunction<2>(),
                                             boundary_values);
   MatrixTools::apply_boundary_values (boundary_values,
                                       system_matrix,
@@ -220,7 +217,6 @@ int main ()
   logfile << std::setprecision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   LaplaceProblem laplace_problem;
   laplace_problem.run ();

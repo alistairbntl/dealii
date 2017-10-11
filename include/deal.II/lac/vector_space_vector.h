@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 - 2016 by the deal.II authors
+// Copyright (C) 2015 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,21 +13,24 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__vector_space_vector_h
-#define dealii__vector_space_vector_h
+#ifndef dealii_vector_space_vector_h
+#define dealii_vector_space_vector_h
 
 #include <deal.II/base/config.h>
-#include <deal.II/base/mpi.h>
 #include <deal.II/base/numbers.h>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
 #include <deal.II/lac/vector.h>
+
+#include <memory>
 
 
 DEAL_II_NAMESPACE_OPEN
 
-class CommunicationPatternBase;
 class IndexSet;
-template <typename Number> class ReadWriteVector;
+namespace LinearAlgebra
+{
+  class CommunicationPatternBase;
+  template <typename Number> class ReadWriteVector;
+}
 
 namespace LinearAlgebra
 {
@@ -52,6 +55,18 @@ namespace LinearAlgebra
     typedef types::global_dof_index                           size_type;
     typedef typename numbers::NumberTraits<Number>::real_type real_type;
 
+    /**
+     * Change the dimension to that of the vector V. The elements of V are not
+     * copied.
+     */
+    virtual void reinit(const VectorSpaceVector<Number> &V,
+                        const bool omit_zeroing_entries = false) = 0;
+
+    /**
+     * Sets all elements of the vector to the scalar @p s. This operation is
+     * only allowed if @p s is equal to zero.
+     */
+    virtual VectorSpaceVector<Number> &operator= (const Number s) = 0;
 
     /**
      * Multiply the entire vector by a fixed factor.
@@ -83,8 +98,8 @@ namespace LinearAlgebra
      */
     virtual void import(const ReadWriteVector<Number> &V,
                         VectorOperation::values operation,
-                        std_cxx11::shared_ptr<const CommunicationPatternBase> communication_pattern =
-                          std_cxx11::shared_ptr<const CommunicationPatternBase> ()) = 0;
+                        std::shared_ptr<const CommunicationPatternBase> communication_pattern =
+                          std::shared_ptr<const CommunicationPatternBase> ()) = 0;
 
     /**
      * Return the scalar product of two vectors.
@@ -117,14 +132,24 @@ namespace LinearAlgebra
     /**
      * Scale each element of this vector by the corresponding element in the
      * argument. This function is mostly meant to simulate multiplication (and
-     * immediate re-assignement) by a diagonal scaling matrix.
+     * immediate re-assignment) by a diagonal scaling matrix.
      */
     virtual void scale(const VectorSpaceVector<Number> &scaling_factors) = 0;
 
     /**
-     * Assignement <tt>*this = a*V</tt>.
+     * Assignment <tt>*this = a*V</tt>.
      */
     virtual void equ(const Number a, const VectorSpaceVector<Number> &V) = 0;
+
+    /**
+     * Return whether the vector contains only elements with value zero.
+     */
+    virtual bool all_zero() const = 0;
+
+    /**
+     * Return the mean value of all the entries of this vector.
+     */
+    virtual value_type mean_value() const = 0;
 
     /**
      * Return the l<sub>1</sub> norm of the vector (i.e., the sum of the
@@ -165,6 +190,11 @@ namespace LinearAlgebra
                                const VectorSpaceVector<Number> &W) = 0;
 
     /**
+     * This function does nothing and only exists for backward compatibility.
+     */
+    virtual void compress(VectorOperation::values) {}
+
+    /**
      * Return the global size of the vector, equal to the sum of the number of
      * locally owned indices among all processors.
      */
@@ -195,6 +225,12 @@ namespace LinearAlgebra
      * Return the memory consumption of this class in bytes.
      */
     virtual std::size_t memory_consumption() const = 0;
+
+    /**
+     * Destructor. Declared as virtual so that inheriting classes (which may
+     * manage their own memory) are destroyed correctly.
+     */
+    virtual ~VectorSpaceVector() = default;
   };
   /*@}*/
 }

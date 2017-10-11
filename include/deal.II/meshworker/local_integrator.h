@@ -14,13 +14,13 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__mesh_worker_local_integrator_h
-#define dealii__mesh_worker_local_integrator_h
+#ifndef dealii_mesh_worker_local_integrator_h
+#define dealii_mesh_worker_local_integrator_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/subscriptor.h>
-#include <deal.II/base/std_cxx11/function.h>
 
+#include <functional>
 #include <vector>
 #include <string>
 
@@ -66,7 +66,7 @@ namespace MeshWorker
     /**
      * The empty virtual destructor.
      */
-    ~LocalIntegrator();
+    virtual ~LocalIntegrator() = default;
 
     /**
      * Virtual function for integrating on cells. Throws exception

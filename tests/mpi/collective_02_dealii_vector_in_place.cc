@@ -18,10 +18,8 @@
 // check Utilities::MPI::sum() for dealii::Vector, but with input=output
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
-#include <fstream>
 
 void test()
 {
@@ -72,9 +70,7 @@ int main(int argc, char *argv[])
 
   if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("mpi");
       test();

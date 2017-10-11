@@ -21,13 +21,11 @@
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/grid_generator.h>
-#include <fstream>
-#include <iomanip>
 
 #define PRECISION 5
 
 
-template<int dim>
+template <int dim>
 void create_triangulation(const unsigned int,
                           Triangulation<dim> &)
 {
@@ -35,7 +33,7 @@ void create_triangulation(const unsigned int,
 }
 
 
-template<>
+template <>
 void create_triangulation(const unsigned int case_no,
                           Triangulation<2> &tria)
 {
@@ -61,7 +59,7 @@ void create_triangulation(const unsigned int case_no,
 }
 
 
-template<>
+template <>
 void create_triangulation(const unsigned int case_no,
                           Triangulation<3> &tria)
 {
@@ -83,7 +81,7 @@ void create_triangulation(const unsigned int case_no,
 }
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   Triangulation<dim> tria;
@@ -106,7 +104,6 @@ int main()
   std::ofstream logfile ("output");
   deallog << std::setprecision (PRECISION);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<2>();
   test<3>();

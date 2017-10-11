@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__convergence_table_h
-#define dealii__convergence_table_h
+#ifndef dealii_convergence_table_h
+#define dealii_convergence_table_h
 
 
 #include <deal.II/base/config.h>
@@ -65,7 +65,7 @@ public:
   /**
    * Constructor.
    */
-  ConvergenceTable();
+  ConvergenceTable() = default;
 
   /**
    * Rate in relation to the rows.
@@ -204,11 +204,6 @@ public:
    * @addtogroup Exceptions
    * @{
    */
-
-  /**
-   * Exception
-   */
-  DeclException0 (ExcWrongValueType);
 
   /**
    * Exception

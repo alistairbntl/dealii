@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2016 by the deal.II authors
+// Copyright (C) 2002 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,6 +24,8 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
+
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -38,7 +40,6 @@ FE_DGPNonparametric<dim,spacedim>::FE_DGPNonparametric (const unsigned int degre
     std::vector<ComponentMask>(
       FiniteElementData<dim>(get_dpo_vector(degree),1, degree).dofs_per_cell,
       std::vector<bool>(1,true))),
-  degree(degree),
   polynomial_space (Polynomials::Legendre::generate_complete_basis(degree))
 {
   const unsigned int n_dofs = this->dofs_per_cell;
@@ -98,7 +99,7 @@ std::string
 FE_DGPNonparametric<dim,spacedim>::get_name () const
 {
   // note that the
-  // FETools::get_fe_from_name
+  // FETools::get_fe_by_name
   // function depends on the
   // particular format of the string
   // this function returns, so they
@@ -107,7 +108,7 @@ FE_DGPNonparametric<dim,spacedim>::get_name () const
   std::ostringstream namebuf;
   namebuf << "FE_DGPNonparametric<"
           << Utilities::dim_string(dim,spacedim)
-          << ">(" << degree << ")";
+          << ">(" << this->degree << ")";
 
   return namebuf.str();
 }
@@ -115,10 +116,10 @@ FE_DGPNonparametric<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_DGPNonparametric<dim,spacedim>::clone() const
 {
-  return new FE_DGPNonparametric<dim,spacedim>(*this);
+  return std_cxx14::make_unique<FE_DGPNonparametric<dim,spacedim>>(*this);
 }
 
 
@@ -282,7 +283,7 @@ template <int dim, int spacedim>
 void
 FE_DGPNonparametric<dim,spacedim>::
 fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
-                const CellSimilarity::Similarity                                     ,
+                const CellSimilarity::Similarity,
                 const Quadrature<dim> &,
                 const Mapping<dim,spacedim> &,
                 const typename Mapping<dim,spacedim>::InternalDataBase &,
@@ -294,9 +295,9 @@ fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
 
   const unsigned int n_q_points = mapping_data.quadrature_points.size();
 
-  std::vector<double> values(fe_internal.update_each & update_values ? this->dofs_per_cell : 0);
-  std::vector<Tensor<1,dim> > grads(fe_internal.update_each & update_gradients ? this->dofs_per_cell : 0);
-  std::vector<Tensor<2,dim> > grad_grads(fe_internal.update_each & update_hessians ? this->dofs_per_cell : 0);
+  std::vector<double> values((fe_internal.update_each & update_values) ? this->dofs_per_cell : 0);
+  std::vector<Tensor<1,dim> > grads((fe_internal.update_each & update_gradients) ? this->dofs_per_cell : 0);
+  std::vector<Tensor<2,dim> > grad_grads((fe_internal.update_each & update_hessians) ? this->dofs_per_cell : 0);
   std::vector<Tensor<3,dim> > empty_vector_of_3rd_order_tensors;
   std::vector<Tensor<4,dim> > empty_vector_of_4th_order_tensors;
 
@@ -328,7 +329,7 @@ template <int dim, int spacedim>
 void
 FE_DGPNonparametric<dim,spacedim>::
 fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
-                     const unsigned int                                                   ,
+                     const unsigned int,
                      const Quadrature<dim-1>                                             &,
                      const Mapping<dim,spacedim> &,
                      const typename Mapping<dim,spacedim>::InternalDataBase &,
@@ -340,9 +341,9 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &
 
   const unsigned int n_q_points = mapping_data.quadrature_points.size();
 
-  std::vector<double> values(fe_internal.update_each & update_values ? this->dofs_per_cell : 0);
-  std::vector<Tensor<1,dim> > grads(fe_internal.update_each & update_gradients ? this->dofs_per_cell : 0);
-  std::vector<Tensor<2,dim> > grad_grads(fe_internal.update_each & update_hessians ? this->dofs_per_cell : 0);
+  std::vector<double> values((fe_internal.update_each & update_values) ? this->dofs_per_cell : 0);
+  std::vector<Tensor<1,dim> > grads((fe_internal.update_each & update_gradients) ? this->dofs_per_cell : 0);
+  std::vector<Tensor<2,dim> > grad_grads((fe_internal.update_each & update_hessians) ? this->dofs_per_cell : 0);
   std::vector<Tensor<3,dim> > empty_vector_of_3rd_order_tensors;
   std::vector<Tensor<4,dim> > empty_vector_of_4th_order_tensors;
 
@@ -374,8 +375,8 @@ template <int dim, int spacedim>
 void
 FE_DGPNonparametric<dim,spacedim>::
 fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
-                        const unsigned int                                                   ,
-                        const unsigned int                                                   ,
+                        const unsigned int,
+                        const unsigned int,
                         const Quadrature<dim-1>                                             &,
                         const Mapping<dim,spacedim> &,
                         const typename Mapping<dim,spacedim>::InternalDataBase &,
@@ -387,9 +388,9 @@ fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterato
 
   const unsigned int n_q_points = mapping_data.quadrature_points.size();
 
-  std::vector<double> values(fe_internal.update_each & update_values ? this->dofs_per_cell : 0);
-  std::vector<Tensor<1,dim> > grads(fe_internal.update_each & update_gradients ? this->dofs_per_cell : 0);
-  std::vector<Tensor<2,dim> > grad_grads(fe_internal.update_each & update_hessians ? this->dofs_per_cell : 0);
+  std::vector<double> values((fe_internal.update_each & update_values) ? this->dofs_per_cell : 0);
+  std::vector<Tensor<1,dim> > grads((fe_internal.update_each & update_gradients) ? this->dofs_per_cell : 0);
+  std::vector<Tensor<2,dim> > grad_grads((fe_internal.update_each & update_hessians) ? this->dofs_per_cell : 0);
   std::vector<Tensor<3,dim> > empty_vector_of_3rd_order_tensors;
   std::vector<Tensor<4,dim> > empty_vector_of_4th_order_tensors;
 
@@ -433,7 +434,7 @@ get_face_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe,
   typedef              FiniteElement<dim,spacedim> FEE;
   AssertThrow ((x_source_fe.get_name().find ("FE_DGPNonparametric<") == 0)
                ||
-               (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&x_source_fe) != 0),
+               (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&x_source_fe) != nullptr),
                typename FEE::
                ExcInterpolationNotImplemented());
 
@@ -451,7 +452,7 @@ template <int dim, int spacedim>
 void
 FE_DGPNonparametric<dim,spacedim>::
 get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe,
-                                  const unsigned int ,
+                                  const unsigned int,
                                   FullMatrix<double>           &interpolation_matrix) const
 {
   // this is only implemented, if the source
@@ -464,7 +465,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe
   typedef              FiniteElement<dim,spacedim> FEE;
   AssertThrow ((x_source_fe.get_name().find ("FE_DGPNonparametric<") == 0)
                ||
-               (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&x_source_fe) != 0),
+               (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&x_source_fe) != nullptr),
                typename FEE::
                ExcInterpolationNotImplemented());
 
@@ -494,7 +495,7 @@ hp_vertex_dof_identities (const FiniteElement<dim,spacedim> &fe_other) const
 {
   // there are no such constraints for DGPNonparametric
   // elements at all
-  if (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&fe_other) != nullptr)
     return
       std::vector<std::pair<unsigned int, unsigned int> > ();
   else
@@ -513,7 +514,7 @@ hp_line_dof_identities (const FiniteElement<dim,spacedim> &fe_other) const
 {
   // there are no such constraints for DGPNonparametric
   // elements at all
-  if (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&fe_other) != nullptr)
     return
       std::vector<std::pair<unsigned int, unsigned int> > ();
   else
@@ -532,7 +533,7 @@ hp_quad_dof_identities (const FiniteElement<dim,spacedim>        &fe_other) cons
 {
   // there are no such constraints for DGPNonparametric
   // elements at all
-  if (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&fe_other) != nullptr)
     return
       std::vector<std::pair<unsigned int, unsigned int> > ();
   else
@@ -552,7 +553,7 @@ compare_for_face_domination (const FiniteElement<dim,spacedim> &fe_other) const
   // check whether both are discontinuous
   // elements, see the description of
   // FiniteElementDomination::Domination
-  if (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_DGPNonparametric<dim,spacedim>*>(&fe_other) != nullptr)
     return FiniteElementDomination::no_requirements;
 
   Assert (false, ExcNotImplemented());
@@ -585,7 +586,7 @@ template <int dim, int spacedim>
 unsigned int
 FE_DGPNonparametric<dim,spacedim>::get_degree () const
 {
-  return degree;
+  return this->degree;
 }
 
 

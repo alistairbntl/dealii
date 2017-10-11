@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2009 - 2015 by the deal.II authors
+ * Copyright (C) 2009 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -21,7 +21,12 @@
 // @sect3{Include files}
 
 // We start with a bunch of include files that have already been explained in
-// previous tutorial programs:
+// previous tutorial programs. One new one is <code>timer.h</code>: This is
+// the first example program that uses the Timer class. The Timer keeps track
+// of both the elapsed wall clock time (that is, the amount of time that a
+// clock mounted on the wall would measure) and CPU clock time (the amount of
+// time that the current process uses on the CPUs). We will use a Timer below
+// to measure how much CPU time each grid refinement cycle takes.
 #include <deal.II/base/timer.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
@@ -73,6 +78,10 @@
 // (as discussed in the introduction) which is defined in the following header
 // file:
 #include <deal.II/grid/grid_tools.h>
+
+// We use a little utility class from boost to save the state of an output
+// stream (see the <code>run</code> function below):
+#include <boost/io/ios_state.hpp>
 
 // Here are two more C++ standard headers that we use to define list data
 // types as well as to fine-tune the output we generate:
@@ -168,7 +177,7 @@ namespace Step28
     sigma_s (n_materials, n_groups, n_groups),
     chi (n_materials, n_groups)
   {
-    switch (n_groups)
+    switch (this->n_groups)
       {
       case 2:
       {
@@ -640,7 +649,7 @@ namespace Step28
     for (unsigned int i=0; i<dim; ++i)
       VectorTools::interpolate_boundary_values (dof_handler,
                                                 2*i+1,
-                                                ZeroFunction<dim>(),
+                                                Functions::ZeroFunction<dim>(),
                                                 boundary_values);
   }
 
@@ -1308,7 +1317,8 @@ namespace Step28
     :
     parameters (parameters),
     material_data (parameters.n_groups),
-    fe (parameters.fe_degree)
+    fe (parameters.fe_degree),
+    k_eff (std::numeric_limits<double>::quiet_NaN())
   {}
 
 
@@ -1623,15 +1633,27 @@ namespace Step28
   template <int dim>
   void NeutronDiffusionProblem<dim>::run ()
   {
+    // We would like to change the output precision for just this function and
+    // restore the state of <code>std::cout</code> when this function returns.
+    // Hence, we need a way to undo the output format change. Boost provides a
+    // convenient way to save the state of an output stream and restore it at
+    // the end of the current block (when the destructor of
+    // <code>restore_flags</code> is called) with the
+    // <code>ios_flags_saver</code> class, which we use here.
+    boost::io::ios_flags_saver restore_flags(std::cout);
     std::cout << std::setprecision (12) << std::fixed;
 
     double k_eff_old = k_eff;
 
-    Timer timer;
-    timer.start ();
-
     for (unsigned int cycle=0; cycle<parameters.n_refinement_cycles; ++cycle)
       {
+        // We will measure the CPU time that each cycle takes below. The
+        // constructor for Timer calls Timer::start(), so once we create a
+        // timer we can query it for information. Since we use a thread pool
+        // to assemble the system matrices, the CPU time we measure (if we run
+        // with more than one thread) will be larger than the wall time.
+        Timer timer;
+
         std::cout << "Cycle " << cycle << ':' << std::endl;
 
         if (cycle == 0)
@@ -1674,7 +1696,7 @@ namespace Step28
           {
             for (unsigned int group=0; group<parameters.n_groups; ++group)
               {
-                energy_groups[group]->assemble_ingroup_rhs (ZeroFunction<dim>());
+                energy_groups[group]->assemble_ingroup_rhs (Functions::ZeroFunction<dim>());
 
                 for (unsigned int bgroup=0; bgroup<parameters.n_groups; ++bgroup)
                   energy_groups[group]->assemble_cross_group_rhs (*energy_groups[bgroup]);
@@ -1704,11 +1726,15 @@ namespace Step28
         for (unsigned int group=0; group<parameters.n_groups; ++group)
           energy_groups[group]->output_results (cycle);
 
+        // Print out information about the simulation as well as the elapsed
+        // CPU time. We can call Timer::cpu_time() without first calling
+        // Timer::stop() to get the elapsed CPU time at the point of calling
+        // the function.
         std::cout << std::endl;
         std::cout << "   Cycle=" << cycle
                   << ", n_dofs=" << energy_groups[0]->n_dofs() + energy_groups[1]->n_dofs()
                   << ",  k_eff=" << k_eff
-                  << ", time=" << timer()
+                  << ", time=" << timer.cpu_time()
                   << std::endl;
 
 
@@ -1756,7 +1782,7 @@ int main (int argc, char **argv)
       NeutronDiffusionProblem<dim>::Parameters parameters;
       parameters.declare_parameters (parameter_handler);
 
-      parameter_handler.read_input (filename);
+      parameter_handler.parse_input (filename);
 
       parameters.get_parameters (parameter_handler);
 

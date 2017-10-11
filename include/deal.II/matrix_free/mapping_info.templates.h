@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,6 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_matrix_free_mapping_info_templates_h
+#define dealii_matrix_free_mapping_info_templates_h
 
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/memory_consumption.h>
@@ -240,12 +242,12 @@ namespace internal
           // hp::DoFHandler<dim>::active_cell_iterator, we need to manually
           // select the correct finite element, so just hold a vector of
           // FEValues
-          std::vector<std_cxx11::shared_ptr<dealii::FEValues<dim> > >
+          std::vector<std::shared_ptr<dealii::FEValues<dim> > >
           fe_values (current_data.quadrature.size());
           UpdateFlags update_flags_feval =
-            (update_flags & update_inverse_jacobians ? update_jacobians : update_default) |
-            (update_flags & update_jacobian_grads ? update_jacobian_grads : update_default) |
-            (update_flags & update_quadrature_points ? update_quadrature_points : update_default);
+            ((update_flags & update_inverse_jacobians) ? update_jacobians : update_default) |
+            ((update_flags & update_jacobian_grads) ? update_jacobian_grads : update_default) |
+            ((update_flags & update_quadrature_points) ? update_quadrature_points : update_default);
 
           // resize the fields that have fixed size or for which we know
           // something from an earlier loop
@@ -288,7 +290,7 @@ namespace internal
               const unsigned int fe_index = active_fe_index.size() > 0 ?
                                             active_fe_index[cell] : 0;
               const unsigned int n_q_points = current_data.n_q_points[fe_index];
-              if (fe_values[fe_index].get() == 0)
+              if (fe_values[fe_index].get() == nullptr)
                 fe_values[fe_index].reset
                 (new dealii::FEValues<dim> (mapping, dummy_fe,
                                             current_data.quadrature[fe_index],
@@ -389,9 +391,10 @@ namespace internal
                           if (update_flags & update_JxW_values)
                             current_data.JxW_values.reserve (reserve_size);
                           if (update_flags & update_jacobian_grads)
-                            current_data.jacobians_grad_diag.reserve (reserve_size);
-                          if (update_flags & update_jacobian_grads)
-                            current_data.jacobians_grad_upper.reserve (reserve_size);
+                            {
+                              current_data.jacobians_grad_diag.reserve (reserve_size);
+                              current_data.jacobians_grad_upper.reserve (reserve_size);
+                            }
                         }
                     }
 
@@ -600,7 +603,7 @@ namespace internal
 
 
 
-    template<int dim, typename Number>
+    template <int dim, typename Number>
     void
     MappingInfo<dim,Number>::evaluate_on_cell (const dealii::Triangulation<dim> &tria,
                                                const std::pair<unsigned int,unsigned int> *cells,
@@ -865,8 +868,9 @@ namespace internal
       // disable the check here only if no processor has any such data
 #ifdef DEAL_II_WITH_MPI
       unsigned int general_size_glob = 0, general_size_loc = jacobians.size();
-      MPI_Allreduce (&general_size_loc, &general_size_glob, 1, MPI_UNSIGNED,
-                     MPI_MAX, size_info.communicator);
+      int ierr = MPI_Allreduce (&general_size_loc, &general_size_glob, 1,
+                                MPI_UNSIGNED, MPI_MAX, size_info.communicator);
+      AssertThrowMPI (ierr);
 #else
       unsigned int general_size_glob = jacobians.size();
 #endif
@@ -884,8 +888,9 @@ namespace internal
 
 #ifdef DEAL_II_WITH_MPI
       unsigned int quad_size_glob = 0, quad_size_loc = quadrature_points.size();
-      MPI_Allreduce (&quad_size_loc, &quad_size_glob, 1, MPI_UNSIGNED,
-                     MPI_MAX, size_info.communicator);
+      ierr = MPI_Allreduce (&quad_size_loc, &quad_size_glob, 1, MPI_UNSIGNED,
+                            MPI_MAX, size_info.communicator);
+      AssertThrowMPI (ierr);
 #else
       unsigned int quad_size_glob = quadrature_points.size();
 #endif
@@ -922,5 +927,6 @@ namespace internal
   } // end of namespace MatrixFreeFunctions
 } // end of namespace internal
 
-
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

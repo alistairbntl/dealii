@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,7 +22,6 @@
 //   FE_FaceQ/FaceP/TraceQ::face_interpolation
 
 
-std::string output_file_name = "output";
 
 
 void
@@ -173,10 +172,9 @@ main()
 {
   try
     {
-      std::ofstream logfile(output_file_name.c_str());
+      std::ofstream logfile("output");
       deallog << std::setprecision (6);
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       check<1>();
       check<2>();

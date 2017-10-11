@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,19 +13,23 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_error_estimator_templates_h
+#define dealii_error_estimator_templates_h
+
 #include <deal.II/base/numbers.h>
 #include <deal.II/base/thread_management.h>
 #include <deal.II/base/quadrature.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/lac/vector.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/base/geometry_info.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -40,32 +44,14 @@
 #include <deal.II/numerics/error_estimator.h>
 #include <deal.II/distributed/tria.h>
 
-#include <deal.II/base/std_cxx11/bind.h>
 
 #include <numeric>
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include <functional>
 
 DEAL_II_NAMESPACE_OPEN
-
-
-namespace
-{
-  template <typename CellIterator>
-  inline
-  void advance_by_n (CellIterator &cell,
-                     const unsigned int n)
-  {
-    // store a pointer to the end iterator, since we can't get at it any more
-    // once cell is already the end iterator (in that case dereferencing
-    // cell-> triggers an assertion)
-    const CellIterator endc = cell->get_dof_handler().end();
-    for (unsigned int t=0; ((t<n) && (cell!=endc)); ++t, ++cell)
-      ;
-  }
-}
-
 
 namespace internal
 {
@@ -83,14 +69,14 @@ namespace internal
      * which we found can take a significant amount of time if it happens
      * often even in the single threaded case (10-20 per cent in our
      * measurements); however, most importantly, memory allocation requires
-     * synchronisation in multithreaded mode. While that is done by the C++
+     * synchronization in multithreaded mode. While that is done by the C++
      * library and has not to be handcoded, it nevertheless seriously damages
      * the ability to efficiently run the functions of this class in parallel,
-     * since they are quite often blocked by these synchronisation points,
+     * since they are quite often blocked by these synchronization points,
      * slowing everything down by a factor of two or three.
      *
      * Thus, every thread gets an instance of this class to work with and
-     * needs not allocate memory itself, or synchronise with other threads.
+     * needs not allocate memory itself, or synchronize with other threads.
      *
      * The sizes of the arrays are initialized with the maximal number of
      * entries necessary for the hp case. Within the loop over individual
@@ -127,7 +113,7 @@ namespace internal
        * points for each of the solution vectors (i.e. a temporary value).
        * This vector is not allocated inside the functions that use it, but
        * rather globally, since memory allocation is slow, in particular in
-       * presence of multiple threads where synchronisation makes things even
+       * presence of multiple threads where synchronization makes things even
        * slower.
        */
       std::vector<std::vector<std::vector<number> > > phi;
@@ -199,7 +185,7 @@ namespace internal
                     const types::subdomain_id subdomain_id,
                     const types::material_id material_id,
                     const typename FunctionMap<spacedim>::type *neumann_bc,
-                    const ComponentMask                component_mask,
+                    const ComponentMask                &component_mask,
                     const Function<spacedim>                   *coefficients);
 
       /**
@@ -223,7 +209,7 @@ namespace internal
      const types::subdomain_id                           subdomain_id,
      const types::material_id                            material_id,
      const typename FunctionMap<spacedim>::type         *neumann_bc,
-     const ComponentMask                                 component_mask,
+     const ComponentMask                                 &component_mask,
      const Function<spacedim>                           *coefficients)
       :
       finite_element (fe),
@@ -391,7 +377,7 @@ namespace internal
 
       // if a coefficient was given: use that to scale the jump in the
       // gradient
-      if (parallel_data.coefficients != 0)
+      if (parallel_data.coefficients != nullptr)
         {
           // scalar coefficient
           if (parallel_data.coefficients->n_components == 1)
@@ -1094,7 +1080,7 @@ estimate (const Mapping<dim, spacedim>               &mapping,
 #ifdef DEAL_II_WITH_P4EST
   if (dynamic_cast<const parallel::distributed::Triangulation<dim,spacedim>*>
       (&dof_handler.get_triangulation())
-      != 0)
+      != nullptr)
     Assert ((subdomain_id_ == numbers::invalid_subdomain_id)
             ||
             (subdomain_id_ ==
@@ -1107,7 +1093,7 @@ estimate (const Mapping<dim, spacedim>               &mapping,
   const types::subdomain_id subdomain_id
     = ((dynamic_cast<const parallel::distributed::Triangulation<dim,spacedim>*>
         (&dof_handler.get_triangulation())
-        != 0)
+        != nullptr)
        ?
        dynamic_cast<const parallel::distributed::Triangulation<dim,spacedim>&>
        (dof_handler.get_triangulation()).locally_owned_subdomain()
@@ -1118,7 +1104,7 @@ estimate (const Mapping<dim, spacedim>               &mapping,
     = subdomain_id_;
 #endif
 
-  const unsigned int n_components = dof_handler.get_fe().n_components();
+  const unsigned int n_components = dof_handler.get_fe(0).n_components();
   (void)n_components;
 
   // sanity checks
@@ -1139,7 +1125,7 @@ estimate (const Mapping<dim, spacedim>               &mapping,
   Assert (component_mask.n_selected_components(n_components) > 0,
           ExcInvalidComponentMask());
 
-  Assert ((coefficients == 0) ||
+  Assert ((coefficients == nullptr) ||
           (coefficients->n_components == n_components) ||
           (coefficients->n_components == 1),
           ExcInvalidCoefficient());
@@ -1161,10 +1147,10 @@ estimate (const Mapping<dim, spacedim>               &mapping,
   // gathered in the following structures
   const hp::MappingCollection<dim,spacedim> mapping_collection(mapping);
   const internal::ParallelData<DoFHandlerType,typename InputVector::value_type>
-  parallel_data (dof_handler.get_fe(),
+  parallel_data (dof_handler.get_fe_collection(),
                  face_quadratures,
                  mapping_collection,
-                 (!neumann_bc.empty() || (coefficients != 0)),
+                 (!neumann_bc.empty() || (coefficients != nullptr)),
                  solutions.size(),
                  subdomain_id,
                  material_id,
@@ -1176,10 +1162,10 @@ estimate (const Mapping<dim, spacedim>               &mapping,
   // now let's work on all those cells:
   WorkStream::run (dof_handler.begin_active(),
                    static_cast<typename DoFHandlerType::active_cell_iterator>(dof_handler.end()),
-                   std_cxx11::bind (&internal::estimate_one_cell<InputVector,DoFHandlerType>,
-                                    std_cxx11::_1, std_cxx11::_2, std_cxx11::_3, std_cxx11::ref(solutions),strategy),
-                   std_cxx11::bind (&internal::copy_local_to_global<DoFHandlerType>,
-                                    std_cxx11::_1, std_cxx11::ref(face_integrals)),
+                   std::bind (&internal::estimate_one_cell<InputVector,DoFHandlerType>,
+                              std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::ref(solutions),strategy),
+                   std::bind (&internal::copy_local_to_global<DoFHandlerType>,
+                              std::placeholders::_1, std::ref(face_integrals)),
                    parallel_data,
                    sample_local_face_integrals);
 
@@ -1307,3 +1293,5 @@ void KellyErrorEstimator<dim, spacedim>::estimate
 }
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

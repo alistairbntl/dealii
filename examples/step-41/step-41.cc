@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2011 - 2015 by the deal.II authors
+ * Copyright (C) 2011 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -130,7 +130,8 @@ namespace Step41
   double RightHandSide<dim>::value (const Point<dim> &,
                                     const unsigned int component) const
   {
-    Assert (component == 0, ExcNotImplemented());
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
 
     return -10;
   }
@@ -151,7 +152,8 @@ namespace Step41
   double BoundaryValues<dim>::value (const Point<dim> &,
                                      const unsigned int component) const
   {
-    Assert (component == 0, ExcNotImplemented());
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
 
     return 0;
   }
@@ -174,7 +176,8 @@ namespace Step41
   double Obstacle<dim>::value (const Point<dim> &p,
                                const unsigned int component) const
   {
-    Assert (component == 0, ExcNotImplemented());
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
 
     if (p (0) < -0.5)
       return -0.2;
@@ -436,7 +439,10 @@ namespace Step41
     TrilinosWrappers::MPI::Vector lambda (complete_index_set(dof_handler.n_dofs()));
     complete_system_matrix.residual (lambda,
                                      solution, complete_system_rhs);
-    contact_force.ratio (lambda, diagonal_of_mass_matrix);
+
+    // compute contact_force[i] = - lambda[i] * diagonal_of_mass_matrix[i]
+    contact_force = lambda;
+    contact_force.scale (diagonal_of_mass_matrix);
     contact_force *= -1;
 
     // The next step is to reset the active set and constraints objects and to

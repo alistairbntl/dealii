@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 
@@ -35,7 +34,6 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/fe/fe_dgq.h>
 
-#include <fstream>
 #include <vector>
 
 
@@ -76,7 +74,7 @@ void test ()
       cell->set_material_id(cell->index() % 128);
       if (functions.find(cell->index() % 128) == functions.end())
         functions[cell->index() % 128]
-          = new ConstantFunction<dim>(cell->index() % 128);
+          = new Functions::ConstantFunction<dim>(cell->index() % 128);
     }
 
   for (unsigned int p=1; p<7-dim; ++p)
@@ -101,6 +99,12 @@ void test ()
             AssertThrow (values[i] == cell->index() % 128, ExcInternalError());
         }
     }
+
+  for (typename std::map<types::material_id, const Function<dim>*>::iterator
+       p = functions.begin();
+       p != functions.end(); ++p)
+    delete p->second;
+
   deallog << "OK" << std::endl;
 }
 
@@ -112,7 +116,6 @@ int main ()
   deallog << std::setprecision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1>();
   test<2>();

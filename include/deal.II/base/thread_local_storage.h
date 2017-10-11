@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__thread_local_storage_h
-#define dealii__thread_local_storage_h
+#ifndef dealii_thread_local_storage_h
+#define dealii_thread_local_storage_h
 
 
 #include <deal.II/base/config.h>
@@ -74,7 +74,7 @@ namespace Threads
      * Default constructor. Initialize each thread local object using its
      * default constructor.
      */
-    ThreadLocalStorage ();
+    ThreadLocalStorage () = default;
 
     /**
      * A kind of copy constructor. Initialize each thread local object by
@@ -153,7 +153,7 @@ namespace Threads
     void clear ();
 
     /**
-     * Returns a reference to the internal Threading Building Blocks
+     * Return a reference to the internal Threading Building Blocks
      * implementation. This function is really only useful if deal.II has been
      * configured with multithreading and has no useful purpose otherwise.
      */
@@ -178,12 +178,6 @@ namespace Threads
   };
 
 // ----------------- inline and template functions ----------------------------
-
-  template <typename T>
-  inline
-  ThreadLocalStorage<T>::ThreadLocalStorage()
-  {}
-
 
   template <typename T>
   inline
@@ -267,6 +261,8 @@ namespace Threads
   {
 #ifdef DEAL_II_WITH_THREADS
     data.clear ();
+#else
+    data = T {};
 #endif
   }
 }   // end of implementation of namespace Threads
@@ -278,6 +274,6 @@ namespace Threads
 
 //---------------------------------------------------------------------------
 DEAL_II_NAMESPACE_CLOSE
-// end of #ifndef dealii__thread_local_storage_h
+// end of #ifndef dealii_thread_local_storage_h
 #endif
 //---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__swappable_vector_h
-#define dealii__swappable_vector_h
+#ifndef dealii_swappable_vector_h
+#define dealii_swappable_vector_h
 
 
 #include <deal.II/base/config.h>
@@ -49,6 +49,8 @@ DEAL_II_NAMESPACE_OPEN
  * section on
  * @ref Instantiations
  * in the manual).
+ *
+ * @deprecated The usage of this class is deprecated.
  *
  * @author Wolfgang Bangerth, 1999, 2000
  */
@@ -128,11 +130,14 @@ public:
   /**
    * Remove the file to which the data has been stored the last time. After
    * this, the object does not own any file any more, so of course you can't
-   * call @p reload no more.
+   * call @p reload again.
    *
    * If this object does not own a file, for example since @p swap_out was not
    * called, or because @p kill_file has been called previously, then this
    * function does nothing.
+   *
+   * This throws a ExcIO exception if, for any reason, deleting the file
+   * failed.
    */
   void kill_file ();
 
@@ -207,11 +212,11 @@ private:
    * to signal success itself if this is required.
    */
   void reload_vector (const bool set_flag);
-};
+} DEAL_II_DEPRECATED;
 
 /*@}*/
 /*----------------------------   swappable_vector.h     ---------------------------*/
-/* end of #ifndef dealii__swappable_vector_h */
+/* end of #ifndef dealii_swappable_vector_h */
 DEAL_II_NAMESPACE_CLOSE
 
 #endif

@@ -22,7 +22,6 @@
 #include <deal.II/base/function.h>
 #include <deal.II/matrix_free/matrix_free.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
@@ -183,7 +182,6 @@ int main ()
   deallog << std::setprecision (3);
 
   {
-    deallog.threshold_double(5.e-11);
     deallog.push("2d");
     test<2>();
     test_cube<2>();

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2016 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_system_h
-#define dealii__fe_system_h
+#ifndef dealii_fe_system_h
+#define dealii_fe_system_h
 
 
 /*----------------------------   fe_system.h     ---------------------------*/
@@ -23,10 +23,17 @@
 #include <deal.II/base/config.h>
 #include <deal.II/base/thread_management.h>
 #include <deal.II/fe/fe.h>
+#include <deal.II/fe/fe_tools.h>
+
 #include <vector>
+#include <memory>
 #include <utility>
+#include <type_traits>
+
 
 DEAL_II_NAMESPACE_OPEN
+
+template <int dim, int spacedim> class FE_Enriched;
 
 
 /**
@@ -34,7 +41,10 @@ DEAL_II_NAMESPACE_OPEN
  * one. To the outside world, the resulting object looks just like a usual
  * finite element object, which is composed of several other finite elements
  * that are possibly of different type. The result is then a vector-valued
- * finite element. %Vector valued elements are discussed in a number of
+ * finite element. An example is given in the documentation of namespace
+ * FETools::Compositing, when using the "tensor product" strategy.
+ *
+ * %Vector valued elements are discussed in a number of
  * tutorial programs, for example step-8, step-20, step-21, and in particular
  * in the
  * @ref vector_valued
@@ -266,8 +276,7 @@ public:
    *   {}
    * @endcode
    *
-   * If your compiler supports the C++11 language standard (or later) and
-   * deal.II has been configured to use it, then you could do something like
+   * Using the C++11 language standard (or later) you could do something like
    * this to create an element with four base elements and multiplicities 1,
    * 2, 3 and 4:
    * @code
@@ -286,7 +295,7 @@ public:
    *
    * This code has a problem: it creates four memory leaks because the first
    * vector above is created with pointers to elements that are allocated with
-   * <code>new</code> but never destroyed. Without C++11, you have another
+   * <code>new</code> but never destroyed. Without C++11, you would have another
    * problem: brace-initializer don't exist in earlier C++ standards.
    *
    * The solution to the second of these problems is to create two static
@@ -416,9 +425,80 @@ public:
             const std::vector<unsigned int>                   &multiplicities);
 
   /**
+   * Constructor taking an arbitrary number of parameters of type
+   * <code>std::pair<std::unique_ptr<FiniteElement<dim, spacedim>>, unsigned int></code>.
+   * In combination with FiniteElement::operator^, this allows to construct FESystem objects
+   * as follows:
+   * @code
+   *   FiniteElementType1<dim,spacedim> fe_1;
+   *   FiniteElementType1<dim,spacedim> fe_2;
+   *   FESystem<dim,spacedim> fe_system = ( fe_1^dim, fe_2^1 );
+   * @endcode
+   *
+   * The FiniteElement objects are not actually used for anything other than creating a
+   * copy that will then be owned by the current object. In other words, it is
+   * completely fine to call this constructor with a temporary object for the
+   * finite element, as in this code snippet:
+   * @code
+   *   FESystem<dim> fe (FE_Q<dim>(2)^2);
+   * @endcode
+   * Here, <code>FE_Q@<dim@>(2)</code> constructs an unnamed, temporary object
+   * that is passed to the FESystem constructor to create a finite element
+   * that consists of two components, both of which are quadratic FE_Q
+   * elements. The temporary is destroyed again at the end of the code that
+   * corresponds to this line, but this does not matter because FESystem
+   * creates its own copy of the FE_Q object.
+   *
+   * As a shortcut, this constructor also allows calling
+   * @code
+   *   FESystem<dim> fe (FE_Q<dim>(2)^dim, FE_Q<dim>(1));
+   * @endcode
+   * instead of the more explicit
+   * @code
+   *   FESystem<dim> fe (FE_Q<dim>(2)^dim, FE_Q<dim>(1)^1);
+   * @endcode
+   * In other words, if no multiplicity for an element is explicitly specified
+   * via the exponentiation operation, then it is assumed to be one (as one
+   * would have expected).
+   */
+  template <class... FEPairs,
+            typename = typename enable_if_all<
+              (std::is_same<typename std::decay<FEPairs>::type,
+                            std::pair<std::unique_ptr<FiniteElement<dim, spacedim>>, unsigned int>>::value
+               ||
+               std::is_base_of<FiniteElement<dim, spacedim>,
+                               typename std::decay<FEPairs>::type>::value)
+              ...
+              >::type
+            >
+  FESystem (FEPairs &&... fe_pairs);
+
+  /**
+   * Same as above allowing the following syntax:
+   * @code
+   *   FiniteElementType1<dim,spacedim> fe_1;
+   *   FiniteElementType1<dim,spacedim> fe_2;
+   *   FESystem<dim,spacedim> fe_system = { fe_1^dim, fe_2^1 };
+   * @endcode
+   */
+  FESystem (const std::initializer_list<std::pair<std::unique_ptr<FiniteElement<dim, spacedim>>,
+            unsigned int>> &fe_systems);
+
+  /**
+   * Copy constructor. This constructor is deleted, i.e., copying
+   * FESystem objects is not allowed.
+   */
+  FESystem (const FESystem<dim,spacedim> &) = delete;
+
+  /**
+   * Move constructor.
+   */
+  FESystem (FESystem<dim,spacedim> &&) = default;
+
+  /**
    * Destructor.
    */
-  virtual ~FESystem ();
+  virtual ~FESystem () = default;
 
   /**
    * Return a string that uniquely identifies a finite element. This element
@@ -431,6 +511,10 @@ public:
   virtual std::string get_name () const;
 
   // for documentation, see the FiniteElement base class
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
+
   virtual
   UpdateFlags
   requires_update_flags (const UpdateFlags update_flags) const;
@@ -683,7 +767,7 @@ public:
    * Code implementing this would then look like this:
    * @code
    * for (i=0; i<dofs_per_face; ++i)
-   *  if (fe.is_primitive(fe.face_to_equivalent_cell_index(i, some_face_no)))
+   *  if (fe.is_primitive(fe.face_to_cell_index(i, some_face_no)))
    *   ... do whatever
    * @endcode
    * The function takes additional arguments that account for the fact that
@@ -729,7 +813,7 @@ public:
   unit_face_support_point (const unsigned int index) const;
 
   /**
-   * Returns a list of constant modes of the element. The returns table has as
+   * Return a list of constant modes of the element. The returns table has as
    * many rows as there are components in the element and dofs_per_cell
    * columns. To each component of the finite element, the row in the returned
    * table contains a basis representation of the constant function 1 on the
@@ -826,14 +910,26 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
   FiniteElementDomination::Domination
   compare_for_face_domination (const FiniteElement<dim,spacedim> &fe_other) const;
   //@}
+
+  /**
+   * Implementation of the
+   * FiniteElement::convert_generalized_support_point_values_to_dof_values()
+   * function. The current function simply takes the input argument apart,
+   * passes the pieces to the base elements, and then re-assembles everything
+   * into the output argument.
+   */
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
 
   /**
    * Determine an estimate for the memory consumption (in bytes) of this
@@ -846,14 +942,6 @@ public:
   virtual std::size_t memory_consumption () const;
 
 protected:
-
-  /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim,spacedim> *clone() const;
-
 
   virtual typename FiniteElement<dim,spacedim>::InternalDataBase *
   get_data (const UpdateFlags                                                    update_flags,
@@ -944,36 +1032,25 @@ private:
    * This object contains a pointer to each contributing element of a mixed
    * discretization and its multiplicity. It is created by the constructor and
    * constant afterwards.
-   *
-   * The pointers are managed as shared pointers. This ensures that we can use
-   * the copy constructor of this class without having to manage cloning the
-   * elements themselves. Since finite element objects do not contain any
-   * state, this also allows multiple copies of an FESystem object to share
-   * pointers to the underlying base finite elements. The last one of these
-   * copies around will then delete the pointer to the base elements.
    */
-  std::vector<std::pair<std_cxx11::shared_ptr<const FiniteElement<dim,spacedim> >,
+  std::vector<std::pair<std::unique_ptr<const FiniteElement<dim,spacedim> >,
       unsigned int> >
       base_elements;
 
-
   /**
-   * Initialize the @p unit_support_points field of the FiniteElement class.
-   * Called from the constructor.
+   * An index table that maps generalized support points of a base element
+   * to the vector of generalized support points of the FE System.
+   * It holds true that
+   * @code
+   *   auto n = generalized_support_points_index_table[i][j];
+   *   generalized_support_points[n] ==
+   *           base_elements[i].generalized_support_points[j];
+   * @endcode
+   * for each base element (indexed by i) and each g. s. point of the base
+   * element (index by j).
    */
-  void initialize_unit_support_points ();
+  std::vector<std::vector<std::size_t>> generalized_support_points_index_table;
 
-  /**
-   * Initialize the @p unit_face_support_points field of the FiniteElement
-   * class. Called from the constructor.
-   */
-  void initialize_unit_face_support_points ();
-
-  /**
-   * Initialize the @p adjust_quad_dof_index_for_face_orientation_table field
-   * of the FiniteElement class. Called from the constructor.
-   */
-  void initialize_quad_dof_index_permutation ();
   /**
    * This function is simply singled out of the constructors since there are
    * several of them. It sets up the index table for the system as well as @p
@@ -981,16 +1058,6 @@ private:
    */
   void initialize (const std::vector<const FiniteElement<dim,spacedim>*> &fes,
                    const std::vector<unsigned int> &multiplicities);
-
-  /**
-   * Used by @p initialize.
-   */
-  void build_cell_tables();
-
-  /**
-   * Used by @p initialize.
-   */
-  void build_face_tables();
 
   /**
    * Used by @p initialize.
@@ -1078,11 +1145,96 @@ private:
    * Mutex for protecting initialization of restriction and embedding matrix.
    */
   mutable Threads::Mutex mutex;
+
+  friend class FE_Enriched<dim,spacedim>;
 };
 
+//------------------------variadic template constructor------------------------
+
+#ifndef DOXYGEN
+namespace
+{
+  template <int dim, int spacedim>
+  unsigned int count_nonzeros
+  (const std::initializer_list<std::pair<std::unique_ptr<FiniteElement<dim, spacedim>>,
+   unsigned int>> &fe_systems)
+  {
+    return std::count_if(fe_systems.begin(),
+                         fe_systems.end(),
+                         [](const std::pair<std::unique_ptr<FiniteElement<dim, spacedim>>,
+                            unsigned int> &fe_system)
+    {
+      return fe_system.second > 0;
+    });
+  }
+
+
+
+  template <int dim, int spacedim>
+  std::pair<std::unique_ptr<FiniteElement<dim, spacedim> >, unsigned int>
+  promote_to_fe_pair (const FiniteElement<dim,spacedim> &fe)
+  {
+    return std::make_pair<std::unique_ptr<FiniteElement<dim, spacedim> >,
+           unsigned int> (std::move(fe.clone()), 1u);
+  }
+
+
+
+  template <int dim, int spacedim>
+  auto
+  promote_to_fe_pair (std::pair<std::unique_ptr<FiniteElement<dim, spacedim> >, unsigned int> &&p)
+  -> decltype(std::forward<std::pair<std::unique_ptr<FiniteElement<dim, spacedim> >, unsigned int> >(p))
+  {
+    return std::forward<std::pair<std::unique_ptr<FiniteElement<dim, spacedim> >, unsigned int> >(p);
+  }
+}
+
+
+
+// We are just forwarding/delegating to the constructor taking a std::initializer_list.
+// If we decide to remove the deprecated constructors, we might just use the variadic
+// constructor with a suitable static_assert instead of the std::enable_if.
+template<int dim, int spacedim>
+template <class... FEPairs,
+          typename>
+FESystem<dim,spacedim>::FESystem (FEPairs &&... fe_pairs)
+  :
+  FESystem<dim, spacedim> ({promote_to_fe_pair<dim,spacedim>(std::forward<FEPairs>(fe_pairs))...})
+{}
+
+
+
+template <int dim, int spacedim>
+FESystem<dim,spacedim>::FESystem
+(const std::initializer_list<std::pair<std::unique_ptr<FiniteElement<dim, spacedim>>,
+ unsigned int>> &fe_systems)
+  :
+  FiniteElement<dim,spacedim>
+  (FETools::Compositing::multiply_dof_numbers<dim,spacedim>(fe_systems),
+   FETools::Compositing::compute_restriction_is_additive_flags<dim,spacedim> (fe_systems),
+   FETools::Compositing::compute_nonzero_components<dim,spacedim>(fe_systems)),
+  base_elements(count_nonzeros(fe_systems))
+{
+  std::vector<const FiniteElement<dim,spacedim>*> fes;
+  std::vector<unsigned int> multiplicities;
+
+  const auto extract
+    = [&fes, &multiplicities]
+      (const std::pair<std::unique_ptr<FiniteElement<dim, spacedim>>, unsigned int> &fe_system)
+  {
+    fes.push_back(fe_system.first.get());
+    multiplicities.push_back(fe_system.second);
+  };
+
+  for (const auto &p : fe_systems)
+    extract (p);
+
+  initialize(fes, multiplicities);
+}
+
+#endif //DOXYGEN
 
 DEAL_II_NAMESPACE_CLOSE
 
-/*----------------------------  fe_system.h  ---------------------------*/
 #endif
 /*----------------------------  fe_system.h  ---------------------------*/

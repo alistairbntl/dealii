@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2007 - 2015 by the deal.II authors
+// Copyright (C) 2007 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,10 +17,8 @@
 // Test if block indices are handled properly
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/block_indices.h>
 
-#include <fstream>
 
 
 void test (const BlockIndices &idx)
@@ -55,8 +53,7 @@ void test (const BlockIndices &idx)
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   BlockIndices bi0;
   deallog << "empty: " << bi0 << std::endl;

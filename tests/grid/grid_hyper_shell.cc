@@ -26,18 +26,13 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_tools.h>
-#include <deal.II/base/logstream.h>
-#include <cmath>
-#include <cstdlib>
 
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 
 std::ofstream logfile("output");
 
 
-template<int dim>
+template <int dim>
 void check (double r1, double r2, unsigned int n)
 {
   deallog << "dim=" << dim << std::endl;
@@ -91,7 +86,6 @@ int main()
 {
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check<2> (4., 5., 10);
   check<3> (3., 5., 6);

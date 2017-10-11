@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,15 +20,14 @@
 // and makes sure nobody writes into it at undue times
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
+#include <atomic>
 #include <unistd.h>
 
 #include <deal.II/base/thread_management.h>
 
 
 Threads::Mutex mutex;
-volatile int spin_lock = 0;
+static std::atomic<int> spin_lock(0);
 
 
 int worker ()
@@ -49,9 +48,7 @@ int worker ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   mutex.acquire ();
   {
@@ -73,4 +70,6 @@ int main()
 
   for (unsigned int i=0; i<sz; ++i)
     AssertThrow (p[i] == 0, ExcInternalError());
+
+  delete[] p;
 }

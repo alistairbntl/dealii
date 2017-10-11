@@ -19,7 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -33,12 +32,10 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_dgq.h>
 
-#include <fstream>
 #include <numeric>
-#include <cstdlib>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   parallel::distributed::Triangulation<dim>
@@ -74,19 +71,12 @@ void test()
 
 int main(int argc, char *argv[])
 {
-#ifdef DEAL_II_WITH_MPI
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, 1);
-#else
-  (void)argc;
-  (void)argv;
-#endif
 
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

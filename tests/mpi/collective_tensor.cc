@@ -18,10 +18,8 @@
 // check Utilities::MPI::sum() for tensor objects
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/symmetric_tensor.h>
-#include <fstream>
 
 void test()
 {
@@ -106,9 +104,7 @@ int main(int argc, char *argv[])
 
   if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("mpi");
       test();

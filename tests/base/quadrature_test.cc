@@ -21,13 +21,9 @@
 
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/qprojector.h>
-#include <cmath>
 
 template <int dim>
 void
@@ -193,9 +189,7 @@ check_faces (const std::vector<Quadrature<dim-1>*>& quadratures, const bool sub)
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   std::vector<Quadrature<1> *> q1;
   std::vector<Quadrature<2> *> q2;

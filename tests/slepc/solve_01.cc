@@ -20,22 +20,19 @@
 
 
 #include "../tests.h"
-#include "../lac/testmatrix.h"
+#include "../testmatrix.h"
 #include "testmatrix.h"
-#include <cmath>
-#include <fstream>
 #include <iostream>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
+#include <deal.II/lac/petsc_compatibility.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
-#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/lac/petsc_solver.h>
 #include <deal.II/lac/slepc_solver.h>
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/vector_memory.h>
 #include <typeinfo>
 
-template<typename SolverType, typename MatrixType, typename VectorType>
+template <typename SolverType, typename MatrixType, typename VectorType>
 void
 check_solve( SolverType &solver,
              const SolverControl &solver_control,
@@ -52,6 +49,9 @@ check_solve( SolverType &solver,
       for (unsigned int i = 0; i < u.size(); i++)
         for (unsigned int j=0; j<u[i].size(); ++j)
           u[i][j] = static_cast<double>(Testing::rand())/static_cast<double>(RAND_MAX);
+
+      for (auto &vector : u)
+        vector.compress(VectorOperation::insert);
 
       solver.set_initial_space(u);
 
@@ -80,10 +80,8 @@ check_solve( SolverType &solver,
 
 int main(int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog << std::setprecision(7);
-  deallog.threshold_double(1.e-10);
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, 1);
   {
@@ -106,13 +104,13 @@ int main(int argc, char **argv)
     diagonal.diag(B);
     B.compress (VectorOperation::insert);
 
-    std::vector<PETScWrappers::Vector>  u(n_eigenvalues,
-                                          PETScWrappers::Vector(dim));
+    std::vector<PETScWrappers::MPI::Vector>
+    u(n_eigenvalues, PETScWrappers::MPI::Vector(MPI_COMM_WORLD, dim, dim));
     std::vector<PetscScalar> v(n_eigenvalues);
 
-    PetscOptionsSetValue("-st_ksp_type","cg");
-    PetscOptionsSetValue("-st_pc_type", "jacobi");
-    PetscOptionsSetValue("-st_ksp_tol", "1e-15");
+    PETScWrappers::set_option_value("-st_ksp_type","cg");
+    PETScWrappers::set_option_value("-st_pc_type", "jacobi");
+    PETScWrappers::set_option_value("-st_ksp_tol", "1e-15");
 
     {
       SLEPcWrappers::SolverKrylovSchur solver(control);
@@ -129,7 +127,7 @@ int main(int argc, char **argv)
       check_solve (solver, control, A,B,u,v);
     }
 
-    PetscOptionsSetValue("-st_ksp_type","preonly");
+    PETScWrappers::set_option_value("-st_ksp_type","preonly");
     {
       SLEPcWrappers::SolverGeneralizedDavidson solver(control);
       check_solve (solver, control, A,B,u,v);
@@ -141,8 +139,8 @@ int main(int argc, char **argv)
       check_solve (solver, control, A,B,u,v);
     }
 
-    PetscOptionsSetValue("-st_ksp_type","cg");
-    PetscOptionsSetValue("-st_ksp_max_it", "10");
+    PETScWrappers::set_option_value("-st_ksp_type","cg");
+    PETScWrappers::set_option_value("-st_ksp_max_it", "10");
     {
       SLEPcWrappers::SolverJacobiDavidson solver(control);
       check_solve (solver, control, A,B,u,v);
@@ -150,4 +148,3 @@ int main(int argc, char **argv)
   }
 
 }
-

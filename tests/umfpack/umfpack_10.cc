@@ -20,8 +20,6 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
-#include <cstdlib>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
@@ -130,9 +128,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-8);
+  initlog();
 
   test<1> ();
   test<2> ();

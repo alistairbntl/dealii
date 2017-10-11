@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2013 - 2015 by the deal.II authors
+## Copyright (C) 2013 - 2016 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -21,7 +21,7 @@
 #    prune_tests    - remove all testsuite subprojects
 #
 
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
 
 MACRO(SET_IF_EMPTY _variable)
   IF("${${_variable}}" STREQUAL "")
@@ -65,7 +65,7 @@ ELSE()
       )
   ENDIF()
 
-  FIND_PACKAGE(deal.II 8.5.0 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
+  FIND_PACKAGE(deal.II 9.0.0 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
   PROJECT(testsuite NONE)
   SET(_options "-DDEAL_II_DIR=${DEAL_II_PATH}")
 ENDIF()
@@ -115,7 +115,10 @@ FOREACH(_category ${_categories})
   IF(DEAL_II_MSVC)
     SET(_command ${CMAKE_COMMAND} -G${CMAKE_GENERATOR} ${_options} ${_category_dir})
   ELSE()
-    SET(_command ${CMAKE_COMMAND} -G${CMAKE_GENERATOR} ${_options} ${_category_dir} > /dev/null)
+    # Do not pass the generator with -G so that we use make instead of ninja
+    # for the test projects. This is because calling ninja several times in
+    # parallel for the same project will break the configuration.
+    SET(_command ${CMAKE_COMMAND} ${_options} ${_category_dir} > /dev/null)
   ENDIF()
 
   ADD_CUSTOM_TARGET(setup_tests_${_category}

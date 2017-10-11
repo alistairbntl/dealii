@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,13 +13,13 @@
 //
 // ---------------------------------------------------------------------
 
-#include <deal.II/base/utilities.h>
+#include <deal.II/base/array_view.h>
 #include <deal.II/base/polynomial.h>
 #include <deal.II/base/quadrature.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/memory_consumption.h>
 #include <deal.II/base/tensor_product_polynomials.h>
-#include <deal.II/base/std_cxx11/unique_ptr.h>
+#include <deal.II/base/utilities.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/dofs/dof_accessor.h>
@@ -28,11 +28,12 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <numeric>
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 MappingQ<dim,spacedim>::InternalData::InternalData ()
   :
   use_mapping_q1_on_current_cell(false)
@@ -40,7 +41,7 @@ MappingQ<dim,spacedim>::InternalData::InternalData ()
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 std::size_t
 MappingQ<dim,spacedim>::InternalData::memory_consumption () const
 {
@@ -52,7 +53,7 @@ MappingQ<dim,spacedim>::InternalData::memory_consumption () const
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 MappingQ<dim,spacedim>::MappingQ (const unsigned int degree,
                                   const bool use_mapping_q_on_all_cells)
   :
@@ -76,14 +77,14 @@ MappingQ<dim,spacedim>::MappingQ (const unsigned int degree,
   // created via the shared_ptr objects
   qp_mapping (this->polynomial_degree>1
               ?
-              std_cxx11::shared_ptr<const MappingQGeneric<dim,spacedim> >(new MappingQGeneric<dim,spacedim>(degree))
+              std::shared_ptr<const MappingQGeneric<dim,spacedim> >(new MappingQGeneric<dim,spacedim>(degree))
               :
               q1_mapping)
 {}
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 MappingQ<dim,spacedim>::MappingQ (const MappingQ<dim,spacedim> &mapping)
   :
   polynomial_degree (mapping.polynomial_degree),
@@ -95,14 +96,14 @@ MappingQ<dim,spacedim>::MappingQ (const MappingQ<dim,spacedim> &mapping)
   // created via the shared_ptr objects
   qp_mapping (this->polynomial_degree>1
               ?
-              std_cxx11::shared_ptr<const MappingQGeneric<dim,spacedim> >(dynamic_cast<MappingQGeneric<dim,spacedim>*>(mapping.qp_mapping->clone()))
+              std::shared_ptr<const MappingQGeneric<dim,spacedim> >(dynamic_cast<MappingQGeneric<dim,spacedim>*>(mapping.qp_mapping->clone()))
               :
               q1_mapping)
 {}
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 unsigned int
 MappingQ<dim,spacedim>::get_degree() const
 {
@@ -121,7 +122,7 @@ MappingQ<dim,spacedim>::preserves_vertex_locations () const
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 UpdateFlags
 MappingQ<dim,spacedim>::requires_update_flags (const UpdateFlags in) const
 {
@@ -132,7 +133,7 @@ MappingQ<dim,spacedim>::requires_update_flags (const UpdateFlags in) const
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 typename MappingQ<dim,spacedim>::InternalData *
 MappingQ<dim,spacedim>::get_data (const UpdateFlags update_flags,
                                   const Quadrature<dim> &quadrature) const
@@ -156,7 +157,7 @@ MappingQ<dim,spacedim>::get_data (const UpdateFlags update_flags,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 typename MappingQ<dim,spacedim>::InternalData *
 MappingQ<dim,spacedim>::get_face_data (const UpdateFlags update_flags,
                                        const Quadrature<dim-1>& quadrature) const
@@ -180,7 +181,7 @@ MappingQ<dim,spacedim>::get_face_data (const UpdateFlags update_flags,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 typename MappingQ<dim,spacedim>::InternalData *
 MappingQ<dim,spacedim>::get_subface_data (const UpdateFlags update_flags,
                                           const Quadrature<dim-1>& quadrature) const
@@ -205,7 +206,7 @@ MappingQ<dim,spacedim>::get_subface_data (const UpdateFlags update_flags,
 
 // Note that the CellSimilarity flag is modifiable, since MappingQ can need to
 // recalculate data even when cells are similar.
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 CellSimilarity::Similarity
 MappingQ<dim,spacedim>::
 fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -216,7 +217,7 @@ fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
 {
   // convert data object to internal data for this class. fails with an
   // exception if that is not possible
-  Assert (dynamic_cast<const InternalData *> (&internal_data) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&internal_data) != nullptr, ExcInternalError());
   const InternalData &data = static_cast<const InternalData &> (internal_data);
 
   // check whether this cell needs the full mapping or can be treated by a
@@ -260,7 +261,7 @@ fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingQ<dim,spacedim>::
 fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -271,7 +272,7 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &
 {
   // convert data object to internal data for this class. fails with an
   // exception if that is not possible
-  Assert (dynamic_cast<const InternalData *> (&internal_data) != 0,
+  Assert (dynamic_cast<const InternalData *> (&internal_data) != nullptr,
           ExcInternalError());
   const InternalData &data = static_cast<const InternalData &> (internal_data);
 
@@ -301,7 +302,7 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &
 }
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingQ<dim,spacedim>::
 fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -313,7 +314,7 @@ fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterato
 {
   // convert data object to internal data for this class. fails with an
   // exception if that is not possible
-  Assert (dynamic_cast<const InternalData *> (&internal_data) != 0,
+  Assert (dynamic_cast<const InternalData *> (&internal_data) != nullptr,
           ExcInternalError());
   const InternalData &data = static_cast<const InternalData &> (internal_data);
 
@@ -346,7 +347,7 @@ fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterato
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingQ<dim,spacedim>::
 transform (const ArrayView<const Tensor<1,dim> >                  &input,
@@ -356,7 +357,7 @@ transform (const ArrayView<const Tensor<1,dim> >                  &input,
 {
   AssertDimension (input.size(), output.size());
   Assert ((dynamic_cast<const typename MappingQ<dim,spacedim>::InternalData *> (&mapping_data)
-           != 0),
+           != nullptr),
           ExcInternalError());
   const InternalData *data = dynamic_cast<const InternalData *>(&mapping_data);
 
@@ -370,17 +371,17 @@ transform (const ArrayView<const Tensor<1,dim> >                  &input,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingQ<dim,spacedim>::
-transform (const ArrayView<const DerivativeForm<1, dim ,spacedim> >  &input,
+transform (const ArrayView<const DerivativeForm<1, dim, spacedim> >  &input,
            const MappingType                                          mapping_type,
            const typename Mapping<dim,spacedim>::InternalDataBase    &mapping_data,
            const ArrayView<Tensor<2,spacedim> >                      &output) const
 {
   AssertDimension (input.size(), output.size());
   Assert ((dynamic_cast<const typename MappingQ<dim,spacedim>::InternalData *> (&mapping_data)
-           != 0),
+           != nullptr),
           ExcInternalError());
   const InternalData *data = dynamic_cast<const InternalData *>(&mapping_data);
 
@@ -394,7 +395,7 @@ transform (const ArrayView<const DerivativeForm<1, dim ,spacedim> >  &input,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingQ<dim,spacedim>::
 transform (const ArrayView<const Tensor<2, dim> >                 &input,
@@ -404,7 +405,7 @@ transform (const ArrayView<const Tensor<2, dim> >                 &input,
 {
   AssertDimension (input.size(), output.size());
   Assert ((dynamic_cast<const typename MappingQ<dim,spacedim>::InternalData *> (&mapping_data)
-           != 0),
+           != nullptr),
           ExcInternalError());
   const InternalData *data = dynamic_cast<const InternalData *>(&mapping_data);
 
@@ -418,17 +419,17 @@ transform (const ArrayView<const Tensor<2, dim> >                 &input,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingQ<dim,spacedim>::
-transform (const ArrayView<const DerivativeForm<2, dim ,spacedim> >  &input,
+transform (const ArrayView<const DerivativeForm<2, dim,spacedim> >  &input,
            const MappingType                                          mapping_type,
            const typename Mapping<dim,spacedim>::InternalDataBase    &mapping_data,
            const ArrayView<Tensor<3,spacedim> >                      &output) const
 {
   AssertDimension (input.size(), output.size());
   Assert ((dynamic_cast<const typename MappingQ<dim,spacedim>::InternalData *> (&mapping_data)
-           != 0),
+           != nullptr),
           ExcInternalError());
   const InternalData *data = dynamic_cast<const InternalData *>(&mapping_data);
 
@@ -442,7 +443,7 @@ transform (const ArrayView<const DerivativeForm<2, dim ,spacedim> >  &input,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void MappingQ<dim,spacedim>::
 transform (const ArrayView<const Tensor<3, dim> >                 &input,
            const MappingType                                       mapping_type,
@@ -451,7 +452,7 @@ transform (const ArrayView<const Tensor<3, dim> >                 &input,
 {
   AssertDimension (input.size(), output.size());
   Assert ((dynamic_cast<const typename MappingQ<dim,spacedim>::InternalData *> (&mapping_data)
-           != 0),
+           != nullptr),
           ExcInternalError());
   const InternalData *data = dynamic_cast<const InternalData *>(&mapping_data);
 
@@ -465,7 +466,7 @@ transform (const ArrayView<const Tensor<3, dim> >                 &input,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 Point<spacedim>
 MappingQ<dim,spacedim>::
 transform_unit_to_real_cell (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -482,7 +483,7 @@ transform_unit_to_real_cell (const typename Triangulation<dim,spacedim>::cell_it
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 Point<dim>
 MappingQ<dim,spacedim>::
 transform_real_to_unit_cell (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -500,11 +501,12 @@ transform_real_to_unit_cell (const typename Triangulation<dim,spacedim>::cell_it
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 Mapping<dim,spacedim> *
 MappingQ<dim,spacedim>::clone () const
 {
-  return new MappingQ<dim,spacedim>(this->polynomial_degree);
+  return new MappingQ<dim,spacedim>(this->polynomial_degree,
+                                    this->use_mapping_q_on_all_cells);
 }
 
 

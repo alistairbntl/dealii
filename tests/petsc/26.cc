@@ -15,17 +15,16 @@
 
 
 
-// check PETScWrappers::Vector::operator = (PetscScalar) with setting to a
+// check PETScWrappers::MPI::Vector::operator = (PetscScalar) with setting to a
 // nonzero value
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
 
-void test (PETScWrappers::Vector &v)
+void test (PETScWrappers::MPI::Vector &v)
 {
   // set some entries of the vector
   for (unsigned int i=0; i<v.size(); ++i)
@@ -45,16 +44,16 @@ void test (PETScWrappers::Vector &v)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, 1);
       {
-        PETScWrappers::Vector v (100);
-        test (v);
+        IndexSet indices(100);
+        indices.add_range(0, 100);
+        PETScWrappers::MPI::Vector v(indices, MPI_COMM_WORLD);
+        test(v);
       }
 
     }

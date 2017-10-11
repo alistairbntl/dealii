@@ -17,8 +17,6 @@
 // test parallel::transform
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 
 #include <deal.II/base/parallel.h>
 #include <deal.II/lac/vector.h>
@@ -28,9 +26,7 @@
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   const unsigned int N=10000;
   Vector<double> x(N), y(N), z(N), a(N);

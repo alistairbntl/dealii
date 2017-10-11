@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__error_estimator_h
-#define dealii__error_estimator_h
+#ifndef dealii_error_estimator_h
+#define dealii_error_estimator_h
 
 
 #include <deal.II/base/config.h>
@@ -110,9 +110,9 @@ namespace hp
  * times some factor) of each cell and take the square root.
  *
  * The integration is done using a quadrature formula on the face. For linear
- * trial functions (FEQ1), the QGauss2 or even the QMidpoint rule will
- * suffice. For higher order elements, it is necessary to utilize higher order
- * quadrature formulae as well.
+ * trial functions (FEQ1), QGauss (with two points) or even the QMidpoint rule
+ * will suffice. For higher order elements, it is necessary to utilize higher
+ * order quadrature formulae as well.
  *
  * We store the contribution of each face in a @p map, as provided by the C++
  * standard library, with the iterator pointing to that face being the key
@@ -334,14 +334,14 @@ public:
    const InputVector                          &solution,
    Vector<float>                              &error,
    const ComponentMask                        &component_mask = ComponentMask(),
-   const Function<spacedim>                   *coefficients   = 0,
+   const Function<spacedim>                   *coefficients   = nullptr,
    const unsigned int                          n_threads      = numbers::invalid_unsigned_int,
    const types::subdomain_id                   subdomain_id   = numbers::invalid_subdomain_id,
    const types::material_id                    material_id    = numbers::invalid_material_id,
    const Strategy                              strategy       = cell_diameter_over_24);
 
   /**
-   * Calls the @p estimate function, see above, with
+   * Call the @p estimate function, see above, with
    * <tt>mapping=MappingQGeneric@<dim@>(1)</tt>.
    */
   template <typename InputVector, typename DoFHandlerType>
@@ -352,7 +352,7 @@ public:
    const InputVector                          &solution,
    Vector<float>                              &error,
    const ComponentMask                        &component_mask = ComponentMask(),
-   const Function<spacedim>                   *coefficients   = 0,
+   const Function<spacedim>                   *coefficients   = nullptr,
    const unsigned int                          n_threads      = numbers::invalid_unsigned_int,
    const types::subdomain_id                   subdomain_id   = numbers::invalid_subdomain_id,
    const types::material_id                    material_id    = numbers::invalid_material_id,
@@ -387,7 +387,7 @@ public:
    const Strategy                              strategy       = cell_diameter_over_24);
 
   /**
-   * Calls the @p estimate function, see above, with
+   * Call the @p estimate function, see above, with
    * <tt>mapping=MappingQGeneric@<dim@>(1)</tt>.
    */
   template <typename InputVector, typename DoFHandlerType>
@@ -437,7 +437,7 @@ public:
    const InputVector                          &solution,
    Vector<float>                              &error,
    const ComponentMask                        &component_mask = ComponentMask(),
-   const Function<spacedim>                   *coefficients   = 0,
+   const Function<spacedim>                   *coefficients   = nullptr,
    const unsigned int                          n_threads      = numbers::invalid_unsigned_int,
    const types::subdomain_id                   subdomain_id   = numbers::invalid_subdomain_id,
    const types::material_id                    material_id    = numbers::invalid_material_id,
@@ -476,7 +476,7 @@ public:
    const std::vector<const InputVector *>     &solutions,
    std::vector<Vector<float>*>                &errors,
    const ComponentMask                        &component_mask = ComponentMask(),
-   const Function<spacedim>                   *coefficients   = 0,
+   const Function<spacedim>                   *coefficients   = nullptr,
    const unsigned int                          n_threads      = numbers::invalid_unsigned_int,
    const types::subdomain_id                   subdomain_id   = numbers::invalid_subdomain_id,
    const types::material_id                    material_id    = numbers::invalid_material_id,
@@ -580,13 +580,13 @@ public:
    const InputVector                          &solution,
    Vector<float>                              &error,
    const ComponentMask                        &component_mask = ComponentMask(),
-   const Function<spacedim>                   *coefficients   = 0,
+   const Function<spacedim>                   *coefficient    = nullptr,
    const unsigned int                          n_threads      = numbers::invalid_unsigned_int,
    const types::subdomain_id                   subdomain_id   = numbers::invalid_subdomain_id,
    const types::material_id                    material_id    = numbers::invalid_material_id);
 
   /**
-   * Calls the @p estimate function, see above, with
+   * Call the @p estimate function, see above, with
    * <tt>mapping=MappingQGeneric1<1>()</tt>.
    */
   template <typename InputVector, typename DoFHandlerType>
@@ -597,7 +597,7 @@ public:
    const InputVector                          &solution,
    Vector<float>                              &error,
    const ComponentMask                        &component_mask = ComponentMask(),
-   const Function<spacedim>                   *coefficients   = 0,
+   const Function<spacedim>                   *coefficients   = nullptr,
    const unsigned int                          n_threads      = numbers::invalid_unsigned_int,
    const types::subdomain_id                   subdomain_id   = numbers::invalid_subdomain_id,
    const types::material_id                    material_id    = numbers::invalid_material_id);
@@ -630,7 +630,7 @@ public:
    const types::material_id                    material_id    = numbers::invalid_material_id);
 
   /**
-   * Calls the @p estimate function, see above, with
+   * Call the @p estimate function, see above, with
    * <tt>mapping=MappingQGeneric1<1>()</tt>.
    */
   template <typename InputVector, typename DoFHandlerType>

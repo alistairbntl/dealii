@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2010 - 2015 by the deal.II authors
+ * Copyright (C) 2010 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -32,7 +32,6 @@
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/tensor_function.h>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
 #include <deal.II/base/index_set.h>
 
 #include <deal.II/lac/full_matrix.h>
@@ -63,12 +62,13 @@
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/trilinos_block_sparse_matrix.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_precondition.h>
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <memory>
 
 
 // At the end of this top-matter, we open a namespace for the current project
@@ -591,8 +591,8 @@ namespace Step43
     const double                         porosity;
     const double                         AOS_threshold;
 
-    std_cxx11::shared_ptr<TrilinosWrappers::PreconditionIC> Amg_preconditioner;
-    std_cxx11::shared_ptr<TrilinosWrappers::PreconditionIC> Mp_preconditioner;
+    std::shared_ptr<TrilinosWrappers::PreconditionIC> Amg_preconditioner;
+    std::shared_ptr<TrilinosWrappers::PreconditionIC> Mp_preconditioner;
 
     bool                                rebuild_saturation_matrix;
 
@@ -624,7 +624,7 @@ namespace Step43
   TwoPhaseFlowProblem<dim>::TwoPhaseFlowProblem (const unsigned int degree)
     :
     triangulation (Triangulation<dim>::maximum_smoothing),
-
+    global_Omega_diameter (std::numeric_limits<double>::quiet_NaN()),
     degree (degree),
     darcy_degree (degree),
     darcy_fe (FE_Q<dim>(darcy_degree+1), dim,
@@ -645,6 +645,7 @@ namespace Step43
 
     time_step (0),
     old_time_step (0),
+    timestep_number (0),
     viscosity (0.2),
     porosity (1.0),
     AOS_threshold (3.0),
@@ -980,11 +981,11 @@ namespace Step43
   {
     assemble_darcy_preconditioner ();
 
-    Amg_preconditioner = std_cxx11::shared_ptr<TrilinosWrappers::PreconditionIC>
+    Amg_preconditioner = std::shared_ptr<TrilinosWrappers::PreconditionIC>
                          (new TrilinosWrappers::PreconditionIC());
     Amg_preconditioner->initialize(darcy_preconditioner_matrix.block(0,0));
 
-    Mp_preconditioner = std_cxx11::shared_ptr<TrilinosWrappers::PreconditionIC>
+    Mp_preconditioner = std::shared_ptr<TrilinosWrappers::PreconditionIC>
                         (new TrilinosWrappers::PreconditionIC());
     Mp_preconditioner->initialize(darcy_preconditioner_matrix.block(1,1));
 
@@ -1743,6 +1744,10 @@ namespace Step43
       old_saturation_solution = tmp_saturation[1];
       saturation_matching_last_computed_darcy_solution = tmp_saturation[2];
 
+      saturation_constraints.distribute(saturation_solution);
+      saturation_constraints.distribute(old_saturation_solution);
+      saturation_constraints.distribute(saturation_matching_last_computed_darcy_solution);
+
       std::vector<TrilinosWrappers::MPI::BlockVector> tmp_darcy (2);
       tmp_darcy[0].reinit (darcy_solution);
       tmp_darcy[1].reinit (darcy_solution);
@@ -1750,6 +1755,9 @@ namespace Step43
 
       last_computed_darcy_solution        = tmp_darcy[0];
       second_last_computed_darcy_solution = tmp_darcy[1];
+
+      darcy_constraints.distribute(last_computed_darcy_solution);
+      darcy_constraints.distribute(second_last_computed_darcy_solution);
 
       rebuild_saturation_matrix    = true;
     }
@@ -2190,7 +2198,6 @@ start_time_iteration:
                           SaturationInitialValues<dim>(),
                           old_saturation_solution);
 
-    timestep_number = 0;
     time_step = old_time_step = 0;
     current_macro_time_step = old_macro_time_step = 0;
 

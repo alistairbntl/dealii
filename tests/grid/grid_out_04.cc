@@ -27,10 +27,7 @@
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 std::ofstream logfile("output");
@@ -57,7 +54,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<2> ();
   test<3> ();

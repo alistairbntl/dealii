@@ -22,16 +22,13 @@
 
 #include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/lac/petsc_parallel_block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
 #include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/lac/vector_memory.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 
-#include <fstream>
 //#include <mpi.h>
 
-template<class v>
+template <class v>
 void testit()
 {
   GrowingVectorMemory<v> m;
@@ -50,8 +47,6 @@ void test()
 
   testit<PETScWrappers::MPI::Vector>();
   testit<PETScWrappers::MPI::BlockVector>();
-  testit<PETScWrappers::Vector>();
-  testit<PETScWrappers::BlockVector>();
 
   if (myid==0)
     deallog << "done" << std::endl;
@@ -64,9 +59,7 @@ int main(int argc, char *argv[])
 
   if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       test();
     }

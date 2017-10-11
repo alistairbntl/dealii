@@ -16,12 +16,8 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_view.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 
 const unsigned int N=10;
 unsigned int check_point = 0;
@@ -34,7 +30,7 @@ void print (const Vector<number> &v)
   deallog << std::endl;
 }
 
-template<typename T>
+template <typename T>
 void fill( T &a)
 {
   for (unsigned int i=0; i<a.size(); ++i)
@@ -47,7 +43,6 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   Vector<double>  v1(N);
   fill(v1);

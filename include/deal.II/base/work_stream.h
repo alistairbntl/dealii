@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__work_stream_h
-#define dealii__work_stream_h
+#ifndef dealii_work_stream_h
+#define dealii_work_stream_h
 
 
 #include <deal.II/base/config.h>
@@ -22,8 +22,6 @@
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/thread_management.h>
 #include <deal.II/base/template_constraints.h>
-#include <deal.II/base/std_cxx11/function.h>
-#include <deal.II/base/std_cxx11/bind.h>
 #include <deal.II/base/thread_local_storage.h>
 #include <deal.II/base/parallel.h>
 
@@ -35,7 +33,7 @@
 #include <vector>
 #include <utility>
 #include <memory>
-
+#include <functional>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -57,11 +55,11 @@ DEAL_II_NAMESPACE_OPEN
  * many such examples, part of the work can be done entirely independently and
  * in parallel, possibly using several processor cores on a machine with
  * shared memory. However, some other part of this work may need to be
- * synchronised and be done in order. In the example of assembling a matrix,
+ * synchronized and be done in order. In the example of assembling a matrix,
  * the computation of local contributions can be done entirely in parallel,
  * but copying the local contributions into the global matrix requires some
  * care: First, several threads can't write at the same time, but need to
- * synchronise writing using a mutex; secondly, we want the order in which
+ * synchronize writing using a mutex; secondly, we want the order in which
  * local contributions are added to the global matrix to be always the same
  * because floating point addition is not commutative and adding local
  * contributions to the global matrix in different orders leads to subtly
@@ -76,7 +74,7 @@ DEAL_II_NAMESPACE_OPEN
  * parallel on all of these objects and then passes each object to a
  * postprocessor function that runs sequentially and gets objects in exactly
  * the order in which they appear in the input iterator range. None of the
- * synchronisation work is exposed to the user of this class.
+ * synchronization work is exposed to the user of this class.
  *
  * Internally, the range given to the run() function of this class is split
  * into a sequence of "items", which are then distributed according to some
@@ -126,6 +124,17 @@ DEAL_II_NAMESPACE_OPEN
  * unused and may be re-used for the next invocation of the worker function,
  * on this or another thread.
  *
+ * The member variables in ScratchData and CopyData can be accessed
+ * independently of other concurrent uses of copies of these data structures.
+ * Therefore, it is perfectly fine to resize auxiliary data structures
+ * associated with ScratchData and CopyData to different lengths on each cell.
+ * For example, a vector holding densities at each quadrature point which is used with
+ * LocalIntegrators::L2::weighted_mass_matrix() to assemble the local matrix
+ * could be resized to the corresponding number of quadrature points of the
+ * current cell in hp::DoFHandler. Similarly, local stiffness matrix in
+ * CopyData can be resized in accordance with the number of local DoFs on the
+ * current cell.
+ *
  * The functions in this namespace only really work in parallel when
  * multithread mode was selected during deal.II configuration. Otherwise they
  * simply work on each item sequentially.
@@ -141,7 +150,7 @@ namespace WorkStream
   namespace internal
   {
 
-//TODO: The following classes all use std_cxx11::shared_ptr, but the
+//TODO: The following classes all use std::shared_ptr, but the
 //  correct pointer class would actually be std::unique_ptr. make this
 //  replacement whenever we have a class that provides these semantics
 //  and that is available also as a fall-back whenever via boost or similar
@@ -184,8 +193,8 @@ namespace WorkStream
            */
           struct ScratchDataObject
           {
-            std_cxx11::shared_ptr<ScratchData> scratch_data;
-            bool                               currently_in_use;
+            std::shared_ptr<ScratchData> scratch_data;
+            bool                         currently_in_use;
 
             /**
              * Default constructor.
@@ -297,8 +306,8 @@ namespace WorkStream
           ItemType ()
             :
             n_items (0),
-            scratch_data (0),
-            sample_scratch_data (0),
+            scratch_data (nullptr),
+            sample_scratch_data (nullptr),
             currently_in_use (false)
           {}
         };
@@ -358,7 +367,7 @@ namespace WorkStream
           // another thread where we release items and set 'false'
           // flags to 'true', but that too does not produce any
           // problems)
-          ItemType *current_item = 0;
+          ItemType *current_item = nullptr;
           for (unsigned int i=0; i<item_buffer.size(); ++i)
             if (item_buffer[i].currently_in_use == false)
               {
@@ -366,7 +375,7 @@ namespace WorkStream
                 current_item = &item_buffer[i];
                 break;
               }
-          Assert (current_item != 0, ExcMessage ("This can't be. There must be a free item!"));
+          Assert (current_item != nullptr, ExcMessage ("This can't be. There must be a free item!"));
 
           // initialize the next item. it may
           // consist of at most chunk_size
@@ -387,7 +396,7 @@ namespace WorkStream
           if (current_item->n_items == 0)
             // there were no items
             // left. terminate the pipeline
-            return 0;
+            return nullptr;
           else
             return current_item;
         }
@@ -450,26 +459,6 @@ namespace WorkStream
          * happens, whereas a small number is better for load balancing.
          */
         const unsigned int           chunk_size;
-
-        /**
-         * Initialize the pointers and vector elements in the specified entry
-         * of the item_buffer.
-         */
-        void init_buffer_elements (const unsigned int element,
-                                   const CopyData    &sample_copy_data)
-        {
-          Assert (item_buffer[element].n_items == 0,
-                  ExcInternalError());
-
-          item_buffer[element].work_items
-          .resize (chunk_size, remaining_iterator_range.second);
-          item_buffer[element].scratch_data
-            = &thread_local_scratch;
-          item_buffer[element].sample_scratch_data
-            = &sample_scratch_data;
-          item_buffer[element].copy_datas
-          .resize (chunk_size, sample_copy_data);
-        }
       };
 
 
@@ -490,9 +479,9 @@ namespace WorkStream
          * operate as well as a pointer to the function that will do the
          * assembly.
          */
-        Worker (const std_cxx11::function<void (const Iterator &,
-                                                ScratchData &,
-                                                CopyData &)> &worker,
+        Worker (const std::function<void (const Iterator &,
+                                          ScratchData &,
+                                          CopyData &)> &worker,
                 bool copier_exist=true)
           :
           tbb::filter (/* is_serial= */ false),
@@ -524,7 +513,7 @@ namespace WorkStream
           // we can't take an iterator into the list now and expect it to
           // still be valid after calling the worker, but we at least do
           // not have to lock the following section
-          ScratchData *scratch_data = 0;
+          ScratchData *scratch_data = nullptr;
           {
             typename ItemType::ScratchDataList &
             scratch_data_list = current_item->scratch_data->get();
@@ -542,7 +531,7 @@ namespace WorkStream
                 }
 
             // if no object was found, create one and mark it as used
-            if (scratch_data == 0)
+            if (scratch_data == nullptr)
               {
                 scratch_data = new ScratchData(*current_item->sample_scratch_data);
 
@@ -608,9 +597,9 @@ namespace WorkStream
          * Pointer to the function that does the assembling on the sequence of
          * cells.
          */
-        const std_cxx11::function<void (const Iterator &,
-                                        ScratchData &,
-                                        CopyData &)> worker;
+        const std::function<void (const Iterator &,
+                                  ScratchData &,
+                                  CopyData &)> worker;
 
         /**
          * This flag is true if the copier stage exist. If it does not, the
@@ -638,7 +627,7 @@ namespace WorkStream
          * copying from the additional data object to the global matrix or
          * similar.
          */
-        Copier (const std_cxx11::function<void (const CopyData &)> &copier)
+        Copier (const std::function<void (const CopyData &)> &copier)
           :
           tbb::filter (/*is_serial=*/true),
           copier (copier)
@@ -683,7 +672,7 @@ namespace WorkStream
 
           // return an invalid item since we are at the end of the
           // pipeline
-          return 0;
+          return nullptr;
         }
 
 
@@ -691,7 +680,7 @@ namespace WorkStream
         /**
          * Pointer to the function that does the copying of data.
          */
-        const std_cxx11::function<void (const CopyData &)> copier;
+        const std::function<void (const CopyData &)> copier;
       };
 
     }
@@ -716,9 +705,9 @@ namespace WorkStream
                 typename CopyData>
       struct ScratchAndCopyDataObjects
       {
-        std_cxx11::shared_ptr<ScratchData> scratch_data;
-        std_cxx11::shared_ptr<CopyData>    copy_data;
-        bool                               currently_in_use;
+        std::shared_ptr<ScratchData> scratch_data;
+        std::shared_ptr<CopyData>    copy_data;
+        bool                         currently_in_use;
 
         /**
          * Default constructor.
@@ -771,10 +760,10 @@ namespace WorkStream
         /**
          * Constructor.
          */
-        WorkerAndCopier (const std_cxx11::function<void (const Iterator &,
-                                                         ScratchData &,
-                                                         CopyData &)> &worker,
-                         const std_cxx11::function<void (const CopyData &)> &copier,
+        WorkerAndCopier (const std::function<void (const Iterator &,
+                                                   ScratchData &,
+                                                   CopyData &)> &worker,
+                         const std::function<void (const CopyData &)> &copier,
                          const ScratchData    &sample_scratch_data,
                          const CopyData       &sample_copy_data)
           :
@@ -801,8 +790,8 @@ namespace WorkStream
           // This means that we can't take an iterator into the list
           // now and expect it to still be valid after calling the worker,
           // but we at least do not have to lock the following section.
-          ScratchData *scratch_data = 0;
-          CopyData    *copy_data    = 0;
+          ScratchData *scratch_data = nullptr;
+          CopyData    *copy_data    = nullptr;
           {
             ScratchAndCopyDataList &scratch_and_copy_data_list = data.get();
 
@@ -820,15 +809,13 @@ namespace WorkStream
                 }
 
             // if no element in the list was found, create one and mark it as used
-            if (scratch_data == 0)
+            if (scratch_data == nullptr)
               {
-                Assert (copy_data==0, ExcInternalError());
+                Assert (copy_data==nullptr, ExcInternalError());
                 scratch_data = new ScratchData(sample_scratch_data);
                 copy_data    = new CopyData(sample_copy_data);
 
-                typename ScratchAndCopyDataList::value_type
-                new_scratch_object (scratch_data, copy_data, true);
-                scratch_and_copy_data_list.push_back (new_scratch_object);
+                scratch_and_copy_data_list.emplace_back (scratch_data, copy_data, true);
               }
           }
 
@@ -891,15 +878,15 @@ namespace WorkStream
          * Pointer to the function that does the assembling on the sequence of
          * cells.
          */
-        const std_cxx11::function<void (const Iterator &,
-                                        ScratchData &,
-                                        CopyData &)> worker;
+        const std::function<void (const Iterator &,
+                                  ScratchData &,
+                                  CopyData &)> worker;
 
         /**
          * Pointer to the function that does the copying from local
          * contribution to global object.
          */
-        const std_cxx11::function<void (const CopyData &)> copier;
+        const std::function<void (const CopyData &)> copier;
 
         /**
          * References to sample scratch and copy data for when we need them.
@@ -1040,11 +1027,11 @@ namespace WorkStream
           {
             // need to check if the function is not the zero function. To
             // check zero-ness, create a C++ function out of it and check that
-            if (static_cast<const std_cxx11::function<void (const Iterator &,
-                                                            ScratchData &,
-                                                            CopyData &)>& >(worker))
+            if (static_cast<const std::function<void (const Iterator &,
+                                                      ScratchData &,
+                                                      CopyData &)>& >(worker))
               worker (i, scratch_data, copy_data);
-            if (static_cast<const std_cxx11::function<void (const CopyData &)>& >
+            if (static_cast<const std::function<void (const CopyData &)>& >
                 (copier))
               copier (copy_data);
           }
@@ -1053,7 +1040,7 @@ namespace WorkStream
     else // have TBB and use more than one thread
       {
         // Check that the copier exist
-        if (static_cast<const std_cxx11::function<void (const CopyData &)>& >(copier))
+        if (static_cast<const std::function<void (const CopyData &)>& >(copier))
           {
             // create the three stages of the pipeline
             internal::Implementation2::IteratorRangeToItemStream<Iterator,ScratchData,CopyData>
@@ -1084,7 +1071,7 @@ namespace WorkStream
             // essentially apply parallel_for. because parallel_for
             // requires subdividing the range for which operator- is
             // necessary between iterators, it is often inefficient to
-            // apply it directory to cell ranges and similar iterator
+            // apply it directly to cell ranges and similar iterator
             // types for which operator- is expensive or, in fact,
             // nonexistent. rather, in that case, we simply copy the
             // iterators into a large array and use operator- on
@@ -1148,11 +1135,11 @@ namespace WorkStream
             {
               // need to check if the function is not the zero function. To
               // check zero-ness, create a C++ function out of it and check that
-              if (static_cast<const std_cxx11::function<void (const Iterator &,
-                                                              ScratchData &,
-                                                              CopyData &)>& >(worker))
+              if (static_cast<const std::function<void (const Iterator &,
+                                                        ScratchData &,
+                                                        CopyData &)>& >(worker))
                 worker (*p, scratch_data, copy_data);
-              if (static_cast<const std_cxx11::function<void (const CopyData &)>& >(copier))
+              if (static_cast<const std::function<void (const CopyData &)>& >(copier))
                 copier (copy_data);
             }
       }
@@ -1180,9 +1167,9 @@ namespace WorkStream
                                  (colored_iterators[color].begin(),
                                   colored_iterators[color].end(),
                                   /*grain_size=*/chunk_size),
-                                 std_cxx11::bind (&WorkerAndCopier::operator(),
-                                                  std_cxx11::ref(worker_and_copier),
-                                                  std_cxx11::_1),
+                                 std::bind (&WorkerAndCopier::operator(),
+                                            std::ref(worker_and_copier),
+                                            std::placeholders::_1),
                                  tbb::auto_partitioner());
             }
       }
@@ -1241,12 +1228,12 @@ namespace WorkStream
   {
     // forward to the other function
     run (begin, end,
-         std_cxx11::bind (worker,
-                          std_cxx11::ref (main_object),
-                          std_cxx11::_1, std_cxx11::_2, std_cxx11::_3),
-         std_cxx11::bind (copier,
-                          std_cxx11::ref (main_object),
-                          std_cxx11::_1),
+         std::bind (worker,
+                    std::ref (main_object),
+                    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+         std::bind (copier,
+                    std::ref (main_object),
+                    std::placeholders::_1),
          sample_scratch_data,
          sample_copy_data,
          queue_length,
@@ -1264,6 +1251,6 @@ DEAL_II_NAMESPACE_CLOSE
 
 
 //----------------------------   work_stream.h     ---------------------------
-// end of #ifndef dealii__work_stream_h
+// end of #ifndef dealii_work_stream_h
 #endif
 //----------------------------   work_stream.h     ---------------------------

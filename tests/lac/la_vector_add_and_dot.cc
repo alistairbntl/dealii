@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,11 +17,7 @@
 // check that LinearAlgebra::Vector::add_and_dot works correctly
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/la_vector.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -47,7 +43,7 @@ void check ()
       v1.add(factor, v2);
       const number prod = v1 * v3;
       const number prod_check = check.add_and_dot(factor, v2, v3);
-      if (test == 0 && types_are_equal<number,double>::value)
+      if (test == 0 && std::is_same<number,double>::value)
         {
           deallog << "Vector add reference:   ";
           for (unsigned int i=0; i<size; ++i)
@@ -79,13 +75,9 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check<float>();
   check<double>();
-  check<long double>();
   check<std::complex<double> >();
   deallog << "OK" << std::endl;
 }
-
-

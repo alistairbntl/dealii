@@ -18,15 +18,11 @@
 // test the testsuite framework. this test is supposed to miscompile
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <cstdlib>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   compile error;
 

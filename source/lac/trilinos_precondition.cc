@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -55,11 +55,6 @@ namespace TrilinosWrappers
 
 
 
-  PreconditionBase::~PreconditionBase()
-  {}
-
-
-
   void PreconditionBase::clear ()
   {
     preconditioner.reset();
@@ -70,6 +65,37 @@ namespace TrilinosWrappers
   }
 
 
+  MPI_Comm
+  PreconditionBase::get_mpi_communicator () const
+  {
+#ifdef DEAL_II_WITH_MPI
+    return communicator.Comm();
+#else
+    return MPI_COMM_SELF;
+#endif
+  }
+
+
+  Epetra_Operator &
+  PreconditionBase::trilinos_operator () const
+  {
+    AssertThrow (preconditioner, ExcMessage("Trying to dereference a null pointer."));
+    return (*preconditioner);
+  }
+
+
+  IndexSet
+  PreconditionBase::locally_owned_domain_indices() const
+  {
+    return IndexSet(preconditioner->OperatorDomainMap());
+  }
+
+
+  IndexSet
+  PreconditionBase::locally_owned_range_indices() const
+  {
+    return IndexSet(preconditioner->OperatorRangeMap());
+  }
 
   /* -------------------------- PreconditionJacobi -------------------------- */
 
@@ -98,8 +124,8 @@ namespace TrilinosWrappers
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -150,8 +176,8 @@ namespace TrilinosWrappers
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -203,8 +229,8 @@ namespace TrilinosWrappers
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -231,11 +257,11 @@ namespace TrilinosWrappers
   /* ----------------------- PreconditionBlockJacobi ---------------------- */
 
   PreconditionBlockJacobi::AdditionalData::
-  AdditionalData (const unsigned int block_size,
-                  const std::string  block_creation_type,
-                  const double omega,
-                  const double min_diagonal,
-                  const unsigned int n_sweeps)
+  AdditionalData (const unsigned int  block_size,
+                  const std::string  &block_creation_type,
+                  const double        omega,
+                  const double        min_diagonal,
+                  const unsigned int  n_sweeps)
     :
     block_size(block_size),
     block_creation_type(block_creation_type),
@@ -252,15 +278,20 @@ namespace TrilinosWrappers
   {
     // release memory before reallocation
     preconditioner.reset ();
+
+    // Block relaxation setup fails if we have no locally owned rows. As a work-around
+    // we just pretend to use point relaxation on those processors:
     preconditioner.reset (Ifpack().Create
-                          ("block relaxation",
-                           const_cast<Epetra_CrsMatrix *>(&matrix.trilinos_matrix()),
-                           0));
+                          (
+                            (matrix.trilinos_matrix().NumMyRows()==0) ?
+                            "point relaxation" : "block relaxation",
+                            const_cast<Epetra_CrsMatrix *>(&matrix.trilinos_matrix()),
+                            0));
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -290,12 +321,12 @@ namespace TrilinosWrappers
   /* ----------------------- PreconditionBlockSSOR ------------------------ */
 
   PreconditionBlockSSOR::AdditionalData::
-  AdditionalData (const unsigned int block_size,
-                  const std::string  block_creation_type,
-                  const double       omega,
-                  const double       min_diagonal,
-                  const unsigned int overlap,
-                  const unsigned int n_sweeps)
+  AdditionalData (const unsigned int  block_size,
+                  const std::string  &block_creation_type,
+                  const double        omega,
+                  const double        min_diagonal,
+                  const unsigned int  overlap,
+                  const unsigned int  n_sweeps)
     :
     block_size(block_size),
     block_creation_type(block_creation_type),
@@ -312,15 +343,20 @@ namespace TrilinosWrappers
                                      const AdditionalData &additional_data)
   {
     preconditioner.reset ();
+
+    // Block relaxation setup fails if we have no locally owned rows. As a work-around
+    // we just pretend to use point relaxation on those processors:
     preconditioner.reset (Ifpack().Create
-                          ("block relaxation",
-                           const_cast<Epetra_CrsMatrix *>(&matrix.trilinos_matrix()),
-                           additional_data.overlap));
+                          (
+                            (matrix.trilinos_matrix().NumMyRows()==0) ?
+                            "point relaxation" : "block relaxation",
+                            const_cast<Epetra_CrsMatrix *>(&matrix.trilinos_matrix()),
+                            additional_data.overlap));
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -351,12 +387,12 @@ namespace TrilinosWrappers
   /* ------------------------ PreconditionBlockSOR ------------------------ */
 
   PreconditionBlockSOR::AdditionalData::
-  AdditionalData (const unsigned int block_size,
-                  const std::string  block_creation_type,
-                  const double       omega,
-                  const double       min_diagonal,
-                  const unsigned int overlap,
-                  const unsigned int n_sweeps)
+  AdditionalData (const unsigned int  block_size,
+                  const std::string  &block_creation_type,
+                  const double        omega,
+                  const double        min_diagonal,
+                  const unsigned int  overlap,
+                  const unsigned int  n_sweeps)
     :
     block_size(block_size),
     block_creation_type(block_creation_type),
@@ -373,15 +409,20 @@ namespace TrilinosWrappers
                                     const AdditionalData &additional_data)
   {
     preconditioner.reset ();
+
+    // Block relaxation setup fails if we have no locally owned rows. As a work-around
+    // we just pretend to use point relaxation on those processors:
     preconditioner.reset (Ifpack().Create
-                          ("block relaxation",
-                           const_cast<Epetra_CrsMatrix *>(&matrix.trilinos_matrix()),
-                           additional_data.overlap));
+                          (
+                            (matrix.trilinos_matrix().NumMyRows()==0) ?
+                            "point relaxation" : "block relaxation",
+                            const_cast<Epetra_CrsMatrix *>(&matrix.trilinos_matrix()),
+                            additional_data.overlap));
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -437,8 +478,8 @@ namespace TrilinosWrappers
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -488,8 +529,8 @@ namespace TrilinosWrappers
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -541,8 +582,8 @@ namespace TrilinosWrappers
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -587,8 +628,8 @@ namespace TrilinosWrappers
 
     Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
                                     (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -636,8 +677,8 @@ namespace TrilinosWrappers
 
     Ifpack_Chebyshev *ifpack = static_cast<Ifpack_Chebyshev *>
                                (preconditioner.get());
-    Assert (ifpack != 0, ExcMessage ("Trilinos could not create this "
-                                     "preconditioner"));
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
 
     int ierr;
 
@@ -675,15 +716,58 @@ namespace TrilinosWrappers
   /* -------------------------- PreconditionIdentity --------------------- */
 
   void
-  PreconditionIdentity::vmult(VectorBase       &dst,
-                              const VectorBase &src) const
+  PreconditionIdentity::initialize (const SparseMatrix   &matrix,
+                                    const AdditionalData &)
+  {
+    // What follows just configures a dummy preconditioner that
+    // sets up the domain and range maps, as well as the communicator.
+    // It is never used as the vmult, Tvmult operations are
+    // given a custom defintion.
+    // Note: This is only required in order to wrap this
+    // preconditioner in a LinearOperator without an exemplar
+    // matrix.
+
+    // From PreconditionJacobi:
+    // release memory before reallocation
+    preconditioner.reset ();
+    preconditioner.reset (Ifpack().Create
+                          ("point relaxation",
+                           const_cast<Epetra_CrsMatrix *>(&matrix.trilinos_matrix()),
+                           0));
+
+    Ifpack_Preconditioner *ifpack = static_cast<Ifpack_Preconditioner *>
+                                    (preconditioner.get());
+    Assert (ifpack != nullptr, ExcMessage ("Trilinos could not create this "
+                                           "preconditioner"));
+
+    int ierr;
+
+    Teuchos::ParameterList parameter_list;
+    parameter_list.set ("relaxation: sweeps", 1);
+    parameter_list.set ("relaxation: type", "Jacobi");
+    parameter_list.set ("relaxation: damping factor", 1.0);
+    parameter_list.set ("relaxation: min diagonal value", 0.0);
+
+    ierr = ifpack->SetParameters(parameter_list);
+    AssertThrow (ierr == 0, ExcTrilinosError(ierr));
+
+    ierr = ifpack->Initialize();
+    AssertThrow (ierr == 0, ExcTrilinosError(ierr));
+
+    ierr = ifpack->Compute();
+    AssertThrow (ierr == 0, ExcTrilinosError(ierr));
+  }
+
+  void
+  PreconditionIdentity::vmult(MPI::Vector       &dst,
+                              const MPI::Vector &src) const
   {
     dst = src;
   }
 
   void
-  PreconditionIdentity::Tvmult(VectorBase       &dst,
-                               const VectorBase &src) const
+  PreconditionIdentity::Tvmult(MPI::Vector       &dst,
+                               const MPI::Vector &src) const
   {
     dst = src;
   }
@@ -703,15 +787,15 @@ namespace TrilinosWrappers
   }
 
   void
-  PreconditionIdentity::vmult(parallel::distributed::Vector<double>       &dst,
-                              const parallel::distributed::Vector<double> &src) const
+  PreconditionIdentity::vmult(LinearAlgebra::distributed::Vector<double>       &dst,
+                              const LinearAlgebra::distributed::Vector<double> &src) const
   {
     dst = src;
   }
 
   void
-  PreconditionIdentity::Tvmult(parallel::distributed::Vector<double>       &dst,
-                               const parallel::distributed::Vector<double> &src) const
+  PreconditionIdentity::Tvmult(LinearAlgebra::distributed::Vector<double>       &dst,
+                               const LinearAlgebra::distributed::Vector<double> &src) const
   {
     dst = src;
   }

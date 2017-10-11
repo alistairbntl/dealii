@@ -18,7 +18,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/data_out_base.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/job_identifier.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function_lib.h>
@@ -27,13 +26,11 @@
 #include <deal.II/lac/vector.h>
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 #include <string>
 
 #include "functions.h"
 
-template<int dim>
+template <int dim>
 void
 check_function(const Functions::FlowFunction<dim> &f,
                unsigned int sub,
@@ -184,7 +181,7 @@ check_function(const Functions::FlowFunction<dim> &f,
 
   DataOutBase::DXFlags dxflags;
   DataOutBase::GnuplotFlags gflags;
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > vectors;
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> > vectors;
   if (dim==2)
     DataOutBase::write_gnuplot(patches, names, vectors, gflags, out);
   else
@@ -197,7 +194,6 @@ int main()
   std::string logname = "output";
   std::ofstream logfile(logname.c_str());
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   if (true)
     {

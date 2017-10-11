@@ -28,11 +28,7 @@
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
-#include <deal.II/base/logstream.h>
 
-#include <cmath>
-#include <cstdlib>
-#include <fstream>
 
 
 // 1: continuous refinement of the unit square always in the middle
@@ -197,7 +193,7 @@ private:
 
 template <int dim>
 TestCases<dim>::TestCases () :
-  tria(0), dof(0) {}
+  tria(nullptr), dof(nullptr) {}
 
 
 
@@ -213,8 +209,8 @@ TestCases<dim>::~TestCases ()
 template <int dim>
 void TestCases<dim>::create_new ()
 {
-  if (dof  != 0) delete dof;
-  if (tria != 0) delete tria;
+  if (dof  != nullptr) delete dof;
+  if (tria != nullptr) delete tria;
 
   tria = new Triangulation<dim>();
   GridGenerator::hyper_cube(*tria);
@@ -345,7 +341,6 @@ void TestCases<dim>::run (const unsigned int test_case)
 int main ()
 {
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   for (unsigned int test_case=1; test_case<=2; ++test_case)
     {

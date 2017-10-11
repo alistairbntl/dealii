@@ -20,7 +20,6 @@
 // shell.
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
@@ -36,10 +35,9 @@
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <sstream>
 
-template<int dim>
+template <int dim>
 void test()
 {
   Assert (dim == 3, ExcNotImplemented());
@@ -177,9 +175,7 @@ int main(int argc, char *argv[])
 
     if (myid == 0)
       {
-        std::ofstream logfile("output");
-        deallog.attach(logfile);
-        deallog.threshold_double(1.e-10);
+        initlog();
 
         deallog.push("3d");
         test<3>();

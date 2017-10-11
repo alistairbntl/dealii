@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,18 +13,16 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_matrix_free_h
-#define dealii__petsc_matrix_free_h
+#ifndef dealii_petsc_matrix_free_h
+#define dealii_petsc_matrix_free_h
 
 
 #include <deal.II/base/config.h>
 
 #ifdef DEAL_II_WITH_PETSC
-
 #  include <deal.II/lac/exceptions.h>
 #  include <deal.II/lac/petsc_matrix_base.h>
-#  include <deal.II/lac/petsc_vector.h>
-
+#  include <deal.II/lac/petsc_parallel_vector.h>
 DEAL_II_NAMESPACE_OPEN
 
 
@@ -48,14 +46,12 @@ namespace PETScWrappers
    * multiplication <tt>vmult(VectorBase &dst, const VectorBase &src)</tt>
    * which is pure virtual and must be reimplemented in derived classes.
    * Besides the usual interface, this class has a matrix-vector
-   * multiplication <tt>vmult(Vec  &dst, const Vec  &src)</tt> taking PETSc
-   * Vec objects, which will be called by <tt>matrix_free_mult(Mat A, Vec src,
-   * Vec dst)</tt> registered as matrix-vector multiplication of this PETSc
-   * matrix object. The default implementation of the vmult function in the
-   * base class translates the given PETSc <tt>Vec*</tt> vectors into a
-   * deal.II vector, calls the usual vmult function with the usual interface
-   * and converts the result back to PETSc <tt>Vec*</tt>. This could be made
-   * much more efficient in derived classes without allocating new memory.
+   * multiplication <tt>vmult(Vec &dst, const Vec &src)</tt> taking PETSc Vec
+   * objects, which will be called by <tt>matrix_free_mult(Mat A, Vec src, Vec
+   * dst)</tt> registered as matrix-vector multiplication of this PETSc matrix
+   * object. The default implementation of the vmult function in the base
+   * class wraps the given PETSc vectors with the PETScWrappers::VectorBase
+   * class and then calls the usual vmult function with the usual interface.
    *
    * @ingroup PETScWrappers
    * @ingroup Matrix1
@@ -77,7 +73,7 @@ namespace PETScWrappers
      * For the meaning of the @p local_rows and @p local_columns parameters,
      * see the PETScWrappers::MPI::SparseMatrix class documentation.
      *
-     * As other PETSc matrices, also the the matrix-free object needs to have
+     * As other PETSc matrices, also the matrix-free object needs to have
      * a size and to perform matrix vector multiplications efficiently in
      * parallel also @p local_rows and @p local_columns. But in contrast to
      * PETSc::SparseMatrix classes a PETSc matrix-free object does not need
@@ -94,7 +90,7 @@ namespace PETScWrappers
      * Create a matrix object of dimensions @p m times @p n with communication
      * happening over the provided @p communicator.
      *
-     * As other PETSc matrices, also the the matrix-free object needs to have
+     * As other PETSc matrices, also the matrix-free object needs to have
      * a size and to perform matrix vector multiplications efficiently in
      * parallel also @p local_rows and @p local_columns. But in contrast to
      * PETSc::SparseMatrix classes a PETSc matrix-free object does not need
@@ -153,7 +149,7 @@ namespace PETScWrappers
                  const unsigned int  this_process);
 
     /**
-     * Calls the @p reinit() function above with <tt>communicator =
+     * Call the @p reinit() function above with <tt>communicator =
      * MPI_COMM_WORLD</tt>.
      */
     void reinit (const unsigned int  m,
@@ -162,7 +158,7 @@ namespace PETScWrappers
                  const unsigned int  local_columns);
 
     /**
-     * Calls the @p reinit() function above with <tt>communicator =
+     * Call the @p reinit() function above with <tt>communicator =
      * MPI_COMM_WORLD</tt>.
      */
     void reinit (const unsigned int  m,

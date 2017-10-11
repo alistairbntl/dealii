@@ -1,6 +1,6 @@
 //-----------------------------------------------------------
 //
-//    Copyright (C) 2014 - 2015 by the deal.II authors
+//    Copyright (C) 2014 - 2017 by the deal.II authors
 //
 //    This file is subject to LGPL and may not be distributed
 //    without copyright and license information. Please refer
@@ -16,8 +16,6 @@
 
 #include <deal.II/opencascade/boundary_lib.h>
 
-#include <fstream>
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/grid_out.h>
@@ -50,9 +48,9 @@ int main ()
   gp_Ax2 axis(center, z_axis);
   Standard_Real radius(std::sqrt(2.)/2.);
 
-  Handle(Geom_Curve) circle = GC_MakeCircle(axis, radius);
+  GC_MakeCircle make_circle(axis, radius);
+  Handle(Geom_Circle) circle = make_circle.Value();
   TopoDS_Edge edge = BRepBuilderAPI_MakeEdge(circle);
-
 
   // Create a boundary projector.
   NormalProjectionBoundary<2,3> boundary_line(edge);

@@ -16,7 +16,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
@@ -91,7 +90,7 @@ void test ()
   std::set<types::material_id> material_ids;
   material_ids.insert(2);
   material_ids.insert(3);
-  std_cxx11::function<bool (const cell_iterator &)> predicate
+  std::function<bool (const cell_iterator &)> predicate
     = IteratorFilters::MaterialIdEqualTo(material_ids, true);
   const std::vector<cell_iterator> active_halo_layer
     = GridTools::compute_active_cell_halo_layer(tria, predicate);

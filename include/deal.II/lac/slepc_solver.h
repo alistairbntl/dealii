@@ -14,15 +14,13 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__slepc_solver_h
-#define dealii__slepc_solver_h
+#ifndef dealii_slepc_solver_h
+#define dealii_slepc_solver_h
 
 #include <deal.II/base/config.h>
 
 #ifdef DEAL_II_WITH_SLEPC
 
-#  include <deal.II/base/std_cxx11/shared_ptr.h>
-#  include <deal.II/lac/exceptions.h>
 #  include <deal.II/lac/solver_control.h>
 #  include <deal.II/lac/petsc_matrix_base.h>
 #  include <deal.II/lac/slepc_spectral_transformation.h>
@@ -30,6 +28,8 @@
 #  include <petscconf.h>
 #  include <petscksp.h>
 #  include <slepceps.h>
+
+#  include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -789,7 +789,6 @@ namespace SLEPcWrappers
   void
   SolverBase::set_initial_space(const std::vector<Vector> &this_initial_space)
   {
-    int ierr;
     std::vector<Vec> vecs(this_initial_space.size());
 
     for (unsigned int i = 0; i < this_initial_space.size(); i++)
@@ -804,11 +803,7 @@ namespace SLEPcWrappers
     // One could still build a vector that is rich in the directions of all guesses,
     // by taking a linear combination of them. (TODO: make function virtual?)
 
-#if DEAL_II_PETSC_VERSION_LT(3,1,0)
-    ierr = EPSSetInitialVector (eps, &vecs[0]);
-#else
-    ierr = EPSSetInitialSpace (eps, vecs.size(), &vecs[0]);
-#endif
+    const PetscErrorCode ierr = EPSSetInitialSpace (eps, vecs.size(), &vecs[0]);
     AssertThrow (ierr == 0, ExcSLEPcError(ierr));
   }
 

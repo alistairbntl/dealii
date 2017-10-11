@@ -19,7 +19,6 @@
 // function is constant in space
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -28,14 +27,13 @@
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 #include <string>
 
 #define PRECISION 3
 
 
 
-template<int dim>
+template <int dim>
 void
 test(const unsigned int degree)
 {
@@ -70,7 +68,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   for (unsigned int degree=0; degree<=4; ++degree)
     test<1>(degree);

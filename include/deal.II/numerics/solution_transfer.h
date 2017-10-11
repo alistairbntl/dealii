@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__solution_transfer_h
-#define dealii__solution_transfer_h
+#ifndef dealii_solution_transfer_h
+#define dealii_solution_transfer_h
 
 
 /*----------------------------   solutiontransfer.h     ----------------------*/
@@ -288,10 +288,17 @@ DEAL_II_NAMESPACE_OPEN
  * @author Ralf Hartmann, 1999, Oliver Kayser-Herold and Wolfgang Bangerth,
  * 2006, Wolfgang Bangerth 2014
  */
-template<int dim, typename VectorType=Vector<double>,
-         typename DoFHandlerType=DoFHandler<dim> >
+template <int dim,
+          typename VectorType = Vector<double>,
+          typename DoFHandlerType = DoFHandler<dim> >
 class SolutionTransfer
 {
+#ifndef DEAL_II_MSVC
+  static_assert (dim == DoFHandlerType::dimension,
+                 "The dimension explicitly provided as a template "
+                 "argument, and the dimension of the DoFHandlerType "
+                 "template argument must match.");
+#endif
 public:
 
   /**
@@ -433,7 +440,18 @@ private:
    */
   enum PreparationState
   {
-    none, pure_refinement, coarsening_and_refinement
+    /**
+     * The SolutionTransfer is not yet prepared.
+     */
+    none,
+    /**
+     * The SolutionTransfer is prepared for purely refinement.
+     */
+    pure_refinement,
+    /**
+     * The SolutionTransfer is prepared for coarsening and refinement.
+     */
+    coarsening_and_refinement
   };
 
   /**
@@ -462,16 +480,16 @@ private:
    */
   struct Pointerstruct
   {
-    Pointerstruct() : indices_ptr(0), dof_values_ptr(0), active_fe_index(0) {};
+    Pointerstruct() : indices_ptr(nullptr), dof_values_ptr(nullptr), active_fe_index(0) {};
     Pointerstruct(std::vector<types::global_dof_index> *indices_ptr_in,
                   const unsigned int active_fe_index_in = 0)
       :
       indices_ptr(indices_ptr_in),
-      dof_values_ptr (0),
+      dof_values_ptr (nullptr),
       active_fe_index(active_fe_index_in) {};
     Pointerstruct(std::vector<Vector<typename VectorType::value_type> > *dof_values_ptr_in,
                   const unsigned int active_fe_index_in = 0) :
-      indices_ptr (0),
+      indices_ptr (nullptr),
       dof_values_ptr(dof_values_ptr_in),
       active_fe_index(active_fe_index_in) {};
     std::size_t memory_consumption () const;

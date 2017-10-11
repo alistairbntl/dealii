@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__solver_control_h
-#define dealii__solver_control_h
+#ifndef dealii_solver_control_h
+#define dealii_solver_control_h
 
 
 #include <deal.II/base/config.h>
@@ -99,7 +99,7 @@ public:
       : last_step (last_step), last_residual(last_residual)
     {}
 
-    virtual ~NoConvergence () throw () {}
+    virtual ~NoConvergence () noexcept = default;
 
     virtual void print_info (std::ostream &out) const
     {
@@ -155,7 +155,7 @@ public:
    * Virtual destructor is needed as there are virtual functions in this
    * class.
    */
-  virtual ~SolverControl();
+  virtual ~SolverControl() = default;
 
   /**
    * Interface to parameter file.
@@ -176,11 +176,7 @@ public:
    * procedure.
    *
    * The iteration is also aborted if the residual becomes a denormalized
-   * value (@p NaN). Note, however, that this check is only performed if the
-   * @p isnan function is provided by the operating system, which is not
-   * always true. CMake checks this with the 'check_01_cxx_features.cmake'
-   * test and sets the flag @p DEAL_II_HAVE_ISNAN in the include file
-   * <tt>deal.II/base/config.h</tt> if this function was found.
+   * value (@p NaN).
    *
    * <tt>check()</tt> additionally preserves @p step and @p check_value. These
    * values are accessible by <tt>last_value()</tt> and <tt>last_step()</tt>.
@@ -251,6 +247,11 @@ public:
   void enable_history_data();
 
   /**
+   * Provide read access to the collected residual data.
+   */
+  const std::vector<double> &get_history_data() const;
+
+  /**
    * Average error reduction over all steps.
    *
    * Requires enable_history_data()
@@ -277,7 +278,7 @@ public:
   void log_history (const bool);
 
   /**
-   * Returns the @p log_history flag.
+   * Return the @p log_history flag.
    */
   bool log_history () const;
 
@@ -292,7 +293,7 @@ public:
   void log_result (const bool);
 
   /**
-   * Returns the @p log_result flag.
+   * Return the @p log_result flag.
    */
   bool log_result () const;
 
@@ -428,7 +429,7 @@ public:
    * Virtual destructor is needed as there are virtual functions in this
    * class.
    */
-  virtual ~ReductionControl();
+  virtual ~ReductionControl() = default;
 
   /**
    * Interface to parameter file.
@@ -512,7 +513,7 @@ public:
    * Virtual destructor is needed as there are virtual functions in this
    * class.
    */
-  virtual ~IterationNumberControl();
+  virtual ~IterationNumberControl() = default;
 
   /**
    * Decide about success or failure of an iteration. This function bases
@@ -521,6 +522,74 @@ public:
    */
   virtual State check (const unsigned int step,
                        const double   check_value);
+};
+
+
+/**
+ * Specialization of @p SolverControl which returns SolverControl::State::success if
+ * and only if a certain positive number of consecutive iterations satisfy the
+ * specified tolerance. This is useful in cases when solving nonlinear problems
+ * using inexact Hessian.
+ *
+ * For example: The requested number of consecutively converged iterations is 2,
+ * the tolerance is 0.2. The ConsecutiveControl will return SolverControl::State::success
+ * only at the last step in the sequence 0.5, 0.0005, 1.0, 0.05, 0.01.
+ *
+ * @author Denis Davydov, 2017
+ */
+class ConsecutiveControl : public SolverControl
+{
+public:
+  /**
+   * Constructor. @p n_consecutive_iterations is the number of
+   * consecutive iterations which should satisfy the prescribed tolerance for
+   * convergence. Other arguments have the same meaning as those of the
+   * constructor of the SolverControl.
+   */
+  ConsecutiveControl (const unsigned int maxiter = 100,
+                      const double   tolerance   = 1.e-10,
+                      const unsigned int n_consecutive_iterations = 2,
+                      const bool     log_history = false,
+                      const bool     log_result  = false);
+
+  /**
+   * Initialize with a SolverControl object. The result will emulate
+   * SolverControl by setting @p n_consecutive_iterations to one.
+   */
+  ConsecutiveControl (const SolverControl &c);
+
+  /**
+   * Assign a SolverControl object to ConsecutiveControl. The result of the
+   * assignment will emulate SolverControl by setting @p n_consecutive_iterations
+   * to one.
+   */
+  ConsecutiveControl &operator= (const SolverControl &c);
+
+  /**
+   * Virtual destructor is needed as there are virtual functions in this
+   * class.
+   */
+  virtual ~ConsecutiveControl() = default;
+
+  /**
+   * Decide about success or failure of an iteration, see the class description
+   * above.
+   */
+  virtual State check (const unsigned int step,
+                       const double   check_value);
+
+protected:
+  /**
+   * The number of consecutive iterations which should satisfy the prescribed
+   * tolerance for convergence.
+   */
+  unsigned int n_consecutive_iterations;
+
+  /**
+   * Counter for the number of consecutively converged iterations.
+   */
+  unsigned int n_converged_iterations;
+
 };
 
 /*@}*/

@@ -17,15 +17,12 @@
 // plot PolynomialsBDM on the reference cell
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/job_identifier.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/polynomials_bdm.h>
 #include <deal.II/base/quadrature_lib.h>
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 
 using namespace std;
 
@@ -62,7 +59,6 @@ int main()
   std::ofstream logfile(logname.c_str());
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   PolynomialsBDM<2> p20(0);
   PolynomialsBDM<2> p21(1);

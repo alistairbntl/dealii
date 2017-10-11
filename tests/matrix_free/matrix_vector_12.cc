@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,10 +23,9 @@
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -45,8 +44,8 @@
 template <int dim, int fe_degree, typename Number>
 void
 helmholtz_operator (const MatrixFree<dim,Number>  &data,
-                    std::vector<parallel::distributed::Vector<Number> > &dst,
-                    const std::vector<parallel::distributed::Vector<Number> > &src,
+                    std::vector<LinearAlgebra::distributed::Vector<Number> > &dst,
+                    const std::vector<LinearAlgebra::distributed::Vector<Number> > &src,
                     const std::pair<unsigned int,unsigned int>  &cell_range)
 {
   FEEvaluation<dim,fe_degree,fe_degree+1,2,Number> fe_eval (data);
@@ -82,15 +81,15 @@ public:
     data (data_in)
   {};
 
-  void vmult (std::vector<parallel::distributed::Vector<Number> >       &dst,
-              const std::vector<parallel::distributed::Vector<Number> > &src) const
+  void vmult (std::vector<LinearAlgebra::distributed::Vector<Number> >       &dst,
+              const std::vector<LinearAlgebra::distributed::Vector<Number> > &src) const
   {
     for (unsigned int i=0; i<dst.size(); ++i)
       dst[i] = 0;
-    const std_cxx11::function<void(const MatrixFree<dim,Number> &,
-                                   std::vector<parallel::distributed::Vector<Number> > &,
-                                   const std::vector<parallel::distributed::Vector<Number> > &,
-                                   const std::pair<unsigned int,unsigned int> &)>
+    const std::function<void(const MatrixFree<dim,Number> &,
+                             std::vector<LinearAlgebra::distributed::Vector<Number> > &,
+                             const std::vector<LinearAlgebra::distributed::Vector<Number> > &,
+                             const std::pair<unsigned int,unsigned int> &)>
     wrap = helmholtz_operator<dim,fe_degree,Number>;
     data.cell_loop (wrap, dst, src);
   };
@@ -151,7 +150,7 @@ void test ()
 
   ConstraintMatrix constraints (relevant_set);
   DoFTools::make_hanging_node_constraints(dof, constraints);
-  VectorTools::interpolate_boundary_values (dof, 0, ZeroFunction<dim>(),
+  VectorTools::interpolate_boundary_values (dof, 0, Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close();
 
@@ -164,7 +163,6 @@ void test ()
   {
     const QGauss<1> quad (fe_degree+1);
     typename MatrixFree<dim,number>::AdditionalData data;
-    data.mpi_communicator = MPI_COMM_WORLD;
     data.tasks_parallel_scheme =
       MatrixFree<dim,number>::AdditionalData::none;
     data.tasks_block_size = 7;
@@ -172,8 +170,8 @@ void test ()
   }
 
   MatrixFreeTest<dim,fe_degree,number> mf (mf_data);
-  parallel::distributed::Vector<number> ref;
-  std::vector<parallel::distributed::Vector<number> > in(2), out(2);
+  LinearAlgebra::distributed::Vector<number> ref;
+  std::vector<LinearAlgebra::distributed::Vector<number> > in(2), out(2);
   for (unsigned int i=0; i<2; ++i)
     {
       mf_data.initialize_dof_vector (in[i]);
@@ -269,10 +267,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       deallog.push("2d");
       test<2,1>();

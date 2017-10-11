@@ -13,6 +13,9 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_fe_poly_templates_h
+#define dealii_fe_poly_templates_h
+
 
 #include <deal.II/base/qprojector.h>
 #include <deal.II/base/polynomial_space.h>
@@ -199,8 +202,8 @@ FE_Poly<PolynomialType,dim,spacedim>::requires_update_flags (const UpdateFlags f
            | update_hessians | update_gradients
            | update_jacobian_pushed_forward_grads
            | update_jacobian_pushed_forward_2nd_derivatives;
-  if (flags & update_cell_normal_vectors)
-    out |= update_cell_normal_vectors | update_JxW_values;
+  if (flags & update_normal_vectors)
+    out |= update_normal_vectors | update_JxW_values;
 
   return out;
 }
@@ -228,7 +231,7 @@ fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr, ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
   const UpdateFlags flags(fe_data.update_each);
@@ -290,7 +293,7 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator  
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr, ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
   // offset determines which data set
@@ -369,7 +372,7 @@ fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterato
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr, ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
   // offset determines which data set
@@ -534,3 +537,5 @@ FE_Poly<PolynomialType,dim,spacedim>::get_poly_space_numbering_inverse () const
 
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

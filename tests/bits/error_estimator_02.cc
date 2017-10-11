@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -34,10 +33,9 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/error_estimator.h>
 
-#include <fstream>
 
 
-template<int dim>
+template <int dim>
 class MySquareFunction : public Function<dim>
 {
 public:
@@ -71,7 +69,7 @@ get_q_face (Function<dim> &)
 Quadrature<0> &
 get_q_face (Function<1> &)
 {
-  Quadrature<0> *q = 0;
+  Quadrature<0> *q = nullptr;
   return *q;
 }
 
@@ -169,7 +167,7 @@ check ()
       Vector<float> this_error (tria.n_active_cells());
       KellyErrorEstimator<dim>::estimate (mapping, dof, q_face, neumann_bc,
                                           v, this_error,
-                                          std::vector<bool>(), 0,
+                                          std::vector<bool>(), nullptr,
                                           MultithreadInfo::n_threads(),
                                           numbers::invalid_unsigned_int,
                                           material);

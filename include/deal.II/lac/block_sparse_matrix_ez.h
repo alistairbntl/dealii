@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_sparse_matrix_ez_h
-#define dealii__block_sparse_matrix_ez_h
+#ifndef dealii_block_sparse_matrix_ez_h
+#define dealii_block_sparse_matrix_ez_h
 
 
 //TODO: Derive BlockSparseMatrixEZ from BlockMatrixBase, like all the other block matrices as well; this would allow to instantiate a few functions with this template argument as well (in particular ConstraintMatrix::distribute_local_to_global)
@@ -48,7 +48,7 @@ template <typename Number> class BlockVector;
  * @ref GlossBlockLA "Block (linear algebra)"
  * @author Guido Kanschat, 2002, 2003
  */
-template<typename Number>
+template <typename Number>
 class BlockSparseMatrixEZ : public Subscriptor
 {
 public:
@@ -60,7 +60,7 @@ public:
   /**
    * Default constructor. The result is an empty object with zero dimensions.
    */
-  BlockSparseMatrixEZ ();
+  BlockSparseMatrixEZ () = default;
 
   /**
    * Constructor setting up an object with given number of block rows and
@@ -148,24 +148,6 @@ public:
    * matrices.
    */
   bool empty () const;
-
-  /**
-   * Return number of rows of this matrix, which equals the dimension of the
-   * codomain (or range) space. It is the sum of the number of rows over the
-   * sub-matrix blocks of this matrix.
-   *
-   * @deprecated Use m() instead.
-   */
-  size_type n_rows () const DEAL_II_DEPRECATED;
-
-  /**
-   * Return number of columns of this matrix, which equals the dimension of
-   * the domain space. It is the sum of the number of columns over the sub-
-   * matrix blocks of this matrix.
-   *
-   * @deprecated Use n() instead.
-   */
-  size_type n_cols () const DEAL_II_DEPRECATED;
 
   /**
    * Return number of rows of this matrix, which equals the dimension of the
@@ -279,30 +261,10 @@ BlockSparseMatrixEZ<Number>::n_block_rows () const
 
 template <typename Number>
 inline
-typename BlockSparseMatrixEZ<Number>::size_type
-BlockSparseMatrixEZ<Number>::n_rows () const
-{
-  return row_indices.total_size();
-}
-
-
-
-template <typename Number>
-inline
 unsigned int
 BlockSparseMatrixEZ<Number>::n_block_cols () const
 {
   return column_indices.size();
-}
-
-
-
-template <typename Number>
-inline
-typename BlockSparseMatrixEZ<Number>::size_type
-BlockSparseMatrixEZ<Number>::n_cols () const
-{
-  return column_indices.total_size();
 }
 
 
@@ -538,4 +500,4 @@ BlockSparseMatrixEZ<number>::print_statistics (StreamType &out, bool full)
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif //dealii__block_sparse_matrix_ez_h
+#endif //dealii_block_sparse_matrix_ez_h

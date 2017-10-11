@@ -20,7 +20,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 
 #include <deal.II/grid/tria.h>
@@ -34,8 +33,6 @@
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
-#include <iomanip>
 #include <vector>
 
 
@@ -75,7 +72,7 @@ void test ()
               << ", DoFs=";
       for (unsigned int i=0; i<fe.dofs_per_cell; ++i)
         {
-          Assert (local_dof_indices[i] != DoFHandler<dim>::invalid_dof_index,
+          Assert (local_dof_indices[i] != numbers::invalid_dof_index,
                   ExcInternalError());
           deallog << local_dof_indices[i] << ' ';
         }
@@ -89,9 +86,7 @@ void test ()
 int main ()
 {
   deal_II_exceptions::disable_abort_on_exception();
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<1>();
   test<2>();

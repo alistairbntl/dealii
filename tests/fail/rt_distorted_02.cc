@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,17 +22,14 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 
 #define PRECISION 2
 
-#include <fstream>
 
 std::ofstream logfile ("output");
 
 char buf[1000];
 
-#include <fstream>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
@@ -49,6 +46,7 @@ char buf[1000];
 #include <deal.II/lac/sparsity_pattern.h>
 #include <deal.II/lac/sparse_matrix.h>
 
+#include <deal.II/base/numbers.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -64,7 +62,6 @@ char buf[1000];
 #include <deal.II/fe/mapping_q1_eulerian.h>
 #include <deal.II/grid/grid_tools.h>
 
-#include <fstream>
 
 
 template <int dim>
@@ -286,7 +283,7 @@ double EvaluateDiver (Mapping<2> &mapping,
   QGauss<2> quad (6);
   FEValues<2> fe_values (mapping, dof_handler.get_fe (), quad,
                          UpdateFlags(update_values    |
-                                     update_q_points  |
+                                     update_quadrature_points  |
                                      update_gradients |
                                      update_JxW_values|
                                      update_contravariant_transformation));
@@ -331,7 +328,6 @@ int main ()
   logfile.precision (PRECISION);
   logfile.setf(std::ios::fixed);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   Triangulation<2> tria_test;
   Point<2> p1 (0,0),
@@ -395,7 +391,7 @@ int main ()
   deallog << buf;
 
   // Try rotating the elements
-  for (double rotat = 0; rotat < 2 * M_PI; rotat += 0.25 * M_PI)
+  for (double rotat = 0; rotat < 2 * numbers::PI; rotat += 0.25 * numbers::PI)
     {
       // Rotate element
       VectorTools::project (dof_handler_def, hn_constraints_def,

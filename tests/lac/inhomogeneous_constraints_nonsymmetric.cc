@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,7 +23,6 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
@@ -39,9 +38,8 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/error_estimator.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -158,8 +156,8 @@ void AdvectionProblem<dim>::setup_system ()
   hanging_nodes_only.close ();
   test_all_constraints.close ();
 
-  CompressedSimpleSparsityPattern csp (dof_handler.n_dofs(),
-                                       dof_handler.n_dofs());
+  DynamicSparsityPattern csp (dof_handler.n_dofs(),
+                              dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern (dof_handler, csp,
                                    hanging_nodes_only, true);
   sparsity_pattern.copy_from (csp);
@@ -476,7 +474,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-12);
 
   {
     AdvectionProblem<2> advection_problem;

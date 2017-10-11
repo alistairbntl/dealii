@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,11 +22,7 @@
 
 
 #include "../tests.h"
-#include "testmatrix.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_memory.h>
@@ -39,7 +35,7 @@
 #include <deal.II/lac/solver_qmrs.h>
 #include <deal.II/lac/precondition.h>
 
-template<typename SolverType, typename MatrixType, typename VectorType>
+template <typename SolverType, typename MatrixType, typename VectorType>
 void
 check_solve (const MatrixType &A,
              VectorType       &u,
@@ -69,7 +65,6 @@ int main()
 //  logfile.setf(std::ios::fixed);
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   for (unsigned int size=4; size <= 30; size *= 3)
     {
@@ -97,7 +92,7 @@ int main()
       check_solve<SolverQMRS<> >(A,u,f);
 
       // test use_default_residual=false case
-      check_solve<SolverGMRES<> >(A,u,f, typename SolverGMRES<>::AdditionalData(30, false, false));
+      check_solve<SolverGMRES<> >(A,u,f, SolverGMRES<>::AdditionalData(30, false, false));
 
       deallog.pop();
     }

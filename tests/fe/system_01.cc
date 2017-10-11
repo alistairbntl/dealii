@@ -23,21 +23,19 @@
 // elements and then munging the results
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_tools.h>
 
-#include <fstream>
 #include <string>
 
 #define PRECISION 5
 
 
 
-template<int dim>
+template <int dim>
 void
 check(const FiniteElement<dim> &fe1,
       const FiniteElement<dim> &fe2)
@@ -81,7 +79,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   CHECK_SYS1(FE_Q<1>(1),  3,
              FE_Q<1>(2),  3,

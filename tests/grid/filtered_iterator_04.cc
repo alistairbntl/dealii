@@ -17,7 +17,6 @@
 // check filtered iterators using multiple predicate
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -73,7 +72,6 @@ int main ()
 {
   initlog();
   deallog << std::setprecision(4);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

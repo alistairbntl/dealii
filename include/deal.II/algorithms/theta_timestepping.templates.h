@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,10 +13,14 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_theta_timestepping_templates_h
+#define dealii_theta_timestepping_templates_h
+
 
 #include <deal.II/algorithms/theta_timestepping.h>
 
 #include <deal.II/base/parameter_handler.h>
+#include <deal.II/base/signaling_nan.h>
 #include <deal.II/lac/vector_memory.h>
 
 DEAL_II_NAMESPACE_OPEN
@@ -24,9 +28,20 @@ DEAL_II_NAMESPACE_OPEN
 namespace Algorithms
 {
   template <typename VectorType>
-  ThetaTimestepping<VectorType>::ThetaTimestepping (OperatorBase &e, OperatorBase &i)
-    : vtheta(0.5), adaptive(false), op_explicit(&e), op_implicit(&i)
-  {}
+  ThetaTimestepping<VectorType>::ThetaTimestepping (OperatorBase &e,
+                                                    OperatorBase &i)
+    :
+    vtheta(0.5),
+    adaptive(false),
+    op_explicit(&e),
+    op_implicit(&i)
+  {
+    d_explicit.step = numbers::signaling_nan<double>();
+    d_explicit.time = numbers::signaling_nan<double>();
+
+    d_implicit.step = numbers::signaling_nan<double>();
+    d_implicit.time = numbers::signaling_nan<double>();
+  }
 
 
   template <typename VectorType>
@@ -66,7 +81,7 @@ namespace Algorithms
   {
     Assert(!adaptive, ExcNotImplemented());
 
-    deallog.push ("Theta");
+    LogStream::Prefix prefix("Theta");
 
     VectorType &solution = *out.entry<VectorType *>(0);
     GrowingVectorMemory<VectorType> mem;
@@ -90,16 +105,16 @@ namespace Algorithms
     AnyData src2;
 
     AnyData out1;
-    out1.add<VectorType *>(aux, "Solution");
+    out1.add<VectorType *>(aux.get(), "Solution");
     // The data provided to the inner solver
-    src2.add<const VectorType *>(aux, "Previous time");
+    src2.add<const VectorType *>(aux.get(), "Previous time");
     src2.add<const VectorType *>(&solution, "Previous iterate");
     src2.add<const double *>(&d_implicit.time, "Time");
     src2.add<const double *>(&d_implicit.step, "Timestep");
     src2.add<const double *>(&vtheta, "Theta");
     src2.merge(in);
 
-    if (output != 0)
+    if (output != nullptr)
       (*output) << 0U << out;
 
     for (unsigned int count = 1; d_explicit.time < control.final(); ++count)
@@ -123,13 +138,14 @@ namespace Algorithms
         (*op_explicit)(out1, src1);
         (*op_implicit)(out, src2);
 
-        if (output != 0 && control.print())
+        if (output != nullptr && control.print())
           (*output) << count << out;
 
         d_explicit.time = control.now();
       }
-    deallog.pop();
   }
 }
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

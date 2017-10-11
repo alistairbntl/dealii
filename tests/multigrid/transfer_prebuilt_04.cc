@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2016 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,17 +16,17 @@
 
 // Deadlock reported by Kronbichler (github
 // https://github.com/dealii/dealii/issues/2051) with 3 processes
-// in MgTransferPrebuilt
+// in MGTransferPrebuilt
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/multigrid/mg_transfer.h>
+#include <deal.II/multigrid/mg_transfer_matrix_free.h>
 #include <deal.II/grid/grid_out.h>
 
 
@@ -56,15 +56,8 @@ void check()
       mgdof.distribute_dofs(fe);
       mgdof.distribute_mg_dofs(fe);
 
-      ConstraintMatrix hanging_node_constraints;
-      IndexSet relevant_dofs;
-      DoFTools::extract_locally_relevant_dofs(mgdof, relevant_dofs);
-      hanging_node_constraints.reinit(relevant_dofs);
-      DoFTools::make_hanging_node_constraints(mgdof, hanging_node_constraints);
-      hanging_node_constraints.close();
-
       MGConstrainedDoFs mg_constrained_dofs;
-      ZeroFunction<dim> zero_function;
+      Functions::ZeroFunction<dim> zero_function;
       typename FunctionMap<dim>::type dirichlet_boundary;
       dirichlet_boundary[0] = &zero_function;
       mg_constrained_dofs.initialize(mgdof, dirichlet_boundary);
@@ -83,16 +76,29 @@ void check()
 
           grid_out.write_svg (tr, grid_output);
         }
+#ifdef DEAL_II_WITH_TRILINOS
+      {
+        // MGTransferPrebuilt internally uses Trilinos matrices, so only
+        // create this if we have Trilinos
+        MGTransferPrebuilt<LinearAlgebra::distributed::Vector<double> >
+        transfer_ref(mg_constrained_dofs);
+        transfer_ref.build_matrices(mgdof);
+      }
+#endif
+      {
+        // but the matrix free transfer will work without Trilinos
+        MGTransferMatrixFree<dim, double>
+        transfer_ref(mg_constrained_dofs);
+        transfer_ref.build(mgdof);
+      }
 
-      MGTransferPrebuilt<parallel::distributed::Vector<double> >
-      transfer_ref(hanging_node_constraints, mg_constrained_dofs);
-      transfer_ref.build_matrices(mgdof);
+
     }
 }
 
 int main(int argc, char **argv)
 {
-  Utilities::MPI::MPI_InitFinalize mpi(argc, argv);
+  Utilities::MPI::MPI_InitFinalize mpi(argc, argv, 1);
   mpi_initlog();
 
   check<2>();

@@ -21,13 +21,11 @@
 // this test does not use any local refinement
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/grid_tools.h>
 
-#include <fstream>
 
 
 void check (Triangulation<3> &tria)
@@ -49,9 +47,7 @@ void check (Triangulation<3> &tria)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

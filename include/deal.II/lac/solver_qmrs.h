@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__solver_qmrs_h
-#define dealii__solver_qmrs_h
+#ifndef dealii_solver_qmrs_h
+#define dealii_solver_qmrs_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/lac/solver.h>
@@ -91,8 +91,8 @@ public:
      * 1e-16.
      */
     explicit
-    AdditionalData(bool exact_residual = false,
-                   double breakdown=1.e-16) :
+    AdditionalData(const bool   exact_residual = false,
+                   const double breakdown      = 1.e-16) :
       exact_residual(exact_residual),
       breakdown(breakdown)
     {}
@@ -125,17 +125,17 @@ public:
   /**
    * Solve the linear system $Ax=b$ for x.
    */
-  template<typename MatrixType, typename PreconditionerType>
+  template <typename MatrixType, typename PreconditionerType>
   void
   solve (const MatrixType         &A,
          VectorType               &x,
          const VectorType         &b,
-         const PreconditionerType &precondition);
+         const PreconditionerType &preconditioner);
 
   /**
    * Interface for derived class. This function gets the current iteration
    * vector, the residual and the update vector in each step. It can be used
-   * for a graphical output of the convergence history.
+   * for graphical output of the convergence history.
    */
   virtual void print_vectors (const unsigned int step,
                               const VectorType   &x,
@@ -146,24 +146,6 @@ protected:
    * Implementation of the computation of the norm of the residual.
    */
   virtual double criterion();
-
-  /**
-   * Temporary vectors, allocated through the @p VectorMemory object at the
-   * start of the actual solution process and deallocated at the end.
-   */
-  VectorType *Vv;
-  VectorType *Vp;
-  VectorType *Vq;
-  VectorType *Vt;
-  VectorType *Vd;
-  /**
-   * Iteration vector.
-   */
-  VectorType *Vx;
-  /**
-   * RHS vector.
-   */
-  const VectorType *Vb;
 
   /**
    * Within the iteration loop, the square of the residual vector is stored in
@@ -198,10 +180,17 @@ private:
    * The iteration loop itself. The function returns a structure indicating
    * what happened in this function.
    */
-  template<typename MatrixType, typename PreconditionerType>
+  template <typename MatrixType, typename PreconditionerType>
   IterationResult
   iterate (const MatrixType         &A,
-           const PreconditionerType &precondition);
+           VectorType &x,
+           const VectorType &b,
+           const PreconditionerType &preconditioner,
+           VectorType &v,
+           VectorType &p,
+           VectorType &q,
+           VectorType &t,
+           VectorType &d);
 
   /**
    * Number of the current iteration (accumulated over restarts)
@@ -214,7 +203,7 @@ private:
 
 #ifndef DOXYGEN
 
-template<class VectorType>
+template <class VectorType>
 SolverQMRS<VectorType>::IterationResult::IterationResult (const SolverControl::State state,
                                                           const double               last_residual)
   :
@@ -223,7 +212,7 @@ SolverQMRS<VectorType>::IterationResult::IterationResult (const SolverControl::S
 {}
 
 
-template<class VectorType>
+template <class VectorType>
 SolverQMRS<VectorType>::SolverQMRS (SolverControl            &cn,
                                     VectorMemory<VectorType> &mem,
                                     const AdditionalData     &data)
@@ -234,7 +223,7 @@ SolverQMRS<VectorType>::SolverQMRS (SolverControl            &cn,
 
 
 
-template<class VectorType>
+template <class VectorType>
 SolverQMRS<VectorType>::SolverQMRS(SolverControl        &cn,
                                    const AdditionalData &data)
   :
@@ -244,7 +233,7 @@ SolverQMRS<VectorType>::SolverQMRS(SolverControl        &cn,
 
 
 
-template<class VectorType>
+template <class VectorType>
 double
 SolverQMRS<VectorType>::criterion()
 {
@@ -253,7 +242,7 @@ SolverQMRS<VectorType>::criterion()
 
 
 
-template<class VectorType>
+template <class VectorType>
 void
 SolverQMRS<VectorType>::print_vectors(const unsigned int,
                                       const VectorType &,
@@ -263,25 +252,25 @@ SolverQMRS<VectorType>::print_vectors(const unsigned int,
 
 
 
-template<class VectorType>
-template<typename MatrixType, typename PreconditionerType>
+template <class VectorType>
+template <typename MatrixType, typename PreconditionerType>
 void
 SolverQMRS<VectorType>::solve (const MatrixType         &A,
                                VectorType               &x,
                                const VectorType         &b,
-                               const PreconditionerType &precondition)
+                               const PreconditionerType &preconditioner)
 {
-  deallog.push("QMRS");
+  LogStream::Prefix prefix("QMRS");
 
-  // Memory allocation
-  Vv  = this->memory.alloc();
-  Vp  = this->memory.alloc();
-  Vq  = this->memory.alloc();
-  Vt  = this->memory.alloc();
-  Vd  = this->memory.alloc();
+  // temporary vectors, allocated through the @p VectorMemory object at the
+  // start of the actual solution process and deallocated at the end.
+  typename VectorMemory<VectorType>::Pointer Vv(this->memory);
+  typename VectorMemory<VectorType>::Pointer Vp(this->memory);
+  typename VectorMemory<VectorType>::Pointer Vq(this->memory);
+  typename VectorMemory<VectorType>::Pointer Vt(this->memory);
+  typename VectorMemory<VectorType>::Pointer Vd(this->memory);
 
-  Vx = &x;
-  Vb = &b;
+
   // resize the vectors, but do not set
   // the values since they'd be overwritten
   // soon anyway.
@@ -298,19 +287,9 @@ SolverQMRS<VectorType>::solve (const MatrixType         &A,
     {
       if (step > 0)
         deallog << "Restart step " << step << std::endl;
-      state = iterate(A, precondition);
+      state = iterate(A, x, b, preconditioner, *Vv, *Vp, *Vq, *Vt, *Vd);
     }
   while (state.state == SolverControl::iterate);
-
-  // Deallocate Memory
-  this->memory.free(Vv);
-  this->memory.free(Vp);
-  this->memory.free(Vq);
-  this->memory.free(Vt);
-  this->memory.free(Vd);
-
-  // Output
-  deallog.pop();
 
   // in case of failure: throw exception
   AssertThrow(state.state == SolverControl::success,
@@ -321,11 +300,18 @@ SolverQMRS<VectorType>::solve (const MatrixType         &A,
 
 
 
-template<class VectorType>
-template<typename MatrixType, typename PreconditionerType>
+template <class VectorType>
+template <typename MatrixType, typename PreconditionerType>
 typename SolverQMRS<VectorType>::IterationResult
 SolverQMRS<VectorType>::iterate(const MatrixType         &A,
-                                const PreconditionerType &precondition)
+                                VectorType &x,
+                                const VectorType &b,
+                                const PreconditionerType &preconditioner,
+                                VectorType &v,
+                                VectorType &p,
+                                VectorType &q,
+                                VectorType &t,
+                                VectorType &d)
 {
   /* Remark: the matrix A in the article is the preconditioned matrix.
    * Therefore, we have to precondition x before we compute the first residual.
@@ -335,24 +321,15 @@ SolverQMRS<VectorType>::iterate(const MatrixType         &A,
 
   SolverControl::State state = SolverControl::iterate;
 
-  // define some aliases for simpler access
-  VectorType &v  = *Vv;
-  VectorType &p  = *Vp;
-  VectorType &q  = *Vq;
-  VectorType &t  = *Vt;
-  VectorType &d  = *Vd;
-  VectorType &x  = *Vx;
-  const VectorType &b = *Vb;
-
   int  it=0;
 
-  double tau, rho, theta=0, sigma, alpha, psi, theta_old, rho_old, beta;
+  double tau, rho, theta=0;
   double res;
 
   d.reinit(x);
 
   // Apply right preconditioning to x
-  precondition.vmult(q,x);
+  preconditioner.vmult(q,x);
   // Preconditioned residual
   A.vmult(v,q);
   v.sadd(-1.,1.,b);
@@ -363,7 +340,7 @@ SolverQMRS<VectorType>::iterate(const MatrixType         &A,
 
   p = v;
 
-  precondition.vmult(q,p);
+  preconditioner.vmult(q,p);
 
   tau = v.norm_sqr();
   rho = q*v;
@@ -375,23 +352,23 @@ SolverQMRS<VectorType>::iterate(const MatrixType         &A,
       // Step 1
       A.vmult(t,q);
       // Step 2
-      sigma = q*t;
+      const double sigma = q*t;
 
 //TODO:[?] Find a really good breakdown criterion. The absolute one detects breakdown instead of convergence
       if (std::fabs(sigma/rho) < additional_data.breakdown)
         return IterationResult(SolverControl::iterate, std::fabs(sigma/rho));
       // Step 3
-      alpha = rho/sigma;
+      const double alpha = rho/sigma;
 
       v.add(-alpha,t);
       // Step 4
-      theta_old = theta;
+      const double theta_old = theta;
       theta = v*v/tau;
-      psi = 1./(1.+theta);
+      const double psi = 1./(1.+theta);
       tau *= theta*psi;
 
       d.sadd(psi*theta_old, psi*alpha, p);
-      x.add(d);
+      x += d;
 
       print_vectors(step,x,v,d);
       // Step 5
@@ -411,13 +388,13 @@ SolverQMRS<VectorType>::iterate(const MatrixType         &A,
       if (std::fabs(rho) < additional_data.breakdown)
         return IterationResult(SolverControl::iterate, std::fabs(rho));
       // Step 7
-      rho_old = rho;
-      precondition.vmult(q,v);
+      const double rho_old = rho;
+      preconditioner.vmult(q,v);
       rho = q*v;
 
-      beta = rho/rho_old;
+      const double beta = rho/rho_old;
       p.sadd(beta,v);
-      precondition.vmult(q,p);
+      preconditioner.vmult(q,p);
     }
   return IterationResult(SolverControl::success, std::fabs(rho));
 }

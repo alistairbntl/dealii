@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/convergence_table.h>
@@ -57,7 +56,6 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/error_estimator.h>
 
-#include <fstream>
 #include <sstream>
 
 namespace Step22
@@ -110,7 +108,7 @@ namespace Step22
     BlockVector<double> solution;
     BlockVector<double> system_rhs;
 
-    std_cxx11::shared_ptr<typename InnerPreconditioner<dim>::type>
+    std::shared_ptr<typename InnerPreconditioner<dim>::type>
     A_preconditioner;
 
     ConvergenceTable convergence_table;
@@ -471,7 +469,7 @@ namespace Step22
             << std::endl;
 
     {
-      BlockCompressedSimpleSparsityPattern csp (2,2);
+      BlockDynamicSparsityPattern csp (2,2);
 
       csp.block(0,0).reinit (n_u, n_u);
       csp.block(1,0).reinit (n_p, n_u);
@@ -626,7 +624,7 @@ namespace Step22
       }
 
     A_preconditioner
-      = std_cxx11::shared_ptr<typename InnerPreconditioner<dim>::type>(new
+      = std::shared_ptr<typename InnerPreconditioner<dim>::type>(new
           typename InnerPreconditioner<dim>::type());
     A_preconditioner->initialize (system_matrix.block(0,0),
                                   typename
@@ -878,7 +876,7 @@ namespace Step22
   }
 
   //squared l^2 norm of divergence of velocity
-  template<int dim>
+  template <int dim>
   void StokesProblem<dim>::divergence_velocity
   (const BlockVector<double> &calc_solution,
    Vector<double>         &output_vector,

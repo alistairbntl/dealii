@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -50,8 +50,13 @@ TimeDependent::TimeDependent (const TimeSteppingData &data_primal,
 
 TimeDependent::~TimeDependent ()
 {
-  while (timesteps.size() != 0)
-    delete_timestep (0);
+  try
+    {
+      while (timesteps.size() != 0)
+        delete_timestep (0);
+    }
+  catch (...)
+    {}
 }
 
 
@@ -60,50 +65,54 @@ TimeDependent::insert_timestep (const TimeStepBase *position,
                                 TimeStepBase       *new_timestep)
 {
   Assert ((std::find(timesteps.begin(), timesteps.end(), position) != timesteps.end()) ||
-          (position == 0),
+          (position == nullptr),
           ExcInvalidPosition());
   // first insert the new time step
   // into the doubly linked list
   // of timesteps
-  if (position == 0)
+  if (position == nullptr)
     {
       // at the end
-      new_timestep->set_next_timestep (0);
+      new_timestep->set_next_timestep (nullptr);
       if (timesteps.size() > 0)
         {
           timesteps.back()->set_next_timestep (new_timestep);
           new_timestep->set_previous_timestep (timesteps.back());
         }
       else
-        new_timestep->set_previous_timestep (0);
+        new_timestep->set_previous_timestep (nullptr);
     }
   else if (position == timesteps[0])
     {
       // at the beginning
-      new_timestep->set_previous_timestep (0);
+      new_timestep->set_previous_timestep (nullptr);
       if (timesteps.size() > 0)
         {
           timesteps[0]->set_previous_timestep (new_timestep);
           new_timestep->set_next_timestep (timesteps[0]);
         }
       else
-        new_timestep->set_next_timestep (0);
+        new_timestep->set_next_timestep (nullptr);
     }
   else
     {
       // inner time step
-      std::vector<SmartPointer<TimeStepBase,TimeDependent> >::iterator insert_position
+      const std::vector<SmartPointer<TimeStepBase,TimeDependent> >::iterator insert_position
         = std::find(timesteps.begin(), timesteps.end(), position);
+      // check iterators again to satisfy coverity: both insert_position and
+      // insert_position - 1 must be valid iterators
+      Assert(insert_position != timesteps.begin() &&
+             insert_position != timesteps.end(), ExcInternalError());
 
       (*(insert_position-1))->set_next_timestep (new_timestep);
       new_timestep->set_previous_timestep (*(insert_position-1));
       new_timestep->set_next_timestep (*insert_position);
       (*insert_position)->set_previous_timestep (new_timestep);
-    };
+    }
 
   // finally enter it into the
   // array
-  timesteps.insert ((position == 0 ?
+  timesteps.insert ((position == nullptr ?
                      timesteps.end() :
                      std::find(timesteps.begin(), timesteps.end(), position)),
                     new_timestep);
@@ -113,7 +122,7 @@ TimeDependent::insert_timestep (const TimeStepBase *position,
 void
 TimeDependent::add_timestep (TimeStepBase *new_timestep)
 {
-  insert_timestep (0, new_timestep);
+  insert_timestep (nullptr, new_timestep);
 }
 
 
@@ -126,7 +135,7 @@ void TimeDependent::delete_timestep (const unsigned int position)
   // later deletion and unlock
   // SmartPointer
   TimeStepBase *t = timesteps[position];
-  timesteps[position] = 0;
+  timesteps[position] = nullptr;
   // Now delete unsubscribed object
   delete t;
 
@@ -154,8 +163,8 @@ void TimeDependent::delete_timestep (const unsigned int position)
 void
 TimeDependent::solve_primal_problem ()
 {
-  do_loop (std::mem_fun(&TimeStepBase::init_for_primal_problem),
-           std::mem_fun(&TimeStepBase::solve_primal_problem),
+  do_loop (std::bind(&TimeStepBase::init_for_primal_problem, std::placeholders::_1),
+           std::bind(&TimeStepBase::solve_primal_problem, std::placeholders::_1),
            timestepping_data_primal,
            forward);
 }
@@ -164,8 +173,8 @@ TimeDependent::solve_primal_problem ()
 void
 TimeDependent::solve_dual_problem ()
 {
-  do_loop (std::mem_fun(&TimeStepBase::init_for_dual_problem),
-           std::mem_fun(&TimeStepBase::solve_dual_problem),
+  do_loop (std::bind(&TimeStepBase::init_for_dual_problem, std::placeholders::_1),
+           std::bind(&TimeStepBase::solve_dual_problem, std::placeholders::_1),
            timestepping_data_dual,
            backward);
 }
@@ -174,8 +183,8 @@ TimeDependent::solve_dual_problem ()
 void
 TimeDependent::postprocess ()
 {
-  do_loop (std::mem_fun(&TimeStepBase::init_for_postprocessing),
-           std::mem_fun(&TimeStepBase::postprocess_timestep),
+  do_loop (std::bind(&TimeStepBase::init_for_postprocessing, std::placeholders::_1),
+           std::bind(&TimeStepBase::postprocess_timestep, std::placeholders::_1),
            timestepping_data_postprocess,
            forward);
 }
@@ -210,7 +219,7 @@ void TimeDependent::end_sweep ()
   void (TimeDependent::*p) (const unsigned int, const unsigned int)
     = &TimeDependent::end_sweep;
   parallel::apply_to_subranges (0U, timesteps.size(),
-                                std_cxx11::bind (p, this, std_cxx11::_1, std_cxx11::_2),
+                                std::bind (p, this, std::placeholders::_1, std::placeholders::_2),
                                 1);
 }
 
@@ -245,16 +254,12 @@ TimeDependent::memory_consumption () const
 
 
 TimeStepBase::TimeStepBase (const double time) :
-  previous_timestep(0),
-  next_timestep (0),
+  previous_timestep(nullptr),
+  next_timestep (nullptr),
   sweep_no (numbers::invalid_unsigned_int),
   timestep_no (numbers::invalid_unsigned_int),
-  time (time)
-{}
-
-
-
-TimeStepBase::~TimeStepBase ()
+  time (time),
+  next_action(numbers::invalid_unsigned_int)
 {}
 
 
@@ -342,7 +347,7 @@ TimeStepBase::get_timestep_no () const
 double
 TimeStepBase::get_backward_timestep () const
 {
-  Assert (previous_timestep != 0,
+  Assert (previous_timestep != nullptr,
           ExcMessage("The backward time step cannot be computed because "
                      "there is no previous time step."));
   return time - previous_timestep->time;
@@ -353,7 +358,7 @@ TimeStepBase::get_backward_timestep () const
 double
 TimeStepBase::get_forward_timestep () const
 {
-  Assert (next_timestep != 0,
+  Assert (next_timestep != nullptr,
           ExcMessage("The forward time step cannot be computed because "
                      "there is no next time step."));
   return next_timestep->time - time;
@@ -405,8 +410,8 @@ TimeStepBase::memory_consumption () const
 template <int dim>
 TimeStepBase_Tria<dim>::TimeStepBase_Tria() :
   TimeStepBase (0),
-  tria (0, typeid(*this).name()),
-  coarse_grid (0, typeid(*this).name()),
+  tria (nullptr, typeid(*this).name()),
+  coarse_grid (nullptr, typeid(*this).name()),
   flags (),
   refinement_flags(0)
 {
@@ -421,7 +426,7 @@ TimeStepBase_Tria<dim>::TimeStepBase_Tria (const double              time,
                                            const Flags              &flags,
                                            const RefinementFlags    &refinement_flags) :
   TimeStepBase (time),
-  tria(0, typeid(*this).name()),
+  tria(nullptr, typeid(*this).name()),
   coarse_grid (&coarse_grid, typeid(*this).name()),
   flags (flags),
   refinement_flags (refinement_flags)
@@ -435,13 +440,13 @@ TimeStepBase_Tria<dim>::~TimeStepBase_Tria ()
   if (!flags.delete_and_rebuild_tria)
     {
       Triangulation<dim> *t = tria;
-      tria = 0;
+      tria = nullptr;
       delete t;
     }
   else
-    Assert (tria==0, ExcInternalError());
+    Assert (tria==nullptr, ExcInternalError());
 
-  coarse_grid = 0;
+  coarse_grid = nullptr;
 }
 
 
@@ -465,12 +470,12 @@ TimeStepBase_Tria<dim>::sleep (const unsigned int sleep_level)
 {
   if (sleep_level == flags.sleep_level_to_delete_grid)
     {
-      Assert (tria!=0, ExcInternalError());
+      Assert (tria!=nullptr, ExcInternalError());
 
       if (flags.delete_and_rebuild_tria)
         {
           Triangulation<dim> *t = tria;
-          tria = 0;
+          tria = nullptr;
           delete t;
         }
     }
@@ -485,8 +490,8 @@ void TimeStepBase_Tria<dim>::save_refine_flags ()
 {
   // for any of the non-initial grids
   // store the refinement flags
-  refine_flags.push_back (std::vector<bool>());
-  coarsen_flags.push_back (std::vector<bool>());
+  refine_flags.emplace_back ();
+  coarsen_flags.emplace_back ();
   tria->save_refine_flags (refine_flags.back());
   tria->save_coarsen_flags (coarsen_flags.back());
 }
@@ -496,7 +501,7 @@ void TimeStepBase_Tria<dim>::save_refine_flags ()
 template <int dim>
 void TimeStepBase_Tria<dim>::restore_grid ()
 {
-  Assert (tria == 0, ExcGridNotDeleted());
+  Assert (tria == nullptr, ExcGridNotDeleted());
   Assert (refine_flags.size() == coarsen_flags.size(),
           ExcInternalError());
 
@@ -735,8 +740,8 @@ void TimeStepBase_Tria<dim>::refine_grid (const RefinementData refinement_data)
   // two pointers into this array denoting
   // the position where the two thresholds
   // are assumed
-  Vector<float>::const_iterator p_refinement_threshold=0,
-                                p_coarsening_threshold=0;
+  Vector<float>::const_iterator p_refinement_threshold=nullptr,
+                                p_coarsening_threshold=nullptr;
 
 
   // if we are to do some cell number
@@ -862,7 +867,7 @@ void TimeStepBase_Tria<dim>::refine_grid (const RefinementData refinement_data)
           if (cell->refine_flag_set())
             previous_cells += (GeometryInfo<dim>::max_children_per_cell-1);
           else if (cell->coarsen_flag_set())
-            previous_cells -= (GeometryInfo<dim>::max_children_per_cell-1) /
+            previous_cells -= (double)(GeometryInfo<dim>::max_children_per_cell-1) /
                               GeometryInfo<dim>::max_children_per_cell;
 
         // @p{previous_cells} now gives the
@@ -888,7 +893,7 @@ void TimeStepBase_Tria<dim>::refine_grid (const RefinementData refinement_data)
           if (cell->refine_flag_set())
             estimated_cells += (GeometryInfo<dim>::max_children_per_cell-1);
           else if (cell->coarsen_flag_set())
-            estimated_cells -= (GeometryInfo<dim>::max_children_per_cell-1) /
+            estimated_cells -= (double)(GeometryInfo<dim>::max_children_per_cell-1) /
                                GeometryInfo<dim>::max_children_per_cell;
 
         // calculate the allowed delta in

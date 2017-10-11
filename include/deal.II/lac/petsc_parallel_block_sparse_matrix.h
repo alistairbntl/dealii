@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_parallel_block_sparse_matrix_h
-#define dealii__petsc_parallel_block_sparse_matrix_h
+#ifndef dealii_petsc_parallel_block_sparse_matrix_h
+#define dealii_petsc_parallel_block_sparse_matrix_h
 
 
 #include <deal.II/base/config.h>
@@ -43,11 +43,11 @@ namespace PETScWrappers
      */
 
     /**
-     * Blocked sparse matrix based on the PETScWrappers::SparseMatrix class.
-     * This class implements the functions that are specific to the PETSc
-     * SparseMatrix base objects for a blocked sparse matrix, and leaves the
-     * actual work relaying most of the calls to the individual blocks to the
-     * functions implemented in the base class. See there also for a
+     * Blocked sparse matrix based on the PETScWrappers::MPI::SparseMatrix
+     * class. This class implements the functions that are specific to the
+     * PETSc SparseMatrix base objects for a blocked sparse matrix, and leaves
+     * the actual work relaying most of the calls to the individual blocks to
+     * the functions implemented in the base class. See there also for a
      * description of when this class is useful.
      *
      * In contrast to the deal.II-type SparseMatrix class, the PETSc matrices
@@ -101,12 +101,12 @@ namespace PETScWrappers
        * reinit(BlockSparsityPattern). The number of blocks per row and column
        * are then determined by that function.
        */
-      BlockSparseMatrix ();
+      BlockSparseMatrix () = default;
 
       /**
        * Destructor.
        */
-      ~BlockSparseMatrix ();
+      ~BlockSparseMatrix () = default;
 
       /**
        * Pseudo copy operator only copying empty objects. The sizes of the
@@ -149,8 +149,8 @@ namespace PETScWrappers
        * the BlockSparsityPattern of the Simple type can efficiently store
        * large sparsity patterns in parallel, so this is the only supported
        * argument. The IndexSets describe the locally owned range of DoFs for
-       * each block. Note that each IndexSet needs to be contiguous. For a
-       * symmetric structure hand in the same vector for the first two
+       * each block. Note that the IndexSets needs to be ascending and 1:1.
+       * For a symmetric structure hand in the same vector for the first two
        * arguments.
        */
       void reinit(const std::vector<IndexSet> &rows,
@@ -368,4 +368,4 @@ DEAL_II_NAMESPACE_CLOSE
 
 #endif    // DEAL_II_WITH_PETSC
 
-#endif    // dealii__petsc_parallel_block_sparse_matrix_h
+#endif    // dealii_petsc_parallel_block_sparse_matrix_h

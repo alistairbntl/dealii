@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,11 +17,9 @@
 // level 0
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 
 #include <deal.II/lac/constraint_matrix.h>
@@ -54,7 +52,6 @@
 #include <deal.II/multigrid/mg_smoother.h>
 #include <deal.II/multigrid/mg_matrix.h>
 
-#include <fstream>
 #include <sstream>
 
 using namespace dealii;
@@ -80,7 +77,6 @@ private:
   SparsityPattern      sparsity_pattern;
   SparseMatrix<double> system_matrix;
 
-  ConstraintMatrix     hanging_node_constraints;
   ConstraintMatrix     constraints;
 
   Vector<double>       solution;
@@ -169,11 +165,9 @@ void LaplaceProblem<dim>::setup_system ()
   system_rhs.reinit (mg_dof_handler.n_dofs());
 
   constraints.clear ();
-  hanging_node_constraints.clear ();
   DoFTools::make_hanging_node_constraints (mg_dof_handler, constraints);
-  DoFTools::make_hanging_node_constraints (mg_dof_handler, hanging_node_constraints);
   typename FunctionMap<dim>::type      dirichlet_boundary;
-  ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
+  Functions::ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
   dirichlet_boundary[0] = &homogeneous_dirichlet_bc;
   MappingQGeneric<dim> mapping(1);
   VectorTools::interpolate_boundary_values (mapping,
@@ -181,7 +175,6 @@ void LaplaceProblem<dim>::setup_system ()
                                             dirichlet_boundary,
                                             constraints);
   constraints.close ();
-  hanging_node_constraints.close ();
   constraints.condense (sparsity_pattern);
   sparsity_pattern.compress();
   system_matrix.reinit (sparsity_pattern);
@@ -191,14 +184,14 @@ void LaplaceProblem<dim>::setup_system ()
   const unsigned int n_levels = triangulation.n_levels();
 
   mg_interface_matrices.resize(min_level, n_levels-1);
-  mg_interface_matrices.clear ();
+  mg_interface_matrices.clear_elements ();
   mg_matrices.resize(min_level, n_levels-1);
-  mg_matrices.clear ();
+  mg_matrices.clear_elements ();
   mg_sparsity_patterns.resize(min_level, n_levels-1);
 
   for (unsigned int level=min_level; level<n_levels; ++level)
     {
-      CompressedSparsityPattern csp;
+      DynamicSparsityPattern csp;
       csp.reinit(mg_dof_handler.n_dofs(level),
                  mg_dof_handler.n_dofs(level));
       MGTools::make_sparsity_pattern(mg_dof_handler, csp, level);
@@ -362,8 +355,7 @@ void LaplaceProblem<dim>::assemble_multigrid ()
 template <int dim>
 void LaplaceProblem<dim>::solve ()
 {
-  MGTransferPrebuilt<Vector<double> > mg_transfer(hanging_node_constraints,
-                                                  mg_constrained_dofs);
+  MGTransferPrebuilt<Vector<double> > mg_transfer(mg_constrained_dofs);
   mg_transfer.build_matrices(mg_dof_handler);
 
   FullMatrix<double> coarse_matrix;
@@ -384,13 +376,15 @@ void LaplaceProblem<dim>::solve ()
   mg::Matrix<> mg_interface_up(mg_interface_matrices);
   mg::Matrix<> mg_interface_down(mg_interface_matrices);
 
-  Multigrid<Vector<double> > mg(min_level,
-                                triangulation.n_global_levels()-1,
+  Multigrid<Vector<double> > mg(mg_dof_handler,
                                 mg_matrix,
                                 coarse_grid_solver,
                                 mg_transfer,
                                 mg_smoother,
-                                mg_smoother);
+                                mg_smoother,
+                                min_level,
+                                triangulation.n_global_levels()-1,
+                                Multigrid<Vector<double> >::v_cycle);
   mg.set_edge_matrices(mg_interface_down, mg_interface_up);
 
   PreconditionMG<dim, Vector<double>, MGTransferPrebuilt<Vector<double> > >
@@ -482,7 +476,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   try
     {

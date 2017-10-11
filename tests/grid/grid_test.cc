@@ -22,13 +22,7 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
-#include <deal.II/base/logstream.h>
-#include <cmath>
-#include <cstdlib>
 
-#include <fstream>
-#include <iomanip>
-#include <cstdio>
 
 std::ofstream logfile("output");
 
@@ -171,7 +165,7 @@ template <int dim>
 void test (const int test_case)
 {
   char testname[100];
-  sprintf(testname, "Test%d.dim%d", test_case , dim);
+  sprintf(testname, "Test%d.dim%d", test_case, dim);
 
   deallog.push(testname);
   deallog << "Start" << std::endl;
@@ -275,7 +269,6 @@ int main ()
   deallog << std::setprecision(2);
   logfile << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   for (unsigned int i=1; i<=3; ++i)
     test<2> (i);

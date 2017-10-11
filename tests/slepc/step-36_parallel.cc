@@ -1,6 +1,22 @@
+// ---------------------------------------------------------------------
+//
+// Copyright (C) 2004 - 2017 by the deal.II authors
+//
+// This file is part of the deal.II library.
+//
+// The deal.II library is free software; you can use it, redistribute
+// it, and/or modify it under the terms of the GNU Lesser General
+// Public License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+// The full text of the license can be found in the file LICENSE at
+// the top level of the deal.II distribution.
+//
+// ---------------------------------------------------------------------
+
+// Solve for smallest eigenvalues of Laplace operator in Step-36 tutorial
+
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/index_set.h>
 
@@ -27,7 +43,6 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
 #include <iostream>
 
 // test parallel (MPI) version of Step-36
@@ -95,7 +110,7 @@ void test (std::string solver_name,
   dealii::DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
   dealii::VectorTools::interpolate_boundary_values (dof_handler,
                                                     0,
-                                                    dealii::ZeroFunction<dim> (),
+                                                    dealii::Functions::ZeroFunction<dim> (),
                                                     constraints);
   constraints.close ();
 
@@ -314,7 +329,7 @@ void test (std::string solver_name,
           stiffness_matrix.vmult(Ax,eigenfunctions[i]);
           Ax.add(-1.0*eigenvalues[i],Bx);
           Assert (Ax.l2_norm() < precision,
-                  ExcMessage(std::to_string(Ax.l2_norm())));
+                  ExcMessage(Utilities::to_string(Ax.l2_norm())));
         }
     }
   }
@@ -330,7 +345,6 @@ int main (int argc,char **argv)
   std::ofstream logfile("output");
   dealii::deallog.attach(logfile,/*do not print job id*/false);
   dealii::deallog.depth_console(0);
-  dealii::deallog.threshold_double(eps);
 
   try
     {

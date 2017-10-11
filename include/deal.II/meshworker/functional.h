@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__mesh_worker_functional_h
-#define dealii__mesh_worker_functional_h
+#ifndef dealii_mesh_worker_functional_h
+#define dealii_mesh_worker_functional_h
 
 #include <deal.II/algorithms/any_data.h>
 #include <deal.II/base/smartpointer.h>
@@ -62,13 +62,13 @@ namespace MeshWorker
       /**
        * Assemble the local values into the global vectors.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info);
 
       /**
        * Assemble both local values into the global vectors.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info1,
                     const DOFINFO &info2);
 
@@ -94,6 +94,11 @@ namespace MeshWorker
     class CellsAndFaces
     {
     public:
+      /**
+       * Constructor. Initialize the member variables.
+       */
+      CellsAndFaces();
+
       /**
        * The initialization function, specifying the @p results vectors and
        * whether face data should be collected separately.
@@ -126,13 +131,13 @@ namespace MeshWorker
       /**
        * Assemble the local values into the global vectors.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info);
 
       /**
        * Assemble both local values into the global vectors.
        */
-      template<class DOFINFO>
+      template <class DOFINFO>
       void assemble(const DOFINFO &info1,
                     const DOFINFO &info2);
 
@@ -197,6 +202,14 @@ namespace MeshWorker
     }
 
 //----------------------------------------------------------------------//
+
+    template <typename number>
+    inline
+    CellsAndFaces<number>::CellsAndFaces()
+      : separate_faces(true)
+    {}
+
+
 
     template <typename number>
     inline void

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -27,7 +27,6 @@
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
@@ -37,7 +36,6 @@
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
 #include <iostream>
 
 std::ofstream logfile("output");
@@ -178,7 +176,7 @@ void test ()
     const QGauss<1> quad (fe_degree+1);
     typename MatrixFree<dim>::AdditionalData data;
     data.tasks_parallel_scheme = MatrixFree<dim>::AdditionalData::none;
-    data.mapping_update_flags = update_gradients | update_second_derivatives;
+    data.mapping_update_flags = update_gradients | update_hessians;
     mf_data.reinit (dof, constraints, quad, data);
   }
 
@@ -192,7 +190,6 @@ int main ()
 {
   deallog.attach(logfile);
 
-  deallog.threshold_double(1.e-14);
   deallog << std::setprecision (3);
 
   {

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tria_h
-#define dealii__tria_h
+#ifndef dealii_tria_h
+#define dealii_tria_h
 
 
 #include <deal.II/base/config.h>
@@ -23,7 +23,6 @@
 #include <deal.II/base/smartpointer.h>
 #include <deal.II/base/geometry_info.h>
 #include <deal.II/base/iterator_range.h>
-#include <deal.II/base/std_cxx11/function.h>
 #include <deal.II/grid/tria_iterator_selector.h>
 
 // Ignore deprecation warnings for auto_ptr.
@@ -31,6 +30,7 @@ DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #include <boost/signals2.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/map.hpp>
+#include <boost/serialization/unique_ptr.hpp>
 #include <boost/serialization/split_member.hpp>
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
@@ -39,6 +39,8 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #include <map>
 #include <numeric>
 #include <bitset>
+#include <functional>
+#include <memory>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -49,7 +51,7 @@ template <int dim, int spacedim> class Manifold;
 
 namespace GridTools
 {
-  template<typename CellIterator>  struct PeriodicFacePair;
+  template <typename CellIterator>  struct PeriodicFacePair;
 }
 
 template <int, int, int> class TriaAccessor;
@@ -88,20 +90,37 @@ namespace hp
 /*------------------------------------------------------------------------*/
 
 /**
- * A structure to describe individual cells and passed as argument to
- * Triangulation::create_triangulation(). It contains all data needed to
- * construct a cell, namely the indices of the vertices, the material or
- * boundary indicator (depending on whether it represents a cell or a face),
- * and a manifold id to describe the manifold this object belongs to.
+ * The CellData class (and the related SubCellData class) is used to
+ * provide a comprehensive, but minimal, description of the cells when
+ * creating a triangulation via Triangulation::create_triangulation().
+ * Specifically, each CellData object -- describing one cell in a
+ * triangulation -- has member variables for indices of the $2^d$ vertices
+ * (the actual coordinates of the vertices are described in a separate
+ * vector passed to Triangulation::create_triangulation(), so the CellData
+ * object only needs to store indices into that vector), the material
+ * id of the cell that can be used in applications to describe which
+ * part of the domain a cell belongs to (see
+ * @ref GlossMaterialId "the glossary entry on material ids"),
+ * and a manifold id that is used to describe the geometry object
+ * that is responsible for this cell (see
+ * @ref GlossManifoldIndicator "the glossary entry on manifold ids")
+ * to describe the manifold this object belongs to.
  *
- * This structure is also used to represent data for faces and edge as part of
- * the SubCellData class. In that case the #vertices array needs to represent
- * the vertices of a face or edge of a cell listed in the argument to
- * Triangulation::create_triangulation() that denotes the faces. It can be
- * used to attach boundary indicators to faces.
+ * This structure is also used to represent data for faces and edges when used
+ * as a member of the SubCellData class. In this case, the template argument
+ * @p structdim of an object will be less than the dimension @p dim of the
+ * triangulation. If this is so, then #vertices array represents the indices of
+ * the vertices of one face or edge of one of the cells passed to
+ * Triangulation::create_triangulation(). Furthermore, for faces the
+ * material id has no meaning, and the @p material_id field is reused
+ * to store a @p boundary_id instead to designate which part of the boundary
+ * the face or edge belongs to (see
+ * @ref GlossBoundaryId "the glossary entry on boundary ids").
  *
  * An example showing how this class can be used is in the
- * <code>create_coarse_grid()</code> function of step-14.
+ * <code>create_coarse_grid()</code> function of step-14. There are also
+ * many more use cases in the implementation of the functions of the
+ * GridGenerator namespace.
  *
  * @ingroup grid
  */
@@ -109,36 +128,59 @@ template <int structdim>
 struct CellData
 {
   /**
-   * Indices of the vertices of this cell.
+   * Indices of the vertices of this cell. These indices correspond
+   * to entries in the vector of vertex locations passed to
+   * Triangulation::create_triangulation().
    */
   unsigned int vertices[GeometryInfo<structdim>::vertices_per_cell];
 
   /**
-   * Material or boundary indicator of this cell. The material_id may be used
-   * to denote different coefficients, etc.
-   *
-   * Note that if this object is part of a SubCellData object, then it
-   * represents a face or edge of a cell. In this case one should use the
-   * field boundary_id instead of material_id.
+   * Material or boundary indicator of this cell.
+   * This field is a union that stores <i>either</i> a boundary or
+   * a material id, depending on whether the current object is used
+   * to describe a cell (in a vector of CellData objects) or a
+   * face or edge (as part of a SubCellData object).
    */
   union
   {
-    types::boundary_id boundary_id;
+    /**
+     * The material id of the cell being described. See the documentation
+     * of the CellData class for examples of how to use this field.
+     *
+     * This variable can only be used if the current object is used to
+     * describe a cell, i.e., if @p structdim equals the dimension
+     * @p dim of a triangulation.
+     */
     types::material_id material_id;
+
+    /**
+     * The boundary id of a face or edge being described. See the documentation
+     * of the CellData class for examples of how to use this field.
+     *
+     * This variable can only be used if the current object is used to
+     * describe a face or edge, i.e., if @p structdim is less than the dimension
+     * @p dim of a triangulation. In this case, the CellData object this
+     * variable belongs to will be part of a SubCellData object.
+     */
+    types::boundary_id boundary_id;
   };
 
   /**
    * Manifold identifier of this object. This identifier should be used to
    * identify the manifold to which this object belongs, and from which this
    * object will collect information on how to add points upon refinement.
+   *
+   * See the documentation of the CellData class for examples of how to use
+   * this field.
    */
   types::manifold_id manifold_id;
 
   /**
-   * Default constructor. Sets the member variables to the following values: -
-   * vertex indices to invalid values - boundary or material id zero (the
-   * default for boundary or material ids) - manifold id to
-   * numbers::invalid_manifold_id
+   * Default constructor. Sets the member variables to the following values:
+   *
+   * - vertex indices to invalid values
+   * - boundary or material id zero (the default for boundary or material ids)
+   * - manifold id to numbers::invalid_manifold_id
    */
   CellData ();
 };
@@ -146,56 +188,83 @@ struct CellData
 
 
 /**
- * Structure to be passed to Triangulation::create_triangulation function to
- * describe boundary information.
+ * The SubCellData class is used to describe information about faces and
+ * edges at the boundary of a mesh when creating a triangulation via
+ * Triangulation::create_triangulation(). It contains member variables
+ * that describe boundary edges and boundary quads.
  *
- * This structure is the same for all dimensions, since we use an input
- * function which is the same for all dimensions. The content of objects of
- * this structure varies with the dimensions, however.
+ * The class has no template argument and is used both in the description
+ * of boundary edges in 2d (in which case the contents of the
+ * @p boundary_quads member variable are ignored), as well as in the
+ * description of boundary edges and faces in 3d (in which case both the
+ * @p boundary_lines and @p boundary_quads members may be used). It is also
+ * used as the argument to Triangulation::create_triangulation() in 1d,
+ * where the contents of objects of the current type are simply ignored.
  *
- * Since in one dimension, there is no boundary information apart from the two
- * end points of the interval, this structure does not contain anything and
- * exists only for consistency, to allow a common interface for all space
- * dimensions. All fields should always be empty.
+ * By default, Triangulation::create_triangulation() simply assigns
+ * default boundary indicators and manifold indicators to edges and
+ * quads at the boundary of the mesh. (See the glossary entries on
+ * @ref GlossBoundaryId "boundary ids"
+ * and
+ * @ref GlossManifoldIndicator "manifold ids"
+ * for more information on what they represent.) As a consequence,
+ * it is not <i>necessary</i> to explicitly describe the properties
+ * of boundary objects. In all cases, these properties can also be
+ * set at a later time, once the triangulation has already been
+ * created. On the other hand, it is sometimes convenient to describe
+ * boundary indicators or manifold ids at the time of creation. In
+ * these cases, the current class can be used by filling the
+ * @p boundary_lines and @p boundary_quads vectors with
+ * CellData<1> and CellData<2> objects that correspond to boundary
+ * edges and quads for which properties other than the default
+ * values should be used.
  *
- * Boundary data in 2D consists of a list of lines which belong to a given
- * boundary component. A boundary component is a list of lines which are given
- * a common number describing the boundary condition to hold on this part of
- * the boundary. The triangulation creation function gives lines not in this
- * list either the boundary indicator zero (if on the boundary) or
- * numbers::internal_face_boundary_id (if in the interior).
+ * Each entry in the @p boundary_lines and @p boundary_quads vectors
+ * then needs to correspond to an edge or quad of the cells that
+ * are described by the vector of CellData objects passed to
+ * Triangulation::create_triangulation(). I.e., the vertex indices
+ * stored in each entry need to correspond to an edge or face
+ * of the triangulation that has the same set of vertex indices,
+ * and in the same order. For these boundary edges or quads, one can
+ * then set either or both the CellData::boundary_id and
+ * CellData::manifold_id.
  *
- * You will get an error if you try to set the boundary indicator of an
- * interior edge or face, i.e., an edge or face that is not at the boundary of
- * the mesh. However, one may sometimes want to set the manifold indicator to
- * an interior object. In this case, set its boundary indicator to
- * numbers::internal_face_boundary_id, to indicate that you understand that it
- * is an interior object, but set its manifold id to the value you want.
+ * There are also use cases where one may want to set the manifold id
+ * of an <i>interior</i> edge or face. Such faces, identified by
+ * their vertex indices, may also appear in the
+ * @p boundary_lines and @p boundary_quads vectors (despite the names of
+ * these member variables). However, it is then obviously not allowed
+ * to set a boundary id (because the object is not actually part of
+ * the boundary). As a consequence, to be valid, the CellData::boundary_id
+ * of interior edges or faces needs to equal
+ * numbers::internal_face_boundary_id.
  *
  * @ingroup grid
  */
 struct SubCellData
 {
   /**
-   * Each record of this vector describes a line on the boundary and its
-   * boundary indicator.
+   * A vector of CellData<1> objects that describe boundary and manifold
+   * information for edges of 2d or 3d triangulations.
+   *
+   * This vector may not be used in the creation of 1d triangulations.
    */
   std::vector<CellData<1> > boundary_lines;
 
   /**
-   * Each record of this vector describes a quad on the boundary and its
-   * boundary indicator.
+   * A vector of CellData<2> objects that describe boundary and manifold
+   * information for quads of 3d triangulations.
+   *
+   * This vector may not be used in the creation of 1d or 2d triangulations.
    */
   std::vector<CellData<2> > boundary_quads;
 
   /**
-   * This function checks whether the vectors which may not be used in a given
-   * dimension are really empty. I.e., whether the <tt>boundary_*</tt> arrays
-   * are empty when in one space dimension and whether the @p boundary_quads
-   * array is empty when in two dimensions.
-   *
-   * Since this structure is the same for all dimensions, the actual dimension
-   * has to be given as a parameter.
+   * Determine whether the member variables above which may not be used in a given
+   * dimension are really empty. In other words, this function returns whether
+   * both @p boundary_lines and @p boundary_quads are empty vectors
+   * when @p dim equals one, and whether the @p boundary_quads
+   * vector is empty when @p dim equals two.
    */
   bool check_consistency (const unsigned int dim) const;
 };
@@ -748,19 +817,25 @@ namespace internal
  * <h3>Material and boundary information</h3>
  *
  * Each cell, face or edge stores information denoting the material or the
- * part of the boundary that an object belongs to. The material of a cell may
- * be used during matrix generation in order to implement different
- * coefficients in different parts of the domain. It is not used by functions
- * of the grid and dof handling libraries.
+ * part of the boundary that an object belongs to. The material id of a cell
+ * is typically used to identify which cells belong to a particular part of
+ * the domain, e.g., when you have different materials (steel, concrete, wood)
+ * that are all part of the same domain. One would then usually query the
+ * material id associated with a cell during assembly of the bilinear form,
+ * and use it to determine (e.g., by table lookup, or a sequence of if-else
+ * statements) what the correct material coefficients would be for that cell.
+ * See also @ref GlossMaterialId "this glossary entry".
  *
  * This material_id may be set upon construction of a triangulation (through
  * the CellData data structure), or later through use of cell iterators. For a
  * typical use of this functionality, see the step-28 tutorial program. The
  * functions of the GridGenerator namespace typically set the material ID of
- * all cells to zero. When reading a triangulation, the material id must be
- * specified in the input file (UCD format) or is otherwise set to zero.
- * Material IDs are inherited by child cells from their parent upon mesh
- * refinement.
+ * all cells to zero. When reading a triangulation through the GridIn class,
+ * different input file formats have different conventions, but typically
+ * either explicitly specify the material id, or if they don't, then GridIn
+ * simply sets them to zero. Because the material of a cell is intended
+ * to pertain to a particular region of the domain, material ids are inherited
+ * by child cells from their parent upon mesh refinement.
  *
  * Boundary indicators on lower dimensional objects (these have no material
  * id) indicate the number of a boundary component. These are used for two
@@ -861,7 +936,7 @@ namespace internal
  * classes. Again, see
  * @ref GlossUserData "the glossary for more information".
  *
- * The value of these user indices or pointers is @p NULL by default. Note
+ * The value of these user indices or pointers is @p nullptr by default. Note
  * that the pointers are not inherited to children upon refinement. Still,
  * after a remeshing they are available on all cells, where they were set on
  * the previous mesh.
@@ -994,8 +1069,8 @@ namespace internal
  *           // mesh refinement
  *           previous_cell = current_cell;
  *           previous_cell->get_triangulation().signals.post_refinement
- *             .connect (std_cxx11::bind (&FEValues<dim>::invalidate_previous_cell,
- *                                        std_cxx11::ref (*this)));
+ *             .connect (std::bind (&FEValues<dim>::invalidate_previous_cell,
+ *                                  std::ref (*this)));
  *         }
  *       else
  *         previous_cell = current_cell;
@@ -1040,27 +1115,32 @@ namespace internal
  * computers that aren't very reliable (e.g. on very large clusters where
  * individual nodes occasionally fail and then bring down an entire MPI job).
  *
- * For technical reasons, writing and restoring a Triangulation object is not-
+ * For technical reasons, writing and restoring a Triangulation object is not
  * trivial. The primary reason is that unlike many other objects,
  * triangulations rely on many other objects to which they store pointers or
  * with which they interface; for example, triangulations store pointers to
  * objects describing boundaries and manifolds, and they have signals that
  * store pointers to other objects so they can be notified of changes in the
- * triangulation (see the section on signals in this introduction). As objects
- * that are re-loaded at a later time do not usually end up at the same
- * location in memory as they were when they were saved, dealing with pointers
- * to other objects is difficult.
+ * triangulation (see the section on signals in this introduction). Since these
+ * objects are owned by the user space (for example the user can create a custom
+ * manifold object), they may not be serializable. So in cases like this,
+ * boost::serialize can store a reference to an object instead of the pointer,
+ * but the reference will never be satisfied at write time because the object
+ * pointed to is not serialized. Clearly, at load time, boost::serialize will
+ * not know where to let the pointer point to because it never gets to re-create
+ * the object originally pointed to.
  *
  * For these reasons, saving a triangulation to an archive does not store all
  * information, but only certain parts. More specifically, the information
  * that is stored is everything that defines the mesh such as vertex
  * locations, vertex indices, how vertices are connected to cells, boundary
  * indicators, subdomain ids, material ids, etc. On the other hand, the
- * following information is not stored: - signals - pointers to boundary
- * objects previously set using Triangulation::set_boundary On the other hand,
- * since these are objects that are usually set in user code, they can
- * typically easily be set again in that part of your code in which you re-
- * load triangulations.
+ * following information is not stored:
+ *   - signals
+ *   - pointers to boundary objects previously set using Triangulation::set_boundary
+ * On the other hand, since these are objects that are usually set in user code,
+ * they can typically easily be set again in that part of your code in which you
+ * re-load triangulations.
  *
  * In a sense, this approach to serialization means that re-loading a
  * triangulation is more akin to calling the
@@ -1178,8 +1258,11 @@ public:
   /**
    * Default manifold object. This is used for those objects for which no
    * boundary description has been explicitly set using set_manifold().
+   *
+   * @deprecated This member variable has been deprecated in favor of creating
+   * an independent FlatManifold.
    */
-  static const StraightBoundary<dim,spacedim> straight_boundary;
+  static const StraightBoundary<dim,spacedim> straight_boundary DEAL_II_DEPRECATED;
 
   /**
    * Declare some symbolic names for mesh smoothing algorithms. The meaning of
@@ -1386,7 +1469,7 @@ public:
   };
 
   /**
-   * A typedef that is used to to identify cell iterators. The concept of
+   * A typedef that is used to identify cell iterators. The concept of
    * iterators is discussed at length in the
    * @ref Iterators "iterators documentation module".
    *
@@ -1403,7 +1486,7 @@ public:
   typedef TriaIterator      <CellAccessor<dim,spacedim>         > cell_iterator;
 
   /**
-   * A typedef that is used to to identify
+   * A typedef that is used to identify
    * @ref GlossActive "active cell iterators".
    * The concept of iterators is discussed at length in the
    * @ref Iterators "iterators documentation module".
@@ -1423,8 +1506,29 @@ public:
   typedef TriaIterator      <TriaAccessor<dim-1, dim, spacedim> > face_iterator;
   typedef TriaActiveIterator<TriaAccessor<dim-1, dim, spacedim> > active_face_iterator;
 
-  typedef typename IteratorSelector::vertex_iterator        vertex_iterator;
-  typedef typename IteratorSelector::active_vertex_iterator active_vertex_iterator;
+  /**
+   * A typedef that defines an iterator type to iterate over
+   * vertices of a mesh.  The concept of iterators is discussed at
+   * length in the
+   * @ref Iterators "iterators documentation module".
+   *
+   * @ingroup Iterators
+   */
+  typedef TriaIterator      <dealii::TriaAccessor<0, dim, spacedim> > vertex_iterator;
+
+  /**
+   * A typedef that defines an iterator type to iterate over
+   * vertices of a mesh.  The concept of iterators is discussed at
+   * length in the
+   * @ref Iterators "iterators documentation module".
+   *
+   * This typedef is in fact identical to the @p vertex_iterator typedef
+   * above since all vertices in a mesh are active (i.e., are a vertex of
+   * an active cell).
+   *
+   * @ingroup Iterators
+   */
+  typedef TriaActiveIterator<dealii::TriaAccessor<0, dim, spacedim> > active_vertex_iterator;
 
   typedef typename IteratorSelector::line_iterator        line_iterator;
   typedef typename IteratorSelector::active_line_iterator active_line_iterator;
@@ -1461,7 +1565,7 @@ public:
      * automatically generated destructor would have a different one due to
      * member objects.
      */
-    virtual ~DistortedCellList () throw();
+    virtual ~DistortedCellList () noexcept;
 
     /**
      * A list of those cells among the coarse mesh cells that are deformed or
@@ -1501,8 +1605,8 @@ public:
   /**
    * Copy constructor.
    *
-   * You should really use the @p copy_triangulation function, so we declare
-   * this function but let it throw an internal error. The reason for this is
+   * You should really use the @p copy_triangulation function, so this
+   * constructor is deleted. The reason for this is
    * that we may want to use triangulation objects in collections. However,
    * C++ containers require that the objects stored in them are copyable, so
    * we need to provide a copy constructor. On the other hand, copying
@@ -1513,7 +1617,20 @@ public:
    * Finally, through the exception, one easily finds the places where code
    * has to be changed to avoid copies.
    */
-  Triangulation (const Triangulation<dim, spacedim> &t);
+  Triangulation (const Triangulation<dim, spacedim> &) = delete;
+
+  /**
+   * Move constructor.
+   *
+   * Create a new triangulation by stealing the internal data of another
+   * triangulation.
+   */
+  Triangulation (Triangulation<dim, spacedim> &&tria);
+
+  /**
+   * Move assignment operator.
+   */
+  Triangulation &operator = (Triangulation<dim, spacedim> &&tria);
 
   /**
    * Delete the object and all levels of the hierarchy.
@@ -1529,11 +1646,16 @@ public:
   virtual void clear ();
 
   /**
-   * Sets the mesh smoothing to @p mesh_smoothing. This overrides the
+   * Set the mesh smoothing to @p mesh_smoothing. This overrides the
    * MeshSmoothing given to the constructor. It is allowed to call this
    * function only if the triangulation is empty.
    */
   virtual void set_mesh_smoothing (const MeshSmoothing mesh_smoothing);
+
+  /**
+   * Return the mesh smoothing requirements that are obeyed.
+   */
+  virtual const MeshSmoothing &get_mesh_smoothing() const;
 
   /**
    * If @p dim==spacedim, assign a boundary object to a certain part of the
@@ -1569,11 +1691,14 @@ public:
    *
    * @ingroup boundary
    *
+   * @deprecated This method has been deprecated. Use
+   * Triangulation::set_manifold() instead.
+   *
    * @see
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
    */
   void set_boundary (const types::manifold_id   number,
-                     const Boundary<dim,spacedim> &boundary_object);
+                     const Boundary<dim,spacedim> &boundary_object) DEAL_II_DEPRECATED;
 
 
   /**
@@ -1584,13 +1709,16 @@ public:
    *
    * @ingroup boundary
    *
+   * @deprecated This method has been deprecated. Use
+   * Triangulation::set_manifold() instead.
+   *
    * @see
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
    */
-  void set_boundary (const types::manifold_id number);
+  void set_boundary (const types::manifold_id number) DEAL_II_DEPRECATED;
 
   /**
-   * Assign a manifold object to a certain part of the the triangulation. If
+   * Assign a manifold object to a certain part of the triangulation. If
    * an object with manifold number @p number is refined, this object is used
    * to find the location of new vertices (see the results section of step-49
    * for a more in-depth discussion of this, with examples).  It is also used
@@ -1669,10 +1797,13 @@ public:
    *
    * @ingroup boundary
    *
+   * @deprecated This method has been deprecated. Use
+   * Triangulation::get_manifold() instead.
+   *
    * @see
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
    */
-  const Boundary<dim,spacedim> &get_boundary (const types::manifold_id number) const;
+  const Boundary<dim,spacedim> &get_boundary (const types::manifold_id number) const DEAL_II_DEPRECATED;
 
   /**
    * Return a constant reference to a Manifold object used for this
@@ -1686,7 +1817,7 @@ public:
   const Manifold<dim,spacedim> &get_manifold (const types::manifold_id number) const;
 
   /**
-   * Returns a vector containing all boundary indicators assigned to boundary
+   * Return a vector containing all boundary indicators assigned to boundary
    * faces of this Triangulation object. Note, that each boundary indicator is
    * reported only once. The size of the return vector will represent the
    * number of different indicators (which is greater or equal one).
@@ -1699,7 +1830,7 @@ public:
   std::vector<types::boundary_id> get_boundary_ids() const;
 
   /**
-   * Returns a vector containing all manifold indicators assigned to the
+   * Return a vector containing all manifold indicators assigned to the
    * objects of this Triangulation. Note, that each manifold indicator is
    * reported only once. The size of the return vector will represent the
    * number of different indicators (which is greater or equal one).
@@ -1712,7 +1843,7 @@ public:
   std::vector<types::manifold_id> get_manifold_ids() const;
 
   /**
-   * Copy @p old_tria to this triangulation. This operation is not cheap, so
+   * Copy @p other_tria to this triangulation. This operation is not cheap, so
    * you should be careful with using this. We do not implement this function
    * as a copy constructor, since it makes it easier to maintain collections
    * of triangulations if you can assign them values later on.
@@ -1728,7 +1859,7 @@ public:
    * The function is made @p virtual since some derived classes might want to
    * disable or extend the functionality of this function.
    *
-   * @note Calling this function triggers the 'copy' signal on old_tria, i.e.
+   * @note Calling this function triggers the 'copy' signal on other_tria, i.e.
    * the triangulation being copied <i>from</i>.  It also triggers the
    * 'create' signal of the current triangulation. See the section on signals
    * in the general documentation for more information.
@@ -1738,7 +1869,7 @@ public:
    * how the old triangulation changes, not how any triangulation it may be
    * copied to changes.
    */
-  virtual void copy_triangulation (const Triangulation<dim, spacedim> &old_tria);
+  virtual void copy_triangulation (const Triangulation<dim, spacedim> &other_tria);
 
   /**
    * Create a triangulation from a list of vertices and a list of cells, each
@@ -1944,12 +2075,12 @@ public:
    * functions below. It takes an iterator range and returns the sum of
    * values.
    */
-  template<typename T>
+  template <typename T>
   struct CellWeightSum
   {
     typedef T result_type;
 
-    template<typename InputIterator>
+    template <typename InputIterator>
     T operator()(InputIterator first, InputIterator last) const
     {
       return std::accumulate (first, last, T());
@@ -1993,6 +2124,15 @@ public:
     boost::signals2::signal<void ()> post_refinement;
 
     /**
+     * This signal is triggered when a function in deal.II moves the grid
+     * points of a mesh, e.g. GridTools::transform. Unfortunately,
+     * modification of a vertex in user code through
+     * <code>cell_iterator->vertex(v) = xxxx</code> cannot be detected by this
+     * method.
+     */
+    boost::signals2::signal<void ()> mesh_movement;
+
+    /**
      * This signal is triggered for each cell that is going to be coarsened.
      *
      * @note This signal is triggered with the immediate parent cell of a set
@@ -2019,9 +2159,16 @@ public:
 
     /**
      * This signal is triggered whenever the Triangulation::clear() function
-     * is called. This signal is also triggered when loading a triangulation
-     * from an archive via Triangulation::load() as the previous content of
-     * the triangulation is first destroyed.
+     * is called and in the destructor of the triangulation. This signal is
+     * also triggered when loading a triangulation from an archive via
+     * Triangulation::load() as the previous content of the triangulation is
+     * first destroyed.
+     *
+     * The signal is triggered before the data structures of the
+     * triangulation are destroyed. In other words, the functions
+     * attached to this signal get a last look at the triangulation,
+     * for example to save information stored as part of the
+     * triangulation.
      */
     boost::signals2::signal<void ()> clear;
 
@@ -2968,27 +3115,27 @@ public:
 
 
   /**
-    * Declare the (coarse) face pairs given in the argument of this function
-    * as periodic. This way it it possible to obtain neighbors across periodic
-    * boundaries.
-    *
-    * The vector can be filled by the function
-    * GridTools::collect_periodic_faces.
-    *
-    * For more information on periodic boundary conditions see
-    * GridTools::collect_periodic_faces,
-    * DoFTools::make_periodicity_constraints and step-45.
-    *
-    * @note Before this function can be used the Triangulation has to be
-    * initialized and must not be refined.
-    */
+   * Declare the (coarse) face pairs given in the argument of this function as
+   * periodic. This way it it possible to obtain neighbors across periodic
+   * boundaries.
+   *
+   * The vector can be filled by the function
+   * GridTools::collect_periodic_faces.
+   *
+   * For more information on periodic boundary conditions see
+   * GridTools::collect_periodic_faces, DoFTools::make_periodicity_constraints
+   * and step-45.
+   *
+   * @note Before this function can be used the Triangulation has to be
+   * initialized and must not be refined.
+   */
   virtual void
   add_periodicity
   (const std::vector<GridTools::PeriodicFacePair<cell_iterator> > &);
 
   /**
-    * Return the periodic_face_map.
-    */
+   * Return the periodic_face_map.
+   */
   const std::map<std::pair<cell_iterator, unsigned int>,std::pair<std::pair<cell_iterator, unsigned int>, std::bitset<3> > > &
   get_periodic_face_map() const;
 
@@ -3106,11 +3253,11 @@ protected:
 
 private:
   /**
-    * If add_periodicity() is called, this variable stores the given
-    * periodic face pairs on level 0 for later access during the
-    * identification of ghost cells for the multigrid hierarchy and for
-    * setting up the periodic_face_map.
-    */
+   * If add_periodicity() is called, this variable stores the given periodic
+   * face pairs on level 0 for later access during the identification of ghost
+   * cells for the multigrid hierarchy and for setting up the
+   * periodic_face_map.
+   */
   std::vector<GridTools::PeriodicFacePair<cell_iterator> > periodic_face_pairs_level_0;
 
   /**
@@ -3131,12 +3278,12 @@ private:
    * Since users should never have to access these internal properties of how
    * we store data, these iterator types are made private.
    */
-  typedef TriaRawIterator   <CellAccessor<dim,spacedim>         > raw_cell_iterator;
-  typedef TriaRawIterator   <TriaAccessor<dim-1, dim, spacedim> > raw_face_iterator;
-  typedef typename IteratorSelector::raw_vertex_iterator          raw_vertex_iterator;
-  typedef typename IteratorSelector::raw_line_iterator            raw_line_iterator;
-  typedef typename IteratorSelector::raw_quad_iterator            raw_quad_iterator;
-  typedef typename IteratorSelector::raw_hex_iterator             raw_hex_iterator;
+  typedef TriaRawIterator<CellAccessor<dim,spacedim>         >     raw_cell_iterator;
+  typedef TriaRawIterator<TriaAccessor<dim-1, dim, spacedim> >     raw_face_iterator;
+  typedef TriaRawIterator<dealii::TriaAccessor<0, dim, spacedim> > raw_vertex_iterator;
+  typedef typename IteratorSelector::raw_line_iterator             raw_line_iterator;
+  typedef typename IteratorSelector::raw_quad_iterator             raw_quad_iterator;
+  typedef typename IteratorSelector::raw_hex_iterator              raw_hex_iterator;
 
   /**
    * Iterator to the first cell, used or not, on level @p level. If a level
@@ -3318,14 +3465,14 @@ private:
    * Array of pointers pointing to the objects storing the cell data on the
    * different levels.
    */
-  std::vector<dealii::internal::Triangulation::TriaLevel<dim>*> levels;
+  std::vector<std::unique_ptr<dealii::internal::Triangulation::TriaLevel<dim> > > levels;
 
   /**
    * Pointer to the faces of the triangulation. In 1d this contains nothing,
    * in 2D it contains data concerning lines and in 3D quads and lines.  All
    * of these have no level and are therefore treated separately.
    */
-  dealii::internal::Triangulation::TriaFaces<dim> *faces;
+  std::unique_ptr<dealii::internal::Triangulation::TriaFaces<dim> > faces;
 
 
   /**
@@ -3342,7 +3489,7 @@ private:
    * Collection of manifold objects. We store only objects, which are not of
    * type FlatManifold.
    */
-  std::map<types::manifold_id, SmartPointer<const Manifold<dim,spacedim> , Triangulation<dim, spacedim> > >  manifold;
+  std::map<types::manifold_id, SmartPointer<const Manifold<dim,spacedim>, Triangulation<dim, spacedim> > >  manifold;
 
 
   /**
@@ -3382,7 +3529,7 @@ private:
    * this field (that can be modified by TriaAccessor::set_boundary_id) were
    * not a pointer.
    */
-  std::map<unsigned int, types::boundary_id> *vertex_to_boundary_id_map_1d;
+  std::unique_ptr<std::map<unsigned int, types::boundary_id> > vertex_to_boundary_id_map_1d;
 
 
   /**
@@ -3404,7 +3551,7 @@ private:
    * this field (that can be modified by TriaAccessor::set_boundary_id) were
    * not a pointer.
    */
-  std::map<unsigned int, types::manifold_id> *vertex_to_manifold_id_map_1d;
+  std::unique_ptr<std::map<unsigned int, types::manifold_id> > vertex_to_manifold_id_map_1d;
 
   // make a couple of classes friends
   template <int,int,int> friend class TriaAccessorBase;
@@ -3421,6 +3568,15 @@ private:
 
   template <typename>
   friend class dealii::internal::Triangulation::TriaObjects;
+
+  // explicitly check for sensible template arguments, but not on windows
+  // because MSVC creates bogus warnings during normal compilation
+#ifndef DEAL_II_MSVC
+  static_assert (dim<=spacedim,
+                 "The dimension <dim> of a Triangulation must be less than or "
+                 "equal to the space dimension <spacedim> in which it lives.");
+#endif
+
 };
 
 
@@ -3536,8 +3692,20 @@ Triangulation<dim,spacedim>::save (Archive &ar,
   // as discussed in the documentation, do not store the signals as
   // well as boundary and manifold description but everything else
   ar &smooth_grid;
-  ar &levels;
-  ar &faces;
+
+  unsigned int n_levels = levels.size();
+  ar &n_levels;
+  for (unsigned int i = 0; i < levels.size(); ++i)
+    ar &levels[i];
+
+  // boost dereferences a nullptr when serializing a nullptr
+  // at least up to 1.65.1. This causes problems with clang-5.
+  // Therefore, work around it.
+  bool faces_is_nullptr = (faces.get()==nullptr);
+  ar &faces_is_nullptr;
+  if (!faces_is_nullptr)
+    ar &faces;
+
   ar &vertices;
   ar &vertices_used;
 
@@ -3567,8 +3735,23 @@ Triangulation<dim,spacedim>::load (Archive &ar,
   // as discussed in the documentation, do not store the signals as
   // well as boundary and manifold description but everything else
   ar &smooth_grid;
-  ar &levels;
-  ar &faces;
+
+  unsigned int size;
+  ar &size;
+  levels.resize(size);
+  for (unsigned int i = 0; i < levels.size(); ++i)
+    {
+      std::unique_ptr<internal::Triangulation::TriaLevel<dim>> level;
+      ar &level;
+      levels[i] = std::move(level);
+    }
+
+  //Workaround for nullptr, see in save().
+  bool faces_is_nullptr = true;
+  ar &faces_is_nullptr;
+  if (!faces_is_nullptr)
+    ar &faces;
+
   ar &vertices;
   ar &vertices_used;
 
@@ -3646,16 +3829,6 @@ template <> unsigned int Triangulation<1,3>::n_raw_hexs (const unsigned int leve
 template <> unsigned int Triangulation<1,3>::n_active_quads (const unsigned int level) const;
 template <> unsigned int Triangulation<1,3>::n_active_quads () const;
 template <> unsigned int Triangulation<1,3>::max_adjacent_cells () const;
-
-
-// -------------------------------------------------------------------
-// Explicit invalid things...
-template <>
-const Manifold<2,1> &Triangulation<2, 1>::get_manifold(const types::manifold_id) const;
-template <>
-const Manifold<3,1> &Triangulation<3, 1>::get_manifold(const types::manifold_id) const;
-template <>
-const Manifold<3,2> &Triangulation<3, 2>::get_manifold(const types::manifold_id) const;
 
 
 #endif // DOXYGEN

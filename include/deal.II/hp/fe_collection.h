@@ -13,14 +13,15 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_collection_h
-#define dealii__fe_collection_h
+#ifndef dealii_fe_collection_h
+#define dealii_fe_collection_h
 
 #include <deal.II/base/config.h>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/fe_values_extractors.h>
 #include <deal.II/fe/component_mask.h>
+
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -57,7 +58,7 @@ namespace hp
      * Default constructor. Leads to an empty collection that can later be
      * filled using push_back().
      */
-    FECollection ();
+    FECollection () = default;
 
     /**
      * Conversion constructor. This constructor creates a FECollection from a
@@ -68,38 +69,11 @@ namespace hp
     explicit FECollection (const FiniteElement<dim,spacedim> &fe);
 
     /**
-     * Constructor. This constructor creates a FECollection from two finite
-     * elements.
+     * Constructor. This constructor creates a FECollection from more than
+     * one finite element.
      */
-    FECollection (const FiniteElement<dim,spacedim> &fe1,
-                  const FiniteElement<dim,spacedim> &fe2);
-
-    /**
-     * Constructor. This constructor creates a FECollection from three finite
-     * elements.
-     */
-    FECollection (const FiniteElement<dim,spacedim> &fe1,
-                  const FiniteElement<dim,spacedim> &fe2,
-                  const FiniteElement<dim,spacedim> &fe3);
-
-    /**
-     * Constructor. This constructor creates a FECollection from four finite
-     * elements.
-     */
-    FECollection (const FiniteElement<dim,spacedim> &fe1,
-                  const FiniteElement<dim,spacedim> &fe2,
-                  const FiniteElement<dim,spacedim> &fe3,
-                  const FiniteElement<dim,spacedim> &fe4);
-
-    /**
-     * Constructor. This constructor creates a FECollection from five finite
-     * elements.
-     */
-    FECollection (const FiniteElement<dim,spacedim> &fe1,
-                  const FiniteElement<dim,spacedim> &fe2,
-                  const FiniteElement<dim,spacedim> &fe3,
-                  const FiniteElement<dim,spacedim> &fe4,
-                  const FiniteElement<dim,spacedim> &fe5);
+    template <class... FETypes>
+    explicit FECollection (const FETypes &... fes);
 
     /**
      * Constructor. Same as above but for any number of elements. Pointers to
@@ -113,7 +87,18 @@ namespace hp
     /**
      * Copy constructor.
      */
-    FECollection (const FECollection<dim,spacedim> &fe_collection);
+    FECollection (const FECollection<dim,spacedim> &) = default;
+
+    /**
+     * Move constructor.
+     */
+    FECollection (FECollection<dim,spacedim> &&fe_collection) = default;
+
+    /**
+     * Move assignement operator.
+     */
+    FECollection<dim, spacedim> &
+    operator= (FECollection<dim,spacedim> &&fe_collection) = default;
 
     /**
      * Add a finite element. This function generates a copy of the given
@@ -458,12 +443,29 @@ namespace hp
     /**
      * Array of pointers to the finite elements stored by this collection.
      */
-    std::vector<std_cxx11::shared_ptr<const FiniteElement<dim,spacedim> > > finite_elements;
+    std::vector<std::shared_ptr<const FiniteElement<dim,spacedim> > > finite_elements;
   };
 
 
 
   /* --------------- inline functions ------------------- */
+
+  template <int dim, int spacedim>
+  template <class... FETypes>
+  FECollection<dim,spacedim>::FECollection (const FETypes &... fes)
+  {
+    static_assert(is_base_of_all<FiniteElement<dim, spacedim>, FETypes...>::value,
+                  "Not all of the input arguments of this function "
+                  "are derived from FiniteElement<dim,spacedim>!");
+
+    // loop over all of the given arguments and add the finite elements to
+    // this collection. Inlining the definition of fe_pointers causes internal
+    // compiler errors on GCC 7.1.1 so we define it separately:
+    const auto fe_pointers = { &fes... };
+    for (auto p : fe_pointers)
+      push_back (*p);
+  }
+
 
   template <int dim, int spacedim>
   inline

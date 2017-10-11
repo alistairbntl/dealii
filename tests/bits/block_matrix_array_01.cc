@@ -19,18 +19,13 @@
 // entered blocks using print_latex.
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/block_matrix_array.h>
 #include <deal.II/lac/full_matrix.h>
-#include <iomanip>
-#include <fstream>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   FullMatrix<double> A1(4,4);
   FullMatrix<double> A2(4,4);

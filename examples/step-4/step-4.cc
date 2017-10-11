@@ -117,11 +117,19 @@ private:
 // where we want to evaluate the function. A value for the component can then
 // simply be omitted for scalar functions.
 //
-// Note that the C++ language forces us to declare and define a constructor to
-// the following classes even though they are empty. This is due to the fact
-// that the base class has no default constructor (i.e. one without
-// arguments), even though it has a constructor which has default values for
-// all arguments.
+// Function objects are used in lots of places in the library (for example, in
+// step-2 we used a Functions::ZeroFunction instance as an argument to
+// VectorTools::interpolate_boundary_values) and this is the first step where
+// we define a new class that inherits from Function. Since we only ever call
+// Function::value, we could get away with just a plain function (and this is
+// what is done in step-5), but since this is a tutorial we inherit from
+// Function for the sake of example.
+//
+// Unfortunately, we have to explicitly provide a default constructor for this
+// class (even though we do not need the constructor to do anything unusual)
+// to satisfy a strict reading of the C++ language standard. Some compilers
+// (like GCC from version 4.3 onwards) do not require this, but we provide the
+// default constructor so that all supported compilers are happy.
 template <int dim>
 class RightHandSide : public Function<dim>
 {
@@ -336,13 +344,9 @@ void Step4<dim>::assemble_system ()
   // dimensions, but a hexahedron in 3D. In fact, the
   // <code>active_cell_iterator</code> data type is something different,
   // depending on the dimension we are in, but to the outside world they look
-  // alike and you will probably never see a difference although the classes
-  // that this typedef stands for are in fact completely unrelated:
-  typename DoFHandler<dim>::active_cell_iterator
-  cell = dof_handler.begin_active(),
-  endc = dof_handler.end();
-
-  for (; cell!=endc; ++cell)
+  // alike and you will probably never see a difference. In any case, the real
+  // type is hidden by using `auto`:
+  for (const auto &cell: dof_handler.active_cell_iterators())
     {
       fe_values.reinit (cell);
       cell_matrix = 0;
@@ -407,7 +411,7 @@ void Step4<dim>::assemble_system ()
 
   // As the final step in this function, we wanted to have non-homogeneous
   // boundary values in this example, unlike the one before. This is a simple
-  // task, we only have to replace the ZeroFunction used there by an object of
+  // task, we only have to replace the Functions::ZeroFunction used there by an object of
   // the class which describes the boundary values we would like to use
   // (i.e. the <code>BoundaryValues</code> class declared above):
   std::map<types::global_dof_index,double> boundary_values;

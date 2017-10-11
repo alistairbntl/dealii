@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2016 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -38,13 +38,16 @@
 #   "${DEAL_II_USER_DEFINITIONS};${DEAL_II_USER_DEFINITIONS_<build type>}"
 #
 # If no "DEBUG" or "RELEASE" keyword is specified after the target, the
-# current CMAKE_BUILD_TYPE determines which compiler and linker flags as
-# well as compile definitions to use and against which deal.II library it
-# should be linked against.
+# current CMAKE_BUILD_TYPE is used instead. A CMAKE_BUILD_TYPE "Debug" is
+# equivalent to the DEBUG keyword, a CMAKE_BUILD_TYPE "Release" is
+# equivalent to the RELEASE keyword.
+#
+# This macro throws a FATAL_ERROR in case no DEBUG/RELEASE keyword is set
+# and the build type is different from "Debug", or "Release".
 #
 # If the requested build type is not available (e.g. DEBUG request but
-# deal.II was compiled with release mode only), the other available will be
-# used instead.
+# deal.II was compiled with release mode only), the macro throws a
+# FATAL_ERROR.
 #
 
 MACRO(DEAL_II_SETUP_TARGET _target)
@@ -63,23 +66,33 @@ MACRO(DEAL_II_SETUP_TARGET _target)
   ENDIF()
 
   # Necessary for setting INCLUDE_DIRECTORIES via SET_PROPERTY
-  CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8)
+  CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
 
   #
-  # Every build type that (case insensitively) matches "debug" is
-  # considered a debug build:
-  #
-  SET(_build "RELEASE")
-  STRING(TOLOWER "${CMAKE_BUILD_TYPE}" _cmake_build_type)
-  IF("${_cmake_build_type}" MATCHES "debug")
-    SET(_build "DEBUG")
-  ENDIF()
-
-  #
-  # Override _on_debug_build if ${ARGN} is set:
+  # Set build type with the help of the specified keyword, or
+  # CMAKE_BUILD_TYPE:
   #
   IF("${ARGN}" MATCHES "^(DEBUG|RELEASE)$")
     SET(_build "${ARGN}")
+  ELSEIF("${ARGN}" STREQUAL "")
+    IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      SET(_build "DEBUG")
+    ELSEIF(CMAKE_BUILD_TYPE STREQUAL "Release")
+      SET(_build "RELEASE")
+    ELSE()
+      MESSAGE(FATAL_ERROR
+        "\nDEAL_II_SETUP_TARGET cannot determine DEBUG, or RELEASE flavor "
+        "for target. CMAKE_BUILD_TYPE \"${CMAKE_BUILD_TYPE}\" is neither "
+        "equal to \"Debug\", nor \"Release\"\n"
+        "Set CMAKE_BUILD_TYPE accordingly, or use an explicit annotation: "
+        "  DEAL_II_SETUP_TARGET(<target> DEBUG|RELEASE)\n\n"
+        )
+    ENDIF()
+  ELSE()
+    MESSAGE(FATAL_ERROR
+      "\nDEAL_II_SETUP_TARGET called with invalid second argument. "
+      "Valid arguments are (empty), DEBUG, or RELEASE\n\n"
+      )
   ENDIF()
 
   #
@@ -94,14 +107,55 @@ MACRO(DEAL_II_SETUP_TARGET _target)
     INCLUDE_DIRECTORIES "${DEAL_II_INCLUDE_DIRS}"
     )
   SET_PROPERTY(TARGET ${_target} APPEND_STRING PROPERTY
-    COMPILE_FLAGS "${DEAL_II_CXX_FLAGS} ${DEAL_II_CXX_FLAGS_${_build}}"
-    )
-  SET_PROPERTY(TARGET ${_target} APPEND_STRING PROPERTY
     LINK_FLAGS " ${DEAL_II_LINKER_FLAGS} ${DEAL_II_LINKER_FLAGS_${_build}}"
     )
-  SET_PROPERTY(TARGET ${_target} APPEND PROPERTY
-    COMPILE_DEFINITIONS "${DEAL_II_USER_DEFINITIONS};${DEAL_II_USER_DEFINITIONS_${_build}}"
-    )
+
+  IF(CMAKE_VERSION VERSION_LESS 3.9)
+    SET_PROPERTY(TARGET ${_target} APPEND_STRING PROPERTY
+      COMPILE_FLAGS " ${DEAL_II_CXX_FLAGS} ${DEAL_II_CXX_FLAGS_${_build}}"
+      )
+    SET_PROPERTY(TARGET ${_target} APPEND PROPERTY
+      COMPILE_DEFINITIONS "${DEAL_II_USER_DEFINITIONS};${DEAL_II_USER_DEFINITIONS_${_build}}"
+      )
+
+  ELSE()
+
+    SET(_flags "${DEAL_II_CXX_FLAGS} ${DEAL_II_CXX_FLAGS_${_build}}")
+    SEPARATE_ARGUMENTS(_flags)
+    TARGET_COMPILE_OPTIONS(${_target} PUBLIC
+      $<$<COMPILE_LANGUAGE:CXX>:${_flags}>
+      )
+
+    TARGET_COMPILE_DEFINITIONS(${_target}
+      PUBLIC ${DEAL_II_USER_DEFINITIONS} ${DEAL_II_USER_DEFINITIONS_${_build}}
+      )
+
+    IF(DEAL_II_WITH_CUDA)
+      #
+      # Add cxx compiler and cuda compilation flags to cuda source files:
+      #
+
+      SET(_cuda_flags "${DEAL_II_CUDA_FLAGS} ${DEAL_II_CUDA_FLAGS_${_build}}")
+      SEPARATE_ARGUMENTS(_cuda_flags)
+
+      #
+      # Workaround: cuda will split every compiler option with a comma
+      # (','), so remove all compiler flags that contain a comma:
+      #
+      STRING(REGEX REPLACE "[^ ]*,[^ ]*" "" _cxx_flags
+        "${DEAL_II_CXX_FLAGS} ${DEAL_II_CXX_FLAGS_${_build}}"
+        )
+
+      TARGET_COMPILE_OPTIONS(${_target} PUBLIC
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler ${_cxx_flags}>
+        $<$<COMPILE_LANGUAGE:CUDA>:${_cuda_flags}>
+        )
+
+      SET_TARGET_PROPERTIES(${_target} PROPERTIES
+        CUDA_SEPARABLE_COMPILATION TRUE
+        )
+    ENDIF()
+  ENDIF()
 
   #
   # Set up the link interface:

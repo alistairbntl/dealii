@@ -13,20 +13,19 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__std_cxx11_bind_h
-#define dealii__std_cxx11_bind_h
+#ifndef dealii_std_cxx11_bind_h
+#define dealii_std_cxx11_bind_h
 
 
 #include <deal.II/base/config.h>
 
-#ifdef DEAL_II_WITH_CXX11
 
 #  include <functional>
 
 DEAL_II_NAMESPACE_OPEN
 // In boost, the placeholders _1, _2, ... are in the global namespace. In
 // C++11, they are in namespace std::placeholders, which makes them awkward to
-// use. Import them into the dealii::std_cxx11 namespace instead and do them
+// use. Import them into the dealii::std_cxx11 namespace instead and do the
 // same below if we use boost instead. Namespace 'placeholders' is also defined
 // in dealii::std_cxx11 namespace to make code C++ standard compatible.
 // That is to say, if std::something works with C++11 standard,
@@ -43,46 +42,6 @@ namespace std_cxx11
 }
 DEAL_II_NAMESPACE_CLOSE
 
-#else
-
-#include <boost/bind.hpp>
-
-DEAL_II_NAMESPACE_OPEN
-namespace std_cxx11
-{
-  using boost::bind;
-  using boost::ref;
-  using boost::cref;
-  using boost::reference_wrapper;
-
-  // now also import the _1, _2 placeholders from the global namespace
-  // into the current one as suggested above
-  using ::_1;
-  using ::_2;
-  using ::_3;
-  using ::_4;
-  using ::_5;
-  using ::_6;
-  using ::_7;
-  using ::_8;
-  using ::_9;
-
-  namespace placeholders
-  {
-    using ::_1;
-    using ::_2;
-    using ::_3;
-    using ::_4;
-    using ::_5;
-    using ::_6;
-    using ::_7;
-    using ::_8;
-    using ::_9;
-  }
-}
-DEAL_II_NAMESPACE_CLOSE
-
-#endif
 
 // then allow using the old namespace name instead of the new one
 DEAL_II_NAMESPACE_OPEN

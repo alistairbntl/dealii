@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,11 +18,8 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <iomanip>
-#include <fstream>
 #include <sstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/base/quadrature.h>
@@ -30,7 +27,7 @@
 template <int dim>
 void test_fe(const char *name)
 {
-  FiniteElement<dim> *fe = FETools::get_fe_from_name<dim>(std::string(name));
+  FiniteElement<dim> *fe = FETools::get_fe_by_name<dim, dim>(std::string(name));
 
   deallog << fe->get_name() << std::endl
           << '\t' << fe->dofs_per_cell
@@ -39,6 +36,8 @@ void test_fe(const char *name)
           << '\t' << fe->dofs_per_quad
           << '\t' << fe->dofs_per_hex
           << std::endl;
+
+  delete fe;
 }
 
 

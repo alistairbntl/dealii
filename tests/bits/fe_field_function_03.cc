@@ -18,7 +18,6 @@
 // Test the functionality of the laplacian in the FEFieldFunction class.
 
 #include "../tests.h"
-#include <fstream>
 
 // all include files you need here
 #include <deal.II/numerics/fe_field_function.h>
@@ -79,8 +78,7 @@ void test()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   test<1>();
   test<2>();

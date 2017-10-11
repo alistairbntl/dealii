@@ -17,9 +17,6 @@
 // BlockSparseMatrix::clear used to forget to reset all sizes to zero
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cstdlib>
 
 #include <deal.II/fe/fe_q_hierarchical.h>
 #include <deal.II/dofs/dof_tools.h>
@@ -34,9 +31,7 @@
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<2> tria;
   GridGenerator::hyper_cube (tria,0,1);

@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_nothing_h
-#define dealii__fe_nothing_h
+#ifndef dealii_fe_nothing_h
+#define dealii_fe_nothing_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/fe/fe.h>
@@ -95,14 +95,8 @@ public:
   FE_Nothing (const unsigned int n_components = 1,
               const bool dominate = false);
 
-  /**
-   * A sort of virtual copy constructor. Some places in the library, for
-   * example the constructors of FESystem as well as the hp::FECollection
-   * class, need to make copied of finite elements without knowing their exact
-   * type. They do so through this function.
-   */
   virtual
-  FiniteElement<dim,spacedim> *
+  std::unique_ptr<FiniteElement<dim,spacedim> >
   clone() const;
 
   /**
@@ -184,8 +178,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    *
    * In the current case, this element is assumed to dominate if the second
@@ -214,6 +208,16 @@ public:
   virtual
   bool
   hp_constraints_are_implemented () const;
+
+  /**
+   * Return the matrix interpolating from the given finite element to the
+   * present one. Since the current finite element has no degrees of freedom, the
+   * interpolation matrix is necessarily empty.
+   */
+  virtual
+  void
+  get_interpolation_matrix (const FiniteElement<dim,spacedim> &source_fe,
+                            FullMatrix<double>       &interpolation_matrix) const;
 
   /**
    * Return the matrix interpolating from a face of of one element to the face

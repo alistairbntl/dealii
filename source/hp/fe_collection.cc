@@ -86,68 +86,12 @@ namespace hp
     return numbers::invalid_unsigned_int;
   }
 
-  template <int dim, int spacedim>
-  FECollection<dim,spacedim>::FECollection ()
-  {}
-
 
 
   template <int dim, int spacedim>
   FECollection<dim,spacedim>::FECollection (const FiniteElement<dim,spacedim> &fe)
   {
     push_back (fe);
-  }
-
-
-
-  template <int dim, int spacedim>
-  FECollection<dim,spacedim>::FECollection (const FiniteElement<dim,spacedim> &fe1,
-                                            const FiniteElement<dim,spacedim> &fe2)
-  {
-    push_back(fe1);
-    push_back(fe2);
-  }
-
-
-
-  template <int dim, int spacedim>
-  FECollection<dim,spacedim>::FECollection (const FiniteElement<dim,spacedim> &fe1,
-                                            const FiniteElement<dim,spacedim> &fe2,
-                                            const FiniteElement<dim,spacedim> &fe3)
-  {
-    push_back(fe1);
-    push_back(fe2);
-    push_back(fe3);
-  }
-
-
-
-  template <int dim, int spacedim>
-  FECollection<dim,spacedim>::FECollection (const FiniteElement<dim,spacedim> &fe1,
-                                            const FiniteElement<dim,spacedim> &fe2,
-                                            const FiniteElement<dim,spacedim> &fe3,
-                                            const FiniteElement<dim,spacedim> &fe4)
-  {
-    push_back(fe1);
-    push_back(fe2);
-    push_back(fe3);
-    push_back(fe4);
-  }
-
-
-
-  template <int dim, int spacedim>
-  FECollection<dim,spacedim>::FECollection (const FiniteElement<dim,spacedim> &fe1,
-                                            const FiniteElement<dim,spacedim> &fe2,
-                                            const FiniteElement<dim,spacedim> &fe3,
-                                            const FiniteElement<dim,spacedim> &fe4,
-                                            const FiniteElement<dim,spacedim> &fe5)
-  {
-    push_back(fe1);
-    push_back(fe2);
-    push_back(fe3);
-    push_back(fe4);
-    push_back(fe5);
   }
 
 
@@ -166,27 +110,6 @@ namespace hp
 
 
   template <int dim, int spacedim>
-  FECollection<dim,spacedim>::
-  FECollection (const FECollection<dim,spacedim> &fe_collection)
-    :
-    Subscriptor (),
-    // copy the array
-    // of shared
-    // pointers. nothing
-    // bad should
-    // happen -- they
-    // simply all point
-    // to the same
-    // objects, and the
-    // last one to die
-    // will delete the
-    // mappings
-    finite_elements (fe_collection.finite_elements)
-  {}
-
-
-
-  template <int dim, int spacedim>
   void FECollection<dim,spacedim>::push_back (const FiniteElement<dim,spacedim> &new_fe)
   {
     // check that the new element has the right
@@ -200,7 +123,7 @@ namespace hp
                           "same number of vector components!"));
 
     finite_elements
-    .push_back (std_cxx11::shared_ptr<const FiniteElement<dim,spacedim> >(new_fe.clone()));
+    .push_back (std::shared_ptr<const FiniteElement<dim,spacedim> >(new_fe.clone()));
   }
 
 

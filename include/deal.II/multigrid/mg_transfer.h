@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2016 by the deal.II authors
+// Copyright (C) 2001 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mg_transfer_h
-#define dealii__mg_transfer_h
+#ifndef dealii_mg_transfer_h
+#define dealii_mg_transfer_h
 
 #include <deal.II/base/config.h>
 
@@ -23,7 +23,7 @@
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 
 #include <deal.II/lac/vector_memory.h>
 
@@ -33,7 +33,7 @@
 
 #include <deal.II/dofs/dof_handler.h>
 
-#include <deal.II/base/std_cxx11/shared_ptr.h>
+#include <memory>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -58,7 +58,7 @@ namespace internal
 
 #ifdef DEAL_II_WITH_TRILINOS
   template <typename Number>
-  struct MatrixSelector<parallel::distributed::Vector<Number> >
+  struct MatrixSelector<LinearAlgebra::distributed::Vector<Number> >
   {
     typedef ::dealii::TrilinosWrappers::SparsityPattern Sparsity;
     typedef ::dealii::TrilinosWrappers::SparseMatrix Matrix;
@@ -72,6 +72,7 @@ namespace internal
     }
 
   };
+
   template <>
   struct MatrixSelector<dealii::TrilinosWrappers::MPI::Vector>
   {
@@ -88,17 +89,40 @@ namespace internal
 
   };
 
+#ifdef DEAL_II_WITH_MPI
   template <>
-  struct MatrixSelector<dealii::TrilinosWrappers::Vector>
+  struct MatrixSelector<dealii::LinearAlgebra::EpetraWrappers::Vector>
   {
     typedef ::dealii::TrilinosWrappers::SparsityPattern Sparsity;
     typedef ::dealii::TrilinosWrappers::SparseMatrix Matrix;
 
     template <typename SparsityPatternType, typename DoFHandlerType>
-    static void reinit(Matrix &, Sparsity &, int /*level*/, const SparsityPatternType &, DoFHandlerType &)
+    static void reinit(Matrix &matrix, Sparsity &, int level, const SparsityPatternType &sp, DoFHandlerType &dh)
     {
+      matrix.reinit(dh.locally_owned_mg_dofs(level+1),
+                    dh.locally_owned_mg_dofs(level),
+                    sp, MPI_COMM_WORLD, true);
     }
   };
+#endif
+
+#else
+  // ! DEAL_II_WITH_TRILINOS
+  template <typename Number>
+  struct MatrixSelector<LinearAlgebra::distributed::Vector<Number> >
+  {
+    typedef ::dealii::SparsityPattern Sparsity;
+    typedef ::dealii::SparseMatrix<Number> Matrix;
+
+    template <typename SparsityPatternType, typename DoFHandlerType>
+    static void reinit(Matrix &, Sparsity &, int, const SparsityPatternType &, const DoFHandlerType &)
+    {
+      AssertThrow(false, ExcNotImplemented(
+                    "ERROR: MGTransferPrebuilt with LinearAlgebra::distributed::Vector currently "
+                    "needs deal.II to be configured with Trilinos."));
+    }
+  };
+
 #endif
 }
 
@@ -130,7 +154,9 @@ public:
 
   /**
    * Transfer from a vector on the global grid to vectors defined on each of
-   * the levels separately, i.a. an @p MGVector.
+   * the levels separately for the active degrees of freedom. In particular,
+   * for a globally refined mesh only the finest level in @p dst is filled as a
+   * plain copy of @p src. All the other level objects are left untouched.
    */
   template <int dim, class InVector, int spacedim>
   void
@@ -259,7 +285,7 @@ protected:
  * Implementation of transfer between the global vectors and the multigrid
  * levels for use in the derived class MGTransferPrebuilt and other classes.
  * This class is a specialization for the case of
- * parallel::distributed::Vector that requires a few different calling
+ * LinearAlgebra::distributed::Vector that requires a few different calling
  * routines as compared to the %parallel vectors in the PETScWrappers and
  * TrilinosWrappers namespaces.
  *
@@ -267,7 +293,7 @@ protected:
  * @date 2016
  */
 template <typename Number>
-class MGLevelGlobalTransfer<parallel::distributed::Vector<Number> > : public MGTransferBase<parallel::distributed::Vector<Number> >
+class MGLevelGlobalTransfer<LinearAlgebra::distributed::Vector<Number> > : public MGTransferBase<LinearAlgebra::distributed::Vector<Number> >
 {
 public:
 
@@ -278,13 +304,15 @@ public:
 
   /**
    * Transfer from a vector on the global grid to vectors defined on each of
-   * the levels separately, i.a. an @p MGVector.
+   * the levels separately for the active degrees of freedom. In particular, for
+   * a globally refined mesh only the finest level in @p dst is filled as a
+   * plain copy of @p src. All the other level objects are left untouched.
    */
   template <int dim, typename Number2, int spacedim>
   void
   copy_to_mg (const DoFHandler<dim,spacedim>                        &mg_dof,
-              MGLevelObject<parallel::distributed::Vector<Number> > &dst,
-              const parallel::distributed::Vector<Number2>          &src) const;
+              MGLevelObject<LinearAlgebra::distributed::Vector<Number> > &dst,
+              const LinearAlgebra::distributed::Vector<Number2>          &src) const;
 
   /**
    * Transfer from multi-level vector to normal vector.
@@ -296,8 +324,8 @@ public:
   template <int dim, typename Number2, int spacedim>
   void
   copy_from_mg (const DoFHandler<dim,spacedim>                              &mg_dof,
-                parallel::distributed::Vector<Number2>                      &dst,
-                const MGLevelObject<parallel::distributed::Vector<Number> > &src) const;
+                LinearAlgebra::distributed::Vector<Number2>                      &dst,
+                const MGLevelObject<LinearAlgebra::distributed::Vector<Number> > &src) const;
 
   /**
    * Add a multi-level vector to a normal vector.
@@ -307,8 +335,8 @@ public:
   template <int dim, typename Number2, int spacedim>
   void
   copy_from_mg_add (const DoFHandler<dim,spacedim>                              &mg_dof,
-                    parallel::distributed::Vector<Number2>                      &dst,
-                    const MGLevelObject<parallel::distributed::Vector<Number> > &src) const;
+                    LinearAlgebra::distributed::Vector<Number2>                      &dst,
+                    const MGLevelObject<LinearAlgebra::distributed::Vector<Number> > &src) const;
 
   /**
    * If this object operates on BlockVector objects, we need to describe how
@@ -341,6 +369,17 @@ public:
 protected:
 
   /**
+   * Internal function to perform transfer of residuals or solutions
+   * basesd on the flag @p solution_transfer.
+   */
+  template <int dim, typename Number2, int spacedim>
+  void
+  copy_to_mg (const DoFHandler<dim,spacedim>                        &mg_dof,
+              MGLevelObject<LinearAlgebra::distributed::Vector<Number> > &dst,
+              const LinearAlgebra::distributed::Vector<Number2>          &src,
+              const bool solution_transfer) const;
+
+  /**
    * Internal function to @p fill copy_indices*. Called by derived classes.
    */
   template <int dim, int spacedim>
@@ -361,6 +400,13 @@ protected:
   std::vector<std::vector<std::pair<unsigned int, unsigned int> > >
   copy_indices;
 
+
+  /**
+   * Same as above, but used to transfer solution vectors.
+   */
+  std::vector<std::vector<std::pair<unsigned int, unsigned int> > >
+  solution_copy_indices;
+
   /**
    * Additional degrees of freedom for the copy_to_mg() function. These are
    * the ones where the global degree of freedom is locally owned and the
@@ -372,6 +418,12 @@ protected:
   copy_indices_global_mine;
 
   /**
+   * Same as above, but used to transfer solution vectors.
+   */
+  std::vector<std::vector<std::pair<unsigned int, unsigned int> > >
+  solution_copy_indices_global_mine;
+
+  /**
    * Additional degrees of freedom for the copy_from_mg() function. These are
    * the ones where the level degree of freedom is locally owned and the
    * global degree of freedom is not.
@@ -380,6 +432,12 @@ protected:
    */
   std::vector<std::vector<std::pair<unsigned int, unsigned int> > >
   copy_indices_level_mine;
+
+  /**
+   * Same as above, but used to transfer solution vectors.
+   */
+  std::vector<std::vector<std::pair<unsigned int, unsigned int> > >
+  solution_copy_indices_level_mine;
 
   /**
    * Stores whether the copy operation from the global to the level vector is
@@ -398,20 +456,31 @@ protected:
   /**
    * The mg_constrained_dofs of the level systems.
    */
-  SmartPointer<const MGConstrainedDoFs, MGLevelGlobalTransfer<parallel::distributed::Vector<Number> > > mg_constrained_dofs;
+  SmartPointer<const MGConstrainedDoFs, MGLevelGlobalTransfer<LinearAlgebra::distributed::Vector<Number> > > mg_constrained_dofs;
 
   /**
    * In the function copy_to_mg, we need to access ghosted entries of the
    * global vector for inserting into the level vectors. This vector is
    * populated with those entries.
    */
-  mutable parallel::distributed::Vector<Number> ghosted_global_vector;
+  mutable LinearAlgebra::distributed::Vector<Number> ghosted_global_vector;
+
+  /**
+   * Same as above but used when working with solution vectors.
+   */
+  mutable LinearAlgebra::distributed::Vector<Number> solution_ghosted_global_vector;
 
   /**
    * In the function copy_from_mg, we access all level vectors with certain
    * ghost entries for inserting the result into a global vector.
    */
-  mutable MGLevelObject<parallel::distributed::Vector<Number> > ghosted_level_vector;
+  mutable MGLevelObject<LinearAlgebra::distributed::Vector<Number> > ghosted_level_vector;
+
+  /**
+   * Same as above but used when working with solution vectors.
+   */
+  mutable MGLevelObject<LinearAlgebra::distributed::Vector<Number> > solution_ghosted_level_vector;
+
 };
 
 
@@ -437,25 +506,40 @@ public:
    * Constructor without constraint matrices. Use this constructor only with
    * discontinuous finite elements or with no local refinement.
    */
-  MGTransferPrebuilt ();
+  MGTransferPrebuilt () = default;
 
   /**
    * Constructor with constraints. Equivalent to the default constructor
    * followed by initialize_constraints().
    */
+  MGTransferPrebuilt (const MGConstrainedDoFs &mg_constrained_dofs);
+
+  /**
+   * Constructor with constraints. Equivalent to the default constructor
+   * followed by initialize_constraints().
+   *
+   * @deprecated @p constraints is unused.
+   */
   MGTransferPrebuilt (const ConstraintMatrix &constraints,
-                      const MGConstrainedDoFs &mg_constrained_dofs);
+                      const MGConstrainedDoFs &mg_constrained_dofs) DEAL_II_DEPRECATED;
 
   /**
    * Destructor.
    */
-  virtual ~MGTransferPrebuilt ();
+  virtual ~MGTransferPrebuilt () = default;
 
   /**
    * Initialize the constraints to be used in build_matrices().
    */
+  void initialize_constraints (const MGConstrainedDoFs &mg_constrained_dofs);
+
+  /**
+   * Initialize the constraints to be used in build_matrices().
+   *
+   * @deprecated @p constraints is unused.
+   */
   void initialize_constraints (const ConstraintMatrix &constraints,
-                               const MGConstrainedDoFs &mg_constrained_dofs);
+                               const MGConstrainedDoFs &mg_constrained_dofs) DEAL_II_DEPRECATED;
 
   /**
    * Reset the object to the state it had right after the default constructor.
@@ -527,25 +611,20 @@ private:
   /**
    * Sparsity patterns for transfer matrices.
    */
-  std::vector<std_cxx11::shared_ptr<typename internal::MatrixSelector<VectorType>::Sparsity> > prolongation_sparsities;
+  std::vector<std::shared_ptr<typename internal::MatrixSelector<VectorType>::Sparsity> > prolongation_sparsities;
 
   /**
    * The actual prolongation matrix.  column indices belong to the dof indices
    * of the mother cell, i.e. the coarse level.  while row indices belong to
    * the child cell, i.e. the fine level.
    */
-  std::vector<std_cxx11::shared_ptr<typename internal::MatrixSelector<VectorType>::Matrix> > prolongation_matrices;
+  std::vector<std::shared_ptr<typename internal::MatrixSelector<VectorType>::Matrix> > prolongation_matrices;
 
   /**
    * Degrees of freedom on the refinement edge excluding those on the
    * boundary.
    */
   std::vector<std::vector<bool> > interface_dofs;
-
-  /**
-   * The constraints of the global system.
-   */
-  SmartPointer<const ConstraintMatrix, MGTransferPrebuilt<VectorType> > constraints;
 };
 
 

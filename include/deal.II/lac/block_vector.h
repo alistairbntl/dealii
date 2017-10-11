@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,14 +13,15 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_vector_h
-#define dealii__block_vector_h
+#ifndef dealii_block_vector_h
+#define dealii_block_vector_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/lac/block_indices.h>
 #include <deal.II/lac/block_vector_base.h>
+#include <deal.II/lac/vector_type_traits.h>
 
 #include <cstdio>
 #include <vector>
@@ -31,7 +32,10 @@ DEAL_II_NAMESPACE_OPEN
 #ifdef DEAL_II_WITH_TRILINOS
 namespace TrilinosWrappers
 {
-  class BlockVector;
+  namespace MPI
+  {
+    class BlockVector;
+  }
 }
 #endif
 
@@ -104,19 +108,12 @@ public:
   BlockVector (const BlockVector<Number> &V);
 
 
-#ifdef DEAL_II_WITH_CXX11
   /**
    * Move constructor. Creates a new vector by stealing the internal data of
-   * the vector @p v.
-   *
-   * @note This constructor is only available if deal.II is configured with
-   * C++11 support.
+   * the given argument vector.
    */
-  BlockVector (BlockVector<Number> &&v) = default;
-#endif
+  BlockVector (BlockVector<Number> &&/*v*/) = default;
 
-
-#ifndef DEAL_II_EXPLICIT_CONSTRUCTOR_BUG
   /**
    * Copy constructor taking a BlockVector of another data type. This will
    * fail if there is no conversion path from <tt>OtherNumber</tt> to
@@ -132,15 +129,13 @@ public:
   template <typename OtherNumber>
   explicit
   BlockVector (const BlockVector<OtherNumber> &v);
-#endif
-
 
 #ifdef DEAL_II_WITH_TRILINOS
   /**
    * A copy constructor taking a (parallel) Trilinos block vector and copying
    * it into the deal.II own format.
    */
-  BlockVector (const TrilinosWrappers::BlockVector &v);
+  BlockVector (const TrilinosWrappers::MPI::BlockVector &v);
 
 #endif
   /**
@@ -172,7 +167,7 @@ public:
   /**
    * Destructor. Clears memory
    */
-  ~BlockVector ();
+  ~BlockVector () = default;
 
   /**
    * Call the compress() function on all the subblocks.
@@ -200,16 +195,11 @@ public:
   BlockVector<Number> &
   operator= (const BlockVector<Number> &v);
 
-#ifdef DEAL_II_WITH_CXX11
   /**
-   * Move the given vector. This operator replaces the present vector with @p
-   * v by efficiently swapping the internal data structures.
-   *
-   * @note This operator is only available if deal.II is configured with C++11
-   * support.
+   * Move the given vector. This operator replaces the present vector with
+   * the contents of the given argument vector.
    */
-  BlockVector<Number> &operator= (BlockVector<Number> &&v) = default;
-#endif
+  BlockVector<Number> &operator= (BlockVector<Number> &&/*v*/) = default;
 
   /**
    * Copy operator for template arguments of different types. Resize the
@@ -231,7 +221,7 @@ public:
    * vector.
    */
   BlockVector<Number> &
-  operator= (const TrilinosWrappers::BlockVector &V);
+  operator= (const TrilinosWrappers::MPI::BlockVector &V);
 #endif
 
   /**
@@ -312,7 +302,7 @@ public:
    * only swaps the pointers to the data of the two vectors and therefore does
    * not need to allocate temporary storage and move data around.
    *
-   * This function is analog to the the swap() function of all C++ standard
+   * This function is analogous to the swap() function of all C++ standard
    * containers. Also, there is a global function swap(u,v) that simply calls
    * <tt>u.swap(v)</tt>, again in analogy to standard functions.
    */
@@ -323,7 +313,7 @@ public:
    *
    * This function is deprecated.
    */
-  void print (const char *format = 0) const DEAL_II_DEPRECATED;
+  void print (const char *format = nullptr) const DEAL_II_DEPRECATED;
 
   /**
    * Print to a stream.
@@ -491,7 +481,7 @@ namespace internal
      * A helper class used internally in linear_operator.h. Specialization for
      * BlockVector<number>.
      */
-    template<typename number>
+    template <typename number>
     class ReinitHelper<BlockVector<number> >
     {
     public:
@@ -516,6 +506,17 @@ namespace internal
 
   } /* namespace LinearOperator */
 } /* namespace internal */
+
+
+/**
+ * Declare dealii::BlockVector< Number > as serial vector.
+ *
+ * @author Uwe Koecher, 2017
+ */
+template <typename Number>
+struct is_serial_vector< BlockVector< Number > > : std::true_type
+{
+};
 
 DEAL_II_NAMESPACE_CLOSE
 

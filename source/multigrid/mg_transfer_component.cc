@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -85,7 +85,7 @@ namespace
   {
     std::vector<bool> selected=sel;
     std::vector<unsigned int> target_component=target_comp;
-    const unsigned int ncomp = mg_dof.get_fe().n_components();
+    const unsigned int ncomp = mg_dof.get_fe(0).n_components();
 
     // If the selected and
     // target_component have size 0,
@@ -120,7 +120,7 @@ namespace
     const unsigned int n_selected
       = std::accumulate(selected.begin(),
                         selected.end(),
-                        0U);
+                        0u);
 
     if (ndofs.size() == 0)
       {
@@ -238,7 +238,6 @@ MGTransferSelect<number>::do_copy_to_mg (
   // next finer level, which we then
   // already have built.
 
-  bool first = true;
   for (unsigned int level=mg_dof_handler.get_triangulation().n_levels(); level!=0;)
     {
       --level;
@@ -247,14 +246,6 @@ MGTransferSelect<number>::do_copy_to_mg (
       for (IT i=copy_to_and_from_indices[level].begin();
            i != copy_to_and_from_indices[level].end(); ++i)
         dst[level](i->second) = src(i->first);
-      // for that part of the level
-      // which is further refined:
-      // get the defect by
-      // restriction of the defect on
-      // one level higher
-      if (!first)
-        restrict_and_add (level+1, dst[level], dst[level+1]);
-      first = false;
     }
 }
 
@@ -269,16 +260,16 @@ void MGTransferComponentBase::build_matrices (
   // is empty
   if (target_component.size() == 0)
     {
-      target_component.resize(mg_dof.get_fe().n_components());
+      target_component.resize(mg_dof.get_fe(0).n_components());
       for (unsigned int i=0; i<target_component.size(); ++i)
         target_component[i] = i;
     }
   else
     {
       // otherwise, check it for consistency
-      Assert (target_component.size() == mg_dof.get_fe().n_components(),
+      Assert (target_component.size() == mg_dof.get_fe(0).n_components(),
               ExcDimensionMismatch(target_component.size(),
-                                   mg_dof.get_fe().n_components()));
+                                   mg_dof.get_fe(0).n_components()));
 
       for (unsigned int i=0; i<target_component.size(); ++i)
         {
@@ -291,15 +282,15 @@ void MGTransferComponentBase::build_matrices (
   // different.
   if (mg_target_component.size() == 0)
     {
-      mg_target_component.resize(mg_dof.get_fe().n_components());
+      mg_target_component.resize(mg_dof.get_fe(0).n_components());
       for (unsigned int i=0; i<mg_target_component.size(); ++i)
         mg_target_component[i] = target_component[i];
     }
   else
     {
-      Assert (mg_target_component.size() == mg_dof.get_fe().n_components(),
+      Assert (mg_target_component.size() == mg_dof.get_fe(0).n_components(),
               ExcDimensionMismatch(mg_target_component.size(),
-                                   mg_dof.get_fe().n_components()));
+                                   mg_dof.get_fe(0).n_components()));
 
       for (unsigned int i=0; i<mg_target_component.size(); ++i)
         {
@@ -381,13 +372,13 @@ void MGTransferComponentBase::build_matrices (
   // by itself
   prolongation_matrices.resize (0);
   prolongation_sparsities.resize (0);
+  prolongation_matrices.reserve (n_levels - 1);
+  prolongation_sparsities.reserve (n_levels - 1);
 
   for (unsigned int i=0; i<n_levels-1; ++i)
     {
-      prolongation_sparsities
-      .push_back (std_cxx11::shared_ptr<BlockSparsityPattern> (new BlockSparsityPattern));
-      prolongation_matrices
-      .push_back (std_cxx11::shared_ptr<BlockSparseMatrix<double> > (new BlockSparseMatrix<double>));
+      prolongation_sparsities.emplace_back (new BlockSparsityPattern);
+      prolongation_matrices.emplace_back (new BlockSparseMatrix<double>);
     }
 
   // two fields which will store the
@@ -563,7 +554,7 @@ void MGTransferSelect<number>::build_matrices (
   const std::vector<std::set<types::global_dof_index> > &bdry_indices)
 {
   const FiniteElement<dim> &fe = mg_dof.get_fe();
-  unsigned int ncomp = mg_dof.get_fe().n_components();
+  unsigned int ncomp = mg_dof.get_fe(0).n_components();
 
   target_component = t_component;
   mg_target_component = mg_t_component;
@@ -668,8 +659,9 @@ void MGTransferSelect<number>::build_matrices (
       // global to level dofs
       const types::global_dof_index n_active_dofs =
         std::count_if (temp_copy_indices.begin(), temp_copy_indices.end(),
-                       std::bind2nd(std::not_equal_to<types::global_dof_index>(),
-                                    numbers::invalid_dof_index));
+                       std::bind (std::not_equal_to<types::global_dof_index>(),
+                                  std::placeholders::_1,
+                                  numbers::invalid_dof_index));
       copy_to_and_from_indices[level].resize (n_active_dofs);
       types::global_dof_index counter = 0;
       for (types::global_dof_index i=0; i<temp_copy_indices.size(); ++i)

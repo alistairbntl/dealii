@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------
-// $Id$
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +17,6 @@
 #include <deal.II/base/quadrature.h>
 #include <deal.II/base/qprojector.h>
 #include <deal.II/base/template_constraints.h>
-#include <deal.II/base/std_cxx11/unique_ptr.h>
 #include <deal.II/fe/fe_q_bubbles.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_tools.h>
@@ -34,135 +32,141 @@
 
 #include <vector>
 #include <sstream>
+#include <memory>
+#include <deal.II/base/std_cxx14/memory.h>
 
 DEAL_II_NAMESPACE_OPEN
 
 
-namespace FE_Q_Bubbles_Helper
+namespace internal
 {
-  namespace
+  namespace FE_Q_Bubbles
   {
-    template <int dim, int spacedim>
-    inline
-    void
-    compute_embedding_matrices(const FE_Q_Bubbles<dim, spacedim> &fe,
-                               std::vector<std::vector<FullMatrix<double> > > &matrices,
-                               const bool isotropic_only)
+    namespace
     {
-      const unsigned int dpc    = fe.dofs_per_cell;
-      const unsigned int degree = fe.degree;
+      template <int dim, int spacedim>
+      inline
+      void
+      compute_embedding_matrices(const dealii::FE_Q_Bubbles<dim, spacedim> &fe,
+                                 std::vector<std::vector<FullMatrix<double> > > &matrices,
+                                 const bool                                 isotropic_only)
+      {
+        const unsigned int dpc    = fe.dofs_per_cell;
+        const unsigned int degree = fe.degree;
 
-      // Initialize quadrature formula on fine cells
-      std_cxx11::unique_ptr<Quadrature<dim> > q_fine;
-      Quadrature<1> q_dummy(std::vector<Point<1> >(1), std::vector<double> (1,1.));
-      switch (dim)
-        {
-        case 1:
-          if (spacedim==1)
+        // Initialize quadrature formula on fine cells
+        std::unique_ptr<Quadrature<dim> > q_fine;
+        Quadrature<1> q_dummy(std::vector<Point<1> >(1), std::vector<double> (1,1.));
+        switch (dim)
+          {
+          case 1:
+            if (spacedim==1)
+              q_fine.reset(new QGauss<dim> (degree+1));
+            else if (spacedim==2)
+              q_fine.reset(new QAnisotropic<dim>(QGauss<1>(degree+1), q_dummy));
+            else
+              q_fine.reset(new QAnisotropic<dim>(QGauss<1>(degree+1), q_dummy, q_dummy));
+            break;
+          case 2:
+            if (spacedim==2)
+              q_fine.reset(new QGauss<dim> (degree+1));
+            else
+              q_fine.reset(new QAnisotropic<dim>(QGauss<1>(degree+1), QGauss<1>(degree+1), q_dummy));
+            break;
+          case 3:
             q_fine.reset(new QGauss<dim> (degree+1));
-          else if (spacedim==2)
-            q_fine.reset(new QAnisotropic<dim>(QGauss<1>(degree+1), q_dummy));
-          else
-            q_fine.reset(new QAnisotropic<dim>(QGauss<1>(degree+1), q_dummy, q_dummy));
-          break;
-        case 2:
-          if (spacedim==2)
-            q_fine.reset(new QGauss<dim> (degree+1));
-          else
-            q_fine.reset(new QAnisotropic<dim>(QGauss<1>(degree+1), QGauss<1>(degree+1), q_dummy));
-          break;
-        case 3:
-          q_fine.reset(new QGauss<dim> (degree+1));
-          break;
-        default:
-          AssertThrow(false, ExcInternalError());
-        }
+            break;
+          default:
+            Assert(false, ExcInternalError());
+          }
 
-      Assert(q_fine.get() != NULL, ExcInternalError());
-      const unsigned int nq = q_fine->size();
+        Assert(q_fine.get() != nullptr, ExcInternalError());
+        const unsigned int nq = q_fine->size();
 
-      // loop over all possible refinement cases
-      unsigned int ref_case = (isotropic_only)
-                              ? RefinementCase<dim>::isotropic_refinement
-                              : RefinementCase<dim>::cut_x;
-      for (; ref_case <= RefinementCase<dim>::isotropic_refinement; ++ref_case)
-        {
-          const unsigned int nc
-            = GeometryInfo<dim>::n_children(RefinementCase<dim>(ref_case));
+        // loop over all possible refinement cases
+        unsigned int ref_case = (isotropic_only)
+                                ? RefinementCase<dim>::isotropic_refinement
+                                : RefinementCase<dim>::cut_x;
+        for (; ref_case <= RefinementCase<dim>::isotropic_refinement; ++ref_case)
+          {
+            const unsigned int nc
+              = GeometryInfo<dim>::n_children(RefinementCase<dim>(ref_case));
 
-          for (unsigned int i=0; i<nc; ++i)
-            {
-              Assert(matrices[ref_case-1][i].n() == dpc,
-                     ExcDimensionMismatch(matrices[ref_case-1][i].n(),dpc));
-              Assert(matrices[ref_case-1][i].m() == dpc,
-                     ExcDimensionMismatch(matrices[ref_case-1][i].m(),dpc));
-            }
+            for (unsigned int i=0; i<nc; ++i)
+              {
+                Assert(matrices[ref_case-1][i].n() == dpc,
+                       ExcDimensionMismatch(matrices[ref_case-1][i].n(),dpc));
+                Assert(matrices[ref_case-1][i].m() == dpc,
+                       ExcDimensionMismatch(matrices[ref_case-1][i].m(),dpc));
+              }
 
-          // create a respective refinement on the triangulation
-          Triangulation<dim, spacedim> tr;
-          GridGenerator::hyper_cube (tr, 0, 1);
-          tr.begin_active()->set_refine_flag(RefinementCase<dim>(ref_case));
-          tr.execute_coarsening_and_refinement();
+            // create a respective refinement on the triangulation
+            dealii::Triangulation<dim, spacedim> tr;
+            GridGenerator::hyper_cube (tr, 0, 1);
+            tr.begin_active()->set_refine_flag(RefinementCase<dim>(ref_case));
+            tr.execute_coarsening_and_refinement();
 
-          DoFHandler<dim, spacedim> dh(tr);
-          dh.distribute_dofs(fe);
+            dealii::DoFHandler<dim, spacedim> dh(tr);
+            dh.distribute_dofs(fe);
 
-          FEValues<dim, spacedim> fine (StaticMappingQ1<dim,spacedim>::mapping, fe, *q_fine,
-                                        update_quadrature_points
-                                        | update_JxW_values | update_values);
+            dealii::FEValues<dim, spacedim> fine
+            (StaticMappingQ1<dim,spacedim>::mapping, fe, *q_fine,
+             update_quadrature_points
+             | update_JxW_values | update_values);
 
-          const unsigned int n_dofs = dh.n_dofs();
+            const unsigned int n_dofs = dh.n_dofs();
 
-          FullMatrix<double> fine_mass(n_dofs);
-          FullMatrix<double> coarse_rhs_matrix(n_dofs, dpc);
+            FullMatrix<double> fine_mass(n_dofs);
+            FullMatrix<double> coarse_rhs_matrix(n_dofs, dpc);
 
-          std::vector<std::vector<types::global_dof_index> > child_ldi
-          (nc, std::vector<types::global_dof_index>(fe.dofs_per_cell));
+            std::vector<std::vector<types::global_dof_index> > child_ldi
+            (nc, std::vector<types::global_dof_index>(fe.dofs_per_cell));
 
-          //now create the mass matrix and all the right_hand sides
-          unsigned int child_no = 0;
-          typename dealii::DoFHandler<dim>::active_cell_iterator cell
-            = dh.begin_active();
-          for (; cell!=dh.end(); ++cell, ++child_no)
-            {
-              fine.reinit(cell);
-              cell->get_dof_indices(child_ldi[child_no]);
+            //now create the mass matrix and all the right_hand sides
+            unsigned int child_no = 0;
+            typename dealii::DoFHandler<dim>::active_cell_iterator cell
+              = dh.begin_active();
+            for (; cell!=dh.end(); ++cell, ++child_no)
+              {
+                fine.reinit(cell);
+                cell->get_dof_indices(child_ldi[child_no]);
 
-              for (unsigned int q=0; q<nq; ++q)
-                for (unsigned int i=0; i<dpc; ++i)
-                  for (unsigned int j=0; j<dpc; ++j)
-                    {
-                      const unsigned int gdi=child_ldi[child_no][i];
-                      const unsigned int gdj=child_ldi[child_no][j];
-                      fine_mass(gdi, gdj)+=fine.shape_value(i,q)
-                                           *fine.shape_value(j,q)
-                                           *fine.JxW(q);
-                      Point<dim> quad_tmp;
-                      for (unsigned int k=0; k<dim; ++k)
-                        quad_tmp(k) = fine.quadrature_point(q)(k);
-                      coarse_rhs_matrix(gdi, j)
-                      +=fine.shape_value(i,q)
-                        *fe.shape_value(j, quad_tmp)
-                        *fine.JxW(q);
-                    }
-            }
+                for (unsigned int q=0; q<nq; ++q)
+                  for (unsigned int i=0; i<dpc; ++i)
+                    for (unsigned int j=0; j<dpc; ++j)
+                      {
+                        const unsigned int gdi=child_ldi[child_no][i];
+                        const unsigned int gdj=child_ldi[child_no][j];
+                        fine_mass(gdi, gdj)+=fine.shape_value(i,q)
+                                             *fine.shape_value(j,q)
+                                             *fine.JxW(q);
+                        Point<dim> quad_tmp;
+                        for (unsigned int k=0; k<dim; ++k)
+                          quad_tmp(k) = fine.quadrature_point(q)(k);
+                        coarse_rhs_matrix(gdi, j)
+                        +=fine.shape_value(i,q)
+                          *fe.shape_value(j, quad_tmp)
+                          *fine.JxW(q);
+                      }
+              }
 
-          //now solve for all right-hand sides simultaneously
-          dealii::FullMatrix<double> solution (n_dofs, dpc);
-          fine_mass.gauss_jordan();
-          fine_mass.mmult(solution, coarse_rhs_matrix);
+            //now solve for all right-hand sides simultaneously
+            dealii::FullMatrix<double> solution (n_dofs, dpc);
+            fine_mass.gauss_jordan();
+            fine_mass.mmult(solution, coarse_rhs_matrix);
 
-          //and distribute to the fine cell matrices
-          for (unsigned int child_no=0; child_no<nc; ++child_no)
-            for (unsigned int i=0; i<dpc; ++i)
-              for (unsigned int j=0; j<dpc; ++j)
-                {
-                  const unsigned int gdi=child_ldi[child_no][i];
-                  //remove small entries
-                  if (std::fabs(solution(gdi, j)) > 1.e-12)
-                    matrices[ref_case-1][child_no](i,j)=solution(gdi, j);
-                }
-        }
+            //and distribute to the fine cell matrices
+            for (unsigned int child_no=0; child_no<nc; ++child_no)
+              for (unsigned int i=0; i<dpc; ++i)
+                for (unsigned int j=0; j<dpc; ++j)
+                  {
+                    const unsigned int gdi=child_ldi[child_no][i];
+                    //remove small entries
+                    if (std::fabs(solution(gdi, j)) > 1.e-12)
+                      matrices[ref_case-1][child_no](i,j)=solution(gdi, j);
+                  }
+          }
+      }
     }
   }
 }
@@ -196,7 +200,7 @@ FE_Q_Bubbles<dim,spacedim>::FE_Q_Bubbles (const unsigned int q_degree)
   this->reinit_restriction_and_prolongation_matrices();
   if (dim == spacedim)
     {
-      FE_Q_Bubbles_Helper::compute_embedding_matrices
+      internal::FE_Q_Bubbles::compute_embedding_matrices
       (*this, this->prolongation, false);
       // Fill restriction matrices with L2-projection
       FETools::compute_projection_matrices (*this, this->restriction);
@@ -234,7 +238,7 @@ FE_Q_Bubbles<dim,spacedim>::FE_Q_Bubbles (const Quadrature<1> &points)
   this->reinit_restriction_and_prolongation_matrices();
   if (dim == spacedim)
     {
-      FE_Q_Bubbles_Helper::compute_embedding_matrices
+      internal::FE_Q_Bubbles::compute_embedding_matrices
       (*this, this->prolongation, false);
       // Fill restriction matrices with L2-projection
       FETools::compute_projection_matrices (*this, this->restriction);
@@ -247,7 +251,7 @@ template <int dim, int spacedim>
 std::string
 FE_Q_Bubbles<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
 
@@ -321,88 +325,38 @@ FE_Q_Bubbles<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_Q_Bubbles<dim,spacedim>::clone() const
 {
-  return new FE_Q_Bubbles<dim,spacedim>(*this);
+  return std_cxx14::make_unique<FE_Q_Bubbles<dim,spacedim>>(*this);
 }
 
 
 
 template <int dim, int spacedim>
 void
-FE_Q_Bubbles<dim,spacedim>::interpolate(std::vector<double>       &local_dofs,
-                                        const std::vector<double> &values) const
+FE_Q_Bubbles<dim,spacedim>::
+convert_generalized_support_point_values_to_dof_values(const std::vector<Vector<double> > &support_point_values,
+                                                       std::vector<double>    &nodal_values) const
 {
-  Assert (values.size() == this->unit_support_points.size(),
-          ExcDimensionMismatch(values.size(),
+  Assert (support_point_values.size() == this->unit_support_points.size(),
+          ExcDimensionMismatch(support_point_values.size(),
                                this->unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (this->n_components() == 1,
-          ExcDimensionMismatch(this->n_components(), 1));
-
-  std::copy(values.begin(), values.end(), local_dofs.begin());
-
-  // We don't use the bubble functions for local interpolation
-  for (unsigned int i = 0; i<n_bubbles; ++i)
-    local_dofs[local_dofs.size()-i-1] = 0.;
-}
-
-
-
-template <int dim, int spacedim>
-void
-FE_Q_Bubbles<dim,spacedim>::interpolate(std::vector<double>    &local_dofs,
-                                        const std::vector<Vector<double> > &values,
-                                        unsigned int offset) const
-{
-  Assert (values.size() == this->unit_support_points.size(),
-          ExcDimensionMismatch(values.size(),
-                               this->unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values[0].size() >= offset+this->n_components(),
-          ExcDimensionMismatch(values[0].size(),offset+this->n_components()));
+  Assert (nodal_values.size() == this->dofs_per_cell,
+          ExcDimensionMismatch(nodal_values.size(),this->dofs_per_cell));
+  Assert (support_point_values[0].size() == this->n_components(),
+          ExcDimensionMismatch(support_point_values[0].size(),this->n_components()));
 
   for (unsigned int i=0; i<this->dofs_per_cell-1; ++i)
     {
       const std::pair<unsigned int, unsigned int> index
         = this->system_to_component_index(i);
-      local_dofs[i] = values[i](offset+index.first);
+      nodal_values[i] = support_point_values[i](index.first);
     }
 
   // We don't use the bubble functions for local interpolation
   for (unsigned int i = 0; i<n_bubbles; ++i)
-    local_dofs[local_dofs.size()-i-1] = 0.;
-}
-
-
-
-template <int dim, int spacedim>
-void
-FE_Q_Bubbles<dim,spacedim>::interpolate(
-  std::vector<double> &local_dofs,
-  const VectorSlice<const std::vector<std::vector<double> > > &values) const
-{
-  Assert (values[0].size() == this->unit_support_points.size(),
-          ExcDimensionMismatch(values.size(),
-                               this->unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values.size() == this->n_components(),
-          ExcDimensionMismatch(values.size(), this->n_components()));
-
-  for (unsigned int i=0; i<this->dofs_per_cell-1; ++i)
-    {
-      const std::pair<unsigned int, unsigned int> index
-        = this->system_to_component_index(i);
-      local_dofs[i] = values[index.first][i];
-    }
-
-  // We don't use the bubble functions for local interpolation
-  for (unsigned int i = 0; i<n_bubbles; ++i)
-    local_dofs[local_dofs.size()-i-1] = 0.;
+    nodal_values[nodal_values.size()-i-1] = 0.;
 }
 
 
@@ -421,7 +375,7 @@ get_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe,
 
   AssertThrow ((x_source_fe.get_name().find ("FE_Q_Bubbles<") == 0)
                ||
-               (dynamic_cast<const FEQBUBBLES *>(&x_source_fe) != 0)
+               (dynamic_cast<const FEQBUBBLES *>(&x_source_fe) != nullptr)
                ,
                typename FEL::
                ExcInterpolationNotImplemented());

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,6 +23,7 @@
 
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #include <boost/random.hpp>
+#include <boost/math/special_functions/erf.hpp>
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 #ifdef DEAL_II_WITH_MUPARSER
@@ -49,14 +50,19 @@ FunctionParser<dim>::FunctionParser(const unsigned int n_components,
                                     const double       initial_time,
                                     const double       h)
   :
-  AutoDerivativeFunction<dim>(h, n_components, initial_time)
+  AutoDerivativeFunction<dim>(h, n_components, initial_time),
+  initialized (false),
+  n_vars (0)
 {}
 
 
 
+// We deliberately delay the definition of the default destructor
+// so that we don't need to include the definition of mu::Parser
+// in the header file.
 template <int dim>
-FunctionParser<dim>::~FunctionParser()
-{}
+FunctionParser<dim>::~FunctionParser() = default;
+
 
 #ifdef DEAL_II_WITH_MUPARSER
 
@@ -182,7 +188,7 @@ namespace internal
 
   double mu_erfc(double value)
   {
-    return erfc(value);
+    return boost::math::erfc(value);
   }
 
   // returns a random value in the range [0,1] initializing the generator
@@ -210,15 +216,16 @@ namespace internal
     static Threads::Mutex rand_mutex;
     Threads::Mutex::ScopedLock lock(rand_mutex);
     static boost::random::uniform_real_distribution<> uniform_distribution(0,1);
-    static boost::random::mt19937 rng(static_cast<unsigned long>(std::time(0)));
+    static boost::random::mt19937 rng(static_cast<unsigned long>(std::time(nullptr)));
     return uniform_distribution(rng);
   }
 
 }
 
 
+
 template <int dim>
-void FunctionParser<dim>:: init_muparser() const
+void FunctionParser<dim>::init_muparser() const
 {
   // check that we have not already initialized the parser on the
   // current thread, i.e., that the current function is only called
@@ -227,34 +234,36 @@ void FunctionParser<dim>:: init_muparser() const
 
   // initialize the objects for the current thread (fp.get() and
   // vars.get())
-  fp.get().resize(this->n_components);
+  fp.get().reserve(this->n_components);
   vars.get().resize(var_names.size());
   for (unsigned int component=0; component<this->n_components; ++component)
     {
+      fp.get().emplace_back(new mu::Parser());
+
       for (std::map< std::string, double >::const_iterator constant = constants.begin();
            constant != constants.end(); ++constant)
         {
-          fp.get()[component].DefineConst(constant->first.c_str(), constant->second);
+          fp.get()[component]->DefineConst(constant->first.c_str(), constant->second);
         }
 
       for (unsigned int iv=0; iv<var_names.size(); ++iv)
-        fp.get()[component].DefineVar(var_names[iv].c_str(), &vars.get()[iv]);
+        fp.get()[component]->DefineVar(var_names[iv].c_str(), &vars.get()[iv]);
 
       // define some compatibility functions:
-      fp.get()[component].DefineFun("if",internal::mu_if, true);
-      fp.get()[component].DefineOprt("|", internal::mu_or, 1);
-      fp.get()[component].DefineOprt("&", internal::mu_and, 2);
-      fp.get()[component].DefineFun("int", internal::mu_int, true);
-      fp.get()[component].DefineFun("ceil", internal::mu_ceil, true);
-      fp.get()[component].DefineFun("cot", internal::mu_cot, true);
-      fp.get()[component].DefineFun("csc", internal::mu_csc, true);
-      fp.get()[component].DefineFun("floor", internal::mu_floor, true);
-      fp.get()[component].DefineFun("sec", internal::mu_sec, true);
-      fp.get()[component].DefineFun("log", internal::mu_log, true);
-      fp.get()[component].DefineFun("pow", internal::mu_pow, true);
-      fp.get()[component].DefineFun("erfc", internal::mu_erfc, true);
-      fp.get()[component].DefineFun("rand_seed", internal::mu_rand_seed, true);
-      fp.get()[component].DefineFun("rand", internal::mu_rand, true);
+      fp.get()[component]->DefineFun("if",internal::mu_if, true);
+      fp.get()[component]->DefineOprt("|", internal::mu_or, 1);
+      fp.get()[component]->DefineOprt("&", internal::mu_and, 2);
+      fp.get()[component]->DefineFun("int", internal::mu_int, true);
+      fp.get()[component]->DefineFun("ceil", internal::mu_ceil, true);
+      fp.get()[component]->DefineFun("cot", internal::mu_cot, true);
+      fp.get()[component]->DefineFun("csc", internal::mu_csc, true);
+      fp.get()[component]->DefineFun("floor", internal::mu_floor, true);
+      fp.get()[component]->DefineFun("sec", internal::mu_sec, true);
+      fp.get()[component]->DefineFun("log", internal::mu_log, true);
+      fp.get()[component]->DefineFun("pow", internal::mu_pow, true);
+      fp.get()[component]->DefineFun("erfc", internal::mu_erfc, true);
+      fp.get()[component]->DefineFun("rand_seed", internal::mu_rand_seed, true);
+      fp.get()[component]->DefineFun("rand", internal::mu_rand, true);
 
       try
         {
@@ -337,7 +346,7 @@ void FunctionParser<dim>:: init_muparser() const
             }
 
           // now use the transformed expression
-          fp.get()[component].SetExpr(transformed_expression);
+          fp.get()[component]->SetExpr(transformed_expression);
         }
       catch (mu::ParserError &e)
         {
@@ -384,7 +393,7 @@ double FunctionParser<dim>::value (const Point<dim>  &p,
 
   try
     {
-      return fp.get()[component].Eval();
+      return fp.get()[component]->Eval();
     }
   catch (mu::ParserError &e)
     {
@@ -420,7 +429,7 @@ void FunctionParser<dim>::vector_value (const Point<dim> &p,
 
   for (unsigned int component = 0; component < this->n_components;
        ++component)
-    values(component) = fp.get()[component].Eval();
+    values(component) = fp.get()[component]->Eval();
 }
 
 #else

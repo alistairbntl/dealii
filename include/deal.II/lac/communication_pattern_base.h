@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,13 +13,10 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__communication_pattern_base_h
-#define dealii__communication_pattern_base_h
+#ifndef dealii_communication_pattern_base_h
+#define dealii_communication_pattern_base_h
 
 #include <deal.II/base/config.h>
-
-#ifdef DEAL_II_WITH_MPI
-
 #include <deal.II/base/mpi.h>
 
 DEAL_II_NAMESPACE_OPEN
@@ -44,7 +41,7 @@ namespace LinearAlgebra
     /**
      * Destructor.
      */
-    virtual ~CommunicationPatternBase() {};
+    virtual ~CommunicationPatternBase() = default;
 
     /**
      * Reinitialize the communication pattern. The first argument @p
@@ -66,7 +63,5 @@ namespace LinearAlgebra
 } // end of namespace LinearAlgebra
 
 DEAL_II_NAMESPACE_CLOSE
-
-#endif
 
 #endif

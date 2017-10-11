@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__point_value_history_h
-#define dealii__point_value_history_h
+#ifndef dealii_point_value_history_h
+#define dealii_point_value_history_h
 
 #include <deal.II/base/point.h>
 #include <deal.II/base/smartpointer.h>
@@ -409,7 +409,7 @@ public:
    * locations output.
    */
   void write_gnuplot (const std::string &base_name,
-                      const std::vector <Point <dim> > postprocessor_locations = std::vector <Point <dim> > ());
+                      const std::vector <Point <dim> > &postprocessor_locations = std::vector <Point <dim> > ());
 
 
   /**
@@ -648,4 +648,4 @@ private:
 
 
 DEAL_II_NAMESPACE_CLOSE
-#endif /* dealii__point_value_history_h */
+#endif /* dealii_point_value_history_h */

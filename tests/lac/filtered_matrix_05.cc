@@ -15,12 +15,11 @@
 // ---------------------------------------------------------------------
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/filtered_matrix.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/vector.h>
 
-template<typename number>
+template <typename number>
 void
 checkApply_Constraints(FullMatrix<number> &A, Vector<number> &V,
                        bool matrix_is_symmetric = false)
@@ -45,7 +44,6 @@ main()
   deallog << std::fixed;
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   const double Adata[] =
   { 1, 2, 3, 4, 5, 6, 7, 8, 9 };

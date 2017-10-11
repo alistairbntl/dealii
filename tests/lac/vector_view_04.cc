@@ -16,14 +16,10 @@
 // check VectorView::checkReinit2
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_view.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 
-template<typename number>
+template <typename number>
 void
 checkReinit2(Vector<number> &V)
 {
@@ -88,7 +84,6 @@ main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   Vector<double> V1(5);
   V1(0) = 1;

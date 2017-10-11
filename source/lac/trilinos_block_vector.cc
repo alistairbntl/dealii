@@ -13,37 +13,19 @@
 //
 // ---------------------------------------------------------------------
 
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 
 #ifdef DEAL_II_WITH_TRILINOS
 
-#  include <deal.II/lac/trilinos_block_sparse_matrix.h>
+#include <deal.II/lac/trilinos_index_access.h>
+
+#include <deal.II/lac/trilinos_block_sparse_matrix.h>
 
 
 DEAL_II_NAMESPACE_OPEN
 
 namespace TrilinosWrappers
 {
-  namespace
-  {
-    // define a helper function that queries the size of an Epetra_Map object
-    // by calling either the 32- or 64-bit function necessary, and returns the
-    // result in the correct data type so that we can use it in calling other
-    // Epetra member functions that are overloaded by index type
-#ifndef DEAL_II_WITH_64BIT_INDICES
-    int n_global_elements (const Epetra_BlockMap &map)
-    {
-      return map.NumGlobalElements();
-    }
-#else
-    long long int n_global_elements (const Epetra_BlockMap &map)
-    {
-      return map.NumGlobalElements64();
-    }
-#endif
-  }
-
-
   namespace MPI
   {
     BlockVector &
@@ -76,56 +58,11 @@ namespace TrilinosWrappers
 
 
 
-#ifdef DEAL_II_WITH_CXX11
     BlockVector &
     BlockVector::operator= (BlockVector &&v)
     {
       swap(v);
       return *this;
-    }
-#endif
-
-
-
-    BlockVector &
-    BlockVector::operator = (const ::dealii::TrilinosWrappers::BlockVector &v)
-    {
-      Assert (n_blocks() == v.n_blocks(),
-              ExcDimensionMismatch(n_blocks(),v.n_blocks()));
-
-      for (size_type i=0; i<this->n_blocks(); ++i)
-        this->components[i] = v.block(i);
-
-      return *this;
-    }
-
-
-
-    BlockVector::~BlockVector ()
-    {}
-
-
-
-    void
-    BlockVector::reinit (const std::vector<Epetra_Map> &input_maps,
-                         const bool                     omit_zeroing_entries)
-    {
-      const size_type no_blocks = input_maps.size();
-      std::vector<size_type> block_sizes (no_blocks);
-
-      for (size_type i=0; i<no_blocks; ++i)
-        {
-          block_sizes[i] = n_global_elements(input_maps[i]);
-        }
-
-      this->block_indices.reinit (block_sizes);
-      if (components.size() != n_blocks())
-        components.resize(n_blocks());
-
-      for (size_type i=0; i<n_blocks(); ++i)
-        components[i].reinit(input_maps[i], omit_zeroing_entries);
-
-      collect_sizes();
     }
 
 
@@ -251,176 +188,7 @@ namespace TrilinosWrappers
     }
 
   } /* end of namespace MPI */
-
-
-
-
-
-
-  BlockVector &
-  BlockVector::operator = (const value_type s)
-  {
-    BaseClass::operator = (s);
-    return *this;
-  }
-
-
-
-  void
-  BlockVector::reinit (const std::vector<Epetra_Map> &input_maps,
-                       const bool                     omit_zeroing_entries)
-  {
-    size_type no_blocks = input_maps.size();
-    std::vector<size_type> block_sizes (no_blocks);
-
-    for (size_type i=0; i<no_blocks; ++i)
-      block_sizes[i] = n_global_elements(input_maps[i]);
-
-
-    this->block_indices.reinit (block_sizes);
-    if (components.size() != n_blocks())
-      components.resize(n_blocks());
-
-    for (size_type i=0; i<n_blocks(); ++i)
-      components[i].reinit(input_maps[i], omit_zeroing_entries);
-
-    collect_sizes();
-  }
-
-
-
-  void
-  BlockVector::reinit (const std::vector<IndexSet> &partitioning,
-                       const MPI_Comm              &communicator,
-                       const bool                   omit_zeroing_entries)
-  {
-    size_type no_blocks = partitioning.size();
-    std::vector<size_type> block_sizes (no_blocks);
-
-    for (size_type i=0; i<no_blocks; ++i)
-      block_sizes[i] = partitioning[i].size();
-
-
-    this->block_indices.reinit (block_sizes);
-    if (components.size() != n_blocks())
-      components.resize(n_blocks());
-
-    for (size_type i=0; i<n_blocks(); ++i)
-      components[i].reinit(partitioning[i], communicator, omit_zeroing_entries);
-
-    collect_sizes();
-  }
-
-
-
-  void
-  BlockVector::reinit (const std::vector<size_type> &block_sizes,
-                       const bool                    omit_zeroing_entries)
-  {
-    this->block_indices.reinit (block_sizes);
-    if (components.size() != n_blocks())
-      components.resize(n_blocks());
-
-    for (size_type i=0; i<n_blocks(); ++i)
-      components[i].reinit(block_sizes[i], omit_zeroing_entries);
-
-    collect_sizes();
-  }
-
-
-
-  void
-  BlockVector::reinit (const MPI::BlockVector &v)
-  {
-    block_indices = v.get_block_indices();
-    if (components.size() != n_blocks())
-      components.resize(n_blocks());
-
-    for (size_type i=0; i<n_blocks(); ++i)
-      components[i] = v.block(i);
-  }
-
-
-
-  void
-  BlockVector::reinit (const size_type num_blocks)
-  {
-    std::vector<size_type> block_sizes (num_blocks, 0);
-    block_indices.reinit (block_sizes);
-    if (components.size() != n_blocks())
-      components.resize(n_blocks());
-
-    for (size_type i=0; i<n_blocks(); ++i)
-      block(i).clear();
-
-    collect_sizes();
-  }
-
-
-
-  void
-  BlockVector::reinit (const BlockVector &v,
-                       const bool         omit_zeroing_entries)
-  {
-    block_indices = v.get_block_indices();
-    if (components.size() != n_blocks())
-      components.resize(n_blocks());
-
-    for (size_type i=0; i<n_blocks(); ++i)
-      components[i].reinit(v.block(i), omit_zeroing_entries);
-
-    collect_sizes();
-  }
-
-
-
-  BlockVector &
-  BlockVector::operator = (const MPI::BlockVector &v)
-  {
-    reinit (v);
-
-    return *this;
-  }
-
-
-
-  BlockVector &
-  BlockVector::operator = (const BlockVector &v)
-  {
-    if (n_blocks() != v.n_blocks())
-      {
-        std::vector<size_type> block_sizes (v.n_blocks(), 0);
-        block_indices.reinit (block_sizes);
-        if (components.size() != n_blocks())
-          components.resize(n_blocks());
-      }
-
-    for (size_type i=0; i<this->n_blocks(); ++i)
-      this->components[i] = v.block(i);
-
-    collect_sizes();
-
-    return *this;
-  }
-
-
-
-  void BlockVector::print (std::ostream       &out,
-                           const unsigned int  precision,
-                           const bool          scientific,
-                           const bool          across) const
-  {
-    for (size_type i=0; i<this->n_blocks(); ++i)
-      {
-        if (across)
-          out << 'C' << i << ':';
-        else
-          out << "Component " << i << std::endl;
-        this->components[i].print(out, precision, scientific, across);
-      }
-  }
-
-}
+} /* end of namespace TrilinosWrappers */
 
 
 DEAL_II_NAMESPACE_CLOSE

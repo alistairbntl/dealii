@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2016 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,6 +14,7 @@
 // ---------------------------------------------------------------------
 
 
+#include <deal.II/base/array_view.h>
 #include <deal.II/base/derivative_form.h>
 #include <deal.II/base/qprojector.h>
 #include <deal.II/base/polynomials_bdm.h>
@@ -23,109 +24,116 @@
 #include <deal.II/fe/fe_poly_tensor.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_cartesian.h>
+#include <deal.II/grid/tria.h>
 
 DEAL_II_NAMESPACE_OPEN
 
-namespace
+namespace internal
 {
-//---------------------------------------------------------------------------
-// Utility method, which is used to determine the change of sign for
-// the DoFs on the faces of the given cell.
-//---------------------------------------------------------------------------
-
-  /**
-   * On noncartesian grids, the sign of the DoFs associated with the faces of
-   * the elements has to be changed in some cases.  This procedure implements an
-   * algorithm, which determines the DoFs, which need this sign change for a
-   * given cell.
-   */
-  void
-  get_face_sign_change_rt (const Triangulation<1>::cell_iterator &,
-                           const unsigned int                     ,
-                           std::vector<double>                   &face_sign)
+  namespace FE_PolyTensor
   {
-    // nothing to do in 1d
-    std::fill (face_sign.begin (), face_sign.end (), 1.0);
-  }
+    namespace
+    {
+      //---------------------------------------------------------------------------
+      // Utility method, which is used to determine the change of sign for
+      // the DoFs on the faces of the given cell.
+      //---------------------------------------------------------------------------
 
-
-
-  void
-  get_face_sign_change_rt (const Triangulation<2>::cell_iterator &cell,
-                           const unsigned int                     dofs_per_face,
-                           std::vector<double>                   &face_sign)
-  {
-    const unsigned int dim = 2;
-    const unsigned int spacedim = 2;
-
-    // Default is no sign
-    // change. I.e. multiply by one.
-    std::fill (face_sign.begin (), face_sign.end (), 1.0);
-
-    for (unsigned int f = GeometryInfo<dim>::faces_per_cell / 2;
-         f < GeometryInfo<dim>::faces_per_cell; ++f)
+      /**
+       * On noncartesian grids, the sign of the DoFs associated with the faces of
+       * the elements has to be changed in some cases.  This procedure implements an
+       * algorithm, which determines the DoFs, which need this sign change for a
+       * given cell.
+       */
+      void
+      get_face_sign_change_rt (const dealii::Triangulation<1>::cell_iterator &,
+                               const unsigned int,
+                               std::vector<double>                           &face_sign)
       {
-        Triangulation<dim,spacedim>::face_iterator face = cell->face (f);
-        if (!face->at_boundary ())
+        // nothing to do in 1d
+        std::fill (face_sign.begin (), face_sign.end (), 1.0);
+      }
+
+
+
+      void
+      get_face_sign_change_rt (const dealii::Triangulation<2>::cell_iterator &cell,
+                               const unsigned int                             dofs_per_face,
+                               std::vector<double>                           &face_sign)
+      {
+        const unsigned int dim = 2;
+        const unsigned int spacedim = 2;
+
+        // Default is no sign
+        // change. I.e. multiply by one.
+        std::fill (face_sign.begin (), face_sign.end (), 1.0);
+
+        for (unsigned int f = GeometryInfo<dim>::faces_per_cell / 2;
+             f < GeometryInfo<dim>::faces_per_cell; ++f)
           {
-            const unsigned int nn = cell->neighbor_face_no(f);
+            dealii::Triangulation<dim,spacedim>::face_iterator face = cell->face (f);
+            if (!face->at_boundary ())
+              {
+                const unsigned int nn = cell->neighbor_face_no(f);
 
-            if (nn < GeometryInfo<dim>::faces_per_cell / 2)
-              for (unsigned int j = 0; j < dofs_per_face; ++j)
-                {
-                  Assert (f * dofs_per_face + j < face_sign.size(),
-                          ExcInternalError());
+                if (nn < GeometryInfo<dim>::faces_per_cell / 2)
+                  for (unsigned int j = 0; j < dofs_per_face; ++j)
+                    {
+                      Assert (f * dofs_per_face + j < face_sign.size(),
+                              ExcInternalError());
 
-//TODO: This is probably only going to work for those elements for which all dofs are face dofs
-                  face_sign[f * dofs_per_face + j] = -1.0;
-                }
+                      //TODO: This is probably only going to work for those elements for which all dofs are face dofs
+                      face_sign[f * dofs_per_face + j] = -1.0;
+                    }
+              }
           }
       }
-  }
 
 
 
-  void
-  get_face_sign_change_rt (const Triangulation<3>::cell_iterator &/*cell*/,
-                           const unsigned int                     /*dofs_per_face*/,
-                           std::vector<double>                   &face_sign)
-  {
-    std::fill (face_sign.begin (), face_sign.end (), 1.0);
-//TODO: think about what it would take here
-  }
+      void
+      get_face_sign_change_rt (const dealii::Triangulation<3>::cell_iterator &/*cell*/,
+                               const unsigned int                             /*dofs_per_face*/,
+                               std::vector<double>                           &face_sign)
+      {
+        std::fill (face_sign.begin (), face_sign.end (), 1.0);
+        //TODO: think about what it would take here
+      }
 
-  void
-  get_face_sign_change_nedelec (const Triangulation<1>::cell_iterator &/*cell*/,
-                                const unsigned int                     /*dofs_per_face*/,
-                                std::vector<double>                   &face_sign)
-  {
-    // nothing to do in 1d
-    std::fill (face_sign.begin (), face_sign.end (), 1.0);
-  }
-
-
-
-  void
-  get_face_sign_change_nedelec (const Triangulation<2>::cell_iterator &/*cell*/,
-                                const unsigned int                     /*dofs_per_face*/,
-                                std::vector<double>                   &face_sign)
-  {
-    std::fill (face_sign.begin (), face_sign.end (), 1.0);
-//TODO: think about what it would take here
-  }
+      void
+      get_face_sign_change_nedelec (const dealii::Triangulation<1>::cell_iterator &/*cell*/,
+                                    const unsigned int                             /*dofs_per_face*/,
+                                    std::vector<double>                           &face_sign)
+      {
+        // nothing to do in 1d
+        std::fill (face_sign.begin (), face_sign.end (), 1.0);
+      }
 
 
-  void
-  get_face_sign_change_nedelec (const Triangulation<3>::cell_iterator &cell,
-                                const unsigned int                     /*dofs_per_face*/,
-                                std::vector<double>                   &face_sign)
-  {
-    const unsigned int dim = 3;
-    std::fill (face_sign.begin (), face_sign.end (), 1.0);
-//TODO: This is probably only going to work for those elements for which all dofs are face dofs
-    for (unsigned int l = 0; l < GeometryInfo<dim>::lines_per_cell; ++l)
-      if (!(cell->line_orientation (l)))
-        face_sign[l] = -1.0;
+
+      void
+      get_face_sign_change_nedelec (const dealii::Triangulation<2>::cell_iterator &/*cell*/,
+                                    const unsigned int                             /*dofs_per_face*/,
+                                    std::vector<double>                           &face_sign)
+      {
+        std::fill (face_sign.begin (), face_sign.end (), 1.0);
+        //TODO: think about what it would take here
+      }
+
+
+      void
+      get_face_sign_change_nedelec (const dealii::Triangulation<3>::cell_iterator &cell,
+                                    const unsigned int                             /*dofs_per_face*/,
+                                    std::vector<double>                           &face_sign)
+      {
+        const unsigned int dim = 3;
+        std::fill (face_sign.begin (), face_sign.end (), 1.0);
+        //TODO: This is probably only going to work for those elements for which all dofs are face dofs
+        for (unsigned int l = 0; l < GeometryInfo<dim>::lines_per_cell; ++l)
+          if (!(cell->line_orientation (l)))
+            face_sign[l] = -1.0;
+      }
+    }
   }
 }
 
@@ -180,6 +188,8 @@ FE_PolyTensor<PolynomialType,dim,spacedim>::shape_value_component
   Assert (i<this->dofs_per_cell, ExcIndexRange(i,0,this->dofs_per_cell));
   Assert (component < dim, ExcIndexRange (component, 0, dim));
 
+  Threads::Mutex::ScopedLock lock (cache_mutex);
+
   if (cached_point != p || cached_values.size() == 0)
     {
       cached_point = p;
@@ -222,6 +232,8 @@ FE_PolyTensor<PolynomialType,dim,spacedim>::shape_grad_component
 {
   Assert (i<this->dofs_per_cell, ExcIndexRange(i,0,this->dofs_per_cell));
   Assert (component < dim, ExcIndexRange (component, 0, dim));
+
+  Threads::Mutex::ScopedLock lock (cache_mutex);
 
   if (cached_point != p || cached_grads.size() == 0)
     {
@@ -268,6 +280,8 @@ FE_PolyTensor<PolynomialType,dim,spacedim>::shape_grad_grad_component
   Assert (i<this->dofs_per_cell, ExcIndexRange(i,0,this->dofs_per_cell));
   Assert (component < dim, ExcIndexRange (component, 0, dim));
 
+  Threads::Mutex::ScopedLock lock (cache_mutex);
+
   if (cached_point != p || cached_grad_grads.size() == 0)
     {
       cached_point = p;
@@ -310,7 +324,7 @@ fill_fe_values
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0,
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr,
           ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
@@ -329,9 +343,9 @@ fill_fe_values
   std::fill( fe_data.sign_change.begin(), fe_data.sign_change.end(), 1.0 );
 
   if (mapping_type == mapping_raviart_thomas)
-    get_face_sign_change_rt (cell, this->dofs_per_face, fe_data.sign_change);
+    internal::FE_PolyTensor::get_face_sign_change_rt (cell, this->dofs_per_face, fe_data.sign_change);
   else if (mapping_type == mapping_nedelec)
-    get_face_sign_change_nedelec (cell, this->dofs_per_face, fe_data.sign_change);
+    internal::FE_PolyTensor::get_face_sign_change_nedelec (cell, this->dofs_per_face, fe_data.sign_change);
 
 
   for (unsigned int i=0; i<this->dofs_per_cell; ++i)
@@ -784,7 +798,7 @@ fill_fe_face_values
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0,
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr,
           ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
@@ -810,10 +824,10 @@ fill_fe_face_values
   std::fill( fe_data.sign_change.begin(), fe_data.sign_change.end(), 1.0 );
 
   if (mapping_type == mapping_raviart_thomas)
-    get_face_sign_change_rt (cell, this->dofs_per_face, fe_data.sign_change);
+    internal::FE_PolyTensor::get_face_sign_change_rt (cell, this->dofs_per_face, fe_data.sign_change);
 
   else if (mapping_type == mapping_nedelec)
-    get_face_sign_change_nedelec (cell, this->dofs_per_face, fe_data.sign_change);
+    internal::FE_PolyTensor::get_face_sign_change_nedelec (cell, this->dofs_per_face, fe_data.sign_change);
 
   for (unsigned int i=0; i<this->dofs_per_cell; ++i)
     {
@@ -1259,7 +1273,7 @@ fill_fe_subface_values
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0,
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr,
           ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
@@ -1289,10 +1303,10 @@ fill_fe_subface_values
   std::fill( fe_data.sign_change.begin(), fe_data.sign_change.end(), 1.0 );
 
   if (mapping_type == mapping_raviart_thomas)
-    get_face_sign_change_rt (cell, this->dofs_per_face, fe_data.sign_change);
+    internal::FE_PolyTensor::get_face_sign_change_rt (cell, this->dofs_per_face, fe_data.sign_change);
 
   else if (mapping_type == mapping_nedelec)
-    get_face_sign_change_nedelec (cell, this->dofs_per_face, fe_data.sign_change);
+    internal::FE_PolyTensor::get_face_sign_change_nedelec (cell, this->dofs_per_face, fe_data.sign_change);
 
   for (unsigned int i=0; i<this->dofs_per_cell; ++i)
     {
@@ -1737,7 +1751,9 @@ FE_PolyTensor<PolynomialType,dim,spacedim>::requires_update_flags(const UpdateFl
         out |= update_hessians |  update_values | update_gradients |
                update_jacobian_pushed_forward_grads |
                update_jacobian_pushed_forward_2nd_derivatives;
+      break;
     }
+
     case mapping_raviart_thomas:
     case mapping_piola:
     {

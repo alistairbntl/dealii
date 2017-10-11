@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2016 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -30,6 +30,8 @@
 
 #include <sstream>
 #include <iostream>
+#include <deal.II/base/std_cxx14/memory.h>
+
 
 //TODO: implement the adjust_quad_dof_index_for_face_orientation_table and
 //adjust_line_dof_index_for_line_orientation_table fields, and write tests
@@ -45,7 +47,9 @@ FE_ABF<dim>::FE_ABF (const unsigned int deg)
   FE_PolyTensor<PolynomialsABF<dim>, dim> (
     deg,
     FiniteElementData<dim>(get_dpo_vector(deg),
-                           dim, deg+1, FiniteElementData<dim>::Hdiv),
+                           dim,
+                           deg+2,
+                           FiniteElementData<dim>::Hdiv),
     std::vector<bool>(PolynomialsABF<dim>::compute_n_pols(deg), true),
     std::vector<ComponentMask>(PolynomialsABF<dim>::compute_n_pols(deg),
                                std::vector<bool>(dim,true))),
@@ -60,18 +64,16 @@ FE_ABF<dim>::FE_ABF (const unsigned int deg)
   // quadrature weights, since they
   // are required for interpolation.
   initialize_support_points(deg);
-  // Now compute the inverse node
-  //matrix, generating the correct
-  //basis functions from the raw
-  //ones.
-  FullMatrix<double> M(n_dofs, n_dofs);
-  FETools::compute_node_matrix(M, *this);
 
+  // Now compute the inverse node matrix, generating the correct
+  // basis functions from the raw ones. For a discussion of what
+  // exactly happens here, see FETools::compute_node_matrix.
+  const FullMatrix<double> M = FETools::compute_node_matrix(*this);
   this->inverse_node_matrix.reinit(n_dofs, n_dofs);
   this->inverse_node_matrix.invert(M);
-  // From now on, the shape functions
-  // will be the correct ones, not
-  // the raw shape functions anymore.
+  // From now on, the shape functions provided by FiniteElement::shape_value
+  // and similar functions will be the correct ones, not
+  // the raw shape functions from the polynomial space anymore.
 
   // Reinit the vectors of
   // restriction and prolongation
@@ -80,7 +82,7 @@ FE_ABF<dim>::FE_ABF (const unsigned int deg)
   // refinement
   this->reinit_restriction_and_prolongation_matrices(true);
   // Fill prolongation matrices with embedding operators
-  FETools::compute_embedding_matrices (*this, this->prolongation);
+  FETools::compute_embedding_matrices (*this, this->prolongation, false, 1.e-10);
 
   initialize_restriction ();
 
@@ -110,7 +112,7 @@ std::string
 FE_ABF<dim>::get_name () const
 {
   // note that the
-  // FETools::get_fe_from_name
+  // FETools::get_fe_by_name
   // function depends on the
   // particular format of the string
   // this function returns, so they
@@ -126,10 +128,10 @@ FE_ABF<dim>::get_name () const
 
 
 template <int dim>
-FiniteElement<dim> *
+std::unique_ptr<FiniteElement<dim,dim> >
 FE_ABF<dim>::clone() const
 {
-  return new FE_ABF<dim>(rt_order);
+  return std_cxx14::make_unique<FE_ABF<dim>>(rt_order);
 }
 
 
@@ -158,7 +160,7 @@ FE_ABF<dim>::initialize_support_points (const unsigned int deg)
 
 
   // These might be required when the faces contribution is computed
-  // Therefore they will be initialised at this point.
+  // Therefore they will be initialized at this point.
   std::vector<AnisotropicPolynomials<dim>* > polynomials_abf(dim);
 
   // Generate x_1^{i} x_2^{r+1} ...
@@ -210,7 +212,7 @@ FE_ABF<dim>::initialize_support_points (const unsigned int deg)
         }
 
 
-      // Now initialise edge interior weights for the ABF elements.
+      // Now initialize edge interior weights for the ABF elements.
       // These are completely independent from the usual edge moments. They
       // stem from applying the Gauss theorem to the nodal values, which
       // was necessary to cast the ABF elements into the deal.II framework
@@ -328,10 +330,10 @@ FE_ABF<dim>::initialize_restriction()
       // Store shape values, since the
       // evaluation suffers if not
       // ordered by point
-      Table<2,double> cached_values(this->dofs_per_cell, q_face.size());
+      Table<2,double> cached_values_face(this->dofs_per_cell, q_face.size());
       for (unsigned int k=0; k<q_face.size(); ++k)
         for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
-          cached_values(i,k)
+          cached_values_face(i,k)
             = this->shape_value_component(i, q_face.point(k),
                                           GeometryInfo<dim>::unit_normal_direction[face]);
 
@@ -371,7 +373,7 @@ FE_ABF<dim>::initialize_restriction()
                   this->restriction[iso][child](face*this->dofs_per_face+i_face,
                                                 i_child)
                   += Utilities::fixed_power<dim-1>(.5) * q_sub.weight(k)
-                     * cached_values(i_child, k)
+                     * cached_values_face(i_child, k)
                      * this->shape_value_component(face*this->dofs_per_face+i_face,
                                                    q_sub.point(k),
                                                    GeometryInfo<dim>::unit_normal_direction[face]);
@@ -402,11 +404,11 @@ FE_ABF<dim>::initialize_restriction()
   // Store shape values, since the
   // evaluation suffers if not
   // ordered by point
-  Table<3,double> cached_values(this->dofs_per_cell, q_cell.size(), dim);
+  Table<3,double> cached_values_cell(this->dofs_per_cell, q_cell.size(), dim);
   for (unsigned int k=0; k<q_cell.size(); ++k)
     for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
       for (unsigned int d=0; d<dim; ++d)
-        cached_values(i,k,d) = this->shape_value_component(i, q_cell.point(k), d);
+        cached_values_cell(i,k,d) = this->shape_value_component(i, q_cell.point(k), d);
 
   for (unsigned int child=0; child<GeometryInfo<dim>::max_children_per_cell; ++child)
     {
@@ -420,7 +422,7 @@ FE_ABF<dim>::initialize_restriction()
                 this->restriction[iso][child](start_cell_dofs+i_weight*dim+d,
                                               i_child)
                 += q_sub.weight(k)
-                   * cached_values(i_child, k, d)
+                   * cached_values_cell(i_child, k, d)
                    * polynomials[d]->compute_value(i_weight, q_sub.point(k));
               }
     }
@@ -510,38 +512,26 @@ FE_ABF<dim>::has_support_on_face (const unsigned int shape_index,
 
 template <int dim>
 void
-FE_ABF<dim>::interpolate(
-  std::vector<double> &,
-  const std::vector<double> &) const
+FE_ABF<dim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                        std::vector<double>                &nodal_values) const
 {
-  Assert(false, ExcNotImplemented());
-}
+  Assert (support_point_values.size() == this->generalized_support_points.size(),
+          ExcDimensionMismatch(support_point_values.size(), this->generalized_support_points.size()));
+  Assert (support_point_values[0].size() == this->n_components(),
+          ExcDimensionMismatch(support_point_values[0].size(), this->n_components()));
+  Assert (nodal_values.size() == this->dofs_per_cell,
+          ExcDimensionMismatch(nodal_values.size(),this->dofs_per_cell));
 
-
-
-template <int dim>
-void
-FE_ABF<dim>::interpolate(
-  std::vector<double>    &local_dofs,
-  const std::vector<Vector<double> > &values,
-  unsigned int offset) const
-{
-  Assert (values.size() == this->generalized_support_points.size(),
-          ExcDimensionMismatch(values.size(), this->generalized_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values[0].size() >= offset+this->n_components(),
-          ExcDimensionMismatch(values[0].size(),offset+this->n_components()));
-
-  std::fill(local_dofs.begin(), local_dofs.end(), 0.);
+  std::fill(nodal_values.begin(), nodal_values.end(), 0.);
 
   const unsigned int n_face_points = boundary_weights.size(0);
   for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
     for (unsigned int k=0; k<n_face_points; ++k)
       for (unsigned int i=0; i<boundary_weights.size(1); ++i)
         {
-          local_dofs[i+face*this->dofs_per_face] += boundary_weights(k,i)
-                                                    * values[face*n_face_points+k](GeometryInfo<dim>::unit_normal_direction[face]+offset);
+          nodal_values[i+face*this->dofs_per_face] += boundary_weights(k,i)
+                                                      * support_point_values[face*n_face_points+k][GeometryInfo<dim>::unit_normal_direction[face]];
         }
 
   const unsigned int start_cell_dofs = GeometryInfo<dim>::faces_per_cell*this->dofs_per_face;
@@ -550,7 +540,7 @@ FE_ABF<dim>::interpolate(
   for (unsigned int k=0; k<interior_weights.size(0); ++k)
     for (unsigned int i=0; i<interior_weights.size(1); ++i)
       for (unsigned int d=0; d<dim; ++d)
-        local_dofs[start_cell_dofs+i*dim+d] += interior_weights(k,i,d) * values[k+start_cell_points](d+offset);
+        nodal_values[start_cell_dofs+i*dim+d] += interior_weights(k,i,d) * support_point_values[k+start_cell_points][d];
 
   const unsigned int start_abf_dofs = start_cell_dofs + interior_weights.size(1) * dim;
 
@@ -558,67 +548,7 @@ FE_ABF<dim>::interpolate(
   for (unsigned int k=0; k<interior_weights_abf.size(0); ++k)
     for (unsigned int i=0; i<interior_weights_abf.size(1); ++i)
       for (unsigned int d=0; d<dim; ++d)
-        local_dofs[start_abf_dofs+i] += interior_weights_abf(k,i,d) * values[k+start_cell_points](d+offset);
-
-  // Face integral of ABF terms
-  for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-    {
-      double n_orient = (double) GeometryInfo<dim>::unit_normal_orientation[face];
-      for (unsigned int fp=0; fp < n_face_points; ++fp)
-        {
-          // TODO: Check what the face_orientation, face_flip and face_rotation  have to be in 3D
-          unsigned int k = QProjector<dim>::DataSetDescriptor::face (face, false, false, false, n_face_points);
-          for (unsigned int i=0; i<boundary_weights_abf.size(1); ++i)
-            local_dofs[start_abf_dofs+i] += n_orient * boundary_weights_abf(k + fp, i)
-                                            * values[k + fp](GeometryInfo<dim>::unit_normal_direction[face]+offset);
-        }
-    }
-
-  // TODO: Check if this "correction" can be removed.
-  for (unsigned int i=0; i<boundary_weights_abf.size(1); ++i)
-    if (std::fabs (local_dofs[start_abf_dofs+i]) < 1.0e-16)
-      local_dofs[start_abf_dofs+i] = 0.0;
-}
-
-template <int dim>
-void
-FE_ABF<dim>::interpolate(
-  std::vector<double> &local_dofs,
-  const VectorSlice<const std::vector<std::vector<double> > > &values) const
-{
-  Assert (values.size() == this->n_components(),
-          ExcDimensionMismatch(values.size(), this->n_components()));
-  Assert (values[0].size() == this->generalized_support_points.size(),
-          ExcDimensionMismatch(values[0].size(), this->generalized_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-
-  std::fill(local_dofs.begin(), local_dofs.end(), 0.);
-
-  const unsigned int n_face_points = boundary_weights.size(0);
-  for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-    for (unsigned int k=0; k<n_face_points; ++k)
-      for (unsigned int i=0; i<boundary_weights.size(1); ++i)
-        {
-          local_dofs[i+face*this->dofs_per_face] += boundary_weights(k,i)
-                                                    * values[GeometryInfo<dim>::unit_normal_direction[face]][face*n_face_points+k];
-        }
-
-  const unsigned int start_cell_dofs = GeometryInfo<dim>::faces_per_cell*this->dofs_per_face;
-  const unsigned int start_cell_points = GeometryInfo<dim>::faces_per_cell*n_face_points;
-
-  for (unsigned int k=0; k<interior_weights.size(0); ++k)
-    for (unsigned int i=0; i<interior_weights.size(1); ++i)
-      for (unsigned int d=0; d<dim; ++d)
-        local_dofs[start_cell_dofs+i*dim+d] += interior_weights(k,i,d) * values[d][k+start_cell_points];
-
-  const unsigned int start_abf_dofs = start_cell_dofs + interior_weights.size(1) * dim;
-
-  // Cell integral of ABF terms
-  for (unsigned int k=0; k<interior_weights_abf.size(0); ++k)
-    for (unsigned int i=0; i<interior_weights_abf.size(1); ++i)
-      for (unsigned int d=0; d<dim; ++d)
-        local_dofs[start_abf_dofs+i] += interior_weights_abf(k,i,d) * values[d][k+start_cell_points];
+        nodal_values[start_abf_dofs+i] += interior_weights_abf(k,i,d) * support_point_values[k+start_cell_points][d];
 
   // Face integral of ABF terms
   for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
@@ -629,16 +559,17 @@ FE_ABF<dim>::interpolate(
           // TODO: Check what the face_orientation, face_flip and face_rotation have to be in 3D
           unsigned int k = QProjector<dim>::DataSetDescriptor::face (face, false, false, false, n_face_points);
           for (unsigned int i=0; i<boundary_weights_abf.size(1); ++i)
-            local_dofs[start_abf_dofs+i] += n_orient * boundary_weights_abf(k + fp, i)
-                                            * values[GeometryInfo<dim>::unit_normal_direction[face]][k + fp];
+            nodal_values[start_abf_dofs+i] += n_orient * boundary_weights_abf(k + fp, i)
+                                              * support_point_values[face*n_face_points+fp][GeometryInfo<dim>::unit_normal_direction[face]];
         }
     }
 
   // TODO: Check if this "correction" can be removed.
   for (unsigned int i=0; i<boundary_weights_abf.size(1); ++i)
-    if (std::fabs (local_dofs[start_abf_dofs+i]) < 1.0e-16)
-      local_dofs[start_abf_dofs+i] = 0.0;
+    if (std::fabs (nodal_values[start_abf_dofs+i]) < 1.0e-16)
+      nodal_values[start_abf_dofs+i] = 0.0;
 }
+
 
 
 template <int dim>

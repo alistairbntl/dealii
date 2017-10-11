@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
@@ -35,7 +34,6 @@
 #include <deal.II/hp/fe_values.h>
 #include <deal.II/hp/dof_handler.h>
 #include <deal.II/hp/fe_collection.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -56,9 +54,7 @@ void print_dofs (const hp::DoFHandler<2>::active_cell_iterator &cell)
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<dim>   triangulation;
   std::vector<unsigned int> subdivisions(dim, 1U);

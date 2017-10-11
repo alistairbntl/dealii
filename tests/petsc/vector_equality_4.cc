@@ -15,18 +15,17 @@
 
 
 
-// check PETScWrappers::Vector::operator!=(PETScWrappers::Vector) for vectors that are
-// equal
+// check PETScWrappers::MPI::Vector::operator!=(PETScWrappers::MPI::Vector)
+// for vectors that are equal
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
 
-void test (PETScWrappers::Vector &v,
-           PETScWrappers::Vector &w)
+void test (PETScWrappers::MPI::Vector &v,
+           PETScWrappers::MPI::Vector &w)
 {
   // set only certain elements of each
   // vector
@@ -38,6 +37,8 @@ void test (PETScWrappers::Vector &v,
     }
   // but then copy elements and make sure the
   // vectors are actually equal
+  v.compress(VectorOperation::insert);
+  w.compress(VectorOperation::insert);
   v = w;
   AssertThrow (! (v!=w), ExcInternalError());
 
@@ -48,16 +49,16 @@ void test (PETScWrappers::Vector &v,
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, 1);
       {
-        PETScWrappers::Vector v (100);
-        PETScWrappers::Vector w (100);
+        IndexSet indices(100);
+        indices.add_range(0, 100);
+        PETScWrappers::MPI::Vector v (indices, MPI_COMM_WORLD);
+        PETScWrappers::MPI::Vector w (indices, MPI_COMM_WORLD);
         test (v,w);
       }
 

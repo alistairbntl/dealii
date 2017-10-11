@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -26,11 +26,6 @@ DEAL_II_NAMESPACE_OPEN
 
 
 /* -------------------------- Boundary --------------------- */
-
-
-template <int dim, int spacedim>
-Boundary<dim, spacedim>::~Boundary ()
-{}
 
 
 template <int dim, int spacedim>
@@ -163,16 +158,16 @@ Boundary<dim,spacedim>::
 get_line_support_points (const unsigned int n_intermediate_points) const
 {
   if (points.size() <= n_intermediate_points ||
-      points[n_intermediate_points].get() == 0)
+      points[n_intermediate_points].get() == nullptr)
     {
       Threads::Mutex::ScopedLock lock(mutex);
       if (points.size() <= n_intermediate_points)
         points.resize(n_intermediate_points+1);
 
       // another thread might have created points in the meantime
-      if (points[n_intermediate_points].get() == 0)
+      if (points[n_intermediate_points].get() == nullptr)
         {
-          std_cxx11::shared_ptr<QGaussLobatto<1> >
+          std::shared_ptr<QGaussLobatto<1> >
           quadrature (new QGaussLobatto<1>(n_intermediate_points+2));
           points[n_intermediate_points] = quadrature;
         }
@@ -185,10 +180,11 @@ get_line_support_points (const unsigned int n_intermediate_points) const
 
 /* -------------------------- StraightBoundary --------------------- */
 
-
+// At least clang < 3.9.0 complains if we move this definition to its
+// declaration when a 'const StraightBoundary' object is built.
 template <int dim, int spacedim>
-StraightBoundary<dim, spacedim>::StraightBoundary ()
-{}
+StraightBoundary<dim, spacedim>::StraightBoundary () = default;
+
 
 
 template <int dim, int spacedim>
@@ -537,8 +533,6 @@ normal_vector (const typename Triangulation<dim,spacedim>::face_iterator &face,
   for (unsigned int i=0; i<facedim; ++i)
     xi[i] = 1./2;
 
-  FE_Q<facedim> linear_fe(1);
-
   const double eps = 1e-12;
   Tensor<1,spacedim> grad_F[facedim];
   unsigned int iteration = 0;
@@ -546,13 +540,14 @@ normal_vector (const typename Triangulation<dim,spacedim>::face_iterator &face,
     {
       Point<spacedim> F;
       for (unsigned int v=0; v<GeometryInfo<facedim>::vertices_per_cell; ++v)
-        F += face->vertex(v) * linear_fe.shape_value(v, xi);
+        F += face->vertex(v) * GeometryInfo<facedim>::d_linear_shape_function(xi, v);
 
       for (unsigned int i=0; i<facedim; ++i)
         {
           grad_F[i] = 0;
           for (unsigned int v=0; v<GeometryInfo<facedim>::vertices_per_cell; ++v)
-            grad_F[i] += face->vertex(v) * linear_fe.shape_grad(v, xi)[i];
+            grad_F[i] += face->vertex(v) *
+                         GeometryInfo<facedim>::d_linear_shape_function_gradient(xi, v)[i];
         }
 
       Tensor<1,facedim> J;
@@ -710,7 +705,7 @@ namespace internal
   Point<spacedim>
   compute_projection (const Iterator        &object,
                       const Point<spacedim> &y,
-                      internal::int2type<dim>)
+                      std::integral_constant<int, dim>)
   {
     // let's look at this for
     // simplicity for a quad (dim==2)
@@ -807,7 +802,7 @@ namespace internal
   Point<1>
   compute_projection (const Iterator &,
                       const Point<1> &y,
-                      /* it's a quad: */internal::int2type<2>)
+                      /* it's a quad: */std::integral_constant<int, 2>)
   {
     return y;
   }
@@ -817,7 +812,7 @@ namespace internal
   Point<2>
   compute_projection (const Iterator &,
                       const Point<2> &y,
-                      /* it's a quad: */internal::int2type<2>)
+                      /* it's a quad: */std::integral_constant<int, 2>)
   {
     return y;
   }
@@ -847,7 +842,7 @@ project_to_surface (const typename Triangulation<dim, spacedim>::quad_iterator &
     return y;
   else
     return internal::compute_projection (quad, y,
-                                         /* it's a quad */internal::int2type<2>());
+                                         /* it's a quad */std::integral_constant<int, 2>());
 }
 
 
@@ -879,4 +874,3 @@ project_to_surface (const typename Triangulation<dim, spacedim>::hex_iterator &,
 #include "tria_boundary.inst"
 
 DEAL_II_NAMESPACE_CLOSE
-

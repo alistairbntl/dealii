@@ -17,9 +17,6 @@
 // test that we can set the width of LogStream objects
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <iomanip>
 #include <limits>
 
 int main ()
@@ -27,7 +24,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog << numbers::PI*2 << 42 << std::endl;
 

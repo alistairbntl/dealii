@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,10 +18,8 @@
 // check Utilities::MPI::sum() for dealii::Vector
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
-#include <fstream>
 
 void test()
 {
@@ -47,7 +45,7 @@ void test()
     Vector<double> values(2);
     values[0] = 1.5;
     values[1] = 2.5;
-    Vector<double> sums;
+    Vector<double> sums(2);
     Utilities::MPI::sum (values,
                          MPI_COMM_WORLD,
                          sums);
@@ -74,9 +72,7 @@ int main(int argc, char *argv[])
 
   if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("mpi");
       test();

@@ -21,13 +21,11 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/tria.h>
 
-#include <fstream>
 std::ofstream logfile("output");
 
 using namespace dealii;
@@ -163,7 +161,7 @@ void generate_grid(Triangulation<3> &triangulation)
 /*
  * Print out the face vertices as well as the orientation of a match:
  */
-template<typename FaceIterator>
+template <typename FaceIterator>
 void print_match(const FaceIterator &face_1,
                  const FaceIterator &face_2,
                  const std::bitset<3> &orientation)
@@ -192,7 +190,6 @@ int main()
   deallog << std::setprecision(4);
   logfile << std::setprecision(4);
   deallog.attach(logfile, false);
-  deallog.threshold_double(1.e-10);
 
   deallog << "Test for 2D: Hypercube" << std::endl << std::endl;
 

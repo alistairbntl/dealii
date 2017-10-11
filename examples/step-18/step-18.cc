@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2000 - 2016 by the deal.II authors
+ * Copyright (C) 2000 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -56,7 +56,7 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/error_estimator.h>
 
-// And here the only two new things among the header files: an include file in
+// And here the only three new things among the header files: an include file in
 // which symmetric tensors of rank 2 and 4 are implemented, as introduced in
 // the introduction:
 #include <deal.II/base/symmetric_tensor.h>
@@ -65,6 +65,11 @@
 // cells. We will use this when selecting only those cells for output that are
 // owned by the present process in a %parallel program:
 #include <deal.II/grid/filtered_iterator.h>
+
+// And lastly a header that contains some functions that will help us compute
+// rotaton matrices of the local coordinate systems at specific points in the
+// domain.
+#include <deal.II/physics/transformations.h>
 
 // This is then simply C++ again:
 #include <fstream>
@@ -280,11 +285,12 @@ namespace Step18
     // From this, compute the angle of rotation:
     const double angle = std::atan (curl);
 
-    // And from this, build the antisymmetric rotation matrix:
-    const double t[2][2] = {{ cos(angle), sin(angle) },
-      {-sin(angle), cos(angle) }
-    };
-    return Tensor<2,2>(t);
+    // And from this, build the antisymmetric rotation matrix. We want this
+    // rotation matrix to represent the rotation of the local coordinate system
+    // with respect to the global Cartesian basis, to we construct it with a
+    // negative angle. The rotation matrix therefore represents the rotation
+    // required to move from the local to the global coordinate system.
+    return Physics::Transformations::Rotations::rotation_matrix_2d(-angle);
   }
 
 
@@ -299,7 +305,8 @@ namespace Step18
                          grad_u[1][0] - grad_u[0][1]);
 
     // From this vector, using its magnitude, compute the tangent of the angle
-    // of rotation, and from it the actual angle:
+    // of rotation, and from it the actual angle of rotation with respect to
+    // the Cartesian basis:
     const double tan_angle = std::sqrt(curl*curl);
     const double angle = std::atan (tan_angle);
 
@@ -313,7 +320,7 @@ namespace Step18
     // into trouble when dividing doing so. Therefore, let's shortcut this and
     // simply return the identity matrix if the angle of rotation is really
     // small:
-    if (angle < 1e-9)
+    if (std::abs(angle) < 1e-9)
       {
         static const double rotation[3][3]
         = {{ 1, 0, 0}, { 0, 1, 0 }, { 0, 0, 1 } };
@@ -321,36 +328,11 @@ namespace Step18
         return rot;
       }
 
-    // Otherwise compute the real rotation matrix. The algorithm for this is
-    // not exactly obvious, but can be found in a number of books,
-    // particularly on computer games where rotation is a very frequent
-    // operation. Online, you can find a description at
-    // http://www.makegames.com/3drotation/ and (this particular form, with
-    // the signs as here) at
-    // http://www.gamedev.net/reference/articles/article1199.asp:
-    const double c = std::cos(angle);
-    const double s = std::sin(angle);
-    const double t = 1-c;
-
+    // Otherwise compute the real rotation matrix. For this, again we rely on
+    // a predefined function to compute the rotation matrix of the local
+    // coordinate system.
     const Point<3> axis = curl/tan_angle;
-    const double rotation[3][3]
-    = {{
-        t *axis[0] *axis[0]+c,
-        t *axis[0] *axis[1]+s *axis[2],
-        t *axis[0] *axis[2]-s *axis[1]
-      },
-      {
-        t *axis[0] *axis[1]-s *axis[2],
-        t *axis[1] *axis[1]+c,
-        t *axis[1] *axis[2]+s *axis[0]
-      },
-      {
-        t *axis[0] *axis[2]+s *axis[1],
-        t *axis[1] *axis[1]-s *axis[0],
-        t *axis[2] *axis[2]+c
-      }
-    };
-    return Tensor<2,3>(rotation);
+    return Physics::Transformations::Rotations::rotation_matrix_3d(axis, -angle);
   }
 
 
@@ -454,6 +436,10 @@ namespace Step18
     // point on those cells for which we are responsible (i.e. we don't store
     // history data for quadrature points on cells that are owned by other
     // processors).
+    // Note that, instead of storing and managing this data ourself, we
+    // could use the CellDataStorage class like is done in step-44. However,
+    // for the purpose of demonstration, in this case we manage the storage
+    // manually.
     std::vector<PointHistory<dim> > quadrature_point_history;
 
     // The way this object is accessed is through a <code>user pointer</code>
@@ -488,7 +474,7 @@ namespace Step18
     // it when necessary. Instead, we opted to obtain the complete copy once
     // and for all, and instead get rid of the distributed copy
     // immediately. Thus, note that the declaration of
-    // <code>inremental_displacement</code> does not denote a distribute
+    // <code>incremental_displacement</code> does not denote a distribute
     // vector as would be indicated by the middle namespace <code>MPI</code>:
     PETScWrappers::MPI::SparseMatrix system_matrix;
 
@@ -653,7 +639,7 @@ namespace Step18
   // For the purposes of this program, we choose a simple form of boundary
   // displacement: we displace the top boundary with constant velocity
   // downwards. The rest of the boundary is either going to be fixed (and is
-  // then described using an object of type <code>ZeroFunction</code>) or free
+  // then described using an object of type <code>Functions::ZeroFunction</code>) or free
   // (Neumann-type, in which case nothing special has to be done).  The
   // implementation of the class describing the constant downward motion
   // should then be obvious using the knowledge we gained through all the
@@ -688,7 +674,7 @@ namespace Step18
                              const double present_timestep)
     :
     Function<dim> (dim),
-    velocity (.1),
+    velocity (.08),
     present_time (present_time),
     present_timestep (present_timestep)
   {}
@@ -754,10 +740,15 @@ namespace Step18
     fe (FE_Q<dim>(1), dim),
     dof_handler (triangulation),
     quadrature_formula (2),
+    present_time (0.0),
+    present_timestep (1.0),
+    end_time (10.0),
+    timestep_no (0),
     mpi_communicator (MPI_COMM_WORLD),
     n_mpi_processes (Utilities::MPI::n_mpi_processes(mpi_communicator)),
     this_mpi_process (Utilities::MPI::this_mpi_process(mpi_communicator)),
-    pcout (std::cout, this_mpi_process == 0)
+    pcout (std::cout, this_mpi_process == 0),
+    n_local_cells (numbers::invalid_unsigned_int)
   {}
 
 
@@ -779,11 +770,6 @@ namespace Step18
   template <int dim>
   void TopLevel<dim>::run ()
   {
-    present_time = 0;
-    present_timestep = 1;
-    end_time = 10;
-    timestep_no = 0;
-
     do_initial_timestep ();
 
     while (present_time < end_time)
@@ -1153,7 +1139,7 @@ namespace Step18
     VectorTools::
     interpolate_boundary_values (dof_handler,
                                  0,
-                                 ZeroFunction<dim> (dim),
+                                 Functions::ZeroFunction<dim> (dim),
                                  boundary_values);
     VectorTools::
     interpolate_boundary_values (dof_handler,
@@ -1391,7 +1377,7 @@ namespace Step18
                                  Utilities::int_to_string(timestep_no,4) +
                                  ".visit");
         std::ofstream visit_master (visit_master_filename.c_str());
-        data_out.write_visit_record (visit_master, filenames);
+        DataOutBase::write_visit_record (visit_master, filenames);
 
         // Similarly, we write the paraview .pvtu:
         const std::string
@@ -1407,7 +1393,7 @@ namespace Step18
         static std::vector<std::pair<double,std::string> > times_and_names;
         times_and_names.push_back (std::pair<double,std::string> (present_time, pvtu_master_filename));
         std::ofstream pvd_output ("solution.pvd");
-        data_out.write_pvd_record (pvd_output, times_and_names);
+        DataOutBase::write_pvd_record (pvd_output, times_and_names);
       }
 
   }
@@ -1524,7 +1510,7 @@ namespace Step18
                                         incremental_displacement,
                                         error_per_cell,
                                         ComponentMask(),
-                                        0,
+                                        nullptr,
                                         MultithreadInfo::n_threads(),
                                         this_mpi_process);
 

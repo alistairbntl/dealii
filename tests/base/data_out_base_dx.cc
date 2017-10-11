@@ -16,13 +16,10 @@
 
 #include "../tests.h"
 #include <deal.II/base/data_out_base.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function_lib.h>
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 #include <string>
 
 #include "patches.h"
@@ -50,7 +47,7 @@ void check(DataOutBase::DXFlags flags,
   names[3] = "x4";
   names[4] = "i";
 
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > vectors;
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> > vectors;
 
   DataOutBase::write_dx(patches, names, vectors, flags, out);
 }
@@ -68,12 +65,12 @@ void check_cont(unsigned int ncells,
 
   std::vector<std::string> names(1);
   names[0] = "CutOff";
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > vectors;
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> > vectors;
   DataOutBase::write_dx(patches, names, vectors, flags, out);
 }
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void check_all(std::ostream &log)
 {
 #if SEPARATE_FILES == 0

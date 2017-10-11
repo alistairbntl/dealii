@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -48,32 +48,32 @@ public:
     std::pair<unsigned int,unsigned int> subrange_deg =
       data.create_cell_subrange_hp (cell_range, 1);
     if (subrange_deg.second > subrange_deg.first)
-      helmholtz_operator<dim,1,Vector<Number> > (data, dst, src,
-                                                 subrange_deg);
+      helmholtz_operator<dim,1,Vector<Number>,2> (data, dst, src,
+                                                  subrange_deg);
     subrange_deg = data.create_cell_subrange_hp (cell_range, 2);
     if (subrange_deg.second > subrange_deg.first)
-      helmholtz_operator<dim,2,Vector<Number> > (data, dst, src,
-                                                 subrange_deg);
+      helmholtz_operator<dim,2,Vector<Number>,3> (data, dst, src,
+                                                  subrange_deg);
     subrange_deg = data.create_cell_subrange_hp (cell_range, 3);
     if (subrange_deg.second > subrange_deg.first)
-      helmholtz_operator<dim,3,Vector<Number> > (data, dst, src,
-                                                 subrange_deg);
+      helmholtz_operator<dim,3,Vector<Number>,4> (data, dst, src,
+                                                  subrange_deg);
     subrange_deg = data.create_cell_subrange_hp (cell_range, 4);
     if (subrange_deg.second > subrange_deg.first)
-      helmholtz_operator<dim,4,Vector<Number> > (data, dst, src,
-                                                 subrange_deg);
+      helmholtz_operator<dim,4,Vector<Number>,5> (data, dst, src,
+                                                  subrange_deg);
     subrange_deg = data.create_cell_subrange_hp (cell_range, 5);
     if (subrange_deg.second > subrange_deg.first)
-      helmholtz_operator<dim,5,Vector<Number> > (data, dst, src,
-                                                 subrange_deg);
+      helmholtz_operator<dim,5,Vector<Number>,6> (data, dst, src,
+                                                  subrange_deg);
     subrange_deg = data.create_cell_subrange_hp (cell_range, 6);
     if (subrange_deg.second > subrange_deg.first)
-      helmholtz_operator<dim,6,Vector<Number> > (data, dst, src,
-                                                 subrange_deg);
+      helmholtz_operator<dim,6,Vector<Number>,7> (data, dst, src,
+                                                  subrange_deg);
     subrange_deg = data.create_cell_subrange_hp (cell_range, 7);
     if (subrange_deg.second > subrange_deg.first)
-      helmholtz_operator<dim,7,Vector<Number> > (data, dst, src,
-                                                 subrange_deg);
+      helmholtz_operator<dim,7,Vector<Number>,8> (data, dst, src,
+                                                  subrange_deg);
   }
 
   void vmult (Vector<Number>       &dst,
@@ -96,10 +96,17 @@ void test ()
     return;
 
   typedef double number;
+  const SphericalManifold<dim> manifold;
   Triangulation<dim> tria;
   GridGenerator::hyper_ball (tria);
-  static const HyperBallBoundary<dim> boundary;
-  tria.set_boundary (0, boundary);
+  typename Triangulation<dim>::active_cell_iterator
+  cell = tria.begin_active (),
+  endc = tria.end();
+  for (; cell!=endc; ++cell)
+    for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+      if (cell->at_boundary(f))
+        cell->face(f)->set_all_manifold_ids(0);
+  tria.set_manifold (0, manifold);
   tria.refine_global(1);
 
   // refine a few cells
@@ -148,11 +155,11 @@ void test ()
                                            constraints);
   VectorTools::interpolate_boundary_values (dof,
                                             0,
-                                            ZeroFunction<dim>(),
+                                            Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close ();
-  CompressedSimpleSparsityPattern csp (dof.n_dofs(),
-                                       dof.n_dofs());
+  DynamicSparsityPattern csp (dof.n_dofs(),
+                              dof.n_dofs());
   DoFTools::make_sparsity_pattern (dof, csp, constraints, false);
   SparsityPattern sparsity;
   sparsity.copy_from (csp);
@@ -233,4 +240,3 @@ void test ()
   const double diff_norm = result_mf.linfty_norm();
   deallog << "Norm of difference: " << diff_norm << std::endl << std::endl;
 }
-

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,8 +18,6 @@
 // one global refinement of a 2d square with p4est
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -30,10 +28,9 @@
 #include <deal.II/base/utilities.h>
 
 
-#include <fstream>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -48,8 +45,7 @@ void test()
       GridGenerator::hyper_cube(tr);
       tr.refine_global(1);
 
-      std::vector< unsigned int > cell_subd;
-      cell_subd.resize(tr.n_active_cells());
+      std::vector<types::subdomain_id> cell_subd(tr.n_active_cells());
 
       GridTools::get_subdomain_association(tr, cell_subd);
       if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
@@ -88,9 +84,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

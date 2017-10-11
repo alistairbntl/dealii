@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -33,7 +33,8 @@ template <typename number>
 LAPACKFullMatrix<number>::LAPACKFullMatrix (const size_type n)
   :
   TransposeTable<number> (n,n),
-  state (matrix)
+  state (matrix),
+  property(general)
 {}
 
 
@@ -42,7 +43,8 @@ LAPACKFullMatrix<number>::LAPACKFullMatrix (const size_type m,
                                             const size_type n)
   :
   TransposeTable<number> (m, n),
-  state (matrix)
+  state (matrix),
+  property(general)
 {}
 
 
@@ -50,7 +52,8 @@ template <typename number>
 LAPACKFullMatrix<number>::LAPACKFullMatrix (const LAPACKFullMatrix &M)
   :
   TransposeTable<number> (M),
-  state (matrix)
+  state (matrix),
+  property(general)
 {}
 
 
@@ -59,7 +62,8 @@ LAPACKFullMatrix<number> &
 LAPACKFullMatrix<number>::operator = (const LAPACKFullMatrix<number> &M)
 {
   TransposeTable<number>::operator=(M);
-  state = LAPACKSupport::matrix;
+  state = M.state;
+  property = M.property;
   return *this;
 }
 
@@ -95,6 +99,7 @@ LAPACKFullMatrix<number>::operator = (const FullMatrix<number2> &M)
       (*this)(i,j) = M(i,j);
 
   state = LAPACKSupport::matrix;
+  property = LAPACKSupport::general;
   return *this;
 }
 
@@ -111,6 +116,7 @@ LAPACKFullMatrix<number>::operator = (const SparseMatrix<number2> &M)
       (*this)(i,j) = M.el(i,j);
 
   state = LAPACKSupport::matrix;
+  property = LAPACKSupport::general;
   return *this;
 }
 
@@ -126,6 +132,41 @@ LAPACKFullMatrix<number>::operator = (const double d)
     this->reset_values();
 
   state = LAPACKSupport::matrix;
+  return *this;
+}
+
+
+template <typename number>
+LAPACKFullMatrix<number> &
+LAPACKFullMatrix<number>::operator*= (const number factor)
+{
+  Assert(state == LAPACKSupport::matrix ||
+         state == LAPACKSupport::inverse_matrix,
+         ExcState(state));
+
+  for (unsigned int column = 0; column<this->n(); ++column)
+    for (unsigned int row = 0; row<this->m(); ++row)
+      (*this)(row,column) *= factor;
+
+  return *this;
+}
+
+
+template <typename number>
+LAPACKFullMatrix<number> &
+LAPACKFullMatrix<number>::operator/= (const number factor)
+{
+  Assert(state == LAPACKSupport::matrix ||
+         state == LAPACKSupport::inverse_matrix,
+         ExcState(state));
+
+  AssertIsFinite(factor);
+  Assert (factor != number(0.), ExcZero() );
+
+  for (unsigned int column = 0; column<this->n(); ++column)
+    for (unsigned int row = 0; row<this->m(); ++row)
+      (*this)(row,column) /= factor;
+
   return *this;
 }
 
@@ -156,6 +197,7 @@ LAPACKFullMatrix<number>::vmult (
     }
     case svd:
     {
+      Threads::Mutex::ScopedLock lock (mutex);
       AssertDimension(v.size(), this->n_cols());
       AssertDimension(w.size(), this->n_rows());
       // Compute V^T v
@@ -170,6 +212,7 @@ LAPACKFullMatrix<number>::vmult (
     }
     case inverse_svd:
     {
+      Threads::Mutex::ScopedLock lock (mutex);
       AssertDimension(w.size(), this->n_cols());
       AssertDimension(v.size(), this->n_rows());
       // Compute U^T v
@@ -214,6 +257,7 @@ LAPACKFullMatrix<number>::Tvmult (
     }
     case svd:
     {
+      Threads::Mutex::ScopedLock lock (mutex);
       AssertDimension(w.size(), this->n_cols());
       AssertDimension(v.size(), this->n_rows());
 
@@ -226,21 +270,22 @@ LAPACKFullMatrix<number>::Tvmult (
       // Multiply with V
       gemv("T", &nn, &nn, &alpha, &svd_vt->values[0], &nn, &work[0], &one, &beta, w.val, &one);
       break;
-      case inverse_svd:
-      {
-        AssertDimension(v.size(), this->n_cols());
-        AssertDimension(w.size(), this->n_rows());
+    }
+    case inverse_svd:
+    {
+      Threads::Mutex::ScopedLock lock (mutex);
+      AssertDimension(v.size(), this->n_cols());
+      AssertDimension(w.size(), this->n_rows());
 
-        // Compute V^T v
-        work.resize(std::max(mm,nn));
-        gemv("N", &nn, &nn, &alpha, &svd_vt->values[0], &nn, v.val, &one, &null, &work[0], &one);
-        // Multiply by singular values
-        for (size_type i=0; i<wr.size(); ++i)
-          work[i] *= wr[i];
-        // Multiply with U
-        gemv("N", &mm, &mm, &alpha, &svd_u->values[0], &mm, &work[0], &one, &beta, w.val, &one);
-        break;
-      }
+      // Compute V^T v
+      work.resize(std::max(mm,nn));
+      gemv("N", &nn, &nn, &alpha, &svd_vt->values[0], &nn, v.val, &one, &null, &work[0], &one);
+      // Multiply by singular values
+      for (size_type i=0; i<wr.size(); ++i)
+        work[i] *= wr[i];
+      // Multiply with U
+      gemv("N", &mm, &mm, &alpha, &svd_u->values[0], &mm, &work[0], &one, &beta, w.val, &one);
+      break;
     }
     default:
       Assert (false, ExcState(state));
@@ -461,6 +506,8 @@ void
 LAPACKFullMatrix<number>::compute_lu_factorization()
 {
   Assert(state == matrix, ExcState(state));
+  state = LAPACKSupport::unusable;
+
   const int mm = this->n_rows();
   const int nn = this->n_cols();
   number *values = const_cast<number *> (&this->values[0]);
@@ -468,11 +515,156 @@ LAPACKFullMatrix<number>::compute_lu_factorization()
   int info = 0;
   getrf(&mm, &nn, values, &mm, &ipiv[0], &info);
 
-  AssertThrow(info >= 0, ExcInternalError());
-  AssertThrow(info == 0, LACExceptions::ExcSingular());
+  Assert(info >= 0, ExcInternalError());
 
+  // if info >= 0, the factorization has been completed
   state = lu;
+
+  AssertThrow(info == 0, LACExceptions::ExcSingular());
 }
+
+
+
+template <typename number>
+void
+LAPACKFullMatrix<number>::set_property(const Property p)
+{
+  property = p;
+}
+
+
+
+template <typename number>
+number LAPACKFullMatrix<number>::l1_norm() const
+{
+  const char type('O');
+  return norm(type);
+}
+
+
+
+template <typename number>
+number LAPACKFullMatrix<number>::linfty_norm() const
+{
+  const char type('I');
+  return norm(type);
+}
+
+
+
+template <typename number>
+number LAPACKFullMatrix<number>::frobenius_norm() const
+{
+  const char type('F');
+  return norm(type);
+}
+
+
+
+template <typename number>
+number LAPACKFullMatrix<number>::norm(const char type) const
+{
+  Threads::Mutex::ScopedLock lock (mutex);
+
+  Assert (state == LAPACKSupport::matrix ||
+          state == LAPACKSupport::inverse_matrix,
+          ExcMessage("norms can be called in matrix state only."));
+
+  const int N = this->n_cols();
+  const int M = this->n_rows();
+  const number *values = &this->values[0];
+  if (property == symmetric)
+    {
+      const int lda = std::max(1,N);
+      const int lwork = (type == 'I' || type == 'O') ?
+                        std::max(1,N) :
+                        0;
+      work.resize(lwork);
+      return lansy (&type, &LAPACKSupport::L, &N, values, &lda, &work[0]);
+    }
+  else
+    {
+      const int lda = std::max(1,M);
+      const int lwork = (type == 'I') ?
+                        std::max(1,M) :
+                        0;
+      work.resize(lwork);
+      return lange (&type, &M, &N, values, &lda, &work[0]);
+    }
+}
+
+
+
+template <typename number>
+number LAPACKFullMatrix<number>::trace() const
+{
+  Assert (state == LAPACKSupport::matrix ||
+          state == LAPACKSupport::inverse_matrix,
+          ExcMessage("Trace can be called in matrix state only."));
+  Assert (this->n_cols() == this->n_rows(),
+          ExcDimensionMismatch(this->n_cols(), this->n_rows()));
+
+  number tr = 0;
+  for (size_type i=0; i<this->n_rows(); ++i)
+    tr += (*this)(i,i);
+
+  return tr;
+}
+
+
+
+template <typename number>
+void
+LAPACKFullMatrix<number>::compute_cholesky_factorization()
+{
+  Assert(state == matrix, ExcState(state));
+  Assert(property == symmetric, ExcProperty(property));
+  state = LAPACKSupport::unusable;
+
+  const int mm = this->n_rows();
+  const int nn = this->n_cols();
+  (void) mm;
+  Assert (mm == nn, ExcDimensionMismatch(mm,nn));
+
+  number *values = &this->values[0];
+  int info = 0;
+  const int lda = std::max(1,nn);
+  potrf (&LAPACKSupport::L, &nn, values, &lda, &info);
+
+  // info < 0 : the info-th argument had an illegal value
+  Assert(info >= 0, ExcInternalError());
+
+  state = cholesky;
+  AssertThrow(info == 0, LACExceptions::ExcSingular());
+}
+
+
+
+template <typename number>
+number
+LAPACKFullMatrix<number>::reciprocal_condition_number(const number a_norm) const
+{
+  Threads::Mutex::ScopedLock lock (mutex);
+  Assert(state == cholesky, ExcState(state));
+  number rcond = 0.;
+
+  const int N = this->n_rows();
+  const number *values = &this->values[0];
+  int info = 0;
+  const int lda = std::max(1,N);
+  work.resize(3*N);
+  iwork.resize(N);
+
+  // use the same uplo as in Cholesky
+  pocon (&LAPACKSupport::L, &N, values, &lda,
+         &a_norm, &rcond,
+         &work[0], &iwork[0], &info);
+
+  Assert(info >= 0, ExcInternalError());
+
+  return rcond;
+}
+
 
 
 template <typename number>
@@ -545,28 +737,38 @@ template <typename number>
 void
 LAPACKFullMatrix<number>::invert()
 {
-  Assert(state == matrix || state == lu,
+  Assert(state == matrix || state == lu || state == cholesky,
          ExcState(state));
   const int mm = this->n_rows();
   const int nn = this->n_cols();
   Assert (nn == mm, ExcNotQuadratic());
 
   number *values = const_cast<number *> (&this->values[0]);
-  ipiv.resize(mm);
   int info = 0;
 
-  if (state == matrix)
+  if (property != symmetric)
     {
-      getrf(&mm, &nn, values, &mm, &ipiv[0], &info);
+      if (state == matrix)
+        compute_lu_factorization();
 
-      AssertThrow(info >= 0, ExcInternalError());
-      AssertThrow(info == 0, LACExceptions::ExcSingular());
+      ipiv.resize(mm);
+      inv_work.resize (mm);
+      getri(&mm, values, &mm, &ipiv[0], &inv_work[0], &mm, &info);
+    }
+  else
+    {
+      if (state == matrix)
+        compute_cholesky_factorization();
+
+      const int lda = std::max(1,nn);
+      potri(&LAPACKSupport::L, &nn, values,&lda,&info);
+      // inverse is stored in lower diagonal, set the upper diagonal appropriately:
+      for (int i=0; i < nn; ++i)
+        for (int j=i+1; j < nn; ++j)
+          this->el(i,j) = this->el(j,i);
     }
 
-  inv_work.resize (mm);
-  getri(&mm, values, &mm, &ipiv[0], &inv_work[0], &mm, &info);
-
-  AssertThrow(info >= 0, ExcInternalError());
+  Assert(info >= 0, ExcInternalError());
   AssertThrow(info == 0, LACExceptions::ExcSingular());
 
   state = inverse_matrix;
@@ -591,7 +793,7 @@ LAPACKFullMatrix<number>::apply_lu_factorization(Vector<number> &v,
   getrs(trans, &nn, &one, values, &nn, &ipiv[0],
         v.begin(), &nn, &info);
 
-  AssertThrow(info == 0, ExcInternalError());
+  Assert(info == 0, ExcInternalError());
 }
 
 
@@ -613,7 +815,37 @@ LAPACKFullMatrix<number>::apply_lu_factorization(LAPACKFullMatrix<number> &B,
 
   getrs(trans, &nn, &kk, values, &nn, &ipiv[0], &B.values[0], &nn, &info);
 
-  AssertThrow(info == 0, ExcInternalError());
+  Assert(info == 0, ExcInternalError());
+}
+
+
+template <typename number>
+number
+LAPACKFullMatrix<number>::determinant() const
+{
+  Assert(this->n_rows() == this->n_cols(), LACExceptions::ExcNotQuadratic());
+
+  // LAPACK doesn't offer a function to compute a matrix determinant.
+  // This is due to the difficulty in maintaining numerical accuracy, as the
+  // calculations are likely to overflow or underflow. See
+  // http://www.netlib.org/lapack/faq.html#_are_there_routines_in_lapack_to_compute_determinants
+  //
+  // However, after a PLU decomposition one can compute this by multiplication
+  // of the diagonal entries with one another. One must take into consideration
+  // the number of permutations (row swaps) stored in the P matrix.
+  //
+  // See the implementations in the blaze library (detNxN)
+  // https://bitbucket.org/blaze-lib/blaze
+  // and also
+  // https://dualm.wordpress.com/2012/01/06/computing-determinant-in-fortran/
+  // http://icl.cs.utk.edu/lapack-forum/viewtopic.php?p=341&#p336
+  // for further information.
+  Assert(state == lu, ExcState(state));
+  Assert(ipiv.size() == this->n_rows(), ExcInternalError());
+  number det = 1.0;
+  for (size_type i=0; i<this->n_rows(); ++i)
+    det *= ( ipiv[i] == int(i+1) ? this->el(i,i) : -this->el(i,i) );
+  return det;
 }
 
 
@@ -796,7 +1028,7 @@ LAPACKFullMatrix<number>::compute_generalized_eigenvalues_symmetric(
   const char *const uplo(&U);
   const char *const range(&V);
   const int *const  dummy(&one);
-  std::vector<int> iwork(static_cast<size_type> (5*nn));
+  iwork.resize(static_cast<size_type> (5*nn));
   std::vector<int> ifail(static_cast<size_type> (nn));
 
 
@@ -946,6 +1178,10 @@ LAPACKFullMatrix<number>::print_formatted (
 
   Assert ((!this->empty()) || (this->n_cols()+this->n_rows()==0),
           ExcInternalError());
+  Assert (state == LAPACKSupport::matrix ||
+          state == LAPACKSupport::inverse_matrix ||
+          state == LAPACKSupport::cholesky,
+          ExcState(state));
 
   // set output format, but store old
   // state
@@ -968,7 +1204,11 @@ LAPACKFullMatrix<number>::print_formatted (
   for (size_type i=0; i<this->n_rows(); ++i)
     {
       for (size_type j=0; j<this->n_cols(); ++j)
-        if (std::fabs(this->el(i,j)) > threshold)
+        // we might have complex numbers, so use abs also to check for nan
+        // since there is no isnan on complex numbers
+        if (std::isnan(std::abs((*this)(i,j))))
+          out << std::setw(width) << (*this)(i,j) << ' ';
+        else if (std::fabs(this->el(i,j)) > threshold)
           out << std::setw(width)
               << this->el(i,j) * denominator << ' ';
         else
@@ -990,7 +1230,7 @@ void
 PreconditionLU<number>::initialize(const LAPACKFullMatrix<number> &M)
 {
   matrix = &M;
-  mem = 0;
+  mem = nullptr;
 }
 
 
@@ -1029,7 +1269,7 @@ void
 PreconditionLU<number>::vmult(BlockVector<number> &dst,
                               const BlockVector<number> &src) const
 {
-  Assert(mem != 0, ExcNotInitialized());
+  Assert(mem != nullptr, ExcNotInitialized());
   Vector<number> *aux = mem->alloc();
   *aux = src;
   matrix->apply_lu_factorization(*aux, false);
@@ -1042,7 +1282,7 @@ void
 PreconditionLU<number>::Tvmult(BlockVector<number> &dst,
                                const BlockVector<number> &src) const
 {
-  Assert(mem != 0, ExcNotInitialized());
+  Assert(mem != nullptr, ExcNotInitialized());
   Vector<number> *aux = mem->alloc();
   *aux = src;
   matrix->apply_lu_factorization(*aux, true);

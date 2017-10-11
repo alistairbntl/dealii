@@ -23,11 +23,8 @@
 #include <deal.II/base/point.h>
 #include <deal.II/base/auto_derivative_function.h>
 #include <deal.II/base/convergence_table.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 
-#include <iomanip>
-#include <cmath>
 
 
 template <int dim>
@@ -123,7 +120,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   const unsigned int dim=2;
   AutoSinExp<dim> auto_function;

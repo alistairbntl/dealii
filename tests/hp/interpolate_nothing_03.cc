@@ -19,7 +19,6 @@
 // scalar elements.
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_q.h>
@@ -38,7 +37,6 @@
 #include <deal.II/hp/dof_handler.h>
 
 
-#include <fstream>
 
 
 template <int dim>
@@ -74,7 +72,7 @@ void test ()
 
   // interpolate the function
   VectorTools::interpolate(dof_handler,
-                           ConstantFunction<dim>(3.14),
+                           Functions::ConstantFunction<dim>(3.14),
                            interpolant);
   deallog << interpolant.mean_value() << std::endl;
 }
@@ -88,7 +86,6 @@ int main ()
   deallog << std::setprecision(3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1> ();
   test<2> ();

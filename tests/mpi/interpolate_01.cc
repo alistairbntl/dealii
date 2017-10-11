@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,8 +21,6 @@
 // wrong with having too many tests, though.
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/function.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -45,11 +43,10 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
 #include <sstream>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -68,7 +65,7 @@ void test()
   x.reinit(owned_set, MPI_COMM_WORLD);
 
   VectorTools::interpolate(dofh,
-                           ConstantFunction<dim>(1),
+                           Functions::ConstantFunction<dim>(1),
                            x);
   const double norm = x.l2_norm();
   if (myid == 0)
@@ -96,9 +93,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

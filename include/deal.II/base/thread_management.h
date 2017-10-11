@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2016 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,28 +13,27 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__thread_management_h
-#define dealii__thread_management_h
+#ifndef dealii_thread_management_h
+#define dealii_thread_management_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/template_constraints.h>
-#include <deal.II/base/std_cxx11/tuple.h>
-#include <deal.II/base/std_cxx11/function.h>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
-#include <deal.II/base/std_cxx11/bind.h>
 
 #ifdef DEAL_II_WITH_THREADS
-#  include <deal.II/base/std_cxx11/thread.h>
-#  include <deal.II/base/std_cxx11/mutex.h>
-#  include <deal.II/base/std_cxx11/condition_variable.h>
+#  include <thread>
+#  include <mutex>
+#  include <condition_variable>
 #endif
 
 #include <iterator>
 #include <vector>
 #include <list>
 #include <utility>
+#include <functional>
+#include <memory>
+#include <tuple>
 
 
 #ifdef DEAL_II_WITH_THREADS
@@ -42,6 +41,7 @@
 #    include <pthread.h>
 #  endif
 #  include <tbb/task.h>
+#  include <tbb/tbb_stddef.h>
 #endif
 
 
@@ -104,7 +104,7 @@ namespace Threads
        * Destructor. Unlock the mutex. Since this is a dummy mutex class, this
        * of course does nothing.
        */
-      ~ScopedLock () {}
+      ~ScopedLock () = default;
     };
 
     /**
@@ -174,7 +174,7 @@ namespace Threads
    * class names in multithreading and non-MT mode and thus may be compiled
    * with or without thread-support without the need to use conditional
    * compilation. Since a barrier class only makes sense in non-multithread
-   * mode if only one thread is to be synchronised (otherwise, the barrier
+   * mode if only one thread is to be synchronized (otherwise, the barrier
    * could not be left, since the one thread is waiting for some other part of
    * the program to reach a certain point of execution), the constructor of
    * this class throws an exception if the <code>count</code> argument
@@ -188,18 +188,18 @@ namespace Threads
   public:
     /**
      * Constructor. Since barriers are only useful in single-threaded mode if
-     * the number of threads to be synchronised is one, this constructor
+     * the number of threads to be synchronized is one, this constructor
      * raises an exception if the <code>count</code> argument is one.
      */
     DummyBarrier (const unsigned int  count,
-                  const char         *name = 0,
-                  void               *arg  = 0);
+                  const char         *name = nullptr,
+                  void               *arg  = nullptr);
 
     /**
      * Wait for all threads to reach this point. Since there may only be one
      * thread, return immediately, i.e. this function is a no-op.
      */
-    int wait () const
+    inline int wait () const
     {
       return 0;
     }
@@ -207,7 +207,7 @@ namespace Threads
     /**
      * Dump the state of this object. Here: do nothing.
      */
-    void dump () const {}
+    inline void dump () const {}
 
     /**
      * @addtogroup Exceptions
@@ -291,8 +291,7 @@ namespace Threads
     /**
      * Default constructor.
      */
-    Mutex ()
-    {}
+    Mutex () = default;
 
     /**
      * Copy constructor. As discussed in this class's documentation, no state
@@ -302,6 +301,16 @@ namespace Threads
       :
       mutex()
     {}
+
+
+    /**
+     * Copy operators. As discussed in this class's documentation, no state
+     * is copied from the object given as argument.
+     */
+    Mutex &operator = (const Mutex &)
+    {
+      return *this;
+    }
 
 
     /**
@@ -324,7 +333,7 @@ namespace Threads
     /**
      * Data object storing the mutex data
      */
-    std_cxx11::mutex mutex;
+    std::mutex mutex;
 
     /**
      * Make the class implementing condition variables a friend, since it
@@ -372,8 +381,7 @@ namespace Threads
      */
     inline void wait (Mutex &mutex)
     {
-      std_cxx11::unique_lock<std_cxx11::mutex> lock(mutex.mutex,
-                                                    std_cxx11::adopt_lock);
+      std::unique_lock<std::mutex> lock(mutex.mutex, std::adopt_lock);
       condition_variable.wait (lock);
     }
 
@@ -381,7 +389,7 @@ namespace Threads
     /**
      * Data object storing the necessary data.
      */
-    std_cxx11::condition_variable condition_variable;
+    std::condition_variable condition_variable;
   };
 
 
@@ -407,8 +415,8 @@ namespace Threads
      * Constructor. Initialize the underlying POSIX barrier data structure.
      */
     PosixThreadBarrier (const unsigned int  count,
-                        const char         *name = 0,
-                        void               *arg  = 0);
+                        const char         *name = nullptr,
+                        void               *arg  = nullptr);
 
     /**
      * Destructor. Release all resources.
@@ -711,7 +719,9 @@ namespace Threads
     private:
       RT *value;
     public:
-      inline return_value () : value(0) {}
+      inline return_value ()
+        : value(nullptr)
+      {}
 
       inline RT &get () const
       {
@@ -743,243 +753,18 @@ namespace Threads
   namespace internal
   {
     template <typename RT>
-    inline void call (const std_cxx11::function<RT ()> &function,
+    inline void call (const std::function<RT ()> &function,
                       internal::return_value<RT> &ret_val)
     {
       ret_val.set (function());
     }
 
 
-    inline void call (const std_cxx11::function<void ()> &function,
+    inline void call (const std::function<void ()> &function,
                       internal::return_value<void> &)
     {
       function();
     }
-  }
-
-
-
-  namespace internal
-  {
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments, and whether the second argument is a const or non-const
-     * class, depending on which the member function will also me const or
-     * non-const. There are specializations of this class for each number of
-     * arguments.
-     */
-    template <typename RT, typename ArgList,
-              int length = std_cxx11::tuple_size<ArgList>::value>
-    struct fun_ptr_helper;
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 0 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 0>
-    {
-      typedef RT (type) ();
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 1 argument.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 1>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type);
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 2 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 2>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type);
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 3 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 3>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type,
-                         typename std_cxx11::tuple_element<2,ArgList>::type);
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 4 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 4>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type,
-                         typename std_cxx11::tuple_element<2,ArgList>::type,
-                         typename std_cxx11::tuple_element<3,ArgList>::type);
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 5 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 5>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type,
-                         typename std_cxx11::tuple_element<2,ArgList>::type,
-                         typename std_cxx11::tuple_element<3,ArgList>::type,
-                         typename std_cxx11::tuple_element<4,ArgList>::type);
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 6 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 6>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type,
-                         typename std_cxx11::tuple_element<2,ArgList>::type,
-                         typename std_cxx11::tuple_element<3,ArgList>::type,
-                         typename std_cxx11::tuple_element<4,ArgList>::type,
-                         typename std_cxx11::tuple_element<5,ArgList>::type);
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 7 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 7>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type,
-                         typename std_cxx11::tuple_element<2,ArgList>::type,
-                         typename std_cxx11::tuple_element<3,ArgList>::type,
-                         typename std_cxx11::tuple_element<4,ArgList>::type,
-                         typename std_cxx11::tuple_element<5,ArgList>::type,
-                         typename std_cxx11::tuple_element<6,ArgList>::type);
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 8 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 8>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type,
-                         typename std_cxx11::tuple_element<2,ArgList>::type,
-                         typename std_cxx11::tuple_element<3,ArgList>::type,
-                         typename std_cxx11::tuple_element<4,ArgList>::type,
-                         typename std_cxx11::tuple_element<5,ArgList>::type,
-                         typename std_cxx11::tuple_element<6,ArgList>::type,
-                         typename std_cxx11::tuple_element<7,ArgList>::type);
-    };
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 9 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 9>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type,
-                         typename std_cxx11::tuple_element<2,ArgList>::type,
-                         typename std_cxx11::tuple_element<3,ArgList>::type,
-                         typename std_cxx11::tuple_element<4,ArgList>::type,
-                         typename std_cxx11::tuple_element<5,ArgList>::type,
-                         typename std_cxx11::tuple_element<6,ArgList>::type,
-                         typename std_cxx11::tuple_element<7,ArgList>::type,
-                         typename std_cxx11::tuple_element<8,ArgList>::type);
-    };
-
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. This is the specialization for 10 arguments.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr_helper<RT, ArgList, 10>
-    {
-      typedef RT (type) (typename std_cxx11::tuple_element<0,ArgList>::type,
-                         typename std_cxx11::tuple_element<1,ArgList>::type,
-                         typename std_cxx11::tuple_element<2,ArgList>::type,
-                         typename std_cxx11::tuple_element<3,ArgList>::type,
-                         typename std_cxx11::tuple_element<4,ArgList>::type,
-                         typename std_cxx11::tuple_element<5,ArgList>::type,
-                         typename std_cxx11::tuple_element<6,ArgList>::type,
-                         typename std_cxx11::tuple_element<7,ArgList>::type,
-                         typename std_cxx11::tuple_element<8,ArgList>::type,
-                         typename std_cxx11::tuple_element<9,ArgList>::type);
-    };
-
-
-
-    /**
-     * @internal
-     *
-     * Construct a pointer to non-member function based on the template
-     * arguments. We do this by dispatching to the fun_ptr_helper classes that
-     * are overloaded on the number of elements.
-     *
-     * Note that the last template argument for the fun_ptr_helper class is
-     * automatically computed in the default argument to the general template.
-     */
-    template <typename RT, typename ArgList>
-    struct fun_ptr
-    {
-      typedef typename fun_ptr_helper<RT,ArgList>::type type;
-    };
   }
 
 
@@ -996,7 +781,7 @@ namespace Threads
      * While we have only one of these objects per thread, several
      * Threads::Thread objects may refer to this descriptor. If all Thread
      * objects go out of scope the ThreadDescriptor will detach from the
-     * thread before being destructed.
+     * thread before being destroyed.
      */
     template <typename RT>
     struct ThreadDescriptor
@@ -1004,17 +789,17 @@ namespace Threads
       /**
        * An object that represents the thread started.
        */
-      std_cxx11::thread thread;
+      std::thread thread;
 
       /**
        * An object that will hold the value returned by the function called on
        * the thread.
        *
        * The return value is stored in a shared_ptr because we might abandon
-       * the the ThreadDescriptor.  This makes sure the object stays alive
+       * the ThreadDescriptor.  This makes sure the object stays alive
        * until the thread exits.
        */
-      std_cxx11::shared_ptr<return_value<RT> > ret_val;
+      std::shared_ptr<return_value<RT> > ret_val;
 
       /**
        * A bool variable that is initially false, is set to true when a new
@@ -1074,11 +859,11 @@ namespace Threads
        * Start the thread and let it put its return value into the ret_val
        * object.
        */
-      void start (const std_cxx11::function<RT ()> &function)
+      void start (const std::function<RT ()> &function)
       {
         thread_is_active = true;
         ret_val.reset(new return_value<RT>());
-        thread = std_cxx11::thread (thread_entry_point, function, ret_val);
+        thread = std::thread (thread_entry_point, function, ret_val);
       }
 
 
@@ -1108,8 +893,8 @@ namespace Threads
        * The function that runs on the thread.
        */
       static
-      void thread_entry_point (const std_cxx11::function<RT ()> function,
-                               std_cxx11::shared_ptr<return_value<RT> > ret_val)
+      void thread_entry_point (const std::function<RT ()> function,
+                               std::shared_ptr<return_value<RT> > ret_val)
       {
         // call the function in question. since an exception that is
         // thrown from one of the called functions will not propagate
@@ -1149,13 +934,13 @@ namespace Threads
        * An object that will hold the value returned by the function called on
        * the thread.
        */
-      std_cxx11::shared_ptr<return_value<RT> > ret_val;
+      std::shared_ptr<return_value<RT> > ret_val;
 
       /**
        * Start the thread and let it put its return value into the ret_val
        * object.
        */
-      void start (const std_cxx11::function<RT ()> &function)
+      void start (const std::function<RT ()> &function)
       {
         ret_val.reset(new return_value<RT>());
         call (function, *ret_val);
@@ -1201,7 +986,7 @@ namespace Threads
     /**
      * Construct a thread object with a function object.
      */
-    Thread (const std_cxx11::function<RT ()> &function)
+    Thread (const std::function<RT ()> &function)
       :
       thread_descriptor (new internal::ThreadDescriptor<RT>())
     {
@@ -1214,7 +999,7 @@ namespace Threads
      * this way, except for assigning it a thread object that holds data
      * created by the new_thread() functions.
      */
-    Thread () {}
+    Thread () = default;
 
     /**
      * Copy constructor.
@@ -1260,7 +1045,7 @@ namespace Threads
      * an implicit pointer to an object that exists exactly once for each
      * thread, the check is simply to compare these pointers.
      */
-    bool operator == (const Thread &t)
+    bool operator == (const Thread &t) const
     {
       return thread_descriptor == t.thread_descriptor;
     }
@@ -1272,14 +1057,14 @@ namespace Threads
      * implementation will make sure that that object lives as long as there
      * is at least one subscriber to it.
      */
-    std_cxx11::shared_ptr<internal::ThreadDescriptor<RT> > thread_descriptor;
+    std::shared_ptr<internal::ThreadDescriptor<RT> > thread_descriptor;
   };
 
 
   namespace internal
   {
     /**
-     * A general template that returns std_cxx11::ref(t) if t is of reference
+     * A general template that returns std::ref(t) if t is of reference
      * type, and t otherwise.
      *
      * The case that t is of reference type is handled in a partial
@@ -1297,7 +1082,7 @@ namespace Threads
 
 
     /**
-     * A general template that returns std_cxx11::ref(t) if t is of reference
+     * A general template that returns std::ref(t) if t is of reference
      * type, and t otherwise.
      *
      * The case that t is of reference type is handled in this partial
@@ -1306,413 +1091,10 @@ namespace Threads
     template <typename T>
     struct maybe_make_ref<T &>
     {
-      static std_cxx11::reference_wrapper<T> act (T &t)
+      static std::reference_wrapper<T> act (T &t)
       {
-        return std_cxx11::ref(t);
+        return std::ref(t);
       }
-    };
-  }
-
-
-
-  namespace internal
-  {
-    /**
-     * @internal
-     *
-     * General template declaration of a class that is used to encapsulate
-     * arguments to global and static member functions, make sure a new thread
-     * is created and that function being run on that thread.
-     *
-     * Although this general template is not implemented at all, the default
-     * template argument makes sure that whenever using the name of this
-     * class, the last template argument will be computed correctly from the
-     * previous arguments, and the correct specialization for this last
-     * template argument be used, even though we need to specify it.
-     */
-    template <typename RT, typename ArgList, int length>
-    class fun_encapsulator;
-
-
-// ----------- encapsulators for function objects
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with no arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 0>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() ()
-      {
-        return Thread<RT> (function);
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 1 argument.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 1>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 2 arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 2>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1,
-                  typename std_cxx11::tuple_element<1,ArgList>::type arg2)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<1,ArgList>::type>::act(arg2)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 3 arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 3>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1,
-                  typename std_cxx11::tuple_element<1,ArgList>::type arg2,
-                  typename std_cxx11::tuple_element<2,ArgList>::type arg3)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<1,ArgList>::type>::act(arg2),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<2,ArgList>::type>::act(arg3)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 4 arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 4>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1,
-                  typename std_cxx11::tuple_element<1,ArgList>::type arg2,
-                  typename std_cxx11::tuple_element<2,ArgList>::type arg3,
-                  typename std_cxx11::tuple_element<3,ArgList>::type arg4)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<1,ArgList>::type>::act(arg2),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<2,ArgList>::type>::act(arg3),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<3,ArgList>::type>::act(arg4)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 5 arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 5>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1,
-                  typename std_cxx11::tuple_element<1,ArgList>::type arg2,
-                  typename std_cxx11::tuple_element<2,ArgList>::type arg3,
-                  typename std_cxx11::tuple_element<3,ArgList>::type arg4,
-                  typename std_cxx11::tuple_element<4,ArgList>::type arg5)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<1,ArgList>::type>::act(arg2),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<2,ArgList>::type>::act(arg3),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<3,ArgList>::type>::act(arg4),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<4,ArgList>::type>::act(arg5)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 6 arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 6>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1,
-                  typename std_cxx11::tuple_element<1,ArgList>::type arg2,
-                  typename std_cxx11::tuple_element<2,ArgList>::type arg3,
-                  typename std_cxx11::tuple_element<3,ArgList>::type arg4,
-                  typename std_cxx11::tuple_element<4,ArgList>::type arg5,
-                  typename std_cxx11::tuple_element<5,ArgList>::type arg6)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<1,ArgList>::type>::act(arg2),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<2,ArgList>::type>::act(arg3),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<3,ArgList>::type>::act(arg4),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<4,ArgList>::type>::act(arg5),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<5,ArgList>::type>::act(arg6)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 7 arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 7>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1,
-                  typename std_cxx11::tuple_element<1,ArgList>::type arg2,
-                  typename std_cxx11::tuple_element<2,ArgList>::type arg3,
-                  typename std_cxx11::tuple_element<3,ArgList>::type arg4,
-                  typename std_cxx11::tuple_element<4,ArgList>::type arg5,
-                  typename std_cxx11::tuple_element<5,ArgList>::type arg6,
-                  typename std_cxx11::tuple_element<6,ArgList>::type arg7)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<1,ArgList>::type>::act(arg2),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<2,ArgList>::type>::act(arg3),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<3,ArgList>::type>::act(arg4),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<4,ArgList>::type>::act(arg5),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<5,ArgList>::type>::act(arg6),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<6,ArgList>::type>::act(arg7)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 8 arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 8>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1,
-                  typename std_cxx11::tuple_element<1,ArgList>::type arg2,
-                  typename std_cxx11::tuple_element<2,ArgList>::type arg3,
-                  typename std_cxx11::tuple_element<3,ArgList>::type arg4,
-                  typename std_cxx11::tuple_element<4,ArgList>::type arg5,
-                  typename std_cxx11::tuple_element<5,ArgList>::type arg6,
-                  typename std_cxx11::tuple_element<6,ArgList>::type arg7,
-                  typename std_cxx11::tuple_element<7,ArgList>::type arg8)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<1,ArgList>::type>::act(arg2),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<2,ArgList>::type>::act(arg3),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<3,ArgList>::type>::act(arg4),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<4,ArgList>::type>::act(arg5),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<5,ArgList>::type>::act(arg6),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<6,ArgList>::type>::act(arg7),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<7,ArgList>::type>::act(arg8)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
-    };
-
-    /**
-     * @internal
-     *
-     * Encapsulator class for functions with 9 arguments.
-     */
-    template <typename RT, typename ArgList>
-    class fun_encapsulator<RT, ArgList, 9>
-    {
-    public:
-      fun_encapsulator (typename internal::fun_ptr<RT,ArgList>::type *function)
-        : function (*function)
-      {}
-
-      fun_encapsulator (const std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> &function)
-        : function (function)
-      {}
-
-      inline
-      Thread<RT>
-      operator() (typename std_cxx11::tuple_element<0,ArgList>::type arg1,
-                  typename std_cxx11::tuple_element<1,ArgList>::type arg2,
-                  typename std_cxx11::tuple_element<2,ArgList>::type arg3,
-                  typename std_cxx11::tuple_element<3,ArgList>::type arg4,
-                  typename std_cxx11::tuple_element<4,ArgList>::type arg5,
-                  typename std_cxx11::tuple_element<5,ArgList>::type arg6,
-                  typename std_cxx11::tuple_element<6,ArgList>::type arg7,
-                  typename std_cxx11::tuple_element<7,ArgList>::type arg8,
-                  typename std_cxx11::tuple_element<8,ArgList>::type arg9)
-      {
-        return
-          Thread<RT>
-          (std_cxx11::bind (function,
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<0,ArgList>::type>::act(arg1),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<1,ArgList>::type>::act(arg2),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<2,ArgList>::type>::act(arg3),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<3,ArgList>::type>::act(arg4),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<4,ArgList>::type>::act(arg5),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<5,ArgList>::type>::act(arg6),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<6,ArgList>::type>::act(arg7),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<7,ArgList>::type>::act(arg8),
-                            internal::maybe_make_ref<typename std_cxx11::tuple_element<8,ArgList>::type>::act(arg9)));
-      }
-
-    private:
-      std_cxx11::function<typename internal::fun_ptr<RT,ArgList>::type> function;
     };
   }
 
@@ -1722,7 +1104,7 @@ namespace Threads
 
   /**
    * Overload of the new_thread function for objects that can be converted to
-   * std_cxx11::function<RT ()>, i.e. anything that can be called like a
+   * std::function<RT ()>, i.e. anything that can be called like a
    * function object without arguments and returning an object of type RT (or
    * void).
    *
@@ -1731,13 +1113,12 @@ namespace Threads
   template <typename RT>
   inline
   Thread<RT>
-  new_thread (const std_cxx11::function<RT ()> &function)
+  new_thread (const std::function<RT ()> &function)
   {
     return Thread<RT>(function);
   }
 
 
-#ifdef DEAL_II_WITH_CXX11
 
   /**
    * Overload of the new_thread() function for objects that can be called like a
@@ -1809,889 +1190,66 @@ namespace Threads
   -> Thread<decltype(function_object())>
   {
     typedef decltype(function_object()) return_type;
-    return Thread<return_type>(std_cxx11::function<return_type ()>(function_object));
+    return Thread<return_type>(std::function<return_type ()>(function_object));
   }
 
-#endif
 
 
   /**
    * Overload of the new_thread function for non-member or static member
-   * functions with no arguments.
+   * functions.
    *
    * @ingroup threads
    */
-  template <typename RT>
+  template <typename RT, typename... Args>
   inline
   Thread<RT>
-  new_thread (RT (*fun_ptr)())
-  {
-    return new_thread (std_cxx11::function<RT ()> (fun_ptr));
-  }
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with
-   * no arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(),
-              typename identity<C>::type &c)
+  new_thread (RT (*fun_ptr)(Args...),
+              typename identity<Args>::type... args)
   {
     return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c))));
-  }
-
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with no
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)() const,
-              const typename identity<C>::type &c)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c))));
-  }
-#endif
-
-
-
-// ----------- thread starters for unary functions
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 1 argument.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename Arg1>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1),
-              typename identity<Arg1>::type arg1)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1))));
+      new_thread (std::function<RT ()>
+                  (std::bind(fun_ptr,
+                             internal::maybe_make_ref<Args>::act(args)...)));
   }
 
 
 
   /**
-   * Overload of the non-const new_thread function for member functions with 1
-   * argument.
+   * Overload of the non-const new_thread function for member functions.
    *
    * @ingroup threads
    */
-  template <typename RT, typename C, typename Arg1>
+  template <typename RT, typename C, typename... Args>
   inline
   Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1),
+  new_thread (RT (C::*fun_ptr)(Args...),
               typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1)
+              typename identity<Args>::type... args)
   {
     return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1))));
+      new_thread (std::function<RT ()>
+                  (std::bind(fun_ptr, std::ref(c),
+                             internal::maybe_make_ref<Args>::act(args)...)));
   }
 
 #ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
   /**
-   * Overload of the new_thread function for const member functions with 1
-   * argument.
+   * Overload of the new_thread function for const member functions.
    *
    * @ingroup threads
    */
-  template <typename RT, typename C, typename Arg1>
+  template <typename RT, typename C, typename... Args>
   inline
   Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1) const,
+  new_thread (RT (C::*fun_ptr)(Args...) const,
               typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1)
+              typename identity<Args>::type... args)
   {
     return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1))));
-  }
-#endif
-
-// ----------- thread starters for binary functions
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 2 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename Arg1, typename Arg2>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1,Arg2),
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with 2
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C, typename Arg1, typename Arg2>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2),
-              typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with 2
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C, typename Arg1, typename Arg2>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2) const,
-              typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2))));
-  }
-#endif
-
-// ----------- thread starters for ternary functions
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 3 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1,Arg2,Arg3),
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with 3
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3),
-              typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with 3
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3) const,
-              typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3))));
-  }
-#endif
-
-
-// ----------- thread starters for functions with 4 arguments
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 4 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4),
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with 4
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4),
-              typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with 4
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4) const,
-              typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4))));
-  }
-#endif
-
-// ----------- thread starters for functions with 5 arguments
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 5 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5),
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with 5
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5),
-              typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with 5
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5) const,
-              typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5))));
-  }
-#endif
-
-// ----------- thread starters for functions with 6 arguments
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 6 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6),
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with 6
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6),
-              typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with 6
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6) const,
-              typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6))));
-  }
-#endif
-
-// ----------- thread starters for functions with 7 arguments
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 7 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6,Arg7),
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with 7
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6,Arg7),
-              typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with 7
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6,Arg7) const,
-              typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7))));
-  }
-#endif
-
-// ----------- thread starters for functions with 8 arguments
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 8 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                            Arg6,Arg7,Arg8),
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7,
-              typename identity<Arg8>::type arg8)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7),
-                                   internal::maybe_make_ref<Arg8>::act(arg8))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with 8
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                               Arg6,Arg7,Arg8),
-              typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7,
-              typename identity<Arg8>::type arg8)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7),
-                                   internal::maybe_make_ref<Arg8>::act(arg8))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with 8
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                               Arg6,Arg7,Arg8) const,
-              typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7,
-              typename identity<Arg8>::type arg8)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7),
-                                   internal::maybe_make_ref<Arg8>::act(arg8))));
-  }
-#endif
-
-// ----------- thread starters for functions with 9 arguments
-
-  /**
-   * Overload of the new_thread function for non-member or static member
-   * functions with 9 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8, typename Arg9>
-  inline
-  Thread<RT>
-  new_thread (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                            Arg6,Arg7,Arg8,Arg9),
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7,
-              typename identity<Arg8>::type arg8,
-              typename identity<Arg9>::type arg9)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr,
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7),
-                                   internal::maybe_make_ref<Arg8>::act(arg8),
-                                   internal::maybe_make_ref<Arg9>::act(arg9))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_thread function for member functions with 9
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8, typename Arg9>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                               Arg6,Arg7,Arg8,Arg9),
-              typename identity<C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7,
-              typename identity<Arg8>::type arg8,
-              typename identity<Arg9>::type arg9)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7),
-                                   internal::maybe_make_ref<Arg8>::act(arg8),
-                                   internal::maybe_make_ref<Arg9>::act(arg9))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_thread function for const member functions with 9
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8, typename Arg9>
-  inline
-  Thread<RT>
-  new_thread (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                               Arg6,Arg7,Arg8,Arg9) const,
-              typename identity<const C>::type &c,
-              typename identity<Arg1>::type arg1,
-              typename identity<Arg2>::type arg2,
-              typename identity<Arg3>::type arg3,
-              typename identity<Arg4>::type arg4,
-              typename identity<Arg5>::type arg5,
-              typename identity<Arg6>::type arg6,
-              typename identity<Arg7>::type arg7,
-              typename identity<Arg8>::type arg8,
-              typename identity<Arg9>::type arg9)
-  {
-    return
-      new_thread (std_cxx11::function<RT ()>
-                  (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                   internal::maybe_make_ref<Arg1>::act(arg1),
-                                   internal::maybe_make_ref<Arg2>::act(arg2),
-                                   internal::maybe_make_ref<Arg3>::act(arg3),
-                                   internal::maybe_make_ref<Arg4>::act(arg4),
-                                   internal::maybe_make_ref<Arg5>::act(arg5),
-                                   internal::maybe_make_ref<Arg6>::act(arg6),
-                                   internal::maybe_make_ref<Arg7>::act(arg7),
-                                   internal::maybe_make_ref<Arg8>::act(arg8),
-                                   internal::maybe_make_ref<Arg9>::act(arg9))));
+      new_thread (std::function<RT ()>
+                  (std::bind(fun_ptr, std::cref(c),
+                             internal::maybe_make_ref<Args>::act(args)...)));
   }
 #endif
 
@@ -2775,7 +1333,7 @@ namespace Threads
           {
             internal::handle_unknown_exception ();
           }
-        return 0;
+        return nullptr;
       }
 
       /**
@@ -2812,7 +1370,7 @@ namespace Threads
       /**
        * The function and its arguments that are to be run on the task.
        */
-      std_cxx11::function<RT ()> function;
+      std::function<RT ()> function;
 
       /**
        * Variable holding the data the TBB needs to work with a task. Set by
@@ -2839,7 +1397,7 @@ namespace Threads
       /**
        * Constructor. Take the function to be run on this task as argument.
        */
-      TaskDescriptor (const std_cxx11::function<RT ()> &function);
+      TaskDescriptor (const std::function<RT ()> &function);
 
       /**
        * Default constructor. Throws an exception since we want to queue a
@@ -2858,6 +1416,13 @@ namespace Threads
        * Destructor.
        */
       ~TaskDescriptor ();
+
+      /**
+       * Copy operator. Throws an exception since we want to make sure that
+       * each TaskDescriptor object corresponds to exactly one task.
+       */
+      TaskDescriptor &
+      operator = (const TaskDescriptor &);
 
       /**
        * Queue up the task to the scheduler. We need to do this in a separate
@@ -2883,9 +1448,10 @@ namespace Threads
 
     template <typename RT>
     inline
-    TaskDescriptor<RT>::TaskDescriptor (const std_cxx11::function<RT ()> &function)
+    TaskDescriptor<RT>::TaskDescriptor (const std::function<RT ()> &function)
       :
       function (function),
+      task(nullptr),
       task_is_done (false)
     {}
 
@@ -2901,13 +1467,25 @@ namespace Threads
       task->set_ref_count (2);
 
       tbb::task *worker = new (task->allocate_child()) TaskEntryPoint<RT>(*this);
+
+      // in earlier versions of the TBB, task::spawn was a regular
+      // member function; however, in later versions, it was converted
+      // into a static function. we could always call it as a regular member
+      // function of *task, but that appears to confuse the NVidia nvcc
+      // compiler. consequently, the following work-around:
+#if TBB_VERSION_MAJOR >= 4
+      tbb::task::spawn (*worker);
+#else
       task->spawn (*worker);
+#endif
     }
 
 
 
     template <typename RT>
     TaskDescriptor<RT>::TaskDescriptor ()
+      :
+      task_is_done (false)
     {
       Assert (false, ExcInternalError());
     }
@@ -2916,7 +1494,11 @@ namespace Threads
 
     template <typename RT>
     TaskDescriptor<RT>::TaskDescriptor (const TaskDescriptor &)
+      :
+      task_is_done (false)
     {
+      // we shouldn't be getting here -- task descriptors
+      // can't be copied
       Assert (false, ExcInternalError());
     }
 
@@ -2939,9 +1521,20 @@ namespace Threads
       // of the arena". rather, let's explicitly destroy the empty
       // task object. before that, make sure that the task has been
       // shut down, expressed by a zero reference count
-      Assert (task != 0, ExcInternalError());
-      Assert (task->ref_count()==0, ExcInternalError());
+      AssertNothrow (task != nullptr, ExcInternalError());
+      AssertNothrow (task->ref_count()==0, ExcInternalError());
       task->destroy (*task);
+    }
+
+
+    template <typename RT>
+    TaskDescriptor<RT> &
+    TaskDescriptor<RT>::operator = (const TaskDescriptor &)
+    {
+      // we shouldn't be getting here -- task descriptors
+      // can't be copied
+      Assert (false, ExcInternalError());
+      return *this;
     }
 
 
@@ -2987,7 +1580,7 @@ namespace Threads
        * Constructor. Call the given function and emplace the return value
        * into the slot reserved for this purpose.
        */
-      TaskDescriptor (const std_cxx11::function<RT ()> &function)
+      TaskDescriptor (const std::function<RT ()> &function)
       {
         call (function, ret_val);
       }
@@ -3032,7 +1625,7 @@ namespace Threads
      * @post Using this constructor automatically makes the task object
      * joinable().
      */
-    Task (const std_cxx11::function<RT ()> &function_object)
+    Task (const std::function<RT ()> &function_object)
     {
       // create a task descriptor and tell it to queue itself up with
       // the scheduling system
@@ -3061,7 +1654,7 @@ namespace Threads
      * @post Using this constructor leaves the object in an unjoinable state,
      * i.e., joinable() will return false.
      */
-    Task () {}
+    Task () = default;
 
     /**
      * Join the task represented by this object, i.e. wait for it to finish.
@@ -3095,7 +1688,7 @@ namespace Threads
     bool joinable () const
     {
       return (task_descriptor !=
-              std_cxx11::shared_ptr<internal::TaskDescriptor<RT> >());
+              std::shared_ptr<internal::TaskDescriptor<RT> >());
     }
 
 
@@ -3121,7 +1714,7 @@ namespace Threads
      * an implicit pointer to an object that exists exactly once for each
      * task, the check is simply to compare these pointers.
      */
-    bool operator == (const Task &t)
+    bool operator == (const Task &t) const
     {
       AssertThrow (joinable(), ExcNoTask());
       return task_descriptor == t.task_descriptor;
@@ -3146,14 +1739,14 @@ namespace Threads
      * pointer implementation will make sure that that object lives as long as
      * there is at least one subscriber to it.
      */
-    std_cxx11::shared_ptr<internal::TaskDescriptor<RT> > task_descriptor;
+    std::shared_ptr<internal::TaskDescriptor<RT> > task_descriptor;
   };
 
 
 
   /**
    * Overload of the new_task function for objects that can be converted to
-   * std_cxx11::function<RT ()>, i.e. anything that can be called like a
+   * std::function<RT ()>, i.e. anything that can be called like a
    * function object without arguments and returning an object of type RT (or
    * void).
    *
@@ -3162,13 +1755,12 @@ namespace Threads
   template <typename RT>
   inline
   Task<RT>
-  new_task (const std_cxx11::function<RT ()> &function)
+  new_task (const std::function<RT ()> &function)
   {
     return Task<RT>(function);
   }
 
 
-#ifdef DEAL_II_WITH_CXX11
 
   /**
    * Overload of the new_task function for objects that can be called like a
@@ -3240,887 +1832,66 @@ namespace Threads
   -> Task<decltype(function_object())>
   {
     typedef decltype(function_object()) return_type;
-    return Task<return_type>(std_cxx11::function<return_type ()>(function_object));
+    return Task<return_type>(std::function<return_type ()>(function_object));
   }
 
-#endif
+
 
   /**
    * Overload of the new_task function for non-member or static member
-   * functions with no arguments.
+   * functions.
    *
    * @ingroup threads
    */
-  template <typename RT>
+  template <typename RT, typename... Args>
   inline
   Task<RT>
-  new_task (RT (*fun_ptr)())
-  {
-    return new_task (std_cxx11::function<RT ()>(fun_ptr));
-  }
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with no
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(),
-            typename identity<C>::type &c)
+  new_task (RT (*fun_ptr)(Args...),
+            typename identity<Args>::type... args)
   {
     return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with no
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)() const,
-            const typename identity<C>::type &c)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c))));
-  }
-#endif
-
-
-
-// ----------- thread starters for unary functions
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 1 argument.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename Arg1>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1),
-            typename identity<Arg1>::type arg1)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1))));
+      new_task (std::function<RT ()>
+                (std::bind(fun_ptr,
+                           internal::maybe_make_ref<Args>::act(args)...)));
   }
 
 
 
   /**
-   * Overload of the non-const new_task function for member functions with 1
-   * argument.
+   * Overloads of the non-const new_task function.
    *
    * @ingroup threads
    */
-  template <typename RT, typename C, typename Arg1>
+  template <typename RT, typename C, typename... Args>
   inline
   Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1),
+  new_task (RT (C::*fun_ptr)(Args...),
             typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1)
+            typename identity<Args>::type... args)
   {
     return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1))));
+      new_task (std::function<RT ()>
+                (std::bind(fun_ptr, std::ref(c),
+                           internal::maybe_make_ref<Args>::act(args)...)));
   }
 
 #ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
   /**
-   * Overload of the new_task function for const member functions with 1
-   * argument.
+   * Overloads of the new_task function.
    *
    * @ingroup threads
    */
-  template <typename RT, typename C, typename Arg1>
+  template <typename RT, typename C, typename... Args>
   inline
   Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1) const,
+  new_task (RT (C::*fun_ptr)(Args...) const,
             typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1)
+            typename identity<Args>::type... args)
   {
     return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1))));
-  }
-#endif
-
-// ----------- thread starters for binary functions
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 2 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename Arg1, typename Arg2>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1,Arg2),
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with 2
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C, typename Arg1, typename Arg2>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2),
-            typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with 2
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C, typename Arg1, typename Arg2>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2) const,
-            typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2))));
-  }
-#endif
-
-// ----------- thread starters for ternary functions
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 3 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1,Arg2,Arg3),
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with 3
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3),
-            typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with 3
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3) const,
-            typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3))));
-  }
-#endif
-
-
-// ----------- thread starters for functions with 4 arguments
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 4 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4),
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with 4
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4),
-            typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with 4
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3, typename Arg4>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4) const,
-            typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4))));
-  }
-#endif
-
-// ----------- thread starters for functions with 5 arguments
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 5 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5),
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with 5
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5),
-            typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with 5
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5) const,
-            typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5))));
-  }
-#endif
-
-// ----------- thread starters for functions with 6 arguments
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 6 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6),
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with 6
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6),
-            typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with 6
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6) const,
-            typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6))));
-  }
-#endif
-
-// ----------- thread starters for functions with 7 arguments
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 7 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6,Arg7),
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with 7
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6,Arg7),
-            typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with 7
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,Arg6,Arg7) const,
-            typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7))));
-  }
-#endif
-
-// ----------- thread starters for functions with 8 arguments
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 8 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                          Arg6,Arg7,Arg8),
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7,
-            typename identity<Arg8>::type arg8)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7),
-                                 internal::maybe_make_ref<Arg8>::act(arg8))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with 8
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                             Arg6,Arg7,Arg8),
-            typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7,
-            typename identity<Arg8>::type arg8)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7),
-                                 internal::maybe_make_ref<Arg8>::act(arg8))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with 8
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                             Arg6,Arg7,Arg8) const,
-            typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7,
-            typename identity<Arg8>::type arg8)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7),
-                                 internal::maybe_make_ref<Arg8>::act(arg8))));
-  }
-#endif
-
-// ----------- thread starters for functions with 9 arguments
-
-  /**
-   * Overload of the new_task function for non-member or static member
-   * functions with 9 arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8, typename Arg9>
-  inline
-  Task<RT>
-  new_task (RT (*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                          Arg6,Arg7,Arg8,Arg9),
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7,
-            typename identity<Arg8>::type arg8,
-            typename identity<Arg9>::type arg9)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr,
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7),
-                                 internal::maybe_make_ref<Arg8>::act(arg8),
-                                 internal::maybe_make_ref<Arg9>::act(arg9))));
-  }
-
-
-
-  /**
-   * Overload of the non-const new_task function for member functions with 9
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8, typename Arg9>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                             Arg6,Arg7,Arg8,Arg9),
-            typename identity<C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7,
-            typename identity<Arg8>::type arg8,
-            typename identity<Arg9>::type arg9)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::ref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7),
-                                 internal::maybe_make_ref<Arg8>::act(arg8),
-                                 internal::maybe_make_ref<Arg9>::act(arg9))));
-  }
-
-#ifndef DEAL_II_CONST_MEMBER_DEDUCTION_BUG
-  /**
-   * Overload of the new_task function for const member functions with 9
-   * arguments.
-   *
-   * @ingroup threads
-   */
-  template <typename RT, typename C,
-            typename Arg1, typename Arg2, typename Arg3,
-            typename Arg4, typename Arg5, typename Arg6,
-            typename Arg7, typename Arg8, typename Arg9>
-  inline
-  Task<RT>
-  new_task (RT (C::*fun_ptr)(Arg1,Arg2,Arg3,Arg4,Arg5,
-                             Arg6,Arg7,Arg8,Arg9) const,
-            typename identity<const C>::type &c,
-            typename identity<Arg1>::type arg1,
-            typename identity<Arg2>::type arg2,
-            typename identity<Arg3>::type arg3,
-            typename identity<Arg4>::type arg4,
-            typename identity<Arg5>::type arg5,
-            typename identity<Arg6>::type arg6,
-            typename identity<Arg7>::type arg7,
-            typename identity<Arg8>::type arg8,
-            typename identity<Arg9>::type arg9)
-  {
-    return
-      new_task (std_cxx11::function<RT ()>
-                (std_cxx11::bind(fun_ptr, std_cxx11::cref(c),
-                                 internal::maybe_make_ref<Arg1>::act(arg1),
-                                 internal::maybe_make_ref<Arg2>::act(arg2),
-                                 internal::maybe_make_ref<Arg3>::act(arg3),
-                                 internal::maybe_make_ref<Arg4>::act(arg4),
-                                 internal::maybe_make_ref<Arg5>::act(arg5),
-                                 internal::maybe_make_ref<Arg6>::act(arg6),
-                                 internal::maybe_make_ref<Arg7>::act(arg7),
-                                 internal::maybe_make_ref<Arg8>::act(arg8),
-                                 internal::maybe_make_ref<Arg9>::act(arg9))));
+      new_task (std::function<RT ()>
+                (std::bind(fun_ptr, std::cref(c),
+                           internal::maybe_make_ref<Args>::act(args)...)));
   }
 #endif
 
@@ -4182,6 +1953,6 @@ namespace Threads
 
 //---------------------------------------------------------------------------
 DEAL_II_NAMESPACE_CLOSE
-// end of #ifndef dealii__thread_management_h
+// end of #ifndef dealii_thread_management_h
 #endif
 //---------------------------------------------------------------------------

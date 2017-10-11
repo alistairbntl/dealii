@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__grid_out_h
-#define dealii__grid_out_h
+#ifndef dealii_grid_out_h
+#define dealii_grid_out_h
 
 
 
@@ -285,7 +285,14 @@ namespace GridOutFlags
      */
     enum SizeType
     {
-      width, height
+      /**
+       * Scale with the width.
+       */
+      width,
+      /**
+       * Scale with the height.
+       */
+      height
     };
 
     /**
@@ -912,7 +919,7 @@ public:
   template <int dim, int spacedim>
   void write_gnuplot (const Triangulation<dim,spacedim> &tria,
                       std::ostream           &out,
-                      const Mapping<dim,spacedim> *mapping=0) const;
+                      const Mapping<dim,spacedim> *mapping=nullptr) const;
 
   /**
    * Write the triangulation in the msh format.
@@ -991,7 +998,7 @@ public:
   template <int dim, int spacedim>
   void write_eps (const Triangulation<dim, spacedim> &tria,
                   std::ostream             &out,
-                  const Mapping<dim, spacedim>       *mapping=0) const;
+                  const Mapping<dim, spacedim>       *mapping=nullptr) const;
 
   /**
    * Write two-dimensional XFig-file.
@@ -1014,7 +1021,7 @@ public:
   template <int dim, int spacedim>
   void write_xfig (const Triangulation<dim, spacedim> &tria,
                    std::ostream              &out,
-                   const Mapping<dim, spacedim>        *mapping=0) const;
+                   const Mapping<dim, spacedim>        *mapping=nullptr) const;
 
   /**
    * Write the triangulation in the SVG format.
@@ -1067,6 +1074,20 @@ public:
 
   /**
    * Write triangulation in VTK format.
+   *
+   * Due to the way this function writes data to the output stream,
+   * the resulting output files correspond to a faithful representation
+   * of the mesh in that all cells are visible for visualization. However,
+   * the data is not in a format that allows reading this file in again
+   * through the GridIn class. This is because every vertex of the mesh is
+   * duplicated as many times as there are adjacent cells. In other words,
+   * every cell has its own, separate set of vertices that are at the
+   * same location as the vertices of other cells, but are separately
+   * numbered. If such a file is read in through the GridIn class, then
+   * that will result in a mesh that has the correct cells and vertex
+   * locations, but because the vertices are logically separate (though at
+   * the same locations) all cells are unconnected and have no neighbors
+   * across faces.
    */
   template <int dim, int spacedim>
   void write_vtk (const Triangulation<dim,spacedim> &tria,
@@ -1074,10 +1095,58 @@ public:
 
   /**
    * Write triangulation in VTU format.
+   *
+   * Due to the way this function writes data to the output stream,
+   * the resulting output files correspond to a faithful representation
+   * of the mesh in that all cells are visible for visualization. However,
+   * the data is not in a format that allows reading this file in again
+   * through the GridIn class. This is because every vertex of the mesh is
+   * duplicated as many times as there are adjacent cells. In other words,
+   * every cell has its own, separate set of vertices that are at the
+   * same location as the vertices of other cells, but are separately
+   * numbered. If such a file is read in through the GridIn class, then
+   * that will result in a mesh that has the correct cells and vertex
+   * locations, but because the vertices are logically separate (though at
+   * the same locations) all cells are unconnected and have no neighbors
+   * across faces.
    */
   template <int dim, int spacedim>
   void write_vtu (const Triangulation<dim,spacedim> &tria,
                   std::ostream                      &out) const;
+
+  /**
+   * Write triangulation in VTU format for each processor, and add a .pvtu file for
+   * visualization in Visit or Paraview that describes the collection of VTU files
+   * as all part of the same simulation. The output is in the form
+   * <tt>filename_without_extension.proc000*.vtu</tt> where * is 0,1,...,n_proc-1 and
+   * <tt>filename_without_extension.pvtu</tt>. The input <tt>view_levels</tt> can be
+   * set as true to view each level of a multilevel method. The input
+   * <tt>include_artificial</tt> can be set as true to view the artificial cells for
+   * each processor. Each .vtu and .pvtu file will have the attributes subdomain,
+   * level_subdomain, level, and proc_writing. The level value can be used to seperate the
+   * image into the view of the grid on each level of a multilevel method and the
+   * proc_writing value can be used to seperate the image into each processor's owned and
+   * ghost cells.
+   * This is accomplished by applying the "warp by scalar" filter in paraview
+   * to each of the values. After opening the .pvtu file of a mesh where the input
+   * <tt>view_levels</tt> is set to true, select the "warp by scalar"
+   * filter. For the "Scalars" input select <tt>proc_writing</tt> and for the "Normal" input
+   * enter in 1 0 0, then click Apply. Next select the "warp by scalar" filter again. For the
+   * "Scalars" input select <tt>level</tt> and for the "Normal" input enter in 0 1 0,
+   * then click Apply. This will give you the following image.
+   * @image html write_mesh_vtu_levels.png
+   * If the <tt>view_levels</tt> remains at false, thereby only giving the mesh for the active
+   * level, it is enough to seperate the image into the views written by different processors.
+   * This is shown in the following image where the <tt>include_artificial</tt> input is set as true.
+   * @image html write_mesh_vtu_active.png
+   * Note: Depending on the size of the mesh you may need to increase the "Scale Factor" input
+   * so that each piece does not overlap.
+   */
+  template <int dim, int spacedim>
+  void write_mesh_per_processor_as_vtu (const Triangulation<dim,spacedim> &tria,
+                                        const std::string                 &filename_without_extension,
+                                        const bool                        view_levels=false,
+                                        const bool                        include_artificial=false) const;
 
   /**
    * Write grid to @p out according to the given data format. This function
@@ -1087,7 +1156,7 @@ public:
   void write (const Triangulation<dim,spacedim> &tria,
               std::ostream                      &out,
               const OutputFormat                 output_format,
-              const Mapping<dim,spacedim>       *mapping=0) const;
+              const Mapping<dim,spacedim>       *mapping=nullptr) const;
 
   /**
    * Write mesh in default format set by ParameterHandler.
@@ -1095,7 +1164,7 @@ public:
   template <int dim, int spacedim>
   void write (const Triangulation<dim,spacedim> &tria,
               std::ostream                      &out,
-              const Mapping<dim,spacedim>       *mapping=0) const;
+              const Mapping<dim,spacedim>       *mapping=nullptr) const;
 
   /**
    * Set flags for DX output

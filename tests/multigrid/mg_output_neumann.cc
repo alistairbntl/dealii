@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 //TODO:[GK] Add checks for RT again!
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -41,9 +40,6 @@
 #include <deal.II/multigrid/mg_transfer.h>
 #include <deal.II/multigrid/mg_tools.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -62,7 +58,7 @@ reinit_vector (const dealii::DoFHandler<dim,spacedim> &mg_dof,
 }
 
 
-template<int dim>
+template <int dim>
 void refine_mesh (Triangulation<dim> &triangulation)
 {
   bool cell_refined = false;
@@ -215,14 +211,6 @@ void check_simple(const FiniteElement<dim> &fe)
   mgdof_renumbered.distribute_dofs(fe);
   mgdof_renumbered.distribute_mg_dofs(fe);
 
-  ConstraintMatrix     hnc, hnc_renumbered;
-  hnc.clear ();
-  hnc_renumbered.clear ();
-  DoFTools::make_hanging_node_constraints (
-    mgdof,
-    hnc);
-  hnc.close ();
-
   std::vector<unsigned int> block_component (4,0);
   block_component[2] = 1;
   block_component[3] = 1;
@@ -231,21 +219,16 @@ void check_simple(const FiniteElement<dim> &fe)
   for (unsigned int level=0; level<tr.n_levels(); ++level)
     DoFRenumbering::component_wise (mgdof_renumbered, level, block_component);
 
-  DoFTools::make_hanging_node_constraints (
-    mgdof_renumbered,
-    hnc_renumbered);
-  hnc_renumbered.close ();
-
   MGConstrainedDoFs mg_constrained_dofs;
   mg_constrained_dofs.initialize(mgdof, dirichlet_boundary_functions);
 
   MGConstrainedDoFs mg_constrained_dofs_renumbered;
   mg_constrained_dofs_renumbered.initialize(mgdof_renumbered, dirichlet_boundary_functions);
 
-  MGTransferPrebuilt<Vector<double> > transfer(hnc, mg_constrained_dofs);
+  MGTransferPrebuilt<Vector<double> > transfer(mg_constrained_dofs);
   transfer.build_matrices(mgdof);
 
-  MGTransferPrebuilt<Vector<double> > transfer_renumbered(hnc_renumbered, mg_constrained_dofs_renumbered);
+  MGTransferPrebuilt<Vector<double> > transfer_renumbered(mg_constrained_dofs_renumbered);
   transfer_renumbered.build_matrices(mgdof_renumbered);
 
   // Fill vector u with some cell based numbering
@@ -293,7 +276,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   //check_simple (FESystem<2>(FE_Q<2>(1), 2));
   check_simple (FESystem<2>(FE_Q<2>(1), 4));

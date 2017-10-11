@@ -16,11 +16,7 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -71,7 +67,6 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check_large_numbers();
 }

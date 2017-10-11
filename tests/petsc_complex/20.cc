@@ -15,18 +15,17 @@
 
 
 
-// check PETScWrappers::Vector::operator*(Vector) on two vectors that are
+// check PETScWrappers::MPI::Vector::operator*(Vector) on two vectors that are
 // not orthogonal
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
 
-void test (PETScWrappers::Vector &v,
-           PETScWrappers::Vector &w)
+void test (PETScWrappers::MPI::Vector &v,
+           PETScWrappers::MPI::Vector &w)
 {
   // set only certain elements of each
   // vector, and record the expected scalar
@@ -57,17 +56,15 @@ void test (PETScWrappers::Vector &v,
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        PETScWrappers::Vector v (100);
-        PETScWrappers::Vector w (100);
+        PETScWrappers::MPI::Vector v (MPI_COMM_WORLD, 100, 100);
+        PETScWrappers::MPI::Vector w (MPI_COMM_WORLD, 100, 100);
         test (v,w);
       }
 

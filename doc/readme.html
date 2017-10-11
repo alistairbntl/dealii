@@ -6,7 +6,7 @@
     <title>The deal.II Readme</title>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
     <link href="screen.css" rel="StyleSheet"/>
-    <meta name="copyright" content="Copyright (C) 1998 - 2015 by the deal.II Authors"/>
+    <meta name="copyright" content="Copyright (C) 1998 - 2017 by the deal.II Authors"/>
     <meta name="keywords" content="deal.II"/>
   </head>
 
@@ -32,7 +32,8 @@
 	<li>  <a href="#documentation">Configuring and building the documentation</a></li>
 	<li>  <a href="#configuration-options">Configuration options</a>
 	  <ol>
-	    <li> <a href="#optional">Selecting optional behavior</a></li>
+	    <li> <a href="#optional-compilation">Selecting optional compilation features</a></li>
+	    <li> <a href="#optional">Selecting optional library features</a></li>
 	    <li> <a href="#optional-software">Optional interfaces to
 		other software packages</a></li>
 	    <li> <a href="#conf-details">More information on configuring
@@ -54,8 +55,11 @@
 <p>
   <acronym>deal.II</acronym> is mostly developed on Linux using the
   <a href="http://gcc.gnu.org">GCC</a> compiler. However, it is not
-  platform specific and we strive to keep the source code C++ Standard
-  compliant.
+  platform specific and we strive to keep the source code compliant
+  with the <a href="https://www.iso.org/standard/50372.html">C++ 2011
+  Standard</a> (see
+  also <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3337.pdf">here</a>
+  for a copy of the C++11 standard).
 </p>
 
 <p>
@@ -63,12 +67,12 @@
   platforms:
 </p>
 <ul>
-  <li>GNU/Linux: GCC version 4.6 or later; Clang version 3.3 or later;
+  <li>GNU/Linux: GCC version 4.8 or later; Clang version 3.3 or later;
   ICC versions 15 or later</li>
-  <li>Mac OS X: GCC version 4.6 or later; Clang version 3.3 or later.
+  <li>Mac OS X: GCC version 4.8 or later; Clang version 3.3 or later.
     Please see the <a href="https://github.com/dealii/dealii/wiki/MacOSX"
     target="_top">deal.II Wiki</a> for installation instructions.</li>
-  <li>Windows: experimental support for Visual Studio 2013 and 2015.
+  <li>Windows: experimental support for Visual Studio 2015 and 2017.
     Please have a look at the
     <a href="https://github.com/dealii/dealii/wiki/Frequently-Asked-Questions#can-i-use-dealii-on-a-windows-platform">
       FAQ</a> and at the <a href="https://github.com/dealii/dealii/wiki/Windows"
@@ -92,7 +96,7 @@
     </p>
     <ul>
       <li>
-        <a href="http://www.cmake.org/" target="_top">CMake</a> version 2.8.8 or later
+        <a href="http://www.cmake.org/" target="_top">CMake</a> version 2.8.12 or later
       </li>
 
       <li>
@@ -288,6 +292,17 @@
 	  are usually found almost instantaneously, displaying the file
 	  name and line number of where the problem occurred.
 	</p>
+	<p>
+	  With GCC Debug mode, by default, uses the <code>-Og</code> flag. It promises most of the
+	  debugging experience of <code>-O0</code> but at a better performance.
+	  This is a reasonable choice for unit tests and enables numerous asserts
+	  within the library. Sometimes, however, one needs Debug mode to use
+	  <code>-O0</code>, where all compiler optimizations are avoided and code and variables
+	  are exactly as indicated in the C++ program (e.g. with <code>-Og</code> GCC 6.2.0
+	  optimizes out local variables).
+	  This can be achieved by configuring <acronym>deal.II</acronym> with
+	  <code>-DDEAL_II_HAVE_FLAG_Og=false</code>.
+	</p>
 	</li>
 
 	<li> <i>Optimized mode</i>: You will want to link with this version of
@@ -316,18 +331,38 @@
       so, invoke <code>cmake</code> in the build instructions above as follows:
     </p>
 
-<pre>
-  cmake -DDEAL_II_COMPONENT_DOCUMENTATION=ON -DCMAKE_INSTALL_PREFIX=/path/install/dir ../deal.II
-</pre>
+    <pre>
+      cmake -DDEAL_II_COMPONENT_DOCUMENTATION=ON -DCMAKE_INSTALL_PREFIX=/path/install/dir ../deal.II
+    </pre>
 
-<p>
-  For this to succeed, you will need <a href="http://www.perl.org/"
-					target="_top">Perl 5.x</a>,
-  <a href="http://www.doxygen.org/" target="_top">doxygen</a>
-  and <code>dot</code> (which is part of
-  the <a href="http://www.graphviz.org" target="_top">GraphViz</a>
-  package) to be installed.
-</p>
+    <p>
+      For this to succeed, you will need <a href="http://www.perl.org/"
+					    target="_top">Perl 5.x</a>,
+      <a href="http://www.doxygen.org/" target="_top">doxygen</a>
+      and <code>dot</code> (which is part of
+      the <a href="http://www.graphviz.org" target="_top">GraphViz</a>
+      package) to be installed.
+    </p>
+
+    <p>
+      The documentation contains links to pictures (e.g., for the
+      tutorial programs) that are by default stored online at the
+      dealii.org domain. If you want to use the documentation
+      completely offline, you can run
+      the <code>contrib/utilities/makeofflinedoc.sh</code> script in
+      an installed documentation directory to download all images.
+    </p>
+
+    <p> Finally, the default for locally installed documentation is to
+      render formulas as images. You can force formulas to be
+      displayed via the MathJax system by
+      adding <code>-DDEAL_II_DOXYGEN_USE_MATHJAX=ON</code> to the
+      CMake call above. These formulas are then rendered natively by the
+      browser. With <code>-DDEAL_II_DOXYGEN_USE_ONLINE_MATHJAX=OFF</code>
+      CMake will try to find a local installation of MathJax scripts,
+      otherwise the online version of the scripts will be used in the
+      documentation.
+    </p>
 
     <p>
       Upon calling <code>make</code> and <code>make install</code>, this will
@@ -364,8 +399,21 @@
       options.
     </p>
 
+    <a name="optional-compilation"/>
+      <h4>Selecting optional compilation features</h4>
+      <ul>
+        <p>
+          <li> <i>Unity build</i>: deal.II may be compiled with a unity build;
+            that is, one may configure the build process so that the library is
+            compiled as a few large files instead of many small ones. The unity
+            build feature may be enabled by passing
+            the <code>-DDEAL_II_UNITY_BUILD=ON</code> argument
+            to <code>cmake</code>. This feature is disabled by default.
+          </p>
+      </ul>
+
     <a name="optional"/>
-      <h4>Selecting optional behavior</h4>
+      <h4>Selecting optional library features</h4>
 
     <ul>
       <li>
@@ -389,16 +437,6 @@
 	  to <code>cmake</code>. If <code>cmake</code> found MPI but you
 	  specifically do not want to use it, then
 	  pass <code>-DDEAL_II_WITH_MPI=OFF</code>.
-	</p>
-      </li>
-
-      <li>
-        <p>
-          <i>parameter_gui</i>: If you wish to compile and install the
-          <code>parameter_gui</code> tool discussed in the documentation
-	  of the <code>ParameterHandler</code> class, specify
-          <code>-DDEAL_II_COMPONENT_PARAMETER_GUI=ON</code>. Beware of the
-          fact that <code>parameter_gui</code> needs development packages for Qt.
 	</p>
       </li>
 
@@ -432,9 +470,10 @@
       found and <acronym>deal.II</acronym> will be built without support
       for them.
       However, there is one interface that we <i>need</i> to have: <a
-      href="http://www.boost.org/" target="_top">BOOST</a>. If it is not
-      found externally <code>cmake</code> will resort to the bundled boost
-      version that is part of the <acronym>deal.II</acronym> tar file.
+      href="http://www.boost.org/" target="_top">BOOST 1.59</a> or newer.
+      If it is not found externally <code>cmake</code> will resort to the
+      bundled boost version that is part of the <acronym>deal.II</acronym>
+      tar file.
     </p>
 
     <p>
@@ -515,6 +554,33 @@
 	</p>
       </dd>
 
+
+      <dt><a name="CUDA"></a><a href="https://developer.nvidia.com/cuda-zone">CUDA</a></dt>
+      <dd>
+  <p>
+    <a href="https://developer.nvidia.com/cuda-zone">CUDA</a> is a parallel 
+    computing platform and API model created by Nvidia. It allows software 
+    developers and software engineers to use CUDA-enabled GPU for general 
+    purpose processing.
+
+    Details about compatibility and configuration can be found <a href=external-libs/cuda.html
+       target="body">here</a>.
+  </p>
+
+      <dt><a name="GSL"></a><a href="http://www.gnu.org/software/gsl/">GSL</a></dt>
+      <dd>
+	<p>
+	  The <a href="http://www.gnu.org/software/gsl/">GNU Scientific Library</a>
+	  provides a wide range of mathematical routines such as random number
+	  generators, special functions and least-squares fitting.
+	  <a href="http://www.gnu.org/software/gsl/">GSL</a> should be
+	  readily packaged by most Linux distributions.  (Don't forget
+          to install a development version of the library).
+	  To use a self compiled version, specify
+	  <code>-DGSL_DIR=/path/to/gsl</code> on the command line.
+	</p>
+      </dd>
+
       <dt><a name="HDF5"></a><a href="http://www.hdfgroup.org/HDF5/">HDF5</a></dt>
       <dd>
 	<p>
@@ -581,11 +647,11 @@
 	from the official website, as well as with the OpenCASCADE
 	Community Edition (OCE, available at
 	<a href="https://github.com/tpaviot/oce">https://github.com/tpaviot/oce</a>),
-	which offers a cmake 
+	which offers a cmake
 	interface for its compilation. Alternatively, you can
 	install one of the many external applications that ship with
-	OpenCASCADE internally (for example 
-	<a href="http://www.salome-platform.org/">SALOME</a>, or 
+	OpenCASCADE internally (for example
+	<a href="http://www.salome-platform.org/">SALOME</a>, or
 	<a href="http://www.freecadweb.org/">FreeCAD</a>). Further
 	installation instructions can be
 	found <a href="external-libs/opencascade.html"
@@ -642,7 +708,7 @@
 
 	<p>
 	  To disable the PETSc interfaces in cases where <code>cmake</code>
-	  automatically finds it, use <code>-DDEAL_II_WITH_PETSC=OFF</code>
+	  automatically finds it, use <code>-DDEAL_II_WITH_PETSC=OFF</code>.
 	  More information on configuring and building PETSc can be
           found <a href="external-libs/petsc.html" target="body">here</a>.
 	</p>
@@ -663,7 +729,7 @@
 
 	<p>
 	  To disable the SLEPc interfaces in cases where <code>cmake</code>
-	  automatically finds it, use <code>-DDEAL_II_WITH_PETSC=OFF</code>
+	  automatically finds it, use <code>-DDEAL_II_WITH_PETSC=OFF</code>.
 	  More information on configuring and building SLEPc can be
           found <a href="external-libs/slepc.html" target="body">here</a>.
 	</p>
@@ -705,7 +771,7 @@
 	<p>
 	  To disable the Trilinos interfaces in cases where
 	  <code>cmake</code> automatically finds it, use
-	  <code>-DDEAL_II_WITH_TRILINOS=OFF</code> More details about
+	  <code>-DDEAL_II_WITH_TRILINOS=OFF</code>. More details about
 	  compatibility and configuration can be found
           <a href="external-libs/trilinos.html" target="body">here</a>.
 	</p>
@@ -748,7 +814,7 @@
       greater control over what exactly is configured or built than just the
       outline above. If you want to learn more about this, take a look
       <a href="users/cmake.html">here</a>. You might also be interested in
-      <a href="users/cmakelists.html">CMake for user projects</a> or 
+      <a href="users/cmakelists.html">CMake for user projects</a> or
       <a href="developers/cmake-internals.html">build system internals</a>.
     </p>
 

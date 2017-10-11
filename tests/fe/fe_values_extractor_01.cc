@@ -20,7 +20,6 @@
 #include "../tests.h"
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 
 
 
@@ -31,7 +30,6 @@ int main()
   deallog << std::setprecision (2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-8);
 
   {
     std::vector<FEValuesExtractors::Scalar> x;

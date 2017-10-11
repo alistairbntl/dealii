@@ -25,7 +25,6 @@
 #include "../tests.h"
 
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
@@ -37,7 +36,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -80,7 +78,7 @@ void test ()
     std::map<types::global_dof_index,double> boundary_values;
     VectorTools::interpolate_boundary_values (dof,
                                               0,
-                                              ConstantFunction<dim>(1.),
+                                              Functions::ConstantFunction<dim>(1.),
                                               boundary_values);
     std::map<types::global_dof_index,double>::const_iterator boundary_value =
       boundary_values.begin();
@@ -102,7 +100,7 @@ void test ()
           << "Total number of constraints: "
           << correct_constraints.n_constraints() << std::endl;
 
-  VectorTools::interpolate_boundary_values (dof, 0, ConstantFunction<dim>(1.),
+  VectorTools::interpolate_boundary_values (dof, 0, Functions::ConstantFunction<dim>(1.),
                                             library_constraints);
   library_constraints.close();
 
@@ -137,7 +135,6 @@ void test ()
 int main ()
 {
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
   deallog << std::setprecision (2);
 
   {

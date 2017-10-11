@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__integrators_advection_h
-#define dealii__integrators_advection_h
+#ifndef dealii_integrators_advection_h
+#define dealii_integrators_advection_h
 
 
 #include <deal.II/base/config.h>
@@ -71,7 +71,7 @@ namespace LocalIntegrators
      * @author Guido Kanschat
      * @date 2012
      */
-    template<int dim>
+    template <int dim>
     void cell_matrix (
       FullMatrix<double> &M,
       const FEValuesBase<dim> &fe,

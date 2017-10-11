@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2016 by the deal.II authors
+ * Copyright (C) 2016 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -23,7 +23,6 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/conditional_ostream.h>
 
@@ -74,7 +73,6 @@ namespace LA
 }
 
 #include <iostream>
-#include <fstream>
 #include <sstream>
 
 namespace Step50
@@ -96,8 +94,6 @@ namespace Step50
     void refine_grid ();
     void output_results (const unsigned int cycle) const;
 
-    ConditionalOStream                        pcout;
-
     parallel::distributed::Triangulation<dim>   triangulation;
     FE_Q<dim>            fe;
     DoFHandler<dim>    mg_dof_handler;
@@ -109,7 +105,6 @@ namespace Step50
 
     IndexSet locally_relevant_set;
 
-    ConstraintMatrix     hanging_node_constraints;
     ConstraintMatrix     constraints;
 
     vector_t       solution;
@@ -180,9 +175,6 @@ namespace Step50
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem (const unsigned int degree)
     :
-    pcout (std::cout,
-           (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD)
-            == 0)),
     triangulation (MPI_COMM_WORLD,Triangulation<dim>::
                    limit_level_difference_at_vertices,
                    parallel::distributed::Triangulation<dim>::construct_multigrid_hierarchy),
@@ -205,18 +197,15 @@ namespace Step50
     solution.reinit(mg_dof_handler.locally_owned_dofs(), MPI_COMM_WORLD);
     system_rhs.reinit(mg_dof_handler.locally_owned_dofs(), MPI_COMM_WORLD);
     constraints.reinit (locally_relevant_set);
-    hanging_node_constraints.reinit (locally_relevant_set);
-    DoFTools::make_hanging_node_constraints (mg_dof_handler, hanging_node_constraints);
     DoFTools::make_hanging_node_constraints (mg_dof_handler, constraints);
 
     typename FunctionMap<dim>::type      dirichlet_boundary;
-    ConstantFunction<dim>                    homogeneous_dirichlet_bc (0.0);
+    Functions::ConstantFunction<dim>                    homogeneous_dirichlet_bc (0.0);
     dirichlet_boundary[0] = &homogeneous_dirichlet_bc;
     VectorTools::interpolate_boundary_values (mg_dof_handler,
                                               dirichlet_boundary,
                                               constraints);
     constraints.close ();
-    hanging_node_constraints.close ();
 
     DynamicSparsityPattern dsp(mg_dof_handler.n_dofs(), mg_dof_handler.n_dofs());
     DoFTools::make_sparsity_pattern (mg_dof_handler, dsp, constraints);
@@ -229,9 +218,9 @@ namespace Step50
     const unsigned int n_levels = triangulation.n_global_levels();
 
     mg_interface_matrices.resize(0, n_levels-1);
-    mg_interface_matrices.clear ();
+    mg_interface_matrices.clear_elements ();
     mg_matrices.resize(0, n_levels-1);
-    mg_matrices.clear ();
+    mg_matrices.clear_elements ();
 
     for (unsigned int level=0; level<n_levels; ++level)
       {
@@ -411,9 +400,9 @@ namespace Step50
     for (unsigned int i=0; i<triangulation.n_global_levels(); ++i)
       {
         mg_matrices[i].compress(VectorOperation::add);
-        pcout << "mg_mat" << i << " " << mg_matrices[i].frobenius_norm() << std::endl;
+        deallog << "mg_mat" << i << " " << mg_matrices[i].frobenius_norm() << std::endl;
         mg_interface_matrices[i].compress(VectorOperation::add);
-        pcout << "mg_interface_mat" << i << " " << mg_interface_matrices[i].frobenius_norm() << std::endl;
+        deallog << "mg_interface_mat" << i << " " << mg_interface_matrices[i].frobenius_norm() << std::endl;
 
       }
   }
@@ -422,7 +411,7 @@ namespace Step50
   template <int dim>
   void LaplaceProblem<dim>::solve ()
   {
-    MGTransferPrebuilt<vector_t> mg_transfer(hanging_node_constraints, mg_constrained_dofs);
+    MGTransferPrebuilt<vector_t> mg_transfer(mg_constrained_dofs);
     mg_transfer.build_matrices(mg_dof_handler);
 
     matrix_t &coarse_matrix = mg_matrices[0];
@@ -477,17 +466,16 @@ namespace Step50
             check3 += check2;
           }
 
-        pcout << "check3 iteration: " << check3.linfty_norm() << std::endl;
+        deallog << "check3 iteration: " << check3.linfty_norm() << std::endl;
       }
 
 
     solver.solve (system_matrix, solution, system_rhs,
                   preconditioner);
-    pcout << "   CG converged in " << solver_control.last_step() << " iterations." << std::endl;
 
     constraints.distribute (solution);
 
-    pcout << " sol: " << solution.min() << " - " << solution.max() << std::endl;
+    deallog << " sol: " << solution.min() << " - " << solution.max() << std::endl;
   }
 
   template <int dim>
@@ -526,7 +514,7 @@ namespace Step50
   {
     for (unsigned int cycle=0; cycle<2; ++cycle)
       {
-        pcout << "Cycle " << cycle << ':' << std::endl;
+        deallog << "Cycle " << cycle << ':' << std::endl;
 
         if (cycle == 0)
           {
@@ -558,20 +546,20 @@ namespace Step50
         else
           triangulation.refine_global ();
 
-        pcout << "   Number of active cells:       "
-              << triangulation.n_global_active_cells()
-              << std::endl;
+        deallog << "   Number of active cells:       "
+                << triangulation.n_global_active_cells()
+                << std::endl;
 
         setup_system ();
 
-        pcout << "   Number of degrees of freedom: "
-              << mg_dof_handler.n_dofs()
-              << " (by level: ";
+        deallog << "   Number of degrees of freedom: "
+                << mg_dof_handler.n_dofs()
+                << " (by level: ";
         for (unsigned int level=0; level<triangulation.n_global_levels(); ++level)
-          pcout << mg_dof_handler.n_dofs(level)
-                << (level == triangulation.n_global_levels()-1
-                    ? ")" : ", ");
-        pcout << std::endl;
+          deallog << mg_dof_handler.n_dofs(level)
+                  << (level == triangulation.n_global_levels()-1
+                      ? ")" : ", ");
+        deallog << std::endl;
 
         assemble_system ();
         assemble_multigrid ();
@@ -585,6 +573,7 @@ namespace Step50
 int main (int argc, char *argv[])
 {
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
+  mpi_initlog(true);
 
   try
     {

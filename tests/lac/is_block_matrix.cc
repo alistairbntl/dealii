@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,18 +16,13 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/block_sparse_matrix.h>
 #include <deal.II/lac/sparsity_pattern.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
-#include <deal.II/lac/compressed_set_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
 #include <deal.II/lac/block_sparse_matrix_ez.h>
 #include <deal.II/lac/constraint_matrix.h>
 
-#include <fstream>
-#include <iomanip>
 #include <algorithm>
 
 
@@ -39,7 +34,6 @@ void test ()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog << IsBlockMatrix<SparseMatrix<double> >::value << ' '
           << IsBlockMatrix<SparseMatrix<float> >::value << ' '
@@ -52,14 +46,10 @@ void test ()
           << IsBlockMatrix<BlockSparseMatrixEZ<float> >::value << std::endl;
 
   deallog << IsBlockMatrix<SparsityPattern>::value << ' '
-          << IsBlockMatrix<CompressedSparsityPattern>::value << ' '
-          << IsBlockMatrix<CompressedSetSparsityPattern>::value << ' '
-          << IsBlockMatrix<CompressedSimpleSparsityPattern>::value << std::endl;
+          << IsBlockMatrix<DynamicSparsityPattern>::value << std::endl;
 
   deallog << IsBlockMatrix<BlockSparsityPattern>::value << ' '
-          << IsBlockMatrix<BlockCompressedSparsityPattern>::value << ' '
-          << IsBlockMatrix<BlockCompressedSetSparsityPattern>::value << ' '
-          << IsBlockMatrix<BlockCompressedSimpleSparsityPattern>::value << std::endl;
+          << IsBlockMatrix<BlockDynamicSparsityPattern>::value << std::endl;
 }
 
 

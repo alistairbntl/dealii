@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparse_matrix_ez_templates_h
-#define dealii__sparse_matrix_ez_templates_h
+#ifndef dealii_sparse_matrix_ez_templates_h
+#define dealii_sparse_matrix_ez_templates_h
 
 
 #include <deal.II/lac/sparse_matrix_ez.h>
@@ -41,10 +41,15 @@ template <typename number>
 SparseMatrixEZ<number>::SparseMatrixEZ(const SparseMatrixEZ<number> &m)
   :
   Subscriptor (m),
-  n_columns (0)
+  n_columns (0),
+  increment (m.increment),
+  saved_default_row_length (m.saved_default_row_length)
 {
-  Assert(m.n() == 0, ExcNotImplemented());
-  Assert(m.m() == 0, ExcNotImplemented());
+  Assert (m.m()==0 && m.n()==0,
+          ExcMessage("This constructor can only be called if the provided argument "
+                     "is an empty matrix. This constructor can not be used to "
+                     "copy-construct a non-empty matrix. Use the "
+                     "SparseMatrixEZ::copy_from() function for that purpose."));
 }
 
 
@@ -58,17 +63,17 @@ SparseMatrixEZ<number>::SparseMatrixEZ(const size_type    n_rows,
 }
 
 
-template <typename number>
-SparseMatrixEZ<number>::~SparseMatrixEZ()
-{}
-
 
 template <typename number>
 SparseMatrixEZ<number> &
 SparseMatrixEZ<number>::operator= (const SparseMatrixEZ<number> &m)
 {
   (void)m;
-  Assert (m.empty(), ExcInvalidConstructorCall());
+  Assert (m.empty(),
+          ExcMessage("This operator can only be called if the provided right "
+                     "hand side is an empty matrix. This operator can not be "
+                     "used to copy a non-empty matrix. Use the "
+                     "SparseMatrixEZ::copy_from() function for that purpose."));
   return *this;
 }
 
@@ -612,4 +617,4 @@ SparseMatrixEZ<number>::block_read (std::istream &in)
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif // dealii__sparse_matrix_ez_templates_h
+#endif // dealii_sparse_matrix_ez_templates_h

@@ -19,7 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_q.h>
@@ -36,7 +35,6 @@
 #include <deal.II/base/function.h>
 
 
-#include <fstream>
 
 
 template <int dim>
@@ -65,7 +63,7 @@ void test ()
   Vector<double> solution(dof_handler.n_dofs());
 
   VectorTools::interpolate(dof_handler,
-                           ZeroFunction<dim>(2),
+                           Functions::ZeroFunction<dim>(2),
                            solution);
 
   deallog << "l2_norm = " << solution.l2_norm() << std::endl;

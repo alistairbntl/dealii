@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2010 - 2015 by the deal.II authors
+ * Copyright (C) 2010 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -525,8 +525,11 @@ namespace Step38
                                        QGauss<dim>(2*fe.degree+1),
                                        VectorTools::H1_norm);
 
+    double h1_error = VectorTools::compute_global_error(triangulation,
+                                                        difference_per_cell,
+                                                        VectorTools::H1_norm);
     std::cout << "H1 error = "
-              << difference_per_cell.l2_norm()
+              << h1_error
               << std::endl;
   }
 

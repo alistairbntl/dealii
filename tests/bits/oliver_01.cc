@@ -23,15 +23,11 @@
 
 #include "../tests.h"
 #include <deal.II/lac/sparse_matrix.h>
-#include <iomanip>
-#include <fstream>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   // this test only needs to compile, not run
   if (false)

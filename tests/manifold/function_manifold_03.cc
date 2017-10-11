@@ -1,5 +1,5 @@
 //----------------------------  function_manifold_chart ---------------------------
-//    Copyright (C) 2011 - 2015 by the mathLab team.
+//    Copyright (C) 2011 - 2016 by the mathLab team.
 //
 //    This file is subject to LGPL and may not be  distributed
 //    without copyright and license information. Please refer
@@ -12,8 +12,6 @@
 // Test a simple parabolic manifold, including gradients and tangent vector
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 
 // all include files you need here
@@ -69,7 +67,8 @@ void test(unsigned int ref=1)
       w[0] = 1.0-(double)i/((double)n_intermediates);
       w[1] = 1.0 - w[0];
 
-      Point<spacedim> ip = manifold.get_new_point(Quadrature<spacedim>(p, w));
+      Point<spacedim> ip = manifold.get_new_point(make_array_view(p),
+                                                  make_array_view(w));
       Tensor<1,spacedim> t1 = manifold.get_tangent_vector(ip, p[0]);
       Tensor<1,spacedim> t2 = manifold.get_tangent_vector(ip, p[1]);
 
@@ -82,9 +81,7 @@ void test(unsigned int ref=1)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
 
   test<2,2>();
@@ -93,4 +90,3 @@ int main ()
 
   return 0;
 }
-

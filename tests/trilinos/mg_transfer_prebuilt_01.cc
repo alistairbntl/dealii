@@ -15,7 +15,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/grid/tria.h>
@@ -31,9 +30,6 @@
 #include <deal.II/multigrid/mg_transfer.h>
 #include <deal.II/multigrid/mg_tools.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -46,7 +42,7 @@ reinit_vector (const dealii::DoFHandler<dim,spacedim> &mg_dof,
   const dealii::parallel::distributed::Triangulation<dim,spacedim> *tria =
     (dynamic_cast<const parallel::distributed::Triangulation<dim,spacedim>*>
      (&mg_dof.get_triangulation()));
-  AssertThrow(tria!=NULL, ExcMessage("multigrid with Trilinos vectors only works with distributed Triangulation!"));
+  AssertThrow(tria!=nullptr, ExcMessage("multigrid with Trilinos vectors only works with distributed Triangulation!"));
 
   for (unsigned int level=v.min_level();
        level<=v.max_level(); ++level)
@@ -147,7 +143,6 @@ int main(int argc, char **argv)
 
   std::ofstream logfile("output");
   deallog << std::setprecision(6);
-  deallog.threshold_double(1.e-10);
   deallog.attach(logfile);
 
   check_simple (FE_DGP<2>(0));

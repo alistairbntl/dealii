@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -27,7 +27,7 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/integrators/laplace.h>
 #include <deal.II/lac/vector.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/meshworker/dof_info.h>
@@ -38,8 +38,6 @@
 #include <deal.II/numerics/vector_tools.h>
 
 
-#include <fstream>
-#include <iomanip>
 
 
 template <int dim>
@@ -286,9 +284,7 @@ void Step4<dim>::run()
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

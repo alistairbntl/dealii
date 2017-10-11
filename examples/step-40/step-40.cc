@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2009 - 2016 by the deal.II authors
+ * Copyright (C) 2009 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -297,7 +297,7 @@ namespace Step40
     DoFTools::make_hanging_node_constraints (dof_handler, constraints);
     VectorTools::interpolate_boundary_values (dof_handler,
                                               0,
-                                              ZeroFunction<dim>(),
+                                              Functions::ZeroFunction<dim>(),
                                               constraints);
     constraints.close ();
 
@@ -354,12 +354,12 @@ namespace Step40
   //   cell->is_artificial()</code> is true. The simplest way, however, is to
   //   simply ask the cell whether it is owned by the local processor.
   // - Copying local contributions into the global matrix must include
-  //   distributing constraints and boundary values. In other words, we can now
+  //   distributing constraints and boundary values. In other words, we cannot
   //   (as we did in step-6) first copy every local contribution into the global
   //   matrix and only in a later step take care of hanging node constraints and
   //   boundary values. The reason is, as discussed in step-17, that PETSc does
   //   not provide access to arbitrary elements of the matrix once they have
-  //   been assembled into it -- in parts because they may simple no longer
+  //   been assembled into it -- in parts because they may simply no longer
   //   reside on the current processor but have instead been shipped to a
   //   different machine.
   // - The way we compute the right hand side (given the
@@ -647,6 +647,16 @@ namespace Step40
   template <int dim>
   void LaplaceProblem<dim>::run ()
   {
+    pcout << "Running with "
+#ifdef USE_PETSC_LA
+          << "PETSc"
+#else
+          << "Trilinos"
+#endif
+          << " on "
+          << Utilities::MPI::n_mpi_processes(mpi_communicator)
+          << " MPI rank(s)..." << std::endl;
+
     const unsigned int n_cycles = 8;
     for (unsigned int cycle=0; cycle<n_cycles; ++cycle)
       {

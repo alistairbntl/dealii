@@ -29,7 +29,8 @@
  * <dd>A cell, face or edge is defined as <i>active</i> if it is not
  * refined any further, i.e., if it does not have children. Unless
  * working with a multigrid algorithm, active cells are the only
- * ones carrying degrees of freedom.</dd>
+ * ones carrying degrees of freedom.
+ * </dd>
  *
  *
  *
@@ -52,7 +53,8 @@
  *
  * The concept of artificial cells has no meaning for triangulations
  * that store the entire mesh on each processor, i.e. the
- * dealii::Triangulation class.  </dd>
+ * dealii::Triangulation class.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossBlockLA <b>Block (linear algebra)</b></dt>
@@ -301,7 +303,8 @@
  *
  * In either case, the length of the vector equals the determinant of
  * the transformation of reference face to the face of the current
- * cell.  </dd>
+ * cell.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossBoundaryIndicator <b>%Boundary indicator</b></dt>
@@ -589,7 +592,7 @@
  * used in the finite element community to indicate two slightly different,
  * but related things. The first is that we'd like to represent the finite
  * element solution as a linear combination of shape functions, in the form
- * $u_h(\mathbf x) = \sum_{j=0}^{N-1} U_j \varphi_j(\mathbf x)$. Here, $U_j$
+ * $u_h(\mathbf{x}) = \sum_{j=0}^{N-1} U_j \varphi_j(\mathbf{x})$. Here, $U_j$
  * is a vector of expansion coefficients. Because we don't know their values
  * yet (we will compute them as the solution of a linear or nonlinear system),
  * they are called "unknowns" or "degrees of freedom". The second meaning of
@@ -600,7 +603,7 @@
  * V_h$). In other words, all we say here that the solution needs to lie in
  * some space $V_h$. However, to actually solve this problem on a computer we
  * need to choose a basis of this space; this is the set of shape functions
- * $\varphi_j(\mathbf x)$ we have used above in the expansion of $u_h(\mathbf
+ * $\varphi_j(\mathbf{x})$ we have used above in the expansion of $u_h(\mathbf
  * x)$ with coefficients $U_j$. There are of course many bases of the space
  * $V_h$, but we will specifically choose the one that is described by the
  * finite element functions that are traditionally defined locally on the
@@ -687,7 +690,6 @@
  * @image html distorted_2d.png "A well-formed, a pinched, and a twisted cell in 2d."
  *
  * @image html distorted_3d.png "A well-formed, a pinched, and a twisted cell in 3d."
- * </dd>
  *
  * Distorted cells can appear in two different ways: The original
  * coarse mesh can already contain such cells, or they can be created
@@ -777,6 +779,7 @@
  * Triangulation object to test for distortion of cells, you need to
  * specify this upon creation of the object by passing the appropriate
  * flag.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor distributed_paper
@@ -852,24 +855,63 @@
  * face_flip and face_rotation. Some documentation for these
  * exists in the GeometryInfo class. An example of their use in user
  * code is given in the DoFTools::make_periodicity_constraints function.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossGeneralizedSupport <b>Generalized support points</b></dt>
- * <dd>While @ref GlossSupport "support points" allow very simple interpolation
- * into the finite element space, their concept is restricted to
- * @ref GlossLagrange "Lagrange elements". For other elements, more general
- * interpolation operators can be defined, often relying on integral values
- * or moments. Since these integral values are again computed using a
- * quadrature rule, we consider them a generalization of support
- * points.
+ * <dd>"Generalized support points" are, as the name suggests, a
+ * generalization of @ref GlossSupport "support points". The latter
+ * are used to describe that a finite element simply <i>interpolates</i>
+ * values at individual points (the "support points"). If we call these
+ * points $\hat{\mathbf{x}}_i$ (where the hat indicates that these points
+ * are defined on the reference cell $\hat{K}$), then one typically defines
+ * shape functions $\varphi_j(\mathbf{x})$ in such a way that the
+ * <i>nodal functionals</i> $\Psi_i[\cdot]$ simply evaluate the function
+ * at the support point, i.e., that $\Psi_i[\varphi]=\varphi(\hat{\mathbf{x}}_i)$,
+ * and the basis is chosen so that $\Psi_i[\varphi_j]=\delta_{ij}$ where
+ * $\delta_{ij}$ is the Kronecker delta function. This leads to the common
+ * @ref GlossLagrange "Lagrange elements".
  *
- * Note that there is no simple relation between
- * @ref GlossShape "shape functions" and generalized support points, unlike for
- * regular @ref GlossSupport "support points". Instead, FiniteElement defines
- * a couple of interpolation functions doing the actual interpolation.
+ * (In the vector valued case, the only other piece of information
+ * besides the support points $\hat{\mathbf{x}}_i$ that one needs to provide
+ * is the <i>vector component</i> $c(i)$ the $i$th node functional
+ * corresponds, so that $\Psi_i[\varphi]=\varphi(\hat{\mathbf{x}}_i)_{c(i)}$.)
  *
- * If a finite element is Lagrangian, generalized support points
- * and support points coincide.
+ * On the other hand, there are other kinds of elements that are not
+ * defined this way. For example, for the lowest order Raviart-Thomas element
+ * (see the FE_RaviartThomas class), the node functional evaluates not
+ * individual components of a vector-valued finite element function with @p dim
+ * components, but the <i>normal component</i> of this vector:
+ * $\Psi_i[\varphi]
+ *  =
+ *  \varphi(\hat{\mathbf{x}}_i) \cdot \mathbf{n}_i
+ * $, where the $\mathbf{n}_i$ are the normal vectors to the face of the cell
+ * on which $\hat{\mathbf{x}}_i$ is located. In other words, the node functional
+ * is a <i>linear combination</i> of the components of $\varphi$ when
+ * evaluated at $\hat{\mathbf{x}}_i$. Similar things happen for the BDM,
+ * ABF, and Nedelec elements (see the FE_BDM, FE_ABF, FE_Nedelec classes).
+ *
+ * In these cases, the element does not have <i>support points</i> because
+ * it is not purely interpolatory; however, some kind of interpolation
+ * is still involved when defining shape functions as the node functionals
+ * still require point evaluations at special points $\hat{\mathbf{x}}_i$.
+ * In these cases, we call the points <i>generalized support points</i>.
+ *
+ * Finally, there are elements that still do not fit into this
+ * scheme. For example, some hierarchical basis functions
+ * (see, for example the FE_Q_Hierarchical element) are defined so
+ * that the node functionals are <i>moments</i> of finite element
+ * functions,
+ * $\Psi_i[\varphi]
+ *  =
+ *  \int_{\hat{K}} \varphi(\hat{\mathbf{x}})
+ *  {\hat{x}_1}^{p_1(i)}
+ *  {\hat{x}_2}^{p_2(i)}
+ * $ in 2d, and similarly for 3d, where the $p_d(i)$ are the order
+ * of the moment described by shape function $i$. Some other elements
+ * use moments over edges or faces. In all of these cases, node functionals
+ * are not defined through interpolation at all, and these elements then
+ * have neither support points, nor generalized support points.
  * </dd>
  *
  *
@@ -898,7 +940,8 @@
  *
  * The concept of ghost cells has no meaning for triangulations that
  * store the entire mesh on each processor, i.e. the
- * dealii::Triangulation class.  </dd>
+ * Triangulation and the parallel::shared::Triangulation classes.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossGhostedVector <b>Ghosted vectors</b></dt>
@@ -993,7 +1036,7 @@
   pages =        {4/1--4/31}
 }
  * @endcode
- * It is available from <a href="http://www.math.tamu.edu/~bangerth/publications.html">http://www.math.tamu.edu/~bangerth/publications.html</a>, also see <a href="https://www.dealii.org/publications.html#details">deal.II publications</a> for details.
+ * It is available from <a href="http://www.math.colostate.edu/~bangerth/publications.html">http://www.math.colostate.edu/~bangerth/publications.html</a>, also see <a href="https://www.dealii.org/publications.html#details">deal.II publications</a> for details.
  *
  * The numerical examples shown in that paper are generated with a slightly
  * modified version of step-27. The main difference to that
@@ -1012,11 +1055,13 @@
  * "node functionals" <i>N<sub>i</sub></i> for the given function
  * <i>f</i> and store the result as entry <i>i</i> in the coefficient
  * vector.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossLagrange <b>Lagrange elements</b></dt>
  * <dd>Finite elements based on Lagrangian interpolation at
- * @ref GlossSupport "support points".</dd>
+ * @ref GlossSupport "support points".
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossLocallyOwnedCell <b>Locally owned cell</b></dt>
@@ -1042,7 +1087,8 @@
  * of freedom.
  *
  * Locally owned DoFs are a subset of the
- * @ref GlossLocallyActiveDof "locally active DoFs".</dd>
+ * @ref GlossLocallyActiveDof "locally active DoFs".
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossLocallyActiveDof <b>Locally active degrees of freedom</b></dt>
@@ -1122,8 +1168,24 @@
  * "material id". It is commonly used in problems with heterogeneous
  * coefficients to identify which part of the domain a cell is in and,
  * consequently, which value the coefficient should have on this particular
- * cell. The material id is inherited from mother to child cell upon mesh
- * refinement.
+ * cell. In practice, the material id of a cell
+ * is typically used to identify which cells belong to a particular part of
+ * the domain, e.g., when you have different materials (steel, concrete, wood)
+ * that are all part of the same domain. One would then usually query the
+ * material id associated with a cell during assembly of the bilinear form,
+ * and use it to determine (e.g., by table lookup, or a sequence of if-else
+ * statements) what the correct material coefficients would be for that cell.
+ *
+ * This material_id may be set upon construction of a triangulation (through
+ * the CellData data structure), or later through use of cell iterators. For a
+ * typical use of this functionality, see the step-28 tutorial program. The
+ * functions of the GridGenerator namespace typically set the material ID of
+ * all cells to zero. When reading a triangulation through the GridIn class,
+ * different input file formats have different conventions, but typically
+ * either explicitly specify the material id, or if they don't, then GridIn
+ * simply sets them to zero. Because the material of a cell is intended
+ * to pertain to a particular region of the domain, material ids are inherited
+ * by child cells from their parent upon mesh refinement.
  *
  * The material id is set and queried using the CellAccessor::material_id,
  * CellAccessor::set_material_id and CellAccessor::recursively_set_material_id
@@ -1228,7 +1290,7 @@
   year=     {2011},
   publisher={SIAM}}
  * @endcode
- * See 
+ * See
  * <a href="http://dx.doi.org/10.1137/090778523">DOI:10.1137/090778523</a>
  * for the paper and <a href="https://www.dealii.org/publications.html#details">deal.II publications</a> for more details.
  * </dd>
@@ -1236,26 +1298,34 @@
  *
  * <dt class="glossary">@anchor GlossNodes <b>Node values or node functionals</b></dt>
  *
- * <dd>It is customary to define a FiniteElement as a pair consisting
- * of a local function space and a set of node values $N_i$ on the
- * mesh cells (usually defined on the @ref GlossReferenceCell
- * "reference cell"). Then, the basis of the local function space is
- * chosen such that $N_i(v_j) = \delta_{ij}$, the Kronecker delta.
+ * <dd>It is customary to define a finite element as a triple
+ * $(K,P,\Psi)$ where
+ * - $K$ is the cell, where in deal.II this is always a line segment,
+ *   quadrilateral, or hexahedron;
+ * - $P$ is a finite-dimensional space, e.g., a polynomial space mapped
+ *   from the @ref GlossReferenceCell "reference cell" to $K$;
+ * - $\Psi$ is a set of "node functionals", i.e., functionals
+ *   $\Psi_i : P \rightarrow {\mathbb R}$.
+ * The dimension of $P$ must be equal to the number of node functionals.
+ * With this definition, we can define a basis of the local function space,
+ * i.e., a set of "shape functions" $\varphi_j\in P$, by requiring that
+ * $\Psi_i(\varphi_j) = \delta_{ij}$, where $\delta$ is the Kronecker delta.
  *
- * This splitting has several advantages, concerning analysis as well
+ * This definition of what a finite element is has several advantages,
+ * concerning analysis as well
  * as implementation. For the analysis, it means that conformity with
  * certain spaces (FiniteElementData::Conformity), e.g. continuity, is
- * up to the node values. In deal.II, it helps simplifying the
+ * up to the node functionals. In deal.II, it helps simplifying the
  * implementation of more complex elements like FE_RaviartThomas
  * considerably.
  *
- * Examples for node functionals are values in @ref GlossSupport
- * "support points" and moments with respect to Legendre
- * polynomials. Let us give some examples:
+ * Examples for node functionals are values in
+ * @ref GlossSupport "support points" and moments with respect to Legendre
+ * polynomials. Examples:
  *
  * <table><tr>
  *   <th>Element</th>
- *   <th>Function space</th>
+ *   <th>%Function space</th>
  *   <th>Node values</th></tr>
  *   <tr><th>FE_Q, FE_DGQ</th>
  *     <td><i>Q<sub>k</sub></i></td>
@@ -1270,6 +1340,14 @@
  *     <td><i>Q<sub>k+1,k</sub> x Q<sub>k,k+1</sub></i></td>
  *     <td>Gauss points on edges(faces) and anisotropic Gauss points in the interior</td></tr>
  * </table>
+ *
+ * The construction of finite elements as outlined above allows writing
+ * code that describes a finite element simply by providing a polynomial
+ * space (without having to give it any particular basis -- whatever is convenient
+ * is entirely sufficient) and the nodal functionals. This is used, for example
+ * in the FiniteElement::convert_generalized_support_point_values_to_dof_values()
+ * function.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossParallelScaling <b>Parallel scaling</b></dt>
@@ -1316,7 +1394,7 @@
  * No program is truly scalable in this theoretical sense. Rather, all programs
  * cease to scale once either $N$ or $P$ grows larger than certain limits.
  * We therefore often say things such as "the program scales up to
- * 4,000 cores", or "the program scales up to $10^{8}$ unknowns". There are
+ * 4,000 cores", or "the program scales up to 100,000,000 unknowns". There are
  * a number of reasons why programs cannot scale without limit; these can
  * all be illustrated by just looking at the (relatively simple) step-17
  * tutorial program:
@@ -1440,9 +1518,10 @@
  * using parallel::distributed::Triangulation::add_periodicity()
  * -# Gather the periodic faces using GridTools::collect_periodic_faces() (DoFHandler)
  * -# Add periodicity constraints using DoFTools::make_periodicity_constraints()
- * 
- * An example for this can be found in step-45. 
- * 
+ *
+ * An example for this can be found in step-45.
+ * </dd>
+ *
  *
  * <dt class="glossary">@anchor GlossPrimitive <b>Primitive finite
  * elements</b></dt>
@@ -1456,13 +1535,15 @@
  * step-29, step-22 and several others. On the other hand,
  * the FE_RaviartThomas class used in step-20 and step-21, or the FE_Nedelec
  * class provide non-primitive finite elements because there, each
- * vector-value shape function may have several non-zero components.</dd>
+ * vector-value shape function may have several non-zero components.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossReferenceCell <b>Reference cell</b></dt>
  * <dd>The hypercube [0,1]<sup>dim</sup>, on which all parametric finite
  * element shape functions are defined. Many properties of the reference
- * cell are described by the GeometryInfo class.</dd>
+ * cell are described by the GeometryInfo class.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossSerialization <b>Serialization</b></dt>
@@ -1479,14 +1560,16 @@
  *
  * deal.II implements serialization facilities by implementing the necessary
  * interfaces for the <a
- * href="http://www.boost.org/doc/libs/1_46_1/libs/serialization/doc/index.html"
+ * href="http://www.boost.org/doc/libs/1_62_0/libs/serialization/doc/index.html"
  * target="_top">BOOST serialization</a> library. See there for examples on
- * how to save and restore objects. </dd>
+ * how to save and restore objects.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossShape <b>Shape functions</b></dt>
  * <dd>The restriction of the finite element basis functions to a single
- * grid cell.</dd>
+ * grid cell.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossSubdomainId <b>Subdomain id</b></dt>
@@ -1540,15 +1623,15 @@
  * </dd>
  *
  *
- * <dt class="glossary">@anchor GlossSupport <b>Support points</b></dt> <dd>Support points are
- * by definition those points $p_i$, such that for the shape functions
- * $v_j$ holds $v_j(p_i) = \delta_{ij}$. Therefore, a finite element
- * interpolation can be defined uniquely by the values in the support
+ * <dt class="glossary">@anchor GlossSupport <b>Support points</b></dt>
+ * <dd>Support points are by definition those points $p_i$, such that for the
+ * shape functions $v_j$ holds $v_j(p_i) = \delta_{ij}$. Therefore, a finite
+ * element interpolation can be defined uniquely by the values in the support
  * points.
  *
  * Lagrangian elements fill the vector accessed by
- * FiniteElementBase::get_unit_support_points(), such that the
- * function FiniteElementBase::has_support_points() returns
+ * FiniteElement::get_unit_support_points(), such that the
+ * function FiniteElement::has_support_points() returns
  * <tt>true</tt>. Naturally, these support points are on the
  * @ref GlossReferenceCell "reference cell".  Then, FEValues can be used
  * (in conjunction with a Mapping) to access support points on the
@@ -1561,20 +1644,23 @@
  * </dd>
  *
  *
- * <dt class="glossary">@anchor GlossTargetComponent <b>Target component</b></dt> <dd>When
- * vectors and matrices are grouped into blocks by component, it is
+ * <dt class="glossary">@anchor GlossTargetComponent <b>Target component</b></dt>
+ * <dd>
+ * When vectors and matrices are grouped into blocks by component, it is
  * often desirable to collect several of the original components into
  * a single one. This could be for instance, grouping the velocities
- * of a Stokes system into a single block.</dd>
+ * of a Stokes system into a single block.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossUnitCell <b>Unit cell</b></dt>
- * <dd>See @ref GlossReferenceCell "Reference cell".</dd>
+ * <dd>See @ref GlossReferenceCell "Reference cell".
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor GlossUnitSupport <b>Unit support points</b></dt>
  * <dd>These are the @ref GlossSupport "support points" on the reference cell, defined in
- * FiniteElementBase. For example, the usual Q1 element in 1d has support
+ * FiniteElement. For example, the usual Q1 element in 1d has support
  * points  at <tt>x=0</tt> and <tt>x=1</tt> (and similarly, in higher
  * dimensions at the vertices of the unit square or cube). On the other
  * hand, higher order Lagrangian elements have unit support points also
@@ -1682,6 +1768,7 @@
  *   @note The usual warning about the missing type safety of @p void pointers are
  *   obviously in place here; responsibility for correctness of types etc
  *   lies entirely with the user of the pointer.
+ * </dd>
  *
  *
  * <dt class="glossary">@anchor workstream_paper <b>%WorkStream paper</b></dt>
@@ -1698,10 +1785,10 @@
   author =       {Bruno Turcksin and Martin Kronbichler and Wolfgang Bangerth},
   title =        {\textit{WorkStream} -- a design pattern for multicore-enabled finite element computations},
   journal =      {accepted for publication in the ACM Trans. Math. Softw.},
-  year =         2015
+  year =         2016
 }
  * @endcode
- * It is available from <a href="http://www.math.tamu.edu/~bangerth/publications.html">http://www.math.tamu.edu/~bangerth/publications.html</a>, also see <a href="https://www.dealii.org/publications.html#details">deal.II publications</a> for details.
+ * It is available from <a href="http://www.math.colostate.edu/~bangerth/publications.html">http://www.math.colostate.edu/~bangerth/publications.html</a>, also see <a href="https://www.dealii.org/publications.html#details">deal.II publications</a> for details.
  * </dd>
  *
  * </dl>

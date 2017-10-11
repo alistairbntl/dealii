@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_vector_base_h
-#define dealii__block_vector_base_h
+#ifndef dealii_block_vector_base_h
+#define dealii_block_vector_base_h
 
 
 #include <deal.II/base/config.h>
@@ -88,7 +88,7 @@ public:
    * derived from BlockVectorBase<T>).
    */
   static const bool value = (sizeof(check_for_block_vector
-                                    ((VectorType *)0))
+                                    ((VectorType *)nullptr))
                              ==
                              sizeof(yes_type));
 };
@@ -267,19 +267,16 @@ namespace internal
        * Copy constructor from an iterator of different constness.
        *
        * @note Constructing a non-const iterator from a const iterator does
-       * not make sense. If deal.II was configured with C++11 support, then
-       * attempting this will result in a compile-time error (via
-       * <code>static_assert</code>). If deal.II was not configured with C++11
-       * support, then attempting this will result in a thrown exception in
-       * debug mode.
+       * not make sense. Attempting this will result in a compile-time error
+       * (via <code>static_assert</code>).
        */
       Iterator (const Iterator<BlockVectorType,!Constness> &c);
 
 
       /**
-       * Copy constructor.
+       * Copy constructor from an iterator with the same constness.
        */
-      Iterator (const Iterator<BlockVectorType,Constness> &c);
+      Iterator (const Iterator &c);
 
     private:
       /**
@@ -343,47 +340,47 @@ namespace internal
        * Compare for equality of iterators. This operator checks whether the
        * vectors pointed to are the same, and if not it throws an exception.
        */
-      template <bool _Constness>
-      bool operator == (const Iterator<BlockVectorType, _Constness> &i) const;
+      template <bool OtherConstness>
+      bool operator == (const Iterator<BlockVectorType, OtherConstness> &i) const;
 
       /**
        * Compare for inequality of iterators. This operator checks whether the
        * vectors pointed to are the same, and if not it throws an exception.
        */
-      template <bool _Constness>
-      bool operator != (const Iterator<BlockVectorType, _Constness> &i) const;
+      template <bool OtherConstness>
+      bool operator != (const Iterator<BlockVectorType, OtherConstness> &i) const;
 
       /**
        * Check whether this iterators points to an element previous to the one
        * pointed to by the given argument. This operator checks whether the
        * vectors pointed to are the same, and if not it throws an exception.
        */
-      template <bool _Constness>
-      bool operator < (const Iterator<BlockVectorType, _Constness> &i) const;
+      template <bool OtherConstness>
+      bool operator < (const Iterator<BlockVectorType, OtherConstness> &i) const;
 
       /**
        * Comparison operator alike to the one above.
        */
-      template <bool _Constness>
-      bool operator <= (const Iterator<BlockVectorType, _Constness> &i) const;
+      template <bool OtherConstness>
+      bool operator <= (const Iterator<BlockVectorType, OtherConstness> &i) const;
 
       /**
        * Comparison operator alike to the one above.
        */
-      template <bool _Constness>
-      bool operator > (const Iterator<BlockVectorType, _Constness> &i) const;
+      template <bool OtherConstness>
+      bool operator > (const Iterator<BlockVectorType, OtherConstness> &i) const;
 
       /**
        * Comparison operator alike to the one above.
        */
-      template <bool _Constness>
-      bool operator >= (const Iterator<BlockVectorType, _Constness> &i) const;
+      template <bool OtherConstness>
+      bool operator >= (const Iterator<BlockVectorType, OtherConstness> &i) const;
 
       /**
        * Return the distance between the two iterators, in elements.
        */
-      template <bool _Constness>
-      difference_type operator - (const Iterator<BlockVectorType, _Constness> &i) const;
+      template <bool OtherConstness>
+      difference_type operator - (const Iterator<BlockVectorType, OtherConstness> &i) const;
 
       /**
        * Return an iterator which is the given number of elements in front of
@@ -423,16 +420,6 @@ namespace internal
                         "different block vectors. There is no reasonable way "
                         "to do this.");
 
-      /**
-       * Exception thrown when one attempts to copy construct a non-const
-       * iterator from a const iterator.
-       *
-       * @note when deal.II is compiled with C++11 support this check is
-       * instead performed at compile time via <code>static_assert</code>.
-       */
-      DeclExceptionMsg (ExcCastingAwayConstness,
-                        "Constructing a non-const iterator from a const "
-                        "iterator does not make sense.");
       //@}
     private:
       /**
@@ -487,9 +474,9 @@ namespace internal
 /**
  * A vector composed of several blocks each representing a vector of its own.
  *
- * The BlockVector is a collection of Vectors (e.g. of either deal.II Vector
- * objects or PETScWrappers::Vector object). Each of the vectors inside can
- * have a different size.
+ * The BlockVector is a collection of vectors of a given type (e.g., deal.II
+ * Vector objects, PETScWrappers::MPI::Vector objects, etc.). Each of the
+ * vectors inside can have a different size.
  *
  * The functionality of BlockVector includes everything a Vector can do, plus
  * the access to a single Vector inside the BlockVector by <tt>block(i)</tt>.
@@ -562,37 +549,21 @@ public:
   typedef typename BlockType::real_type real_type;
 
   /**
-   * A variable that indicates whether this vector supports distributed data
-   * storage. If true, then this vector also needs an appropriate compress()
-   * function that allows communicating recent set or add operations to
-   * individual elements to be communicated to other processors.
-   *
-   * For the current class, the variable equals the value declared for the
-   * type of the individual blocks.
-   */
-  static const bool supports_distributed_data = BlockType::supports_distributed_data;
-
-  /**
    * Default constructor.
    */
-  BlockVectorBase ();
+  BlockVectorBase () = default;
 
-#ifdef DEAL_II_WITH_CXX11
   /**
    * Copy constructor.
    */
-  BlockVectorBase (const BlockVectorBase &V) = default;
+  BlockVectorBase (const BlockVectorBase &/*V*/) = default;
 
   /**
-   * Move constructor. Each block of the vector @p V is moved into the current
+   * Move constructor. Each block of the argument vector is moved into the current
    * object if the underlying <code>VectorType</code> is move-constructible,
    * otherwise they are copied.
-   *
-   * @note This constructor is only available if deal.II is configured with
-   * C++11 support.
    */
-  BlockVectorBase (BlockVectorBase &&V) = default;
-#endif
+  BlockVectorBase (BlockVectorBase &&/*V*/) = default;
 
   /**
    * Update internal structures after resizing vectors. Whenever you reinited
@@ -710,18 +681,50 @@ public:
   reference operator[] (const size_type i);
 
   /**
-   * A collective get operation: instead of getting individual elements of a
-   * vector, this function allows to get a whole set of elements at once. The
+   * Instead of getting individual elements of a vector via operator(),
+   * this function allows getting a whole set of elements at once. The
    * indices of the elements to be read are stated in the first argument, the
    * corresponding values are returned in the second.
+   *
+   * If the current vector is called @p v, then this function is the equivalent
+   * to the code
+   * @code
+   *   for (unsigned int i=0; i<indices.size(); ++i)
+   *     values[i] = v[indices[i]];
+   * @endcode
+   *
+   * @pre The sizes of the @p indices and @p values arrays must be identical.
    */
   template <typename OtherNumber>
   void extract_subvector_to (const std::vector<size_type> &indices,
                              std::vector<OtherNumber> &values) const;
 
   /**
-   * Just as the above, but with pointers. Useful in minimizing copying of
-   * data around.
+   * Instead of getting individual elements of a vector via operator(),
+   * this function allows getting a whole set of elements at once. In
+   * contrast to the previous function, this function obtains the
+   * indices of the elements by dereferencing all elements of the iterator
+   * range provided by the first two arguments, and puts the vector
+   * values into memory locations obtained by dereferencing a range
+   * of iterators starting at the location pointed to by the third
+   * argument.
+   *
+   * If the current vector is called @p v, then this function is the equivalent
+   * to the code
+   * @code
+   *   ForwardIterator indices_p = indices_begin;
+   *   OutputIterator  values_p  = values_begin;
+   *   while (indices_p != indices_end)
+   *   {
+   *     *values_p = v[*indices_p];
+   *     ++indices_p;
+   *     ++values_p;
+   *   }
+   * @endcode
+   *
+   * @pre It must be possible to write into as many memory locations
+   *   starting at @p values_begin as there are iterators between
+   *   @p indices_begin and @p indices_end.
    */
   template <typename ForwardIterator, typename OutputIterator>
   void extract_subvector_to (ForwardIterator          indices_begin,
@@ -740,13 +743,12 @@ public:
   BlockVectorBase &
   operator= (const BlockVectorBase &V);
 
-#ifdef DEAL_II_WITH_CXX11
   /**
-   * Move assignment operator. Move each block of the vector @p V into the
-   * current object if `VectorType` is move-constructible, otherwise copy them.
+   * Move assignment operator. Move each block of the given argument
+   * vector into the current object if `VectorType` is
+   * move-constructible, otherwise copy them.
    */
-  BlockVectorBase &operator= (BlockVectorBase &&V) = default;
-#endif
+  BlockVectorBase &operator= (BlockVectorBase &&/*V*/) = default;
 
   /**
    * Copy operator for template arguments of different types.
@@ -813,7 +815,7 @@ public:
    * The reason this function exists is that this operation involves less
    * memory transfer than calling the two functions separately on deal.II's
    * vector classes (Vector<Number> and
-   * parallel::distributed::Vector<double>). This method only needs to load
+   * LinearAlgebra::distributed::Vector<double>). This method only needs to load
    * three vectors, @p this, @p V, @p W, whereas calling separate methods
    * means to load the calling vector @p this twice. Since most vector
    * operations are memory transfer limited, this reduces the time by 25\% (or
@@ -824,7 +826,7 @@ public:
                           const BlockVectorBase &W);
 
   /**
-   * Returns true if the given global index is in the local range of this
+   * Return true if the given global index is in the local range of this
    * processor. Asks the corresponding block.
    */
   bool in_local_range (const size_type global_index) const;
@@ -887,13 +889,6 @@ public:
    * <tt>s</tt> is a scalar and not a vector.
    */
   void add (const value_type s);
-
-  /**
-   * U+=V. Simple vector addition, equal to the <tt>operator +=</tt>.
-   *
-   * This function is deprecated use the <tt>operator +=</tt> instead.
-   */
-  void add (const BlockVectorBase &V) DEAL_II_DEPRECATED;
 
   /**
    * U+=a*V. Simple addition of a scaled vector.
@@ -961,15 +956,8 @@ public:
             const value_type b, const BlockVectorBase &W);
 
   /**
-   * This function does nothing but is there for compatibility with the @p
-   * PETScWrappers::Vector class.
-   *
-   * For the PETSc vector wrapper class, this function updates the ghost
-   * values of the PETSc vector. This is necessary after any modification
-   * before reading ghost values.
-   *
-   * However, for the implementation of this class, it is immaterial and thus
-   * an empty function.
+   * Update the ghost values by calling <code>update_ghost_values</code> for
+   * each block.
    */
   void update_ghost_values () const;
 
@@ -1042,13 +1030,9 @@ namespace internal
       // iterators, and not vice versa (i.e., Constness must always be
       // true). As mentioned above, try to check this at compile time if C++11
       // support is available.
-#ifdef DEAL_II_WITH_CXX11
       static_assert(Constness == true,
                     "Constructing a non-const iterator from a const iterator "
                     "does not make sense.");
-#else
-      Assert(Constness == true, ExcCastingAwayConstness());
-#endif
     }
 
 
@@ -1175,11 +1159,11 @@ namespace internal
 
 
     template <class BlockVectorType, bool Constness>
-    template <bool _Constness>
+    template <bool OtherConstness>
     inline
     bool
     Iterator<BlockVectorType,Constness>::
-    operator == (const Iterator<BlockVectorType, _Constness> &i) const
+    operator == (const Iterator<BlockVectorType, OtherConstness> &i) const
     {
       Assert (parent == i.parent, ExcPointerToDifferentVectors());
 
@@ -1189,11 +1173,11 @@ namespace internal
 
 
     template <class BlockVectorType, bool Constness>
-    template <bool _Constness>
+    template <bool OtherConstness>
     inline
     bool
     Iterator<BlockVectorType,Constness>::
-    operator != (const Iterator<BlockVectorType, _Constness> &i) const
+    operator != (const Iterator<BlockVectorType, OtherConstness> &i) const
     {
       Assert (parent == i.parent, ExcPointerToDifferentVectors());
 
@@ -1203,11 +1187,11 @@ namespace internal
 
 
     template <class BlockVectorType, bool Constness>
-    template <bool _Constness>
+    template <bool OtherConstness>
     inline
     bool
     Iterator<BlockVectorType,Constness>::
-    operator < (const Iterator<BlockVectorType, _Constness> &i) const
+    operator < (const Iterator<BlockVectorType, OtherConstness> &i) const
     {
       Assert (parent == i.parent, ExcPointerToDifferentVectors());
 
@@ -1217,11 +1201,11 @@ namespace internal
 
 
     template <class BlockVectorType, bool Constness>
-    template <bool _Constness>
+    template <bool OtherConstness>
     inline
     bool
     Iterator<BlockVectorType,Constness>::
-    operator <= (const Iterator<BlockVectorType, _Constness> &i) const
+    operator <= (const Iterator<BlockVectorType, OtherConstness> &i) const
     {
       Assert (parent == i.parent, ExcPointerToDifferentVectors());
 
@@ -1231,11 +1215,11 @@ namespace internal
 
 
     template <class BlockVectorType, bool Constness>
-    template <bool _Constness>
+    template <bool OtherConstness>
     inline
     bool
     Iterator<BlockVectorType,Constness>::
-    operator > (const Iterator<BlockVectorType, _Constness> &i) const
+    operator > (const Iterator<BlockVectorType, OtherConstness> &i) const
     {
       Assert (parent == i.parent, ExcPointerToDifferentVectors());
 
@@ -1245,11 +1229,11 @@ namespace internal
 
 
     template <class BlockVectorType, bool Constness>
-    template <bool _Constness>
+    template <bool OtherConstness>
     inline
     bool
     Iterator<BlockVectorType,Constness>::
-    operator >= (const Iterator<BlockVectorType, _Constness> &i) const
+    operator >= (const Iterator<BlockVectorType, OtherConstness> &i) const
     {
       Assert (parent == i.parent, ExcPointerToDifferentVectors());
 
@@ -1259,11 +1243,11 @@ namespace internal
 
 
     template <class BlockVectorType, bool Constness>
-    template <bool _Constness>
+    template <bool OtherConstness>
     inline
     typename Iterator<BlockVectorType,Constness>::difference_type
     Iterator<BlockVectorType,Constness>::
-    operator - (const Iterator<BlockVectorType, _Constness> &i) const
+    operator - (const Iterator<BlockVectorType, OtherConstness> &i) const
     {
       Assert (parent == i.parent, ExcPointerToDifferentVectors());
 
@@ -1491,13 +1475,6 @@ namespace internal
   } // namespace BlockVectorIterators
 
 } //namespace internal
-
-
-
-template <class VectorType>
-inline
-BlockVectorBase<VectorType>::BlockVectorBase ()
-{}
 
 
 
@@ -1869,14 +1846,6 @@ void BlockVectorBase<VectorType>::add (const value_type a)
 
 
 template <class VectorType>
-void BlockVectorBase<VectorType>::add (const BlockVectorBase<VectorType> &v)
-{
-  *this += v;
-}
-
-
-
-template <class VectorType>
 void BlockVectorBase<VectorType>::add (const value_type a,
                                        const BlockVectorBase<VectorType> &v)
 {
@@ -2048,11 +2017,9 @@ template <class VectorType>
 std::size_t
 BlockVectorBase<VectorType>::memory_consumption () const
 {
-  std::size_t mem = sizeof(this->n_blocks());
-  for (size_type i=0; i<this->components.size(); ++i)
-    mem += MemoryConsumption::memory_consumption (this->components[i]);
-  mem += MemoryConsumption::memory_consumption (this->block_indices);
-  return mem;
+  return (MemoryConsumption::memory_consumption (this->block_indices)
+          +
+          MemoryConsumption::memory_consumption (this->components));
 }
 
 

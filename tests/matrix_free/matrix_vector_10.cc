@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -28,7 +28,6 @@
 
 #include "matrix_vector_mf.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/distributed/tria.h>
@@ -96,7 +95,7 @@ void test ()
 
   ConstraintMatrix constraints (relevant_set);
   DoFTools::make_hanging_node_constraints(dof, constraints);
-  VectorTools::interpolate_boundary_values (dof, 0, ZeroFunction<dim>(),
+  VectorTools::interpolate_boundary_values (dof, 0, Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close();
 
@@ -109,15 +108,14 @@ void test ()
   {
     const QGauss<1> quad (fe_degree+1);
     typename MatrixFree<dim,number>::AdditionalData data;
-    data.mpi_communicator = MPI_COMM_WORLD;
     data.tasks_parallel_scheme =
       MatrixFree<dim,number>::AdditionalData::none;
     data.tasks_block_size = 7;
     mf_data.reinit (dof, constraints, quad, data);
   }
 
-  MatrixFreeTest<dim,fe_degree,number,parallel::distributed::Vector<number> > mf (mf_data);
-  parallel::distributed::Vector<number> in, out, ref;
+  MatrixFreeTest<dim,fe_degree,number,LinearAlgebra::distributed::Vector<number> > mf (mf_data);
+  LinearAlgebra::distributed::Vector<number> in, out, ref;
   mf_data.initialize_dof_vector (in);
   out.reinit (in);
   ref.reinit (in);
@@ -205,10 +203,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       deallog.push("2d");
       test<2,1>();

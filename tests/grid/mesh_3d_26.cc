@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -32,7 +32,6 @@
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 
 #include <deal.II/dofs/dof_handler.h>
@@ -40,8 +39,6 @@
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
-#include <cmath>
 #include <vector>
 
 using namespace dealii;
@@ -114,7 +111,6 @@ int main ()
 {
   std::ofstream logfile ("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.0e-10);
 
   Triangulation<3> triangulation;
   GridGenerator::hyper_ball(triangulation);

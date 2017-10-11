@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2009 - 2015 by the deal.II authors
+ * Copyright (C) 2009 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -287,7 +287,7 @@ namespace Step34
     Functions::ParsedFunction<dim> exact_solution;
 
     unsigned int singular_quadrature_order;
-    std_cxx11::shared_ptr<Quadrature<dim-1> > quadrature;
+    std::shared_ptr<Quadrature<dim-1> > quadrature;
 
     SolverControl solver_control;
 
@@ -321,7 +321,12 @@ namespace Step34
     fe(fe_degree),
     dh(tria),
     mapping(mapping_degree, true),
-    wind(dim)
+    wind(dim),
+    singular_quadrature_order(5),
+    n_cycles(4),
+    external_refinement(5),
+    run_in_this_dimension(true),
+    extend_solution(true)
   {}
 
 
@@ -417,7 +422,7 @@ namespace Step34
     // After declaring all these parameters to the ParameterHandler object,
     // let's read an input file that will give the parameters their values. We
     // then proceed to extract these values from the ParameterHandler object:
-    prm.read_input(filename);
+    prm.parse_input(filename);
 
     n_cycles = prm.get_integer("Number of cycles");
     external_refinement = prm.get_integer("External refinement");
@@ -426,7 +431,7 @@ namespace Step34
     prm.enter_subsection("Quadrature rules");
     {
       quadrature =
-        std_cxx11::shared_ptr<Quadrature<dim-1> >
+        std::shared_ptr<Quadrature<dim-1> >
         (new QuadratureSelector<dim-1> (prm.get("Quadrature type"),
                                         prm.get_integer("Quadrature order")));
       singular_quadrature_order = prm.get_integer("Singular quadrature order");
@@ -602,7 +607,7 @@ namespace Step34
         cell->get_dof_indices(local_dof_indices);
 
         const std::vector<Point<dim> >    &q_points = fe_v.get_quadrature_points();
-        const std::vector<Tensor<1,dim> > &normals  = fe_v.get_all_normal_vectors();
+        const std::vector<Tensor<1,dim> > &normals  = fe_v.get_normal_vectors();
         wind.vector_value_list(q_points, cell_wind);
 
         // We then form the integral over the current cell for all degrees of
@@ -687,7 +692,7 @@ namespace Step34
                 std::vector<Vector<double> > singular_cell_wind( singular_quadrature.size(),
                                                                  Vector<double>(dim) );
 
-                const std::vector<Tensor<1,dim> > &singular_normals  = fe_v_singular.get_all_normal_vectors();
+                const std::vector<Tensor<1,dim> > &singular_normals  = fe_v_singular.get_normal_vectors();
                 const std::vector<Point<dim> >    &singular_q_points = fe_v_singular.get_quadrature_points();
 
                 wind.vector_value_list(singular_q_points, singular_cell_wind);
@@ -768,8 +773,9 @@ namespace Step34
                                        difference_per_cell,
                                        QGauss<(dim-1)>(2*fe.degree+1),
                                        VectorTools::L2_norm);
-    const double L2_error = difference_per_cell.l2_norm();
-
+    const double L2_error = VectorTools::compute_global_error(tria,
+                                                              difference_per_cell,
+                                                              VectorTools::L2_norm);
 
     // The error in the alpha vector can be computed directly using the
     // Vector::linfty_norm() function, since on each node, the value should be
@@ -863,7 +869,7 @@ namespace Step34
   // as an argument is the index of the unit support point where the
   // singularity is located.
 
-  template<>
+  template <>
   const Quadrature<2> &BEMProblem<3>::get_singular_quadrature(
     const DoFHandler<2,3>::active_cell_iterator &,
     const unsigned int index) const
@@ -881,7 +887,7 @@ namespace Step34
   }
 
 
-  template<>
+  template <>
   const Quadrature<1> &BEMProblem<2>::get_singular_quadrature(
     const DoFHandler<1,2>::active_cell_iterator &cell,
     const unsigned int index) const
@@ -889,7 +895,7 @@ namespace Step34
     Assert(index < fe.dofs_per_cell,
            ExcIndexRange(0, fe.dofs_per_cell, index));
 
-    static Quadrature<1> *q_pointer = NULL;
+    static Quadrature<1> *q_pointer = nullptr;
     if (q_pointer) delete q_pointer;
 
     q_pointer = new QGaussLogR<1>(singular_quadrature_order,
@@ -958,7 +964,7 @@ namespace Step34
         fe_v.reinit(cell);
 
         const std::vector<Point<dim> >    &q_points = fe_v.get_quadrature_points();
-        const std::vector<Tensor<1,dim> > &normals  = fe_v.get_all_normal_vectors();
+        const std::vector<Tensor<1,dim> > &normals  = fe_v.get_normal_vectors();
 
         cell->get_dof_indices(dofs);
         fe_v.get_function_values(phi, local_phi);

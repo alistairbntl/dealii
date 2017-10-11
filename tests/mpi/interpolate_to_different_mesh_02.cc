@@ -14,15 +14,13 @@
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/error_estimator.h>
 #include <deal.II/distributed/solution_transfer.h>
-#include <fstream>
 #include <deal.II/base/conditional_ostream.h>
-#include <cmath>
 #include <deal.II/lac/generic_linear_algebra.h>
 #include <deal.II/lac/sparsity_tools.h>
 
@@ -119,10 +117,10 @@ void SeventhProblem<dim>::setup_system ()
   DoFTools::make_hanging_node_constraints (dof_handler, constraints);
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim>(),
+                                            Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close ();
-  CompressedSimpleSparsityPattern csp (locally_relevant_dofs);
+  DynamicSparsityPattern csp (locally_relevant_dofs);
   DoFTools::make_sparsity_pattern (dof_handler, csp,
                                    constraints, false);
   SparsityTools::distribute_sparsity_pattern (csp,

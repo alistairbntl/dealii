@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2016 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__vector_h
-#define dealii__vector_h
+#ifndef dealii_vector_h
+#define dealii_vector_h
 
 
 #include <deal.II/base/config.h>
@@ -22,7 +22,16 @@
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/subscriptor.h>
 #include <deal.II/base/index_set.h>
-#include <boost/serialization/array.hpp>
+#include <deal.II/lac/vector_type_traits.h>
+
+// boost::serialization::make_array used to be in array.hpp, but was
+// moved to a different file in BOOST 1.64
+#include <boost/version.hpp>
+#if BOOST_VERSION >= 106400
+#  include <boost/serialization/array_wrapper.hpp>
+#else
+#  include <boost/serialization/array.hpp>
+#endif
 #include <boost/serialization/split_member.hpp>
 
 #include <cstdio>
@@ -36,11 +45,7 @@ DEAL_II_NAMESPACE_OPEN
 #ifdef DEAL_II_WITH_PETSC
 namespace PETScWrappers
 {
-  class Vector;
-  namespace MPI
-  {
-    class Vector;
-  }
+  class VectorBase;
 }
 #endif
 
@@ -51,11 +56,10 @@ namespace TrilinosWrappers
   {
     class Vector;
   }
-  class Vector;
 }
 #endif
 
-template<typename number> class LAPACKFullMatrix;
+template <typename number> class LAPACKFullMatrix;
 
 template <typename> class BlockVector;
 
@@ -88,7 +92,21 @@ namespace parallel
  */
 struct VectorOperation
 {
-  enum values { unknown, insert, add };
+  enum values
+  {
+    /**
+     * The current operation is unknown.
+     */
+    unknown,
+    /**
+     * The current operation is an insertion.
+     */
+    insert,
+    /**
+     * The current operation is an addition.
+     */
+    add
+  };
 };
 
 
@@ -104,9 +122,8 @@ struct VectorOperation
  * suitable for numerical computations.
  *
  * @note Instantiations for this template are provided for <tt>@<float@>,
- * @<double@>, @<long double@>, @<std::complex@<float@>@>,
- * @<std::complex@<double@>@>, @<std::complex@<long double@>@></tt>; others
- * can be generated in application programs (see the section on
+ * @<double@>, @<std::complex@<float@>@>, @<std::complex@<double@>@></tt>;
+ * others can be generated in application programs (see the section on
  * @ref Instantiations
  * in the manual).
  *
@@ -140,17 +157,6 @@ public:
    */
   typedef typename numbers::NumberTraits<Number>::real_type real_type;
 
-  /**
-   * A variable that indicates whether this vector supports distributed data
-   * storage. If true, then this vector also needs an appropriate compress()
-   * function that allows communicating recent set or add operations to
-   * individual elements to be communicated to other processors.
-   *
-   * For the current class, the variable equals false, since it does not
-   * support parallel data storage.
-   */
-  static const bool supports_distributed_data = false;
-
 public:
 
   /**
@@ -171,19 +177,12 @@ public:
    */
   Vector (const Vector<Number> &v);
 
-#ifdef DEAL_II_WITH_CXX11
   /**
    * Move constructor. Creates a new vector by stealing the internal data of
    * the vector @p v.
-   *
-   * @note This constructor is only available if deal.II is configured with
-   * C++11 support.
    */
   Vector (Vector<Number> &&v);
-#endif
 
-
-#ifndef DEAL_II_EXPLICIT_CONSTRUCTOR_BUG
   /**
    * Copy constructor taking a vector of another data type. This will fail if
    * there is no conversion path from @p OtherNumber to @p Number. Note that
@@ -199,27 +198,20 @@ public:
   template <typename OtherNumber>
   explicit
   Vector (const Vector<OtherNumber> &v);
-#endif
 
 #ifdef DEAL_II_WITH_PETSC
   /**
-   * Another copy constructor: copy the values from a sequential PETSc wrapper
-   * vector class. This copy constructor is only available if PETSc was
-   * detected during configuration time.
-   */
-  Vector (const PETScWrappers::Vector &v);
-
-  /**
-   * Another copy constructor: copy the values from a parallel PETSc wrapper
-   * vector class. This copy constructor is only available if PETSc was
-   * detected during configuration time.
+   * Another copy constructor: copy the values from a PETSc vector class. This
+   * copy constructor is only available if PETSc was detected during
+   * configuration time.
    *
    * Note that due to the communication model used in MPI, this operation can
-   * only succeed if all processes do it at the same time. I.e., it is not
-   * possible for only one process to obtain a copy of a parallel vector while
-   * the other jobs do something else.
+   * only succeed if all processes do it at the same time when <code>v</code>
+   * is a distributed vector: It is not possible for only one process to
+   * obtain a copy of a parallel vector while the other jobs do something
+   * else.
    */
-  Vector (const PETScWrappers::MPI::Vector &v);
+  explicit Vector (const PETScWrappers::VectorBase &v);
 #endif
 
 #ifdef DEAL_II_WITH_TRILINOS
@@ -234,14 +226,7 @@ public:
    * vector while the other jobs do something else. This call will rather
    * result in a copy of the vector on all processors.
    */
-  Vector (const TrilinosWrappers::MPI::Vector &v);
-
-  /**
-   * Another copy constructor: copy the values from a localized Trilinos
-   * wrapper vector. This copy constructor is only available if Trilinos was
-   * detected during configuration time.
-   */
-  Vector (const TrilinosWrappers::Vector &v);
+  explicit Vector (const TrilinosWrappers::MPI::Vector &v);
 #endif
 
   /**
@@ -270,14 +255,14 @@ public:
   virtual ~Vector ();
 
   /**
-   * This function does nothing but is there for compatibility with the @p
-   * PETScWrappers::Vector class.
+   * This function does nothing but exists for compatibility with the parallel
+   * vector classes.
    *
-   * For the PETSc vector wrapper class, this function compresses the
-   * underlying representation of the PETSc object, i.e. flushes the buffers
-   * of the vector object if it has any. This function is necessary after
-   * writing into a vector element-by-element and before anything else can be
-   * done on it.
+   * For the parallel vector wrapper class, this function compresses the
+   * underlying representation of the vector, i.e. flushes the buffers of the
+   * vector object if it has any. This function is necessary after writing
+   * into a vector element-by-element and before anything else can be done on
+   * it.
    *
    * However, for the implementation of this class, it is immaterial and thus
    * an empty function.
@@ -321,9 +306,10 @@ public:
    * swaps the pointers to the data of the two vectors and therefore does not
    * need to allocate temporary storage and move data around.
    *
-   * This function is analog to the the @p swap function of all C++ standard
-   * containers. Also, there is a global function <tt>swap(u,v)</tt> that
-   * simply calls <tt>u.swap(v)</tt>, again in analogy to standard functions.
+   * This function is analogous to the @p swap function of all C++
+   * standard containers. Also, there is a global function <tt>swap(u,v)</tt>
+   * that simply calls <tt>u.swap(v)</tt>, again in analogy to standard
+   * functions.
    *
    * This function is virtual in order to allow for derived classes to handle
    * memory separately.
@@ -357,9 +343,6 @@ public:
    * Move the given vector. This operator replaces the present vector with
    * the internal data of the vector @p v and resets @p v to the state it would
    * have after being newly default-constructed.
-   *
-   * @note This operator is only available if deal.II is configured with C++11
-   * support.
    */
   Vector<Number> &operator= (Vector<Number> &&v);
 #endif
@@ -379,25 +362,18 @@ public:
 
 #ifdef DEAL_II_WITH_PETSC
   /**
-   * Another copy operator: copy the values from a sequential PETSc wrapper
-   * vector class. This operator is only available if PETSc was detected
-   * during configuration time.
-   */
-  Vector<Number> &
-  operator= (const PETScWrappers::Vector &v);
-
-  /**
-   * Another copy operator: copy the values from a parallel PETSc wrapper
-   * vector class. This operator is only available if PETSc was detected
-   * during configuration time.
+   * Another copy operator: copy the values from a PETSc wrapper vector
+   * class. This operator is only available if PETSc was detected during
+   * configuration time.
    *
    * Note that due to the communication model used in MPI, this operation can
-   * only succeed if all processes do it at the same time. I.e., it is not
-   * possible for only one process to obtain a copy of a parallel vector while
-   * the other jobs do something else.
+   * only succeed if all processes do it at the same time when <code>v</code>
+   * is a distributed vector: It is not possible for only one process to
+   * obtain a copy of a parallel vector while the other jobs do something
+   * else.
    */
   Vector<Number> &
-  operator= (const PETScWrappers::MPI::Vector &v);
+  operator= (const PETScWrappers::VectorBase &v);
 #endif
 
 
@@ -415,14 +391,6 @@ public:
    */
   Vector<Number> &
   operator= (const TrilinosWrappers::MPI::Vector &v);
-
-  /**
-   * Another copy operator: copy the values from a sequential Trilinos wrapper
-   * vector class. This operator is only available if Trilinos was detected
-   * during configuration time.
-   */
-  Vector<Number> &
-  operator= (const TrilinosWrappers::Vector &v);
 #endif
 
   /**
@@ -597,18 +565,50 @@ public:
   Number &operator[] (const size_type i);
 
   /**
-   * A collective get operation: instead of getting individual elements of a
-   * vector, this function allows to get a whole set of elements at once. The
+   * Instead of getting individual elements of a vector via operator(),
+   * this function allows getting a whole set of elements at once. The
    * indices of the elements to be read are stated in the first argument, the
    * corresponding values are returned in the second.
+   *
+   * If the current vector is called @p v, then this function is the equivalent
+   * to the code
+   * @code
+   *   for (unsigned int i=0; i<indices.size(); ++i)
+   *     values[i] = v[indices[i]];
+   * @endcode
+   *
+   * @pre The sizes of the @p indices and @p values arrays must be identical.
    */
   template <typename OtherNumber>
   void extract_subvector_to (const std::vector<size_type> &indices,
                              std::vector<OtherNumber> &values) const;
 
   /**
-   * Just as the above, but with pointers. Useful in minimizing copying of
-   * data around.
+   * Instead of getting individual elements of a vector via operator(),
+   * this function allows getting a whole set of elements at once. In
+   * contrast to the previous function, this function obtains the
+   * indices of the elements by dereferencing all elements of the iterator
+   * range provided by the first two arguments, and puts the vector
+   * values into memory locations obtained by dereferencing a range
+   * of iterators starting at the location pointed to by the third
+   * argument.
+   *
+   * If the current vector is called @p v, then this function is the equivalent
+   * to the code
+   * @code
+   *   ForwardIterator indices_p = indices_begin;
+   *   OutputIterator  values_p  = values_begin;
+   *   while (indices_p != indices_end)
+   *   {
+   *     *values_p = v[*indices_p];
+   *     ++indices_p;
+   *     ++values_p;
+   *   }
+   * @endcode
+   *
+   * @pre It must be possible to write into as many memory locations
+   *   starting at @p values_begin as there are iterators between
+   *   @p indices_begin and @p indices_end.
    */
   template <typename ForwardIterator, typename OutputIterator>
   void extract_subvector_to (ForwardIterator       indices_begin,
@@ -671,16 +671,6 @@ public:
   void add (const Number s);
 
   /**
-   * Simple vector addition, equal to the <tt>operator +=</tt>.
-   *
-   * @deprecated Use the <tt>operator +=</tt> instead.
-   *
-   * @dealiiOperationIsMultithreaded
-   */
-  void add (const Vector<Number> &V) DEAL_II_DEPRECATED;
-
-
-  /**
    * Multiple addition of scaled vectors, i.e. <tt>*this += a*V+b*W</tt>.
    *
    * @dealiiOperationIsMultithreaded
@@ -711,35 +701,6 @@ public:
   void sadd (const Number          s,
              const Number          a,
              const Vector<Number> &V);
-
-  /**
-   * Scaling and multiple addition.
-   *
-   * This function is deprecated.
-   *
-   * @dealiiOperationIsMultithreaded
-   */
-  void sadd (const Number          s,
-             const Number          a,
-             const Vector<Number> &V,
-             const Number          b,
-             const Vector<Number> &W) DEAL_II_DEPRECATED;
-
-  /**
-   * Scaling and multiple addition.  <tt>*this = s*(*this)+a*V + b*W +
-   * c*X</tt>.
-   *
-   * This function is deprecated.
-   *
-   * @dealiiOperationIsMultithreaded
-   */
-  void sadd (const Number          s,
-             const Number          a,
-             const Vector<Number> &V,
-             const Number          b,
-             const Vector<Number> &W,
-             const Number          c,
-             const Vector<Number> &X) DEAL_II_DEPRECATED;
 
   /**
    * Scale each element of the vector by a constant value.
@@ -786,27 +747,6 @@ public:
   void equ (const Number a, const Vector<Number2> &u);
 
   /**
-   * Assignment <tt>*this = a*u + b*v</tt>.
-   *
-   * This function is deprecated.
-   *
-   * @dealiiOperationIsMultithreaded
-   */
-  void equ (const Number a, const Vector<Number> &u,
-            const Number b, const Vector<Number> &v) DEAL_II_DEPRECATED;
-
-  /**
-   * Assignment <tt>*this = a*u + b*v + b*w</tt>.
-   *
-   * This function is deprecated.
-   *
-   * @dealiiOperationIsMultithreaded
-   */
-  void equ (const Number a, const Vector<Number> &u,
-            const Number b, const Vector<Number> &v,
-            const Number c, const Vector<Number> &w) DEAL_II_DEPRECATED;
-
-  /**
    * Compute the elementwise ratio of the two given vectors, that is let
    * <tt>this[i] = a[i]/b[i]</tt>. This is useful for example if you want to
    * compute the cellwise ratio of true to estimated error.
@@ -822,15 +762,8 @@ public:
               const Vector<Number> &b) DEAL_II_DEPRECATED;
 
   /**
-   * This function does nothing but is there for compatibility with the @p
-   * PETScWrappers::Vector class.
-   *
-   * For the PETSc vector wrapper class, this function updates the ghost
-   * values of the PETSc vector. This is necessary after any modification
-   * before reading ghost values.
-   *
-   * However, for the implementation of this class, it is immaterial and thus
-   * an empty function.
+   * This function does nothing but exists for compatibility with the @p
+   * parallel vector classes (e.g., LinearAlgebra::distributed::Vector class).
    */
   void update_ghost_values () const;
   //@}
@@ -846,7 +779,7 @@ public:
    *
    * This function is deprecated.
    */
-  void print (const char *format = 0) const DEAL_II_DEPRECATED;
+  void print (const char *format = nullptr) const DEAL_II_DEPRECATED;
 
   /**
    * Print to a stream. @p precision denotes the desired precision with which
@@ -917,7 +850,7 @@ public:
   //@{
 
   /**
-   * Returns true if the given global index is in the local range of this
+   * Return true if the given global index is in the local range of this
    * processor.  Since this is not a distributed vector the method always
    * returns true.
    */
@@ -995,7 +928,7 @@ protected:
    * For parallel loops with TBB, this member variable stores the affinity
    * information of loops.
    */
-  mutable std_cxx11::shared_ptr<parallel::internal::TBBPartitioner> thread_loop_partitioner;
+  mutable std::shared_ptr<parallel::internal::TBBPartitioner> thread_loop_partitioner;
 
   /**
    * Make all other vector types friends.
@@ -1033,13 +966,21 @@ private:
 #ifndef DOXYGEN
 
 
+//------------------------ declarations for explicit specializations
+template <>
+Vector<int>::real_type
+Vector<int>::lp_norm (const real_type) const;
+
+
+//------------------------ inline functions
+
 template <typename Number>
 inline
 Vector<Number>::Vector ()
   :
   vec_size(0),
   max_vec_size(0),
-  val(0)
+  val(nullptr)
 {
   reinit(0);
 }
@@ -1052,7 +993,7 @@ Vector<Number>::Vector (const InputIterator first, const InputIterator last)
   :
   vec_size (0),
   max_vec_size (0),
-  val (0)
+  val (nullptr)
 {
   // allocate memory. do not initialize it, as we will copy over to it in a
   // second
@@ -1068,7 +1009,7 @@ Vector<Number>::Vector (const size_type n)
   :
   vec_size(0),
   max_vec_size(0),
-  val(0)
+  val(nullptr)
 {
   reinit (n, false);
 }
@@ -1082,7 +1023,7 @@ Vector<Number>::~Vector ()
   if (val)
     {
       deallocate();
-      val=0;
+      val=nullptr;
     }
 }
 
@@ -1236,7 +1177,7 @@ Vector<Number>::add (const std::vector<size_type> &indices,
 {
   Assert (indices.size() == values.size(),
           ExcDimensionMismatch(indices.size(), values.size()));
-  add (indices.size(), &indices[0], &values[0]);
+  add (indices.size(), indices.data(), values.data());
 }
 
 
@@ -1250,7 +1191,7 @@ Vector<Number>::add (const std::vector<size_type> &indices,
 {
   Assert (indices.size() == values.size(),
           ExcDimensionMismatch(indices.size(), values.size()));
-  add (indices.size(), &indices[0], values.val);
+  add (indices.size(), indices.data(), values.val);
 }
 
 
@@ -1397,8 +1338,19 @@ operator << (LogStream &os, const Vector<number> &v)
   return os;
 }
 
-
 /*@}*/
+
+
+/**
+ * Declare dealii::Vector< Number > as serial vector.
+ *
+ * @author Uwe Koecher, 2017
+ */
+template <typename Number>
+struct is_serial_vector< Vector<Number> > : std::true_type
+{
+};
+
 
 DEAL_II_NAMESPACE_CLOSE
 

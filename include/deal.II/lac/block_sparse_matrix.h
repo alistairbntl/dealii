@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_sparse_matrix_h
-#define dealii__block_sparse_matrix_h
+#ifndef dealii_block_sparse_matrix_h
+#define dealii_block_sparse_matrix_h
 
 
 #include <deal.II/base/config.h>
@@ -87,7 +87,7 @@ public:
    * reinit(BlockSparsityPattern). The number of blocks per row and column are
    * then determined by that function.
    */
-  BlockSparseMatrix ();
+  BlockSparseMatrix () = default;
 
   /**
    * Constructor. Takes the given matrix sparsity structure to represent the
@@ -529,4 +529,4 @@ precondition_Jacobi (Vector<number2>       &dst,
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif    // dealii__block_sparse_matrix_h
+#endif    // dealii_block_sparse_matrix_h

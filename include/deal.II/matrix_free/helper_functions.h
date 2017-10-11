@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__matrix_free_helper_functions_h
-#define dealii__matrix_free_helper_functions_h
+#ifndef dealii_matrix_free_helper_functions_h
+#define dealii_matrix_free_helper_functions_h
 
 
 #include <deal.II/base/exceptions.h>
@@ -46,12 +46,12 @@ namespace internal
       TaskInfo ();
 
       /**
-       * Clears all the data fields and resets them to zero.
+       * Clear all the data fields and resets them to zero.
        */
       void clear ();
 
       /**
-       * Returns the memory consumption of the class.
+       * Return the memory consumption of the class.
        */
       std::size_t memory_consumption () const;
 
@@ -90,7 +90,7 @@ namespace internal
       SizeInfo ();
 
       /**
-       * Clears all data fields and resets the sizes to zero.
+       * Clear all data fields and resets the sizes to zero.
        */
       void clear();
 
@@ -135,7 +135,26 @@ namespace internal
     /**
      * Data type to identify cell type.
      */
-    enum CellType {cartesian=0, affine=1, general=2, undefined=3};
+    enum CellType
+    {
+      /**
+       * The cell is Cartesian.
+       */
+      cartesian = 0,
+      /**
+       * The cell may be described with an affine mapping.
+       */
+      affine    = 1,
+      /**
+       * There is no special information available for compressing the
+       * representation of the cell.
+       */
+      general   = 2,
+      /**
+       * The cell type is undefined.
+       */
+      undefined = 3
+    };
 
 
     /**
@@ -150,7 +169,7 @@ namespace internal
      * in the use cases for this class, but be careful when using it in other
      * contexts.
      */
-    template<typename Number>
+    template <typename Number>
     struct FPArrayComparator
     {
       FPArrayComparator (const Number scaling);

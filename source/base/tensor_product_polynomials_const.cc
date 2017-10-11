@@ -45,7 +45,7 @@ TensorProductPolynomialsConst<dim>::compute_value (const unsigned int i,
 
 template <>
 double
-TensorProductPolynomialsConst<0>::compute_value (const unsigned int ,
+TensorProductPolynomialsConst<0>::compute_value (const unsigned int,
                                                  const Point<0> &) const
 {
   Assert (false, ExcNotImplemented());
@@ -142,13 +142,13 @@ compute (const Point<dim>            &p,
   if (do_values)
     values.push_back(1.);
   if (do_grads)
-    grads.push_back(Tensor<1,dim>());
+    grads.emplace_back();
   if (do_grad_grads)
-    grad_grads.push_back(Tensor<2,dim>());
+    grad_grads.emplace_back();
   if (do_3rd_derivatives)
-    third_derivatives.push_back(Tensor<3,dim>());
+    third_derivatives.emplace_back();
   if (do_4th_derivatives)
-    fourth_derivatives.push_back(Tensor<4,dim>());
+    fourth_derivatives.emplace_back();
 }
 
 

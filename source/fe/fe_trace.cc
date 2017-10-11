@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -26,6 +26,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -49,6 +50,14 @@ FE_TraceQ<dim,spacedim>::FE_TraceQ (const unsigned int degree)
 
   // Initialize face support points
   this->unit_face_support_points = fe_q.get_unit_face_support_points();
+
+  // initialize unit support points (this makes it possible to assign initial
+  // values to FE_TraceQ). Note that we simply take the points of fe_q but
+  // skip the last ones which are associated with the interior of FE_Q.
+  this->unit_support_points.resize(this->dofs_per_cell);
+  for (unsigned int i=0; i<this->dofs_per_cell; ++i)
+    this->unit_support_points[i] = fe_q.get_unit_support_points()[i];
+
   // Initialize constraint matrices
   this->interface_constraints = fe_q.constraints();
 }
@@ -56,10 +65,10 @@ FE_TraceQ<dim,spacedim>::FE_TraceQ (const unsigned int degree)
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_TraceQ<dim,spacedim>::clone() const
 {
-  return new FE_TraceQ<dim,spacedim>(this->degree);
+  return std_cxx14::make_unique<FE_TraceQ<dim,spacedim>>(this->degree);
 }
 
 
@@ -68,7 +77,7 @@ template <int dim, int spacedim>
 std::string
 FE_TraceQ<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
 
@@ -209,7 +218,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe
     {
       fe_q.get_subface_interpolation_matrix (source_fe->fe_q, subface, interpolation_matrix);
     }
-  else if (dynamic_cast<const FE_Nothing<dim> *>(&x_source_fe) != 0)
+  else if (dynamic_cast<const FE_Nothing<dim> *>(&x_source_fe) != nullptr)
     {
       // nothing to do here, the FE_Nothing has no degrees of freedom anyway
     }
@@ -232,7 +241,7 @@ template <int spacedim>
 std::string
 FE_TraceQ<1,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
   std::ostringstream namebuf;

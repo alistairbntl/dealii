@@ -14,10 +14,8 @@
 // ---------------------------------------------------------------------
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/geometry_info.h>
 
-#include <fstream>
 
 #include <bitset>
 
@@ -29,7 +27,7 @@ using namespace dealii;
 //
 
 
-template<int dim>
+template <int dim>
 void test_vertices()
 {
   deallog << dim << "D:" << std::endl;
@@ -60,7 +58,7 @@ void test_vertices()
 }
 
 
-template<int dim>
+template <int dim>
 void test_lines()
 {
   deallog << dim << "D:" << std::endl;
@@ -93,9 +91,7 @@ void test_lines()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   deallog << std::endl << "GeometryInfo<dim>::face_to_cell_vertices:" << std::endl;
 

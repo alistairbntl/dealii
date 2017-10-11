@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2008 - 2015 by the deal.II authors
+ * Copyright (C) 2008 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -283,7 +283,7 @@ namespace Step22
     triangulation (mpi_communicator/*,
                    Triangulation<dim>::maximum_smoothing*/),
     fe (FE_Q<dim>(degree+1), dim,
-        FE_Q<dim>(degree)  , 1),
+        FE_Q<dim>(degree), 1),
     dof_handler (triangulation),
     pcout (Utilities::MPI::this_mpi_process(mpi_communicator)
            == 0
@@ -342,12 +342,12 @@ namespace Step22
 #endif
       VectorTools::interpolate_boundary_values (dof_handler,
                                                 0,
-                                                BoundaryValues<dim>(),//ZeroFunction<dim>(dim+1),
+                                                BoundaryValues<dim>(),//Functions::ZeroFunction<dim>(dim+1),
                                                 constraints,
                                                 fe.component_mask(velocities));
       VectorTools::interpolate_boundary_values (dof_handler,
                                                 1,
-                                                BoundaryValues<dim>(),//ZeroFunction<dim>(dim+1),
+                                                BoundaryValues<dim>(),//Functions::ZeroFunction<dim>(dim+1),
                                                 constraints,
                                                 fe.component_mask(velocities));
 
@@ -365,9 +365,9 @@ namespace Step22
       GridTools::collect_periodic_faces(
         dof_handler, 2, 3, 1, periodicity_vector, Tensor<1, dim>(), matrix);
 
-      DoFTools::make_periodicity_constraints<DoFHandler<dim>>(
-                                                             periodicity_vector, constraints, fe.component_mask(velocities)),
-                                                                                 first_vector_components;
+      DoFTools::make_periodicity_constraints<DoFHandler<dim> >(
+        periodicity_vector, constraints, fe.component_mask(velocities)),
+                            first_vector_components;
 #endif
     }
 
@@ -775,7 +775,6 @@ int main (int argc, char *argv[])
         {
           std::ofstream logfile("output");
           deallog.attach(logfile, false);
-          deallog.threshold_double(1.e-10);
           {
             StokesProblem<2> flow_problem(1);
             flow_problem.run ();

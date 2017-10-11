@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__chunk_sparse_matrix_h
-#define dealii__chunk_sparse_matrix_h
+#ifndef dealii_chunk_sparse_matrix_h
+#define dealii_chunk_sparse_matrix_h
 
 
 #include <deal.II/base/config.h>
@@ -24,10 +24,13 @@
 #include <deal.II/lac/identity_matrix.h>
 #include <deal.II/lac/exceptions.h>
 
+#include <memory>
+
+
 DEAL_II_NAMESPACE_OPEN
 
-template<typename number> class Vector;
-template<typename number> class FullMatrix;
+template <typename number> class Vector;
+template <typename number> class FullMatrix;
 
 /*! @addtogroup Matrix1
  *@{
@@ -579,13 +582,13 @@ public:
   bool empty () const;
 
   /**
-   * Return the dimension of the codomain (or range) space. To remember: the
+   * Return the dimension of the codomain (or range) space. Note that the
    * matrix is of dimension $m \times n$.
    */
   size_type m () const;
 
   /**
-   * Return the dimension of the domain space. To remember: the matrix is of
+   * Return the dimension of the domain space. Note that the matrix is of
    * dimension $m \times n$.
    */
   size_type n () const;
@@ -1325,12 +1328,13 @@ private:
   SmartPointer<const ChunkSparsityPattern,ChunkSparseMatrix<number> > cols;
 
   /**
-   * Array of values for all the nonzero entries. The position within the
-   * matrix, i.e.  the row and column number for a given entry can only be
-   * deduced using the sparsity pattern. The same holds for the more common
-   * operation of finding an entry by its coordinates.
+   * Array of values for all the nonzero entries. The position of an
+   * entry within the matrix, i.e., the row and column number for a
+   * given value in this array can only be deduced using the sparsity
+   * pattern. The same holds for the more common operation of finding
+   * an entry by its coordinates.
    */
-  number *val;
+  std::unique_ptr<number[]> val;
 
   /**
    * Allocated size of #val. This can be larger than the actually used part if
@@ -1368,7 +1372,7 @@ inline
 typename ChunkSparseMatrix<number>::size_type
 ChunkSparseMatrix<number>::m () const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   return cols->rows;
 }
 
@@ -1378,7 +1382,7 @@ inline
 typename ChunkSparseMatrix<number>::size_type
 ChunkSparseMatrix<number>::n () const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   return cols->cols;
 }
 
@@ -1389,7 +1393,7 @@ inline
 const ChunkSparsityPattern &
 ChunkSparseMatrix<number>::get_sparsity_pattern () const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   return *cols;
 }
 
@@ -1427,7 +1431,7 @@ void ChunkSparseMatrix<number>::set (const size_type i,
 
   AssertIsFinite(value);
 
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   // it is allowed to set elements of the matrix that are not part of the
   // sparsity pattern, if the value to which we set it is zero
   const size_type index = compute_location(i,j);
@@ -1450,7 +1454,7 @@ void ChunkSparseMatrix<number>::add (const size_type i,
 
   AssertIsFinite(value);
 
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
 
   if (value != 0.)
     {
@@ -1486,8 +1490,8 @@ inline
 ChunkSparseMatrix<number> &
 ChunkSparseMatrix<number>::operator *= (const number factor)
 {
-  Assert (cols != 0, ExcNotInitialized());
-  Assert (val != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
+  Assert (val != nullptr, ExcNotInitialized());
 
   const size_type chunk_size = cols->get_chunk_size();
 
@@ -1495,8 +1499,8 @@ ChunkSparseMatrix<number>::operator *= (const number factor)
   // the padding elements in chunks that overlap the boundaries of the actual
   // matrix -- but since multiplication with a number does not violate the
   // invariant of keeping these elements at zero nothing can happen
-  number             *val_ptr    = val;
-  const number *const end_ptr    = val +
+  number             *val_ptr    = val.get();
+  const number *const end_ptr    = val.get() +
                                    cols->sparsity_pattern.n_nonzero_elements()
                                    *
                                    chunk_size * chunk_size;
@@ -1513,8 +1517,8 @@ inline
 ChunkSparseMatrix<number> &
 ChunkSparseMatrix<number>::operator /= (const number factor)
 {
-  Assert (cols != 0, ExcNotInitialized());
-  Assert (val != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
+  Assert (val != nullptr, ExcNotInitialized());
   Assert (factor !=0, ExcDivideByZero());
 
   const number factor_inv = 1. / factor;
@@ -1525,8 +1529,8 @@ ChunkSparseMatrix<number>::operator /= (const number factor)
   // the padding elements in chunks that overlap the boundaries of the actual
   // matrix -- but since multiplication with a number does not violate the
   // invariant of keeping these elements at zero nothing can happen
-  number             *val_ptr    = val;
-  const number *const end_ptr    = val +
+  number             *val_ptr    = val.get();
+  const number *const end_ptr    = val.get() +
                                    cols->sparsity_pattern.n_nonzero_elements()
                                    *
                                    chunk_size * chunk_size;
@@ -1544,7 +1548,7 @@ inline
 number ChunkSparseMatrix<number>::operator () (const size_type i,
                                                const size_type j) const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   AssertThrow (compute_location(i,j) != SparsityPattern::invalid_entry,
                ExcInvalidIndex(i,j));
   return val[compute_location(i,j)];
@@ -1557,7 +1561,7 @@ inline
 number ChunkSparseMatrix<number>::el (const size_type i,
                                       const size_type j) const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   const size_type index = compute_location(i,j);
 
   if (index != ChunkSparsityPattern::invalid_entry)
@@ -1572,7 +1576,7 @@ template <typename number>
 inline
 number ChunkSparseMatrix<number>::diag_element (const size_type i) const
 {
-  Assert (cols != 0, ExcNotInitialized());
+  Assert (cols != nullptr, ExcNotInitialized());
   Assert (m() == n(),  ExcNotQuadratic());
   AssertIndexRange(i, m());
 

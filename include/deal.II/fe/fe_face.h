@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_face_h
-#define dealii__fe_face_h
+#ifndef dealii_fe_face_h
+#define dealii_fe_face_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/tensor_product_polynomials.h>
@@ -59,7 +59,9 @@ public:
    */
   FE_FaceQ (const unsigned int p);
 
-  virtual FiniteElement<dim,spacedim> *clone() const;
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
   /**
    * Return a string that uniquely identifies a finite element. This class
@@ -111,8 +113,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -120,7 +122,7 @@ public:
   compare_for_face_domination (const FiniteElement<dim,spacedim> &fe_other) const;
 
   /**
-   * Returns a list of constant modes of the element. For this element, it
+   * Return a list of constant modes of the element. For this element, it
    * simply returns one row with all entries set to true.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
@@ -156,10 +158,9 @@ public:
    */
   FE_FaceQ (const unsigned int p);
 
-  /**
-   * Clone method.
-   */
-  virtual FiniteElement<1,spacedim> *clone() const;
+  virtual
+  std::unique_ptr<FiniteElement<1,spacedim>>
+                                          clone() const;
 
   /**
    * Return a string that uniquely identifies a finite element. This class
@@ -216,8 +217,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -225,7 +226,7 @@ public:
   compare_for_face_domination (const FiniteElement<1,spacedim> &fe_other) const;
 
   /**
-   * Returns a list of constant modes of the element. For this element, it
+   * Return a list of constant modes of the element. For this element, it
    * simply returns one row with all entries set to true.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
@@ -358,10 +359,9 @@ public:
    */
   FE_FaceP(unsigned int p);
 
-  /**
-   * Clone method.
-   */
-  virtual FiniteElement<dim,spacedim> *clone() const;
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
   /**
    * Return a string that uniquely identifies a finite element. This class
@@ -413,8 +413,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -422,7 +422,7 @@ public:
   compare_for_face_domination (const FiniteElement<dim,spacedim> &fe_other) const;
 
   /**
-   * Returns a list of constant modes of the element. For this element, the
+   * Return a list of constant modes of the element. For this element, the
    * first entry on each face is true, all other are false (as the constant
    * function is represented by the first base function of Legendre
    * polynomials).
@@ -452,7 +452,7 @@ public:
   FE_FaceP (const unsigned int p);
 
   /**
-   * Returns the name of the element
+   * Return the name of the element
    */
   std::string get_name() const;
 };

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,7 +17,6 @@
 // be executed with exactly two threads.
 
 #include <deal.II/grid/tria.h>
-#include <stdio.h>
 #include <sched.h>
 #include <mpi.h>
 #include <iostream>
@@ -40,13 +39,21 @@ int main(int argc, char *argv[] )
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  int err;
+  int err = MPI_SUCCESS;
   int value = myrank;
 
   if (myrank==1)
     err = MPI_Send(&value, 1, MPI_INT, 0, 1, MPI_COMM_WORLD);
   else if (myrank==0)
     err = MPI_Recv(&value, 1, MPI_INT, 1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+  if (err != MPI_SUCCESS)
+    {
+      std::cerr << "MPI_Send/Recv error code = "
+                << err
+                << std::endl;
+      abort ();
+    }
 
   if (myrank==0 && value!=1)
     {

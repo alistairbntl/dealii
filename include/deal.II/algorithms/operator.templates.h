@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,22 +13,23 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_operator_templates_h
+#define dealii_operator_templates_h
+
 
 #include <deal.II/algorithms/operator.h>
 #include <deal.II/base/logstream.h>
+#include <deal.II/lac/vector_element_access.h>
 
 DEAL_II_NAMESPACE_OPEN
 
 namespace Algorithms
 {
   template <typename VectorType>
-  OutputOperator<VectorType>::~OutputOperator()
-  {}
-
-  template <typename VectorType>
   OutputOperator<VectorType>::OutputOperator()
     :
-    os(0)
+    step (numbers::invalid_unsigned_int),
+    os(nullptr)
   {}
 
   template <typename VectorType>
@@ -41,16 +42,17 @@ namespace Algorithms
   OutputOperator<VectorType> &
   OutputOperator<VectorType>::operator<< (const AnyData &vectors)
   {
-    if (os == 0)
+    if (os == nullptr)
       {
         deallog << "Step " << step << std::endl;
         for (unsigned int i=0; i<vectors.size(); ++i)
           {
             const VectorType *v = vectors.try_read_ptr<VectorType>(i);
-            if (v == 0) continue;
+            if (v == nullptr) continue;
             deallog << vectors.name(i);
             for (unsigned int j=0; j<v->size(); ++j)
-              deallog << ' ' << (*v)(j);
+              deallog << ' '
+                      << ::dealii::internal::ElementAccess<VectorType>::get(*v, j);
             deallog << std::endl;
           }
         deallog << std::endl;
@@ -61,9 +63,10 @@ namespace Algorithms
         for (unsigned int i=0; i<vectors.size(); ++i)
           {
             const VectorType *v = vectors.try_read_ptr<VectorType>(i);
-            if (v == 0) continue;
+            if (v == nullptr) continue;
             for (unsigned int j=0; j<v->size(); ++j)
-              (*os) << ' ' << (*v)(j);
+              (*os) << ' '
+                    << ::dealii::internal::ElementAccess<VectorType>::get(*v, j);
           }
         (*os) << std::endl;
       }
@@ -72,3 +75,5 @@ namespace Algorithms
 }
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

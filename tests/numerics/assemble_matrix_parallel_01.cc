@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,7 +23,6 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/base/graph_coloring.h>
@@ -42,11 +41,10 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/error_estimator.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/hp/dof_handler.h>
 #include <deal.II/hp/fe_values.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -259,13 +257,13 @@ void LaplaceProblem<dim>::setup_system ()
   constraints.close ();
 
   graph = GraphColoring::make_graph_coloring(dof_handler.begin_active(),dof_handler.end(),
-                                             static_cast<std_cxx11::function<std::vector<types::global_dof_index>
+                                             static_cast<std::function<std::vector<types::global_dof_index>
                                              (typename hp::DoFHandler<dim>::active_cell_iterator const &)> >
-                                             (std_cxx11::bind(&LaplaceProblem<dim>::get_conflict_indices, this,std_cxx11::_1)));
+                                             (std::bind(&LaplaceProblem<dim>::get_conflict_indices, this,std::placeholders::_1)));
 
 
-  CompressedSimpleSparsityPattern csp (dof_handler.n_dofs(),
-                                       dof_handler.n_dofs());
+  DynamicSparsityPattern csp (dof_handler.n_dofs(),
+                              dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern (dof_handler, csp,
                                    constraints, false);
   sparsity_pattern.copy_from (csp);
@@ -362,23 +360,22 @@ void LaplaceProblem<dim>::assemble_test ()
 
   WorkStream::
   run (graph,
-       std_cxx11::bind (&LaplaceProblem<dim>::
-                        local_assemble,
-                        this,
-                        std_cxx11::_1,
-                        std_cxx11::_2,
-                        std_cxx11::_3),
-       std_cxx11::bind (&LaplaceProblem<dim>::
-                        copy_local_to_global,
-                        this,
-                        std_cxx11::_1),
+       std::bind (&LaplaceProblem<dim>::
+                  local_assemble,
+                  this,
+                  std::placeholders::_1,
+                  std::placeholders::_2,
+                  std::placeholders::_3),
+       std::bind (&LaplaceProblem<dim>::
+                  copy_local_to_global,
+                  this,
+                  std::placeholders::_1),
        Assembly::Scratch::Data<dim>(fe_collection, quadrature_collection),
        Assembly::Copy::Data ());
 
   test_matrix.add(-1, reference_matrix);
 
   // there should not even be roundoff difference between matrices
-  deallog.threshold_double(1.e-30);
   deallog << "error in matrix: " << test_matrix.frobenius_norm() << std::endl;
   test_rhs.add(-1., reference_rhs);
   deallog << "error in vector: " << test_rhs.l2_norm() << std::endl;

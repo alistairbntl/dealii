@@ -18,11 +18,9 @@
 // LAPACKFullMatrix::apply_lu_factorization
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/lapack_full_matrix.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
 #include <iostream>
 
 
@@ -82,7 +80,6 @@ int main()
   std::ofstream logfile(logname.c_str());
   logfile.precision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test(4, false);
   test(4, true);

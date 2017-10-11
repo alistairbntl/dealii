@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_dgp_nonparametric_h
-#define dealii__fe_dgp_nonparametric_h
+#ifndef dealii_fe_dgp_nonparametric_h
+#define dealii_fe_dgp_nonparametric_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/polynomial.h>
@@ -281,6 +281,10 @@ public:
    */
   virtual std::string get_name () const;
 
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
+
   // for documentation, see the FiniteElement base class
   virtual
   UpdateFlags
@@ -468,8 +472,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -497,48 +501,7 @@ public:
    */
   virtual std::size_t memory_consumption () const;
 
-
-private:
-  /**
-   * Declare a nested class which will hold static definitions of various
-   * matrices such as constraint and embedding matrices. The definition of the
-   * various static fields are in the files <tt>fe_dgp_[123]d.cc</tt> in the
-   * source directory.
-   */
-  struct Matrices
-  {
-    /**
-     * Pointers to the embedding matrices, one for each polynomial degree
-     * starting from constant elements
-     */
-    static const double *const embedding[][GeometryInfo<dim>::max_children_per_cell];
-
-    /**
-     * Number of elements (first index) the above field has. Equals the
-     * highest polynomial degree plus one for which the embedding matrices
-     * have been computed.
-     */
-    static const unsigned int n_embedding_matrices;
-
-    /**
-     * As @p embedding but for projection matrices.
-     */
-    static const double *const projection_matrices[][GeometryInfo<dim>::max_children_per_cell];
-
-    /**
-     * As @p n_embedding_matrices but for projection matrices.
-     */
-    static const unsigned int n_projection_matrices;
-  };
-
 protected:
-
-  /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim,spacedim> *clone() const;
 
   /**
    * Prepare internal data structures and fill in values independent of the
@@ -598,11 +561,6 @@ private:
   get_dpo_vector (const unsigned int degree);
 
   /**
-   * Degree of the polynomials.
-   */
-  const unsigned int degree;
-
-  /**
    * Pointer to an object representing the polynomial space used here.
    */
   const PolynomialSpace<dim> polynomial_space;
@@ -614,50 +572,6 @@ private:
 };
 
 /*@}*/
-
-#ifndef DOXYGEN
-
-// declaration of explicit specializations of member variables, if the
-// compiler allows us to do that (the standard says we must)
-#ifndef DEAL_II_MEMBER_VAR_SPECIALIZATION_BUG
-template <>
-const double *const FE_DGPNonparametric<1,1>::Matrices::embedding[][GeometryInfo<1>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGPNonparametric<1,1>::Matrices::n_embedding_matrices;
-
-template <>
-const double *const FE_DGPNonparametric<1,1>::Matrices::projection_matrices[][GeometryInfo<1>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGPNonparametric<1,1>::Matrices::n_projection_matrices;
-
-template <>
-const double *const FE_DGPNonparametric<2,2>::Matrices::embedding[][GeometryInfo<2>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGPNonparametric<2,2>::Matrices::n_embedding_matrices;
-
-template <>
-const double *const FE_DGPNonparametric<2,2>::Matrices::projection_matrices[][GeometryInfo<2>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGPNonparametric<2,2>::Matrices::n_projection_matrices;
-
-template <>
-const double *const FE_DGPNonparametric<3,3>::Matrices::embedding[][GeometryInfo<3>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGPNonparametric<3,3>::Matrices::n_embedding_matrices;
-
-template <>
-const double *const FE_DGPNonparametric<3,3>::Matrices::projection_matrices[][GeometryInfo<3>::max_children_per_cell];
-
-template <>
-const unsigned int FE_DGPNonparametric<3,3>::Matrices::n_projection_matrices;
-#endif
-
-#endif // DOXYGEN
 
 DEAL_II_NAMESPACE_CLOSE
 

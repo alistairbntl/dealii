@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__integrators_l2_h
-#define dealii__integrators_l2_h
+#ifndef dealii_integrators_l2_h
+#define dealii_integrators_l2_h
 
 
 #include <deal.II/base/config.h>
@@ -105,7 +105,7 @@ namespace LocalIntegrators
     void weighted_mass_matrix (
       FullMatrix<double> &M,
       const FEValuesBase<dim> &fe,
-      const std::vector<double> weights)
+      const std::vector<double> &weights)
     {
       const unsigned int n_dofs = fe.dofs_per_cell;
       const unsigned int n_components = fe.get_fe().n_components();
@@ -182,11 +182,10 @@ namespace LocalIntegrators
       const double factor = 1.)
     {
       const unsigned int n_dofs = fe.dofs_per_cell;
-      const unsigned int fe_components = fe.get_fe().n_components();
       const unsigned int n_components = input.size();
 
       AssertDimension(result.size(), n_dofs);
-      AssertDimension(input.size(), fe_components);
+      AssertDimension(input.size(), fe.get_fe().n_components());
 
       for (unsigned int k=0; k<fe.n_quadrature_points; ++k)
         for (unsigned int i=0; i<n_dofs; ++i)
@@ -222,6 +221,7 @@ namespace LocalIntegrators
       const unsigned int n_components = fe1.get_fe().n_components();
 
       Assert(n1_dofs == n2_dofs, ExcNotImplemented());
+      (void) n2_dofs;
       AssertDimension(n_components, fe2.get_fe().n_components());
       AssertDimension(M11.m(), n1_dofs);
       AssertDimension(M12.m(), n1_dofs);

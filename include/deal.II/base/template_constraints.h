@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__template_constraints_h
-#define dealii__template_constraints_h
+#ifndef dealii_template_constraints_h
+#define dealii_template_constraints_h
 
 
 #include <deal.II/base/config.h>
@@ -24,6 +24,69 @@
 #include <utility>
 
 DEAL_II_NAMESPACE_OPEN
+
+namespace internal
+{
+  namespace TemplateConstraints
+  {
+    // helper struct for is_base_of_all and all_same_as
+    template <bool... Values> struct BoolStorage;
+
+
+    /**
+     * A helper class whose `value` member is true or false depending on
+    // whether all of the given boolean template arguments are true.
+     */
+    template <bool... Values>
+    struct all_true
+    {
+      static constexpr bool value =
+        std::is_same<BoolStorage<Values..., true>,
+        BoolStorage<true, Values...>>::value;
+    };
+  }
+}
+
+/**
+ * This struct is a generalization of std::is_base_of<Base, Derived>
+ * to template parameter packs and tests if all of the Derived...
+ * classes have Base as base class or are Base itself. The result
+ * is stored in the member variable value.
+ */
+template <class Base, class... Derived>
+struct is_base_of_all
+{
+  static constexpr bool value =
+    internal::TemplateConstraints::all_true<std::is_base_of<Base,Derived>::value...>::value;
+};
+
+
+
+/**
+ * This struct is a generalization of std::is_same to template
+ * parameter packs and tests if all of the types in the `Types...`
+ * parameter pack are equal to the `Type` given as first template
+ * argument. The result is stored in the member variable value.
+ */
+template <class Type, class... Types>
+struct all_same_as
+{
+  static constexpr bool value =
+    internal::TemplateConstraints::all_true<std::is_same<Type, Types>::value...>::value;
+};
+
+
+
+/*
+ * A generalization of `std::enable_if` that only works if
+ * <i>all</i> of the given boolean template parameters are
+ * true.
+ */
+template <bool... Values>
+struct enable_if_all : std::enable_if<internal::TemplateConstraints::all_true<Values...>::value>
+{};
+
+
 
 template <bool, typename> struct constraint_and_return_value;
 
@@ -81,12 +144,14 @@ template <bool, typename> struct constraint_and_return_value;
  * constraint_and_return_value template is true, then the return type is just
  * the second type in the template.
  *
+ * @deprecated Use std::enable_if instead.
+ *
  * @author Wolfgang Bangerth, 2003
  */
 template <typename T> struct constraint_and_return_value<true,T>
 {
   typedef T type;
-};
+} DEAL_II_DEPRECATED;
 
 
 
@@ -174,7 +239,11 @@ struct PointerComparison
    * two pointers are equal.
    */
   template <typename T>
-  static bool equal (const T *p1, const T *p2);
+  static bool equal (const T *p1, const T *p2)
+  {
+    return (p1==p2);
+  }
+
 
   /**
    * Comparison function for pointers of different types. The C++ language
@@ -183,7 +252,11 @@ struct PointerComparison
    * can't be the same, so we always return @p false.
    */
   template <typename T, typename U>
-  static bool equal (const T *, const U *);
+  static bool equal (const T *, const U *)
+  {
+    return false;
+  }
+
 };
 
 
@@ -246,21 +319,25 @@ namespace internal
    * still select which of the different <code>X::f()</code> we want based on
    * the <code>subdim</code> template argument.
    *
+   * @deprecated Use std::integral_constant<int, N> instead.
+   *
    * @author Wolfgang Bangerth, 2006
    */
   template <int N>
   struct int2type
-  {};
+  {} DEAL_II_DEPRECATED;
 
 
   /**
    * The equivalent of the int2type class for boolean arguments.
    *
+   * @deprecated Use std::integral_constant<bool, B> instead.
+   *
    * @author Wolfgang Bangerth, 2009
    */
   template <bool B>
   struct bool2type
-  {};
+  {} DEAL_II_DEPRECATED;
 }
 
 
@@ -271,7 +348,7 @@ namespace internal
  * @code
  *   template <typename T>
  *   void Vector<T>::some_operation () {
- *     if (types_are_equal<T,double>::value == true)
+ *     if (std::is_same<T,double>::value == true)
  *       call_some_blas_function_for_doubles;
  *     else
  *       do_it_by_hand;
@@ -280,24 +357,38 @@ namespace internal
  *
  * This construct is made possible through the existence of a partial
  * specialization of the class for template arguments that are equal.
+ *
+ * @deprecated Use the standard library type trait <code>std::is_same</code>
+ * instead of this class.
  */
 template <typename T, typename U>
-struct types_are_equal
-{
-  static const bool value = false;
-};
+struct types_are_equal : std::is_same<T,U>
+{} DEAL_II_DEPRECATED;
 
 
-/**
- * Partial specialization of the general template for the case that both
- * template arguments are equal. See the documentation of the general template
- * for more information.
- */
-template <typename T>
-struct types_are_equal<T,T>
+
+namespace internal
 {
-  static const bool value = true;
-};
+
+  /**
+   * A struct that implements the default product type resulting from the
+   * multiplication of two types.
+   *
+   * @note Care should be taken when @p T or @p U have qualifiers (@p const or
+   * @p volatile) or are @p lvalue or @p rvalue references! It is recommended
+   * that specialization of this class is only made for unqualified (fully
+   * stripped) types and that the ProductType class be used to determine the
+   * result of operating with (potentially) qualified types.
+   *
+   * @author Wolfgang Bangerth, Jean-Paul Pelteret, 2017
+   */
+  template <typename T, typename U>
+  struct ProductTypeImpl
+  {
+    typedef decltype(std::declval<T>() * std::declval<U>()) type;
+  };
+
+}
 
 
 
@@ -347,163 +438,60 @@ struct types_are_equal<T,T>
  * used for the result of computing the product of unknowns and the values,
  * gradients, or other properties of shape functions.
  *
- * @author Wolfgang Bangerth, 2015
+ * @author Wolfgang Bangerth, 2015, 2017
  */
 template <typename T, typename U>
 struct ProductType
 {
-#ifdef DEAL_II_WITH_CXX11
-  typedef decltype(std::declval<T>() * std::declval<U>()) type;
-#endif
+  typedef typename internal::ProductTypeImpl<
+  typename std::decay<T>::type, typename std::decay<U>::type>::type type;
 };
 
-#ifndef DEAL_II_WITH_CXX11
-
-template <typename T>
-struct ProductType<T,T>
+namespace internal
 {
-  typedef T type;
-};
 
-template <typename T>
-struct ProductType<T,bool>
-{
-  typedef T type;
-};
+  // Annoyingly, there is no std::complex<T>::operator*(U) for scalars U
+  // other than T (not even in C++11, or C++14). We provide our own overloads
+  // in base/complex_overloads.h, but in order for them to work, we have to
+  // manually specify all products we want to allow:
 
-template <typename T>
-struct ProductType<bool, T>
-{
-  typedef T type;
-};
+  template <typename T>
+  struct ProductTypeImpl<std::complex<T>,std::complex<T> >
+  {
+    typedef std::complex<T> type;
+  };
 
-template <>
-struct ProductType<bool,double>
-{
-  typedef double type;
-};
+  template <typename T, typename U>
+  struct ProductTypeImpl<std::complex<T>,std::complex<U> >
+  {
+    typedef std::complex<typename ProductType<T,U>::type> type;
+  };
 
-template <>
-struct ProductType<double,bool>
-{
-  typedef double type;
-};
+  template <typename U>
+  struct ProductTypeImpl<double,std::complex<U> >
+  {
+    typedef std::complex<typename ProductType<double,U>::type> type;
+  };
 
-template <>
-struct ProductType<double,float>
-{
-  typedef double type;
-};
+  template <typename T>
+  struct ProductTypeImpl<std::complex<T>,double>
+  {
+    typedef std::complex<typename ProductType<T,double>::type> type;
+  };
 
-template <>
-struct ProductType<float,double>
-{
-  typedef double type;
-};
+  template <typename U>
+  struct ProductTypeImpl<float,std::complex<U> >
+  {
+    typedef std::complex<typename ProductType<float,U>::type> type;
+  };
 
-template <>
-struct ProductType<double,long double>
-{
-  typedef long double type;
-};
+  template <typename T>
+  struct ProductTypeImpl<std::complex<T>,float>
+  {
+    typedef std::complex<typename ProductType<T,float>::type> type;
+  };
 
-template <>
-struct ProductType<long double,double>
-{
-  typedef long double type;
-};
-
-template <>
-struct ProductType<double,int>
-{
-  typedef double type;
-};
-
-template <>
-struct ProductType<int,double>
-{
-  typedef double type;
-};
-
-template <>
-struct ProductType<float,int>
-{
-  typedef float type;
-};
-
-template <>
-struct ProductType<int,float>
-{
-  typedef float type;
-};
-
-template <>
-struct ProductType<double, unsigned int>
-{
-  typedef double type;
-};
-
-template <>
-struct ProductType<unsigned int, double>
-{
-  typedef double type;
-};
-
-template <>
-struct ProductType<float,unsigned int>
-{
-  typedef float type;
-};
-
-template <>
-struct ProductType<unsigned int,float>
-{
-  typedef float type;
-};
-
-#endif
-
-// Annoyingly, there is no std::complex<T>::operator*(U) for scalars U
-// other than T (not even in C++11, or C++14). We provide our own overloads
-// in base/complex_overloads.h, but in order for them to work, we have to
-// manually specify all products we want to allow:
-
-template <typename T>
-struct ProductType<std::complex<T>,std::complex<T> >
-{
-  typedef std::complex<T> type;
-};
-
-template <typename T, typename U>
-struct ProductType<std::complex<T>,std::complex<U> >
-{
-  typedef std::complex<typename ProductType<T,U>::type> type;
-};
-
-template <typename U>
-struct ProductType<double,std::complex<U> >
-{
-  typedef std::complex<typename ProductType<double,U>::type> type;
-};
-
-template <typename T>
-struct ProductType<std::complex<T>,double>
-{
-  typedef std::complex<typename ProductType<T,double>::type> type;
-};
-
-
-template <typename U>
-struct ProductType<float,std::complex<U> >
-{
-  typedef std::complex<typename ProductType<float,U>::type> type;
-};
-
-template <typename T>
-struct ProductType<std::complex<T>,float>
-{
-  typedef std::complex<typename ProductType<T,float>::type> type;
-};
+}
 
 
 
@@ -556,7 +544,7 @@ struct ProductType<std::complex<T>,float>
  * multiply for different types of arguments, without resulting in ambiguous
  * call errors by the compiler.
  *
- * @author Wolfgang Bangerth, 2015
+ * @author Wolfgang Bangerth, Matthias Maier, 2015 - 2017
  */
 template <typename T>
 struct EnableIfScalar;
@@ -567,58 +555,30 @@ template <> struct EnableIfScalar<double>
   typedef double type;
 };
 
-
 template <> struct EnableIfScalar<float>
 {
   typedef float type;
 };
-
 
 template <> struct EnableIfScalar<long double>
 {
   typedef long double type;
 };
 
-
 template <> struct EnableIfScalar<int>
 {
   typedef int type;
 };
-
 
 template <> struct EnableIfScalar<unsigned int>
 {
   typedef unsigned int type;
 };
 
-
-
 template <typename T> struct EnableIfScalar<std::complex<T> >
 {
   typedef std::complex<T> type;
 };
-
-
-// --------------- inline functions -----------------
-
-
-template <typename T, typename U>
-inline
-bool
-PointerComparison::equal (const T *, const U *)
-{
-  return false;
-}
-
-
-
-template <typename T>
-inline
-bool
-PointerComparison::equal (const T *p1, const T *p2)
-{
-  return (p1==p2);
-}
 
 
 DEAL_II_NAMESPACE_CLOSE

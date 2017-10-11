@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2016 by the deal.II authors
+// Copyright (C) 2002 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__table_h
-#define dealii__table_h
+#ifndef dealii_table_h
+#define dealii_table_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
@@ -166,9 +166,9 @@ namespace internal
                 const iterator    data);
 
       /**
-       * Default constructor. Not needed, and invisible, so private.
+       * Default constructor. Not needed, and invisible, so deleted.
        */
-      Accessor ();
+      Accessor () = delete;
 
     public:
 
@@ -269,9 +269,9 @@ namespace internal
                 const iterator    data);
 
       /**
-       * Default constructor. Not needed, so private.
+       * Default constructor. Not needed, so deleted.
        */
-      Accessor ();
+      Accessor () = delete;
 
     public:
       /**
@@ -414,7 +414,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  TableBase ();
+  TableBase () = default;
 
   /**
    * Constructor. Initialize the array with the given dimensions in each index
@@ -445,9 +445,14 @@ public:
   TableBase (const TableBase<N,T2> &src);
 
   /**
+   * Move constructor. Transfers the contents of another Table.
+   */
+  TableBase (TableBase<N,T> &&src);
+
+  /**
    * Destructor. Free allocated memory.
    */
-  ~TableBase ();
+  ~TableBase () = default;
 
   /**
    * Assignment operator. Copy all elements of <tt>src</tt> into the matrix.
@@ -466,8 +471,14 @@ public:
    * This function requires that the type <tt>T2</tt> is convertible to
    * <tt>T</tt>.
    */
-  template<typename T2>
+  template <typename T2>
   TableBase<N,T> &operator = (const TableBase<N,T2> &src);
+
+  /**
+   * Move assignment operator. Transfer all elements of <tt>src</tt> into the
+   * table.
+   */
+  TableBase<N,T> &operator = (TableBase<N,T> &&src);
 
   /**
    * Test for equality of two tables.
@@ -481,12 +492,12 @@ public:
   void reset_values ();
 
   /**
-   * Set the dimensions of this object to the sizes given in the argument, and
-   * newly allocate the required memory. If
-   * <tt>omit_default_initialization</tt> is set to <tt>false</tt>, all
-   * elements of the table are set to a default constructed object for the
-   * element type. Otherwise the memory is left in an uninitialized or
-   * otherwise undefined state.
+   * Set the dimensions of this object to the sizes given in the first
+   * argument, and allocate the required memory for table entries to
+   * accommodate these sizes. If @p omit_default_initialization
+   * is set to @p false, all elements of the table are set to a
+   * default constructed object for the element type. Otherwise the
+   * memory is left in an uninitialized or otherwise undefined state.
    */
   void reinit (const TableIndices<N> &new_size,
                const bool             omit_default_initialization = false);
@@ -581,9 +592,10 @@ public:
    * swaps the pointers to the data of the two vectors and therefore does not
    * need to allocate temporary storage and move data around.
    *
-   * This function is analog to the the @p swap function of all C++ standard
-   * containers. Also, there is a global function <tt>swap(u,v)</tt> that
-   * simply calls <tt>u.swap(v)</tt>, again in analogy to standard functions.
+   * This function is analogous to the @p swap function of all C++
+   * standard containers. Also, there is a global function <tt>swap(u,v)</tt>
+   * that simply calls <tt>u.swap(v)</tt>, again in analogy to standard
+   * functions.
    */
   void swap (TableBase<N,T> &v);
 
@@ -688,7 +700,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  Table ();
+  Table () = default;
 
   /**
    * Constructor. Pass down the given dimension to the base class.
@@ -807,7 +819,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  Table ();
+  Table () = default;
 
   /**
    * Constructor. Pass down the given dimensions to the base class.
@@ -992,7 +1004,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  Table ();
+  Table () = default;
 
   /**
    * Constructor. Pass down the given dimensions to the base class.
@@ -1126,7 +1138,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  Table ();
+  Table () = default;
 
   /**
    * Constructor. Pass down the given dimensions to the base class.
@@ -1219,7 +1231,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  Table ();
+  Table () = default;
 
   /**
    * Constructor. Pass down the given dimensions to the base class.
@@ -1313,7 +1325,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  Table ();
+  Table () = default;
 
   /**
    * Constructor. Pass down the given dimensions to the base class.
@@ -1409,7 +1421,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  Table ();
+  Table () = default;
 
   /**
    * Constructor. Pass down the given dimensions to the base class.
@@ -1512,7 +1524,7 @@ public:
   /**
    * Default constructor. Set all dimensions to zero.
    */
-  TransposeTable ();
+  TransposeTable () = default;
 
   /**
    * Constructor. Pass down the given dimensions to the base class.
@@ -1599,12 +1611,6 @@ protected:
 #ifndef DOXYGEN
 
 template <int N, typename T>
-TableBase<N,T>::TableBase ()
-{}
-
-
-
-template <int N, typename T>
 TableBase<N,T>::TableBase (const TableIndices<N> &sizes)
 {
   reinit (sizes);
@@ -1649,6 +1655,18 @@ TableBase<N,T>::TableBase (const TableBase<N,T2> &src)
 
 
 template <int N, typename T>
+TableBase<N,T>::TableBase (TableBase<N,T> &&src)
+  :
+  Subscriptor (std::move(src)),
+  values (std::move(src.values)),
+  table_size (src.table_size)
+{
+  src.table_size = TableIndices<N>();
+}
+
+
+
+template <int N, typename T>
 template <class Archive>
 inline
 void
@@ -1688,21 +1706,6 @@ namespace internal
 
     template <int N, typename T, bool C, unsigned int P>
     inline
-    Accessor<N,T,C,P>::Accessor ()
-      :
-      table (*static_cast<const TableType *>(0)),
-      data (0)
-    {
-      // accessor objects are only
-      // temporary objects, so should
-      // not need to be copied around
-      Assert (false, ExcInternalError());
-    }
-
-
-
-    template <int N, typename T, bool C, unsigned int P>
-    inline
     Accessor<N,T,C,P-1>
     Accessor<N,T,C,P>::operator [] (const unsigned int i) const
     {
@@ -1737,21 +1740,6 @@ namespace internal
       table (table),
       data (data)
     {}
-
-
-
-    template <int N, typename T, bool C>
-    inline
-    Accessor<N,T,C,1>::Accessor ()
-      :
-      table (*static_cast<const TableType *>(0)),
-      data (0)
-    {
-      // accessor objects are only
-      // temporary objects, so should
-      // not need to be copied around
-      Assert (false, ExcInternalError());
-    }
 
 
 
@@ -1811,13 +1799,6 @@ namespace internal
 
 template <int N, typename T>
 inline
-TableBase<N,T>::~TableBase ()
-{}
-
-
-
-template <int N, typename T>
-inline
 TableBase<N,T> &
 TableBase<N,T>::operator = (const TableBase<N,T> &m)
 {
@@ -1843,6 +1824,22 @@ TableBase<N,T>::operator = (const TableBase<N,T2> &m)
 
   return *this;
 }
+
+
+
+template <int N, typename T>
+inline
+TableBase<N,T> &
+TableBase<N,T>::operator = (TableBase<N,T> &&m)
+{
+  static_cast<Subscriptor &>(*this) = std::move(m);
+  values = std::move(m.values);
+  table_size = m.table_size;
+  m.table_size = TableIndices<N>();
+
+  return *this;
+}
+
 
 
 template <int N, typename T>
@@ -1911,11 +1908,11 @@ TableBase<N,T>::reinit (const TableIndices<N> &new_sizes,
   if (!omit_default_initialization)
     {
       if (values.empty())
-        values.resize(new_size, T());
+        values.resize(new_size);
       else
         {
           values.resize_fast(new_size);
-          values.fill(T());
+          values.fill();
         }
     }
   else
@@ -2134,13 +2131,6 @@ TableBase<N,T>::el (const TableIndices<N> &indices)
 
 template <typename T>
 inline
-Table<1,T>::Table ()
-{}
-
-
-
-template <typename T>
-inline
 Table<1,T>::Table (const unsigned int size)
   :
   TableBase<1,T> (TableIndices<1> (size))
@@ -2230,11 +2220,6 @@ Table<1,T>::operator () (const TableIndices<1> &indices)
 
 
 //---------------------------------------------------------------------------
-
-template <typename T>
-inline
-Table<2,T>::Table ()
-{}
 
 
 
@@ -2394,14 +2379,6 @@ Table<2,T>::n_cols () const
 
 
 //---------------------------------------------------------------------------
-
-template <typename T>
-inline
-TransposeTable<T>::TransposeTable ()
-{}
-
-
-
 template <typename T>
 inline
 TransposeTable<T>::TransposeTable (const unsigned int size1,
@@ -2497,12 +2474,6 @@ TransposeTable<T>::n_cols () const
 
 
 //---------------------------------------------------------------------------
-
-
-template <typename T>
-inline
-Table<3,T>::Table ()
-{}
 
 
 
@@ -2625,13 +2596,6 @@ Table<3,T>::operator () (const TableIndices<3> &indices)
 
 template <typename T>
 inline
-Table<4,T>::Table ()
-{}
-
-
-
-template <typename T>
-inline
 Table<4,T>::Table (const unsigned int size1,
                    const unsigned int size2,
                    const unsigned int size3,
@@ -2739,13 +2703,6 @@ Table<4,T>::operator () (const TableIndices<4> &indices)
 {
   return TableBase<4,T>::operator () (indices);
 }
-
-
-
-template <typename T>
-inline
-Table<5,T>::Table ()
-{}
 
 
 
@@ -2874,13 +2831,6 @@ Table<5,T>::operator () (const TableIndices<5> &indices)
 
 template <typename T>
 inline
-Table<6,T>::Table ()
-{}
-
-
-
-template <typename T>
-inline
 Table<6,T>::Table (const unsigned int size1,
                    const unsigned int size2,
                    const unsigned int size3,
@@ -2888,8 +2838,18 @@ Table<6,T>::Table (const unsigned int size1,
                    const unsigned int size5,
                    const unsigned int size6)
   :
-  TableBase<6,T> (TableIndices<6> (size1, size2, size3, size4, size5, size6))
-{}
+  TableBase<6,T> ()
+{
+  TableIndices<6> table_indices;
+  table_indices[0] = size1;
+  table_indices[1] = size2;
+  table_indices[2] = size3;
+  table_indices[3] = size4;
+  table_indices[4] = size5;
+  table_indices[5] = size6;
+
+  TableBase<6,T>::reinit(table_indices);
+}
 
 
 
@@ -3015,13 +2975,6 @@ Table<6,T>::operator () (const TableIndices<6> &indices)
 
 template <typename T>
 inline
-Table<7,T>::Table ()
-{}
-
-
-
-template <typename T>
-inline
 Table<7,T>::Table (const unsigned int size1,
                    const unsigned int size2,
                    const unsigned int size3,
@@ -3030,8 +2983,19 @@ Table<7,T>::Table (const unsigned int size1,
                    const unsigned int size6,
                    const unsigned int size7)
   :
-  TableBase<7,T> (TableIndices<7> (size1, size2, size3, size4, size5, size6, size7))
-{}
+  TableBase<7,T> ()
+{
+  TableIndices<7> table_indices;
+  table_indices[0] = size1;
+  table_indices[1] = size2;
+  table_indices[2] = size3;
+  table_indices[3] = size4;
+  table_indices[4] = size5;
+  table_indices[5] = size6;
+  table_indices[6] = size7;
+
+  TableBase<7,T>::reinit(table_indices);
+}
 
 
 

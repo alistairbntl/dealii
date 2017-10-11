@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,11 +18,7 @@
 // test lucky breakdown in GMRES (and others)
 
 #include "../tests.h"
-#include "testmatrix.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_memory.h>
@@ -32,7 +28,7 @@
 #include <deal.II/lac/precondition.h>
 #include <deal.II/base/point.h>
 
-template<typename SolverType>
+template <typename SolverType>
 void test()
 {
   const unsigned int size = 3;
@@ -62,7 +58,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<SolverGMRES<Vector<double> > >();
   test<SolverCG<Vector<double> > >();

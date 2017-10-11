@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__dof_handler_policy_h
-#define dealii__dof_handler_policy_h
+#ifndef dealii_dof_handler_policy_h
+#define dealii_dof_handler_policy_h
 
 
 
@@ -59,42 +59,50 @@ namespace internal
         /**
          * Destructor.
          */
-        virtual ~PolicyBase ();
+        virtual ~PolicyBase () = default;
 
         /**
-         * Distribute degrees of freedom on the object given as first
-         * argument. The reference to the NumberCache of the DoFHandler object
-         * has to be passed in a second argument. It could then be modified to
+         * Distribute degrees of freedom on the DoFHandler object associated
+         * with this policy object. The argument is a reference to the NumberCache
+         * of the DoFHandler object. The function may modify it to
          * make DoFHandler related functions work properly when called within
          * the policies classes. The updated NumberCache is written to that
          * argument.
          */
         virtual
-        void
-        distribute_dofs (dealii::DoFHandler<dim,spacedim> &dof_handler,
-                         NumberCache &number_cache) const = 0;
+        NumberCache
+        distribute_dofs () const = 0;
 
         /**
-         * Distribute the multigrid dofs on each level
+         * Distribute the multigrid dofs on each level of the DoFHandler
+         * associated with this policy object. Return a vector of number
+         * caches for all of the levels.
          */
         virtual
-        void
-        distribute_mg_dofs (dealii::DoFHandler<dim,spacedim> &dof_handler,
-                            std::vector<NumberCache> &number_caches) const = 0;
+        std::vector<NumberCache>
+        distribute_mg_dofs () const = 0;
 
         /**
-         * Renumber degrees of freedom as specified by the first argument. The
-         * reference to the NumberCache of the DoFHandler object has to be
-         * passed in a second argument. It could then be modified to make
-         * DoFHandler related functions work properly when called within the
-         * policies classes. The updated NumberCache is written to that
-         * argument.
+         * Renumber degrees of freedom as specified by the first argument.
+         *
+         * Return an updated NumberCache for the DoFHandler after renumbering.
          */
         virtual
-        void
-        renumber_dofs (const std::vector<types::global_dof_index> &new_numbers,
-                       dealii::DoFHandler<dim,spacedim> &dof_handler,
-                       NumberCache &number_cache) const = 0;
+        NumberCache
+        renumber_dofs (const std::vector<types::global_dof_index> &new_numbers) const = 0;
+
+        /**
+         * Renumber multilevel degrees of freedom on one level of a multigrid
+         * hierarchy. The second argument specifies the set of new DoF
+         * indices.
+         *
+         * Return an updated NumberCache for the specified level of the
+         * DoFHandler after renumbering.
+         */
+        virtual
+        NumberCache
+        renumber_mg_dofs (const unsigned int                          level,
+                          const std::vector<types::global_dof_index> &new_numbers) const = 0;
       };
 
 
@@ -102,44 +110,61 @@ namespace internal
        * This class implements the default policy for sequential operations,
        * i.e. for the case where all cells get degrees of freedom.
        */
-      template <int dim, int spacedim>
-      class Sequential : public PolicyBase<dim,spacedim>
+      template <class DoFHandlerType>
+      class Sequential : public PolicyBase<DoFHandlerType::dimension,DoFHandlerType::space_dimension>
       {
       public:
         /**
-         * Distribute degrees of freedom on the object given as last argument.
+         * Constructor.
+         * @param dof_handler The DoFHandler object upon which this
+         *   policy class is supposed to work.
          */
-        virtual
-        void
-        distribute_dofs (dealii::DoFHandler<dim,spacedim> &dof_handler,
-                         NumberCache &number_cache) const;
+        Sequential (DoFHandlerType &dof_handler);
 
-        /**
-         * Distribute multigrid DoFs.
-         */
+        // documentation is inherited
         virtual
-        void
-        distribute_mg_dofs (dealii::DoFHandler<dim,spacedim> &dof_handler,
-                            std::vector<NumberCache> &number_caches) const;
+        NumberCache
+        distribute_dofs () const;
 
-        /**
-         * Renumber degrees of freedom as specified by the first argument.
-         */
+        // documentation is inherited
         virtual
-        void
-        renumber_dofs (const std::vector<types::global_dof_index>  &new_numbers,
-                       dealii::DoFHandler<dim,spacedim> &dof_handler,
-                       NumberCache &number_cache) const;
+        std::vector<NumberCache>
+        distribute_mg_dofs () const;
+
+        // documentation is inherited
+        virtual
+        NumberCache
+        renumber_dofs (const std::vector<types::global_dof_index>  &new_numbers) const;
+
+        // documentation is inherited
+        virtual
+        NumberCache
+        renumber_mg_dofs (const unsigned int                          level,
+                          const std::vector<types::global_dof_index> &new_numbers) const;
+
+      protected:
+        /**
+         * The DoFHandler object on which this policy object works.
+         */
+        SmartPointer<DoFHandlerType> dof_handler;
       };
+
+
 
       /**
        * This class implements the policy for operations when we use a
        * parallel::shared::Triangulation object.
        */
-      template <int dim, int spacedim>
-      class ParallelShared : public Sequential<dim,spacedim>
+      template <class DoFHandlerType>
+      class ParallelShared : public PolicyBase<DoFHandlerType::dimension,DoFHandlerType::space_dimension>
       {
       public:
+        /**
+         * Constructor.
+         * @param dof_handler The DoFHandler object upon which this
+         *   policy class is supposed to work.
+         */
+        ParallelShared (DoFHandlerType &dof_handler);
 
         /**
          * Distribute degrees of freedom on the object given as first
@@ -150,17 +175,15 @@ namespace internal
          * number_cache.locally_owned_dofs are updated consistently.
          */
         virtual
-        void
-        distribute_dofs (dealii::DoFHandler<dim,spacedim> &dof_handler,
-                         NumberCache &number_cache) const;
+        NumberCache
+        distribute_dofs () const;
 
         /**
          * This function is not yet implemented.
          */
         virtual
-        void
-        distribute_mg_dofs (dealii::DoFHandler<dim,spacedim> &dof_handler,
-                            std::vector<NumberCache> &number_caches) const;
+        std::vector<NumberCache>
+        distribute_mg_dofs () const;
 
         /**
          * Renumber degrees of freedom as specified by the first argument.
@@ -168,16 +191,24 @@ namespace internal
          * The input argument @p new_numbers may either have as many entries
          * as there are global degrees of freedom (i.e. dof_handler.n_dofs() )
          * or dof_handler.locally_owned_dofs().n_elements(). Therefore it can
-         * be utilised with renumbering functions implemented for the
+         * be utilized with renumbering functions implemented for the
          * parallel::distributed case.
          */
         virtual
-        void
-        renumber_dofs (const std::vector<types::global_dof_index>  &new_numbers,
-                       dealii::DoFHandler<dim,spacedim> &dof_handler,
-                       NumberCache &number_cache) const;
-      private:
+        NumberCache
+        renumber_dofs (const std::vector<types::global_dof_index>  &new_numbers) const;
 
+        // documentation is inherited
+        virtual
+        NumberCache
+        renumber_mg_dofs (const unsigned int                          level,
+                          const std::vector<types::global_dof_index> &new_numbers) const;
+
+      private:
+        /**
+         * The DoFHandler object on which this policy object works.
+         */
+        SmartPointer<DoFHandlerType> dof_handler;
       };
 
 
@@ -185,34 +216,43 @@ namespace internal
        * This class implements the policy for operations when we use a
        * parallel::distributed::Triangulation object.
        */
-      template <int dim, int spacedim>
-      class ParallelDistributed : public PolicyBase<dim,spacedim>
+      template <class DoFHandlerType>
+      class ParallelDistributed : public PolicyBase<DoFHandlerType::dimension,DoFHandlerType::space_dimension>
       {
       public:
         /**
-         * Distribute degrees of freedom on the object given as last argument.
+         * Constructor.
+         * @param dof_handler The DoFHandler object upon which this
+         *   policy class is supposed to work.
          */
-        virtual
-        void
-        distribute_dofs (dealii::DoFHandler<dim,spacedim> &dof_handler,
-                         NumberCache &number_cache) const;
+        ParallelDistributed (DoFHandlerType &dof_handler);
 
-        /**
-         * Distribute multigrid DoFs.
-         */
+        // documentation is inherited
         virtual
-        void
-        distribute_mg_dofs (dealii::DoFHandler<dim,spacedim> &dof_handler,
-                            std::vector<NumberCache> &number_caches) const;
+        NumberCache
+        distribute_dofs () const;
 
-        /**
-         * Renumber degrees of freedom as specified by the first argument.
-         */
+        // documentation is inherited
         virtual
-        void
-        renumber_dofs (const std::vector<types::global_dof_index>  &new_numbers,
-                       dealii::DoFHandler<dim,spacedim> &dof_handler,
-                       NumberCache &number_cache) const;
+        std::vector<NumberCache>
+        distribute_mg_dofs () const;
+
+        // documentation is inherited
+        virtual
+        NumberCache
+        renumber_dofs (const std::vector<types::global_dof_index>  &new_numbers) const;
+
+        // documentation is inherited
+        virtual
+        NumberCache
+        renumber_mg_dofs (const unsigned int                          level,
+                          const std::vector<types::global_dof_index> &new_numbers) const;
+
+      private:
+        /**
+         * The DoFHandler object on which this policy object works.
+         */
+        SmartPointer<DoFHandlerType> dof_handler;
       };
     }
   }

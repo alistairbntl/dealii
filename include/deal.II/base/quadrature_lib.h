@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__quadrature_lib_h
-#define dealii__quadrature_lib_h
+#ifndef dealii_quadrature_lib_h
+#define dealii_quadrature_lib_h
 
 
 #include <deal.II/base/config.h>
@@ -121,7 +121,7 @@ protected:
    * Evaluate the Gamma function $ \Gamma(n) = (n-1)! $.
    * @param n  point of evaluation (integer).
    */
-  long double gamma(const unsigned int n) const;
+  static long double gamma(const unsigned int n);
 };
 
 
@@ -224,19 +224,20 @@ public:
   QGaussLog(const unsigned int n,
             const bool revert=false);
 
-protected:
+private:
   /**
-   * Sets the points of the quadrature formula.
+   * Compute the points of the quadrature formula.
    */
+  static
   std::vector<double>
-  set_quadrature_points(const unsigned int n) const;
+  get_quadrature_points(const unsigned int n);
 
   /**
-   * Sets the weights of the quadrature formula.
+   * Compute the weights of the quadrature formula.
    */
+  static
   std::vector<double>
-  set_quadrature_weights(const unsigned int n) const;
-
+  get_quadrature_weights(const unsigned int n);
 };
 
 
@@ -244,7 +245,7 @@ protected:
 
 /**
  * A class for Gauss quadrature with arbitrary logarithmic weighting function.
- * This formula is used to to integrate $\ln(|x-x_0|/\alpha)\;f(x)$ on the
+ * This formula is used to integrate $\ln(|x-x_0|/\alpha)\;f(x)$ on the
  * interval $[0,1]$, where $f$ is a smooth function without singularities, and
  * $x_0$ and $\alpha$ are given at construction time, and are the location of
  * the singularity $x_0$ and an arbitrary scaling factor in the singularity.
@@ -294,13 +295,11 @@ public:
              const double alpha = 1,
              const bool factor_out_singular_weight=false);
 
-#ifdef DEAL_II_WITH_CXX11
   /**
    * Move constructor. We cannot rely on the move constructor for `Quadrature`,
    * since it does not know about the additional member `fraction` of this class.
    */
   QGaussLogR(QGaussLogR<dim> &&) = default;
-#endif
 
 protected:
   /**
@@ -313,10 +312,10 @@ protected:
 
 /**
  * A class for Gauss quadrature with $1/R$ weighting function. This formula
- * can be used to to integrate $1/R \ f(x)$ on the reference element
- * $[0,1]^2$, where $f$ is a smooth function without singularities, and $R$ is
- * the distance from the point $x$ to the vertex $\xi$, given at construction
- * time by specifying its index. Notice that this distance is evaluated in the
+ * can be used to integrate $1/R \ f(x)$ on the reference element $[0,1]^2$,
+ * where $f$ is a smooth function without singularities, and $R$ is the
+ * distance from the point $x$ to the vertex $\xi$, given at construction time
+ * by specifying its index. Notice that this distance is evaluated in the
  * reference element.
  *
  * This quadrature formula is obtained from two QGauss quadrature formulas,
@@ -436,15 +435,19 @@ class QSorted : public Quadrature<dim>
 {
 public:
   /**
-   * The constructor takes an arbitrary quadrature formula.
+   * The constructor takes an arbitrary quadrature formula @p quad and sorts
+   * its points and weights according to ascending weights.
    */
-  QSorted (const Quadrature<dim>);
+  QSorted (const Quadrature<dim> &quad);
 
+private:
   /**
-   * A rule to reorder pairs of points and weights.
+   * A rule for std::sort to reorder pairs of points and weights.
+   * @p a and @p b are indices into the weights array and the result will
+   * be determined by comparing the weights.
    */
-  bool operator()(const std::pair<double, Point<dim> > &a,
-                  const std::pair<double, Point<dim> > &b);
+  bool compare_weights(const unsigned int a,
+                       const unsigned int b) const;
 };
 
 /**
@@ -523,8 +526,6 @@ public:
 
 };
 
-/*@}*/
-
 /**
  * Gauss-Chebyshev quadrature rules integrate the weighted product
  * $\int_{-1}^1 f(x) w(x) dx$ with weight given by: $w(x) = 1/\sqrt{1-x^2}$.
@@ -533,7 +534,7 @@ public:
  * we rescale the quadrature formula so that it is defined on the interval
  * $[0,1]$ instead of $[-1,1]$. So the quadrature formulas integrate exactly
  * the integral $\int_0^1 f(x) w(x) dx$ with the weight: $w(x) =
- * 1/sqrt{x(1-x)}$. For details see: M. Abramowitz & I.A. Stegun: Handbook of
+ * 1/\sqrt{x(1-x)}$. For details see: M. Abramowitz & I.A. Stegun: Handbook of
  * Mathematical Functions, par. 25.4.38
  *
  * @author Giuseppe Pitton, Luca Heltai 2015
@@ -566,7 +567,7 @@ private:
  * of quadrature points. Here we rescale the quadrature formula so that it is
  * defined on the interval $[0,1]$ instead of $[-1,1]$. So the quadrature
  * formulas integrate exactly the integral $\int_0^1 f(x) w(x) dx$ with the
- * weight: $w(x) = 1/sqrt{x(1-x)}$. By default the quadrature is constructed
+ * weight: $w(x) = 1/\sqrt{x(1-x)}$. By default the quadrature is constructed
  * with the left endpoint as quadrature node, but the quadrature node can be
  * imposed at the right endpoint through the variable ep that can assume the
  * values left or right.
@@ -580,18 +581,26 @@ public:
   /* EndPoint is used to specify which of the two endpoints of the unit interval
    * is used also as quadrature point
    */
-  enum EndPoint { left,right };
+  enum EndPoint
+  {
+    /**
+     * Left end point.
+     */
+    left,
+    /**
+     * Right end point.
+     */
+    right
+  };
   /// Generate a formula with <tt>n</tt> quadrature points
   QGaussRadauChebyshev(const unsigned int n,
                        EndPoint ep=QGaussRadauChebyshev::left);
 
-#ifdef DEAL_II_WITH_CXX11
   /**
    * Move constructor. We cannot rely on the move constructor for `Quadrature`,
    * since it does not know about the additional member `ep` of this class.
    */
   QGaussRadauChebyshev(QGaussRadauChebyshev<dim> &&) = default;
-#endif
 
 private:
   const EndPoint ep;
@@ -614,7 +623,7 @@ private:
  * where $n$ is the number of quadrature points. Here we rescale the
  * quadrature formula so that it is defined on the interval $[0,1]$ instead of
  * $[-1,1]$. So the quadrature formulas integrate exactly the integral
- * $\int_0^1 f(x) w(x) dx$ with the weight: $w(x) = 1/sqrt{x(1-x)}$. For
+ * $\int_0^1 f(x) w(x) dx$ with the weight: $w(x) = 1/\sqrt{x(1-x)}$. For
  * details see: M. Abramowitz & I.A. Stegun: Handbook of Mathematical
  * Functions, par. 25.4.40
  *
@@ -638,6 +647,8 @@ private:
 
 };
 
+/*@}*/
+
 /* -------------- declaration of explicit specializations ------------- */
 
 template <> QGauss<1>::QGauss (const unsigned int n);
@@ -653,10 +664,10 @@ long double QGaussLobatto<1>::
 JacobiP(const long double, const int, const int, const unsigned int) const;
 template <>
 long double
-QGaussLobatto<1>::gamma(const unsigned int n) const;
+QGaussLobatto<1>::gamma(const unsigned int n);
 
-template <> std::vector<double> QGaussLog<1>::set_quadrature_points(const unsigned int) const;
-template <> std::vector<double> QGaussLog<1>::set_quadrature_weights(const unsigned int) const;
+template <> std::vector<double> QGaussLog<1>::get_quadrature_points(const unsigned int);
+template <> std::vector<double> QGaussLog<1>::get_quadrature_weights(const unsigned int);
 
 template <> QMidpoint<1>::QMidpoint ();
 template <> QTrapez<1>::QTrapez ();

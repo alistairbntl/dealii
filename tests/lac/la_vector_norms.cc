@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,11 +19,7 @@
 // lose more than 1 decimal also for 200000 vector entries)
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/la_vector.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -104,14 +100,10 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check_norms<float>();
   check_norms<double>();
-  check_norms<long double>();
   check_complex_norms<double>();
   check_complex_norms<float>();
   deallog << "OK" << std::endl;
 }
-
-

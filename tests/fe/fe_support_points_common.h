@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2007 - 2015 by the deal.II authors
+// Copyright (C) 2007 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -69,6 +69,31 @@ check_support (const FiniteElement<dim> &finel, const char *name)
       Quadrature<dim> qp(q_points);
       deallog << name << '<' << dim << '>' << " face " << i
               << " support points" << std::endl;
+
+      for (unsigned int k=0; k<face_points.size(); ++k)
+        deallog << std::setprecision(3) << qp.point(k)
+                << std::endl;
+    }
+
+  deallog << name << '<' << dim << '>' << " cell generalized support points" << std::endl;
+
+  const std::vector<Point<dim> > &cell_g_points = finel.get_generalized_support_points ();
+
+  for (unsigned int k=0; k<cell_g_points.size(); ++k)
+    deallog << std::setprecision(3) << cell_g_points[k] << std::endl;
+
+  const std::vector<Point<dim-1> > &face_g_points = finel.get_generalized_face_support_points ();
+  const std::vector<double> dummy_g_weights (face_g_points.size());
+
+  Quadrature<dim-1> qg(face_g_points, dummy_g_weights);
+
+  for (unsigned int i=0; i<GeometryInfo<dim>::faces_per_cell; ++i)
+    {
+      std::vector<Point<dim> > q_points (qg.get_points().size());
+      QProjector<dim>::project_to_face (qg, i, q_points);
+      Quadrature<dim> qp(q_points);
+      deallog << name << '<' << dim << '>' << " face " << i
+              << " generalized support points" << std::endl;
 
       for (unsigned int k=0; k<face_points.size(); ++k)
         deallog << std::setprecision(3) << qp.point(k)

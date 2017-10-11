@@ -1,7 +1,17 @@
-//------------------  matrix_vector_common.h  ------------------------
-//    Version: $Name$
+// ---------------------------------------------------------------------
 //
-//------------------  matrix_vector_common.h  ------------------------
+// Copyright (C) 2013 - 2017 by the deal.II authors
+//
+// This file is part of the deal.II library.
+//
+// The deal.II library is free software; you can use it, redistribute
+// it, and/or modify it under the terms of the GNU Lesser General
+// Public License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+// The full text of the license can be found in the file LICENSE at
+// the top level of the deal.II distribution.
+//
+// ---------------------------------------------------------------------
 
 
 // this is a template for matrix-vector products with the Helmholtz equation
@@ -18,12 +28,12 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria_boundary_lib.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -38,7 +48,7 @@ void test ();
 
 
 
-template <int dim, int fe_degree, typename number>
+template <int dim, int fe_degree, typename number, int n_q_points_1d>
 void do_test (const DoFHandler<dim> &dof,
               const ConstraintMatrix &constraints,
               const unsigned int     parallel_option = 0)
@@ -51,9 +61,10 @@ void do_test (const DoFHandler<dim> &dof,
   //std::cout << "Number of degrees of freedom: " << dof.n_dofs() << std::endl;
   //std::cout << "Number of constraints: " << constraints.n_constraints() << std::endl;
 
+  MappingQGeneric<dim> mapping(dof.get_fe().degree);
   MatrixFree<dim,number> mf_data;
   {
-    const QGauss<1> quad (fe_degree+1);
+    const QGauss<1> quad (n_q_points_1d);
     typename MatrixFree<dim,number>::AdditionalData data;
     if (parallel_option == 1)
       data.tasks_parallel_scheme =
@@ -69,10 +80,10 @@ void do_test (const DoFHandler<dim> &dof,
       }
     data.tasks_block_size = 7;
 
-    mf_data.reinit (dof, constraints, quad, data);
+    mf_data.reinit (mapping, dof, constraints, quad, data);
   }
 
-  MatrixFreeTest<dim,fe_degree,number> mf (mf_data);
+  MatrixFreeTest<dim,fe_degree,number,Vector<number>,n_q_points_1d> mf (mf_data);
   Vector<number> in (dof.n_dofs()), out (dof.n_dofs());
   Vector<number> in_dist (dof.n_dofs());
   Vector<number> out_dist (in_dist);
@@ -92,15 +103,15 @@ void do_test (const DoFHandler<dim> &dof,
   // assemble sparse matrix with (\nabla v, \nabla u) + (v, 10 * u)
   SparsityPattern sparsity;
   {
-    CompressedSimpleSparsityPattern csp(dof.n_dofs(), dof.n_dofs());
+    DynamicSparsityPattern csp(dof.n_dofs(), dof.n_dofs());
     DoFTools::make_sparsity_pattern (dof, csp, constraints, true);
     sparsity.copy_from(csp);
   }
   SparseMatrix<double> sparse_matrix (sparsity);
   {
-    QGauss<dim>  quadrature_formula(fe_degree+1);
+    QGauss<dim>  quadrature_formula(n_q_points_1d);
 
-    FEValues<dim> fe_values (dof.get_fe(), quadrature_formula,
+    FEValues<dim> fe_values (mapping, dof.get_fe(), quadrature_formula,
                              update_values    |  update_gradients |
                              update_JxW_values);
 
@@ -154,7 +165,6 @@ int main ()
   deallog << std::setprecision (3);
 
   {
-    deallog.threshold_double(5.e-11);
     deallog.push("2d");
     test<2,1>();
     test<2,2>();
@@ -165,4 +175,3 @@ int main ()
     deallog.pop();
   }
 }
-

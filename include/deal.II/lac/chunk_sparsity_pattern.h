@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__chunk_sparsity_pattern_h
-#define dealii__chunk_sparsity_pattern_h
+#ifndef dealii_chunk_sparsity_pattern_h
+#define dealii_chunk_sparsity_pattern_h
 
 
 #include <deal.II/base/config.h>
@@ -80,7 +80,7 @@ namespace ChunkSparsityPatternIterators
     unsigned int row () const;
 
     /**
-     * Returns the global index from the reduced sparsity pattern.
+     * Return the global index from the reduced sparsity pattern.
      */
     std::size_t reduced_index() const;
 
@@ -334,7 +334,7 @@ public:
   /**
    * Destructor.
    */
-  ~ChunkSparsityPattern ();
+  ~ChunkSparsityPattern () = default;
 
   /**
    * Copy operator. For this the same holds as for the copy constructor: it is
@@ -734,21 +734,23 @@ public:
                   << "(Maximum number of entries for this row: "
                   << arg2 << "; maybe the matrix is already compressed?)");
   /**
-   * Exception
+   * The operation is only allowed after the SparsityPattern has been set up
+   * and compress() was called.
    */
-  DeclException0 (ExcNotCompressed);
+  DeclExceptionMsg (ExcNotCompressed,
+                    "The operation you attempted is only allowed after the SparsityPattern "
+                    "has been set up and compress() was called.");
   /**
-   * Exception
+   * This operation changes the structure of the SparsityPattern and is not
+   * possible after compress() has been called.
    */
-  DeclException0 (ExcMatrixIsCompressed);
+  DeclExceptionMsg (ExcMatrixIsCompressed,
+                    "The operation you attempted changes the structure of the SparsityPattern "
+                    "and is not possible after compress() has been called.");
   /**
    * Exception
    */
   DeclException0 (ExcEmptyObject);
-  /**
-   * Exception
-   */
-  DeclException0 (ExcInvalidConstructorCall);
   /**
    * Exception
    */

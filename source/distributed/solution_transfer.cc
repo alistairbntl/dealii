@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,12 +20,12 @@
 
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 
 #include <deal.II/distributed/solution_transfer.h>
 #include <deal.II/distributed/tria.h>
@@ -34,7 +34,7 @@
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
 
-#include <deal.II/base/std_cxx11/bind.h>
+#include <functional>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -43,25 +43,20 @@ namespace parallel
   namespace distributed
   {
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     SolutionTransfer<dim, VectorType, DoFHandlerType>::SolutionTransfer (const DoFHandlerType &dof)
       :
-      dof_handler(&dof, typeid(*this).name())
+      dof_handler(&dof, typeid(*this).name()),
+      offset (numbers::invalid_unsigned_int)
     {
-      Assert (dynamic_cast<const parallel::distributed::Triangulation<dim>*>
-              (&dof_handler->get_triangulation()) != 0,
+      Assert ((dynamic_cast<const parallel::distributed::Triangulation<dim,DoFHandlerType::space_dimension>*>
+               (&dof_handler->get_triangulation()) != nullptr),
               ExcMessage("parallel::distributed::SolutionTransfer requires a parallel::distributed::Triangulation object."));
     }
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
-    SolutionTransfer<dim, VectorType, DoFHandlerType>::~SolutionTransfer ()
-    {}
-
-
-
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::
     prepare_for_coarsening_and_refinement (const std::vector<const VectorType *> &all_in)
@@ -72,7 +67,7 @@ namespace parallel
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::register_data_attach (const std::size_t size)
     {
@@ -83,22 +78,22 @@ namespace parallel
         = (dynamic_cast<parallel::distributed::Triangulation<dim,DoFHandlerType::space_dimension>*>
            (const_cast<dealii::Triangulation<dim,DoFHandlerType::space_dimension>*>
             (&dof_handler->get_triangulation())));
-      Assert (tria != 0, ExcInternalError());
+      Assert (tria != nullptr, ExcInternalError());
 
       offset
         = tria->register_data_attach(size,
-                                     std_cxx11::bind(&SolutionTransfer<dim, VectorType,
-                                                     DoFHandlerType>::pack_callback,
-                                                     this,
-                                                     std_cxx11::_1,
-                                                     std_cxx11::_2,
-                                                     std_cxx11::_3));
+                                     std::bind(&SolutionTransfer<dim, VectorType,
+                                               DoFHandlerType>::pack_callback,
+                                               this,
+                                               std::placeholders::_1,
+                                               std::placeholders::_2,
+                                               std::placeholders::_3));
 
     }
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::
     prepare_for_coarsening_and_refinement (const VectorType &in)
@@ -109,7 +104,7 @@ namespace parallel
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::prepare_serialization (const VectorType &in)
     {
@@ -119,7 +114,7 @@ namespace parallel
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::prepare_serialization
     (const std::vector<const VectorType *> &all_in)
@@ -129,7 +124,7 @@ namespace parallel
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::deserialize (VectorType &in)
     {
@@ -139,7 +134,7 @@ namespace parallel
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::deserialize (std::vector<VectorType *> &all_in)
     {
@@ -152,7 +147,7 @@ namespace parallel
     }
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::interpolate (std::vector<VectorType *> &all_out)
     {
@@ -164,16 +159,16 @@ namespace parallel
         = (dynamic_cast<parallel::distributed::Triangulation<dim,DoFHandlerType::space_dimension>*>
            (const_cast<dealii::Triangulation<dim,DoFHandlerType::space_dimension>*>
             (&dof_handler->get_triangulation())));
-      Assert (tria != 0, ExcInternalError());
+      Assert (tria != nullptr, ExcInternalError());
 
       tria->notify_ready_to_unpack(offset,
-                                   std_cxx11::bind(&SolutionTransfer<dim, VectorType,
-                                                   DoFHandlerType>::unpack_callback,
-                                                   this,
-                                                   std_cxx11::_1,
-                                                   std_cxx11::_2,
-                                                   std_cxx11::_3,
-                                                   std_cxx11::ref(all_out)));
+                                   std::bind(&SolutionTransfer<dim, VectorType,
+                                             DoFHandlerType>::unpack_callback,
+                                             this,
+                                             std::placeholders::_1,
+                                             std::placeholders::_2,
+                                             std::placeholders::_3,
+                                             std::ref(all_out)));
 
 
       for (typename std::vector<VectorType *>::iterator it=all_out.begin();
@@ -186,7 +181,7 @@ namespace parallel
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::interpolate (VectorType &out)
     {
@@ -196,7 +191,7 @@ namespace parallel
 
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     unsigned int
     SolutionTransfer<dim, VectorType, DoFHandlerType>::get_data_size() const
     {
@@ -204,7 +199,7 @@ namespace parallel
     }
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::
     pack_callback(const typename Triangulation<dim,DoFHandlerType::space_dimension>::cell_iterator &cell_,
@@ -228,7 +223,7 @@ namespace parallel
     }
 
 
-    template<int dim, typename VectorType, typename DoFHandlerType>
+    template <int dim, typename VectorType, typename DoFHandlerType>
     void
     SolutionTransfer<dim, VectorType, DoFHandlerType>::unpack_callback
     (const typename Triangulation<dim,DoFHandlerType::space_dimension>::cell_iterator &cell_,

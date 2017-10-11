@@ -27,8 +27,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_raviart_thomas.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -63,7 +61,6 @@ int main()
   deallog << std::setprecision (4);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   test();
 }

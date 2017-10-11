@@ -26,16 +26,13 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
-#include <iomanip>
 #include <string>
 
 std::ofstream logfile("output");
 
 
-template<int dim>
+template <int dim>
 void check_file (const std::string name,
                  typename GridIn<dim>::Format format)
 {
@@ -62,7 +59,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   filename_resolution();
 }

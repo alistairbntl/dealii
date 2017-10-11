@@ -19,8 +19,6 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
-#include <cstdlib>
 
 #include <deal.II/lac/block_sparse_matrix.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
@@ -68,9 +66,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test ();
 }

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,9 +21,6 @@
 // mapping. However, P(k/2) is. Therefore, we have a gap for
 // convergence, which we have to specify in the last argument to the
 // call below
-
-char logname[] = "output";
-
 
 #include "project_common.h"
 

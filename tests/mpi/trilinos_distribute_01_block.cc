@@ -22,11 +22,9 @@
 // contiguous
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/constraint_matrix.h>
 
-#include <fstream>
 #include <sstream>
 
 
@@ -191,9 +189,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       test();
     }

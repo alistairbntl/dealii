@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,7 +15,7 @@
 
 
 
-// TrilinosWrappers::SparseMatrix::reinit(CompressedSparsityPattern) should
+// TrilinosWrappers::SparseMatrix::reinit(DynamicSparsityPattern) should
 // create a matrix that, when filled with elements that match the sparsity
 // pattern, doesn't require any more memory allocation any more. This is
 // tricky to get right, though, and took a while until it worked.
@@ -29,9 +29,7 @@
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
-#include <fstream>
-#include <cstdlib>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
 
 void test ()
@@ -57,7 +55,7 @@ void test ()
   // used to allocate additional memory for 2
   // processes. note that only one of the
   // four blocks uses Inodes
-  CompressedSparsityPattern csp (N,N);
+  DynamicSparsityPattern csp (N,N);
   for (unsigned int i=0; i<N; ++i)
     for (unsigned int j=0; j<N; ++j)
       {
@@ -106,9 +104,7 @@ void test ()
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 

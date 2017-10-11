@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 // (unused cells). Check that this works now.
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/grid/tria.h>
@@ -31,9 +30,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/dofs/dof_accessor.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -44,7 +40,7 @@ void check()
   FE_DGQ<dim> fe(1);
   deallog << fe.get_name() << std::endl;
 
-  Triangulation<dim> tria;
+  Triangulation<dim> tria(Triangulation<dim>::limit_level_difference_at_vertices);
   GridGenerator::hyper_cube(tria);
   tria.refine_global(2);
   typename Triangulation<dim>::active_cell_iterator cell=tria.begin_active();

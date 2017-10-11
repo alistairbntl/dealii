@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2010 - 2015 by the deal.II authors
+ * Copyright (C) 2010 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -473,6 +473,7 @@ namespace Step39
   template <int dim>
   InteriorPenaltyProblem<dim>::InteriorPenaltyProblem(const FiniteElement<dim> &fe)
     :
+    triangulation (Triangulation<dim>::limit_level_difference_at_vertices),
     mapping(),
     fe(fe),
     dof_handler(triangulation),
@@ -491,7 +492,7 @@ namespace Step39
     // First, we use the finite element to distribute degrees of freedom over
     // the mesh and number them.
     dof_handler.distribute_dofs(fe);
-    dof_handler.distribute_mg_dofs(fe);
+    dof_handler.distribute_mg_dofs();
     unsigned int n_dofs = dof_handler.n_dofs();
     // Then, we already know the size of the vectors representing finite
     // element functions.
@@ -511,11 +512,11 @@ namespace Step39
     // The global system is set up, now we attend to the level matrices. We
     // resize all matrix objects to hold one matrix per level.
     mg_matrix.resize(0, n_levels-1);
-    mg_matrix.clear();
+    mg_matrix.clear_elements();
     mg_matrix_dg_up.resize(0, n_levels-1);
-    mg_matrix_dg_up.clear();
+    mg_matrix_dg_up.clear_elements();
     mg_matrix_dg_down.resize(0, n_levels-1);
-    mg_matrix_dg_down.clear();
+    mg_matrix_dg_down.clear_elements();
     // It is important to update the sparsity patterns after <tt>clear()</tt>
     // was called for the level matrices, since the matrices lock the sparsity
     // pattern through the SmartPointer and Subscriptor mechanism.
@@ -717,7 +718,7 @@ namespace Step39
 
     // Now, we are ready to set up the V-cycle operator and the multilevel
     // preconditioner.
-    Multigrid<Vector<double> > mg(dof_handler, mgmatrix,
+    Multigrid<Vector<double> > mg(mgmatrix,
                                   mg_coarse, mg_transfer,
                                   mg_smoother, mg_smoother);
     // Let us not forget the edge matrices needed because of the adaptive
@@ -858,16 +859,16 @@ namespace Step39
   }
 
 
-  // Some graphical output
+  // Create graphical output. We produce the filename by collating the
+  // name from its various components, including the refinement cycle
+  // that we output with two digits.
   template <int dim>
   void InteriorPenaltyProblem<dim>::output_results (const unsigned int cycle) const
   {
-    // Output of the solution in gnuplot format.
-    char *fn = new char[100];
-    sprintf(fn, "sol-%02d", cycle);
+    const std::string filename = "sol-" +
+                                 Utilities::int_to_string(cycle,2) +
+                                 ".gnuplot";
 
-    std::string filename(fn);
-    filename += ".gnuplot";
     deallog << "Writing solution to <" << filename << ">..."
             << std::endl << std::endl;
     std::ofstream gnuplot_output (filename.c_str());

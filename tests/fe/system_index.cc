@@ -17,21 +17,18 @@
 // Test the various index conversion methods
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_raviart_thomas.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
 #include <string>
-#include <iomanip>
 
 #define PRECISION 5
 
 
 
-template<int dim>
+template <int dim>
 void
 check_fe(const FiniteElement<dim> &fe)
 {
@@ -123,7 +120,7 @@ check_fe(const FiniteElement<dim> &fe)
 
 
 
-template<int dim>
+template <int dim>
 void check()
 {
   FE_DGQ<dim> co(0);
@@ -153,7 +150,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check<2>();
   check<3>();

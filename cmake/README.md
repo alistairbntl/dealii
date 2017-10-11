@@ -2,7 +2,7 @@ This folder contains the deal.II CMake build system
 ===================================================
 
 Extensive documentation can be found at
-`/doc/development/cmake-internals.html`
+`/doc/developers/cmake-internals.html`
 
 It is structured as follows:
 
@@ -17,7 +17,6 @@ config
 Contains configuration templates for
 
   * the project configuration (deal.IIConfig.cmake)
-  * the legacy Make.global_options mechanism
   * the C++ template expansion mechanism (template-arguments)
 
 configure

@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2016 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -36,15 +36,6 @@
 #
 
 MACRO(DEAL_II_INVOKE_AUTOPILOT)
-
-  # Set CMAKE_BUILD_TYPE=Debug if both 
-  # Debug and Release mode are given
-  IF("${CMAKE_BUILD_TYPE}" STREQUAL "DebugRelease")
-    SET(CMAKE_BUILD_TYPE "Debug" CACHE STRING
-      "Choose the type of build, options are: Debug, Release"
-      FORCE)
-  ENDIF()
-
 
   # Generator specific values:
   IF(CMAKE_GENERATOR MATCHES "Ninja")
@@ -128,8 +119,8 @@ MACRO(DEAL_II_INVOKE_AUTOPILOT)
         COMMAND
            ${CMAKE_COMMAND} -E echo ''
         && ${CMAKE_COMMAND} -E echo '***************************************************************************'
-        && ${CMAKE_COMMAND} -E echo '**  Error: No Mac OSX developer certificate specified'
-        && ${CMAKE_COMMAND} -E echo '**  Please reconfigure with -DOSX_CERTIFICATE_NAME="<...>"'
+        && ${CMAKE_COMMAND} -E echo '**           Error: No Mac OSX developer certificate specified           **'
+        && ${CMAKE_COMMAND} -E echo '**         Please reconfigure with -DOSX_CERTIFICATE_NAME="<...>"        **'
         && ${CMAKE_COMMAND} -E echo '***************************************************************************'
         && ${CMAKE_COMMAND} -E echo ''
         COMMENT "Digitally signing ${TARGET}"
@@ -177,7 +168,9 @@ MACRO(DEAL_II_INVOKE_AUTOPILOT)
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target clean
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target runclean
     COMMAND ${CMAKE_COMMAND} -E remove_directory CMakeFiles
-    COMMAND ${CMAKE_COMMAND} -E remove CMakeCache.txt cmake_install.cmake Makefile
+    COMMAND ${CMAKE_COMMAND} -E remove
+      CMakeCache.txt cmake_install.cmake Makefile
+      build.ninja rules.ninja .ninja_deps .ninja_log
     COMMENT "distclean invoked"
     )
 

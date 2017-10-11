@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,13 +13,14 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tria_manifold_h
-#define dealii__tria_manifold_h
+#ifndef dealii_tria_manifold_h
+#define dealii_tria_manifold_h
 
 
 /*----------------------------   manifold.h     ---------------------------*/
 
 #include <deal.II/base/config.h>
+#include <deal.II/base/array_view.h>
 #include <deal.II/base/subscriptor.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/thread_management.h>
@@ -29,12 +30,34 @@
 
 DEAL_II_NAMESPACE_OPEN
 
+// forward declaration
+template <int, typename> class Table;
+
 /**
  * We collect here some helper functions used in the Manifold<dim,spacedim>
  * classes.
  */
 namespace Manifolds
 {
+  /**
+   * A <code>constexpr</code> helper function that returns the number of
+   * default points for the structure type pointed to by the given
+   * <code>MeshIteratorType</code>. See the documentation of
+   * Manifolds::get_default_points_and_weights() for more information.
+   */
+  template <typename MeshIteratorType>
+  inline
+  constexpr std::size_t n_default_points_per_cell()
+  {
+    // Note that in C++11 a constexpr function can only have a return
+    // statement, so we cannot alias the structure dimension
+    return GeometryInfo<MeshIteratorType::AccessorType::structure_dimension>::vertices_per_cell
+           + GeometryInfo<MeshIteratorType::AccessorType::structure_dimension>::lines_per_cell
+           + GeometryInfo<MeshIteratorType::AccessorType::structure_dimension>::quads_per_cell
+           + GeometryInfo<MeshIteratorType::AccessorType::structure_dimension>::hexes_per_cell
+           - 1; // don't count the cell itself, just the bounding objects
+  }
+
   /**
    * Given a general mesh iterator, construct a quadrature object that
    * contains the following points:
@@ -79,9 +102,56 @@ namespace Manifolds
   template <typename MeshIteratorType>
   Quadrature<MeshIteratorType::AccessorType::space_dimension>
   get_default_quadrature(const MeshIteratorType &iterator,
-                         const bool              with_laplace = false);
-}
+                         const bool              with_laplace = false) DEAL_II_DEPRECATED;
 
+  /**
+   * Given a general mesh iterator, construct arrays of quadrature points and
+   * weights that contain the following points:
+   * - If the iterator points to a line, then the quadrature points
+   *   are the two vertices of the line. This results in a point vector
+   *   with two points.
+   * - If the iterator points to a quad, then the quadrature points
+   *   are the vertices and line mid-points. This results in a point vector
+   *   with eight (4+4) points.
+   * - If the iterator points to a hex, then the quadrature points
+   *   are the vertices, the line mid-points, and the face mid-points.
+   *   This results in a points vector with 26 (8+12+6) points.
+   *
+   * The quadrature weights for these points are either chosen identically
+   * and equal to one over the number of quadrature points (if @p with_laplace
+   * is @p false), or in a way that gives points closer to the cell center
+   * (measured on the reference cell) a higher weight. These weights correspond
+   * to solving a Laplace equation and evaluating the solution at the quadrature
+   * points (if @p with_laplace is @p true).
+   *
+   * The function is primarily used to construct the input argument
+   * for the Manifold::get_new_point() function, which computes a new
+   * point on a manifold based on a weighted average of "surrounding"
+   * points represented by the quadrature points and weights stored in the
+   * returned pair of vectors. This function creates such an object based on
+   * the points that "surround" a cell, face, or edge, and weights
+   * are chosen in a way appropriate for computing the new "mid-point"
+   * of the object pointed to. An example of where this is necessary
+   * is for mesh refinement, where (using the 2d situation as an example)
+   * we need to first create new edge mid-points, and then a new cell-point.
+   *
+   * @param[in] iterator A mesh iterator that points to either a line, quad,
+   *   or hex.
+   * @param[in] with_laplace Whether or not to compute the quadrature weights
+   *   by solving a Laplace equation, as discussed above.
+   * @tparam MeshIteratorType An iterator type that corresponds to either
+   *   Triangulation::cell_iterator (or variants such as
+   *   Triangulation::active_cell_iterator or DoFHandler::cell_iterator) or
+   *   that is the result of statements such as
+   *   <code>cell-@>face(f)</code> or <code>cell-@>line(l)</code>.
+   */
+  template <typename MeshIteratorType>
+  std::pair<std::array<Point<MeshIteratorType::AccessorType::space_dimension>,
+      n_default_points_per_cell<MeshIteratorType>()>,
+      std::array<double, n_default_points_per_cell<MeshIteratorType>()> >
+      get_default_points_and_weights(const MeshIteratorType &iterator,
+                                     const bool              with_laplace = false);
+}
 
 /**
  * Manifolds are used to describe the geometry of boundaries of domains as
@@ -103,11 +173,11 @@ namespace Manifolds
  * vertex' coordinates through the following function call:
  *   @code
  *     ...
- *     Point<spacedim> new_vertex = manifold.get_new_point (quadrature);
+ *     Point<spacedim> new_vertex = manifold.get_new_point (points,weights);
  *     ...
  *   @endcode
- * Here, @p quadrature is a Quadrature<spacedim> object, which contains a collection
- * of points in @p spacedim dimension, and a collection of weights. The points
+ * Here, @p points is a collection of points in @p spacedim dimension,
+ * and @p a collection of corresponding weights. The points
  * in this context will then be the vertices of the cell, face, or edge, and
  * the weights are typically one over the number of points when a new midpoint
  * of the cell, face, or edge is needed. Derived classes then will implement the
@@ -123,17 +193,21 @@ namespace Manifolds
  *
  *
  * @note Unlike almost all other cases in the library, we here interpret the points
- * in the quadrature object to be in real space, not on the reference cell.
+ * to be in real space, not on the reference cell.
  *
- * Manifold::get_new_point() has a default implementation that can simplify
- * this process somewhat:
- * Internally, the function calls the Manifold::project_to_manifold()
- * function after computing the weighted average of the quadrature points.
- * This allows derived classes to only overload Manifold::project_to_manifold()
- * for simple situations. This is often useful when describing manifolds that
- * are embedded in higher dimensional space, e.g., the surface of a sphere.
- * In those cases, the desired new point is simply the (weighted) average
- * of the provided point, projected back out onto the sphere.
+ * Manifold::get_new_point() has a default implementation that can
+ * simplify this process somewhat: Internally, the function calls the
+ * Manifold::get_intermediate_point() to compute pair-wise
+ * intermediate points. Internally the
+ * Manifold::get_intermediate_point() calls the
+ * Manifold::project_to_manifold() function after computing the convex
+ * conbination of the given points.  This allows derived classes to
+ * only overload Manifold::project_to_manifold() for simple
+ * situations. This is often useful when describing manifolds that are
+ * embedded in higher dimensional space, e.g., the surface of a
+ * sphere.  In those cases, the desired new point may be computed
+ * simply by the (weighted) average of the provided points, projected
+ * back out onto the sphere.
  *
  *
  * <h3>Common use case: Computing tangent vectors</h3>
@@ -247,6 +321,12 @@ class Manifold : public Subscriptor
 {
 public:
 
+  // explicitly check for sensible template arguments
+  static_assert (dim<=spacedim,
+                 "The dimension <dim> of a Manifold must be less than or "
+                 "equal to the space dimension <spacedim> in which it lives.");
+
+
   /**
    * Type keeping information about the normals at the vertices of a face of a
    * cell. Thus, there are <tt>GeometryInfo<dim>::vertices_per_face</tt>
@@ -265,7 +345,7 @@ public:
    * Destructor. Does nothing here, but needs to be declared virtual to make
    * class hierarchies derived from this class possible.
    */
-  virtual ~Manifold ();
+  virtual ~Manifold () = default;
 
   /**
    * @name Computing the location of points.
@@ -273,35 +353,90 @@ public:
   /// @{
 
   /**
-   * Return the point which shall become the new vertex surrounded by the
-   * given points which make up the quadrature. We use a quadrature object,
-   * which should be filled with the surrounding points together with
-   * appropriate weights.
+   * Return an intermediate point between two given
+   * points. Overloading this function allows the default pair-wise
+   * reduction implementation of the method get_new_point() that takes
+   * a Quadrature object as input to work properly.
    *
-   * In its default implementation it calls internally the function
-   * project_to_manifold. User classes can get away by simply implementing
-   * that method.
+   * An implementation of this function should returns a parametric
+   * curve on the manifold, joining the points `p1` and `p2`, with
+   * parameter `w` in the interval [0,1]. In particular
+   * `get_intermediate_point(p1, p2, 0.0)` should return `p1` and
+   * `get_intermediate_point(p1, p2, 1.0)` should return `p2`.
+   *
+   * In its default implementation, this function calls the
+   * project_to_manifold() method with the convex combination of `p1`
+   * and `p2`. User classes can get away by simply implementing the
+   * project_to_manifold() method.
    */
   virtual
   Point<spacedim>
-  get_new_point(const Quadrature<spacedim> &quad) const;
+  get_intermediate_point (const Point<spacedim> &p1,
+                          const Point<spacedim> &p2,
+                          const double w) const;
+
+  /**
+   * Return the point which shall become the new vertex surrounded by the
+   * given points @p surrounding_points. @p weights contains appropriate
+   * weights for the surrounding points according to which the manifold
+   * determines the new point's position.
+   *
+   * In its default implementation it uses a pair-wise reduction of
+   * the points by calling the function get_intermediate_point() on the first
+   * two points, then on the resulting point and the next, until all points in
+   * the vector have been taken into account. User classes can get away by
+   * simply implementing the get_intermediate_point() function. Notice that
+   * by default the get_intermediate_point() function calls the
+   * project_to_manifold() function with the convex combination of its
+   * arguments. For simple situations you may get away by implementing
+   * only the project_to_manifold() function.
+   */
+  virtual
+  Point<spacedim>
+  get_new_point (const ArrayView<const Point<spacedim>> &surrounding_points,
+                 const ArrayView<const double>          &weights) const;
+
+
+  /**
+   * Compute a new set of points that interpolate between the given points @p
+   * surrounding_points. @p weights is a table with as many columns as @p
+   * surrounding_points.size(). The number of rows in @p weights must match
+   * the length of @p new_points.
+   *
+   * In its default implementation, this function simply calls get_new_point()
+   * on each row of @p weights and writes those points into the output array
+   * @p new_points. However, this function is more efficient if multiple new
+   * points need to be generated like in MappingQGeneric and the manifold does
+   * expensive transformations between a chart space and the physical space,
+   * such as ChartManifold. For this function, the surrounding points need to
+   * be transformed back to the chart sparse only once, rather than for every
+   * call to get_new_point(). If efficiency is not important, you may get away
+   * by implementing only the get_new_point() function.
+   *
+   * The implementation does not allow for @p surrounding_points and
+   * @p new_points to point to the same array, so make sure to pass different
+   * objects into the function.
+   */
+  virtual
+  void
+  get_new_points (const ArrayView<const Point<spacedim>> &surrounding_points,
+                  const Table<2,double>                  &weights,
+                  ArrayView<Point<spacedim>>              new_points) const;
 
   /**
    * Given a point which lies close to the given manifold, it modifies it and
    * projects it to manifold itself.
    *
    * This class is used by the default implementation of the function
-   * get_new_point(). It should be made pure virtual, but for historical
-   * reason, derived classes like Boundary<dim, spacedim> do not implement it.
-   * The default behavior of this class, however, is to throw an exception
-   * when called.
+   * get_new_point() and should be implemented by derived classes. The default
+   * implementation simply throws an exception if called.
    *
    * If your manifold is simple, you could implement this function only, and
    * the default behavior should work out of the box.
    */
   virtual
-  Point<spacedim> project_to_manifold (const std::vector<Point<spacedim> > &surrounding_points,
-                                       const Point<spacedim> &candidate) const;
+  Point<spacedim> project_to_manifold (const ArrayView<const Point<spacedim>> &surrounding_points,
+                                       const Point<spacedim>                  &candidate) const;
 
   /**
    * Backward compatibility interface.  Return the point which shall become
@@ -414,7 +549,7 @@ public:
    * arguments $t=0$ and $t=1$ are farther apart.
    *
    * The default implementation of this function approximates
-   * $\mathbf s'(0) \approx \frac{$\mathbf s(\epsilon)-\mathbf x_1}{\epsilon}$
+   * $\mathbf s'(0) \approx \frac{\mathbf s(\epsilon)-\mathbf x_1}{\epsilon}$
    * for a small value of $\epsilon$, and the evaluation of $\mathbf s(\epsilon)$
    * is done by calling get_new_point(). If possible, derived classes should
    * override this function by an implemention of the exact derivative.
@@ -446,6 +581,24 @@ public:
    * mapped surface, however, will not usually coincide with the
    * actual surface.)
    *
+   * This function only makes sense if dim==spacedim because
+   * otherwise there is no unique normal vector but in fact a
+   * (spacedim-dim+1)-dimensional tangent space of vectors that
+   * are all both normal to the face and normal to the dim-dimensional
+   * surface that lives in spacedim-dimensional space. For example,
+   * think of a two-dimensional mesh that covers a two-dimensional
+   * surface in three-dimensional space. In that case, each
+   * face (edge) is one-dimensional, and there are two linearly independent
+   * vectors that are both normal to the edge: one is normal to the
+   * edge and tangent to the surface (intuitively, that would be the
+   * one that points from the current cell to the neighboring one,
+   * if the surface was locally flat), and the other one is rooted
+   * in the edge but points perpendicular to the surface (which is
+   * also perpendicular to the edge that lives within the surface).
+   * Thus, because there are no obviously correct semantics for this function
+   * if spacedim is greater than dim, the function will simply throw
+   * an error in that situation.
+   *
    * The face iterator gives an indication which face this function is
    * supposed to compute the normal vector for.  This is useful if the
    * boundary of the domain is composed of different nondifferential
@@ -454,10 +607,22 @@ public:
    * mesh, with piecewise (bi-)linear components between the vertices,
    * but where the boundary may have a kink at the vertices itself).
    *
-   * @note The default implementation of this function computes the
-   * normal vector by taking the cross product between the tangent
-   * vectors from p to the most orthogonal and further non consecutive
-   * vertices of the face.
+   * @note In 2d, the default implementation of this function computes the
+   * normal vector by taking the tangent direction from p to
+   * the further one of the two vertices that make up an edge, and then
+   * rotates it outward (with respect to the coordinate system of the edge)
+   * by 90 degrees. In 3d, the default implementation is more
+   * complicated, aiming at avoiding problems with numerical round-off
+   * for points close to one of the vertices. If the point p is closer
+   * to the center of the face than to any of the vertices, the
+   * normal vector is computed by the cross product of the tangent
+   * vectors from p to either vertex zero and one of the face (if
+   * the closest vertex is either vertex two or three), or of the tangent
+   * vectors from p to vertices two and three (if the closest vertex is
+   * either vertex zero or one). On the other hand, if the point p
+   * is closer to one of the vertices than to the center of the face,
+   * then we take the cross product of the tangent vectors from p
+   * to the two vertices that are adjacent to the closest one.
    */
   virtual
   Tensor<1,spacedim>
@@ -555,8 +720,25 @@ public:
    */
   virtual
   Point<spacedim>
-  get_new_point(const Quadrature<spacedim> &quad) const;
+  get_new_point(const ArrayView<const Point<spacedim>> &surrounding_points,
+                const ArrayView<const double>          &weights) const override;
 
+
+  /**
+   * Compute a new set of points that interpolate between the given points @p
+   * surrounding_points. @p weights is a table with as many columns as @p
+   * surrounding_points.size(). The number of rows in @p weights must match
+   * the length of @p new_points.
+   *
+   * For this particular implementation, the interpolation of the
+   * @p surrounding_points according to the @p weights is simply performed in
+   * Cartesian space.
+   */
+  virtual
+  void
+  get_new_points (const ArrayView<const Point<spacedim>> &surrounding_points,
+                  const Table<2,double>                  &weights,
+                  ArrayView<Point<spacedim>>              new_points) const override;
 
   /**
    * Project to FlatManifold. This is the identity function for flat,
@@ -567,8 +749,8 @@ public:
    */
   virtual
   Point<spacedim>
-  project_to_manifold (const std::vector<Point<spacedim> > &points,
-                       const Point<spacedim> &candidate) const;
+  project_to_manifold (const ArrayView<const Point<spacedim>> &points,
+                       const Point<spacedim>                  &candidate) const override;
 
   /**
    * Return a vector that, at $\mathbf x_1$, is tangential to
@@ -594,7 +776,7 @@ public:
   virtual
   Tensor<1,spacedim>
   get_tangent_vector (const Point<spacedim> &x1,
-                      const Point<spacedim> &x2) const;
+                      const Point<spacedim> &x2) const override;
 
   /**
    * Return the periodicity of this Manifold.
@@ -665,7 +847,7 @@ private:
  * tangent to a surface embedded in higher dimensional space, or simply the
  * three unit vectors of ${\mathbb R}^3$), one needs to also have access
  * to the <i>gradient</i> of the push-forward function $F$. The gradient
- * is the matrix ${\nabla F)_{ij}=\partial_j F_i$, where we take the derivative
+ * is the matrix $(\nabla F)_{ij}=\partial_j F_i$, where we take the derivative
  * with regard to the chartdim reference coordinates on the flat Euclidean
  * space in which $\mathcal B$ is located. In other words, at a point
  * $\mathbf x$, $\nabla F(\mathbf x)$ is a matrix of size @p spacedim
@@ -721,6 +903,11 @@ template <int dim, int spacedim=dim, int chartdim=dim>
 class ChartManifold : public Manifold<dim,spacedim>
 {
 public:
+  // explicitly check for sensible template arguments
+  static_assert (dim<=spacedim,
+                 "The dimension <dim> of a ChartManifold must be less than or "
+                 "equal to the space dimension <spacedim> in which it lives.");
+
   /**
    * Constructor. The optional argument can be used to specify the periodicity
    * of the chartdim-dimensional manifold (one period per direction). A
@@ -741,8 +928,7 @@ public:
    * Destructor. Does nothing here, but needs to be declared to make it
    * virtual.
    */
-  virtual ~ChartManifold ();
-
+  virtual ~ChartManifold () = default;
 
   /**
    * Refer to the general documentation of this class and the documentation of
@@ -750,8 +936,35 @@ public:
    */
   virtual
   Point<spacedim>
-  get_new_point(const Quadrature<spacedim> &quad) const;
+  get_new_point(const ArrayView<const Point<spacedim>> &surrounding_points,
+                const ArrayView<const double>          &weights) const override;
 
+  /**
+   * Compute a new set of points that interpolate between the given points @p
+   * surrounding_points. @p weights is a table with as many columns as @p
+   * surrounding_points.size(). The number of rows in @p weights must match
+   * the length of @p new_points.
+   *
+   * The implementation of this function first transforms the
+   * @p surrounding_points to the chart space by calling pull_back(). Then, new
+   * points are computed on the chart by usual interpolation according to the
+   * given @p weights, which are finally transformed to the image space by
+   * push_forward().
+   *
+   * This implementation can be much more efficient for computing multiple new
+   * points from the same surrounding points than separate calls to
+   * get_new_point() in case the pull_back() operation is expensive. This is
+   * because pull_back() is only called once for the surrounding points and
+   * the interpolation is done for all given weights using this set of
+   * points. Often, pull_back() is also more expensive than push_forward()
+   * because the former might involve some kind of Newton iteration in
+   * non-trivial manifolds.
+   */
+  virtual
+  void
+  get_new_points (const ArrayView<const Point<spacedim>> &surrounding_points,
+                  const Table<2,double>                  &weights,
+                  ArrayView<Point<spacedim>>              new_points) const override;
   /**
    * Pull back the given point in spacedim to the Euclidean chartdim
    * dimensional space.
@@ -813,7 +1026,7 @@ public:
    * In image space, i.e., in the space in which we operate, this
    * leads to the curve
    * @f{align*}{
-   *   \mathbf s(t) &= F(s(t)
+   *   \mathbf s(t) &= F(\zeta(t))
    *  \\          &= F(\xi_1 +  t (\xi_2-\xi_1))
    *  \\          &= F\left(F^{-1}(\mathbf x_1) + t\left[F^{-1}(\mathbf x_2)
    *                                     -F^{-1}(\mathbf x_1)\right]\right).
@@ -850,7 +1063,7 @@ public:
   virtual
   Tensor<1,spacedim>
   get_tangent_vector (const Point<spacedim> &x1,
-                      const Point<spacedim> &x2) const;
+                      const Point<spacedim> &x2) const override;
 
   /**
    * Return the periodicity associated with the submanifold.
@@ -861,11 +1074,16 @@ private:
   /**
    * The sub_manifold object is used to compute the average of the points in
    * the chart coordinates system.
+   *
+   * In an ideal world, it would have type
+   * FlatManifold<dim,chartdim>. However, this would instantiate cases
+   * where dim>spacedim, which leads to invalid situations. We instead
+   * use <chartdim,chartdim>, which is (i) always valid, and (ii) does
+   * not matter at all since the first (dim) argument of manifolds is,
+   * in fact, ignored as far as manifold functionality is concerned.
    */
-  const FlatManifold<dim,chartdim> sub_manifold;
+  const FlatManifold<chartdim,chartdim> sub_manifold;
 };
-
-
 
 
 /* -------------- declaration of explicit specializations ------------- */
@@ -920,11 +1138,30 @@ namespace Manifolds
   get_default_quadrature(const MeshIteratorType &iterator,
                          const bool              with_laplace)
   {
-    const int spacedim = MeshIteratorType::AccessorType::space_dimension;
-    const int dim = MeshIteratorType::AccessorType::structure_dimension;
+    const auto points_and_weights = get_default_points_and_weights(iterator, with_laplace);
+    static const int spacedim = MeshIteratorType::AccessorType::space_dimension;
+    return Quadrature<spacedim>
+           (std::vector<Point<spacedim>>(points_and_weights.first.begin(),
+                                         points_and_weights.first.end()),
+            std::vector<double>(points_and_weights.second.begin(),
+                                points_and_weights.second.end()));
+  }
 
-    std::vector<Point<spacedim> > sp;
-    std::vector<double> wp;
+
+
+  template <typename MeshIteratorType>
+  std::pair<std::array<Point<MeshIteratorType::AccessorType::space_dimension>,
+      n_default_points_per_cell<MeshIteratorType>()>,
+      std::array<double, n_default_points_per_cell<MeshIteratorType>()> >
+      get_default_points_and_weights(const MeshIteratorType &iterator,
+                                     const bool              with_laplace)
+  {
+    const int dim = MeshIteratorType::AccessorType::structure_dimension;
+    const int spacedim = MeshIteratorType::AccessorType::space_dimension;
+    constexpr std::size_t points_per_cell = n_default_points_per_cell<MeshIteratorType>();
+
+    std::pair<std::array<Point<spacedim>, points_per_cell>, std::array<double, points_per_cell> >
+    points_weights;
 
 
     // note that the exact weights are chosen such as to minimize the
@@ -934,32 +1171,32 @@ namespace Manifolds
     switch (dim)
       {
       case 1:
-        sp.resize(2);
-        wp.resize(2);
-        sp[0] = iterator->vertex(0);
-        wp[0] = .5;
-        sp[1] = iterator->vertex(1);
-        wp[1] = .5;
+        Assert(points_weights.first.size() == 2, ExcInternalError());
+        Assert(points_weights.second.size() == 2, ExcInternalError());
+        points_weights.first[0] = iterator->vertex(0);
+        points_weights.second[0] = .5;
+        points_weights.first[1] = iterator->vertex(1);
+        points_weights.second[1] = .5;
         break;
       case 2:
-        sp.resize(8);
-        wp.resize(8);
+        Assert(points_weights.first.size() == 8, ExcInternalError());
+        Assert(points_weights.second.size() == 8, ExcInternalError());
 
         for (unsigned int i=0; i<4; ++i)
           {
-            sp[i] = iterator->vertex(i);
-            sp[4+i] = ( iterator->line(i)->has_children() ?
-                        iterator->line(i)->child(0)->vertex(1) :
-                        iterator->line(i)->get_manifold().get_new_point_on_line(iterator->line(i)) );
+            points_weights.first[i] = iterator->vertex(i);
+            points_weights.first[4+i] = ( iterator->line(i)->has_children() ?
+                                          iterator->line(i)->child(0)->vertex(1) :
+                                          iterator->line(i)->get_manifold().get_new_point_on_line(iterator->line(i)) );
           }
 
         if (with_laplace)
           {
-            std::fill(wp.begin(), wp.begin()+4, 1.0/16.0);
-            std::fill(wp.begin()+4, wp.end(), 3.0/16.0);
+            std::fill(points_weights.second.begin(), points_weights.second.begin()+4, 1.0/16.0);
+            std::fill(points_weights.second.begin()+4, points_weights.second.end(), 3.0/16.0);
           }
         else
-          std::fill(wp.begin(), wp.end(), 1.0/8.0);
+          std::fill(points_weights.second.begin(), points_weights.second.end(), 1.0/8.0);
         break;
       case 3:
       {
@@ -969,9 +1206,10 @@ namespace Manifolds
           GeometryInfo<dim>::vertices_per_cell+
           GeometryInfo<dim>::lines_per_cell+
           GeometryInfo<dim>::faces_per_cell;
-        sp.resize(np);
-        wp.resize(np);
-        std::vector<Point<3> > *sp3 = reinterpret_cast<std::vector<Point<3> > *>(&sp);
+        Assert(points_weights.first.size() == np, ExcInternalError());
+        Assert(points_weights.second.size() == np, ExcInternalError());
+        auto *sp3 = reinterpret_cast<std::array<Point<3>, n_default_points_per_cell<decltype(hex)>()> *>
+                    (&points_weights.first);
 
         unsigned int j=0;
 
@@ -982,33 +1220,33 @@ namespace Manifolds
         for (unsigned int i=0; i<GeometryInfo<dim>::vertices_per_cell; ++i, ++j)
           {
             (*sp3)[j] = hex->vertex(i);
-            wp[j] = 1.0/128.0;
+            points_weights.second[j] = 1.0/128.0;
           }
         for (unsigned int i=0; i<GeometryInfo<dim>::lines_per_cell; ++i, ++j)
           {
             (*sp3)[j] = (hex->line(i)->has_children() ?
                          hex->line(i)->child(0)->vertex(1) :
                          hex->line(i)->get_manifold().get_new_point_on_line(hex->line(i)));
-            wp[j] = 7.0/192.0;
+            points_weights.second[j] = 7.0/192.0;
           }
         for (unsigned int i=0; i<GeometryInfo<dim>::faces_per_cell; ++i, ++j)
           {
             (*sp3)[j] = (hex->quad(i)->has_children() ?
                          hex->quad(i)->isotropic_child(0)->vertex(3) :
                          hex->quad(i)->get_manifold().get_new_point_on_quad(hex->quad(i)));
-            wp[j] = 1.0/12.0;
+            points_weights.second[j] = 1.0/12.0;
           }
         // Overwrite the weights with 1/np if we don't want to use
         // laplace vectors.
         if (with_laplace == false)
-          std::fill(wp.begin(), wp.end(), 1.0/np);
+          std::fill(points_weights.second.begin(), points_weights.second.end(), 1.0/np);
       }
       break;
       default:
         Assert(false, ExcInternalError());
         break;
       }
-    return Quadrature<spacedim>(sp,wp);
+    return points_weights;
   }
 }
 

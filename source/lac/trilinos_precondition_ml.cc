@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,6 +13,7 @@
 //
 // ---------------------------------------------------------------------
 
+#include <deal.II/lac/trilinos_index_access.h>
 #include <deal.II/lac/trilinos_precondition.h>
 
 #ifdef DEAL_II_WITH_TRILINOS
@@ -20,6 +21,7 @@
 #  include <deal.II/lac/vector.h>
 #  include <deal.II/lac/sparse_matrix.h>
 #  include <deal.II/lac/trilinos_sparse_matrix.h>
+#  include <deal.II/lac/trilinos_index_access.h>
 
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #  include <Ifpack.h>
@@ -35,43 +37,6 @@ DEAL_II_NAMESPACE_OPEN
 
 namespace TrilinosWrappers
 {
-  namespace
-  {
-#ifndef DEAL_II_WITH_64BIT_INDICES
-    int n_global_rows (const Epetra_RowMatrix &matrix)
-    {
-      return matrix.NumGlobalRows();
-    }
-
-    int global_length (const Epetra_MultiVector &vector)
-    {
-      return vector.GlobalLength();
-    }
-
-    int gid(const Epetra_Map &map, unsigned int i)
-    {
-      return map.GID(i);
-    }
-#else
-    long long int n_global_rows (const Epetra_RowMatrix &matrix)
-    {
-      return matrix.NumGlobalRows64();
-    }
-
-    long long int global_length (const Epetra_MultiVector &vector)
-    {
-      return vector.GlobalLength64();
-    }
-
-    long long int gid(const Epetra_Map &map, dealii::types::global_dof_index i)
-    {
-      return map.GID64(i);
-    }
-#endif
-  }
-
-
-
   /* -------------------------- PreconditionAMG -------------------------- */
 
   PreconditionAMG::AdditionalData::
@@ -110,8 +75,8 @@ namespace TrilinosWrappers
 
 
   void
-  PreconditionAMG:: initialize (const SparseMatrix   &matrix,
-                                const AdditionalData &additional_data)
+  PreconditionAMG::initialize (const SparseMatrix   &matrix,
+                               const AdditionalData &additional_data)
   {
     initialize(matrix.trilinos_matrix(), additional_data);
   }
@@ -119,8 +84,8 @@ namespace TrilinosWrappers
 
 
   void
-  PreconditionAMG:: initialize (const Epetra_RowMatrix &matrix,
-                                const AdditionalData   &additional_data)
+  PreconditionAMG::initialize (const Epetra_RowMatrix &matrix,
+                               const AdditionalData   &additional_data)
   {
     // Build the AMG preconditioner.
     Teuchos::ParameterList parameter_list;
@@ -188,12 +153,12 @@ namespace TrilinosWrappers
 
     if (constant_modes_dimension > 0)
       {
-        const size_type global_size = n_global_rows(matrix);
+        const size_type global_size = TrilinosWrappers::n_global_rows(matrix);
         (void)global_length; // work around compiler warning about unused function in release mode
         Assert (global_size ==
-                static_cast<size_type>(global_length(distributed_constant_modes)),
+                static_cast<size_type>(TrilinosWrappers::global_length(distributed_constant_modes)),
                 ExcDimensionMismatch(global_size,
-                                     global_length(distributed_constant_modes)));
+                                     TrilinosWrappers::global_length(distributed_constant_modes)));
         const bool constant_modes_are_global
           = additional_data.constant_modes[0].size() == global_size;
         const size_type my_size = domain_map.NumMyElements();
@@ -209,7 +174,7 @@ namespace TrilinosWrappers
             for (size_type row=0; row<my_size; ++row)
               {
                 const TrilinosWrappers::types::int_type mode_index =
-                  constant_modes_are_global ? gid(domain_map,row) : row;
+                  constant_modes_are_global ? TrilinosWrappers::global_index(domain_map,row) : row;
                 distributed_constant_modes[d][row] =
                   additional_data.constant_modes[d][mode_index];
               }
@@ -235,7 +200,7 @@ namespace TrilinosWrappers
       {
         ML_Epetra::MultiLevelPreconditioner *multilevel_operator =
           dynamic_cast<ML_Epetra::MultiLevelPreconditioner *> (preconditioner.get());
-        Assert (multilevel_operator != 0,
+        Assert (multilevel_operator != nullptr,
                 ExcMessage ("Preconditioner setup failed."));
         multilevel_operator->PrintUnused(0);
       }
@@ -281,7 +246,7 @@ namespace TrilinosWrappers
     vector_distributor.reset (new Epetra_Map(static_cast<TrilinosWrappers::types::int_type>(n_rows),
                                              0, communicator));
 
-    if (trilinos_matrix.get() == 0)
+    if (trilinos_matrix.get() == nullptr)
       trilinos_matrix.reset (new SparseMatrix());
 
     trilinos_matrix->reinit (*vector_distributor, *vector_distributor,
@@ -313,11 +278,11 @@ namespace TrilinosWrappers
   PreconditionAMG::size_type
   PreconditionAMG::memory_consumption() const
   {
-    unsigned int memory = sizeof(this);
+    unsigned int memory = sizeof(*this);
 
     // todo: find a way to read out ML's data
     // sizes
-    if (trilinos_matrix.get() != 0)
+    if (trilinos_matrix.get() != nullptr)
       memory += trilinos_matrix->memory_consumption();
     return memory;
   }

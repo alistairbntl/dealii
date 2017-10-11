@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,14 +18,12 @@
 // check SparsityTools::distribute_sparsity_pattern
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 
 #include <deal.II/base/index_set.h>
 #include <deal.II/lac/sparsity_tools.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
-#include <fstream>
 
 
 void test_mpi()
@@ -52,7 +50,7 @@ void test_mpi()
   if (myid<numprocs-1)
     locally_rel.add_range((myid+1)*num_local, (myid+2)*num_local);
 
-  CompressedSimpleSparsityPattern csp(n,n, locally_rel);
+  DynamicSparsityPattern csp(n,n, locally_rel);
 
   for (unsigned int i=0; i<n; ++i)
     csp.add(i, myid);
@@ -105,9 +103,7 @@ int main(int argc, char *argv[])
 
   if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("mpi");
       test_mpi();

@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__matrix_free_mapping_data_on_the_fly_h
-#define dealii__matrix_free_mapping_data_on_the_fly_h
+#ifndef dealii_matrix_free_mapping_data_on_the_fly_h
+#define dealii_matrix_free_mapping_data_on_the_fly_h
 
 
 #include <deal.II/base/config.h>
@@ -82,7 +82,7 @@ namespace internal
       void reinit(typename dealii::Triangulation<dim>::cell_iterator cell);
 
       /**
-       * Returns whether reinit() has been called at least once, i.e., a cell
+       * Return whether reinit() has been called at least once, i.e., a cell
        * has been set.
        */
       bool is_initialized() const;

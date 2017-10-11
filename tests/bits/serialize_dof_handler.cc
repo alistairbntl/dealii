@@ -29,16 +29,12 @@
 #include <boost/archive/text_oarchive.hpp>
 
 #include <iostream>
-#include <fstream>
 #include <string>
-#include <fstream>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<2> triangulation;
   GridGenerator::hyper_cube (triangulation);

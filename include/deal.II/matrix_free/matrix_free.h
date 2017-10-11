@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2016 by the deal.II authors
+// Copyright (C) 2011 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,19 +14,21 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__matrix_free_h
-#define dealii__matrix_free_h
+#ifndef dealii_matrix_free_h
+#define dealii_matrix_free_h
 
+#include <deal.II/base/aligned_vector.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parallel.h>
 #include <deal.II/base/quadrature.h>
 #include <deal.II/base/vectorization.h>
+#include <deal.II/base/thread_local_storage.h>
 #include <deal.II/base/template_constraints.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
 #include <deal.II/fe/mapping_q1.h>
 #include <deal.II/lac/vector.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/block_vector_base.h>
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -47,6 +49,7 @@
 #include <stdlib.h>
 #include <memory>
 #include <limits>
+#include <list>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -97,11 +100,13 @@ DEAL_II_NAMESPACE_OPEN
  * operations for several cells with one CPU instruction and is one of the
  * main features of this framework.
  *
+ * For details on usage of this class, see the description of FEEvaluation.
+ *
  * @author Katharina Kormann, Martin Kronbichler, 2010, 2011
  */
 
 template <int dim, typename Number=double>
-class MatrixFree
+class MatrixFree : public Subscriptor
 {
 public:
 
@@ -136,15 +141,35 @@ public:
   struct AdditionalData
   {
     /**
-     * Collects options for task parallelism.
+     * Collects options for task parallelism. See the documentation of the
+     * member variable MatrixFree::AdditionalData::tasks_parallel_scheme for a
+     * thorough description.
      */
-    enum TasksParallelScheme {none, partition_partition, partition_color, color};
+    enum TasksParallelScheme
+    {
+      /**
+       * Perform application in serial.
+       */
+      none,
+      /**
+       * Partition the cells into two levels and afterwards form chunks.
+       */
+      partition_partition,
+      /**
+       * Partition on the global level and color cells within the partitions.
+       */
+      partition_color,
+      /**
+       * Use the traditional coloring algorithm: this is like
+       * TasksParallelScheme::partition_color, but only uses one partition.
+       */
+      color
+    };
 
     /**
      * Constructor for AdditionalData.
      */
-    AdditionalData (const MPI_Comm            mpi_communicator   = MPI_COMM_SELF,
-                    const TasksParallelScheme tasks_parallel_scheme = partition_partition,
+    AdditionalData (const TasksParallelScheme tasks_parallel_scheme = partition_partition,
                     const unsigned int        tasks_block_size   = 0,
                     const UpdateFlags         mapping_update_flags  = update_gradients | update_JxW_values,
                     const unsigned int level_mg_handler = numbers::invalid_unsigned_int,
@@ -152,7 +177,6 @@ public:
                     const bool                initialize_indices = true,
                     const bool                initialize_mapping = true)
       :
-      mpi_communicator      (mpi_communicator),
       tasks_parallel_scheme (tasks_parallel_scheme),
       tasks_block_size      (tasks_block_size),
       mapping_update_flags  (mapping_update_flags),
@@ -162,16 +186,9 @@ public:
       initialize_mapping    (initialize_mapping)
     {};
 
-    /**
-     * Sets the MPI communicator that the parallel layout of the operator
-     * should be based upon. Defaults to MPI_COMM_SELF, but should be set to a
-     * communicator similar to the one used for a distributed triangulation in
-     * order to inform this class over all cells that are present.
-     */
-    MPI_Comm            mpi_communicator;
 
     /**
-     * Sets the scheme for task parallelism. There are four options available.
+     * Set the scheme for task parallelism. There are four options available.
      * If set to @p none, the operator application is done in serial without
      * shared memory parallelism. If this class is used together with MPI and
      * MPI is also used for parallelism within the nodes, this flag should be
@@ -201,7 +218,7 @@ public:
     TasksParallelScheme tasks_parallel_scheme;
 
     /**
-     * Sets the number of so-called macro cells that should form one
+     * Set the number of so-called macro cells that should form one
      * partition. If zero size is given, the class tries to find a good size
      * for the blocks based on MultithreadInfo::n_threads() and the number of
      * cells present. Otherwise, the given number is used. If the given number
@@ -271,9 +288,14 @@ public:
   MatrixFree ();
 
   /**
+   * Copy constructor, calls copy_from
+   */
+  MatrixFree (const MatrixFree<dim,Number> &other);
+
+  /**
    * Destructor.
    */
-  ~MatrixFree();
+  ~MatrixFree() = default;
 
   /**
    * Extracts the information needed to perform loops over cells. The
@@ -285,24 +307,6 @@ public:
    * or contain several copies of the same element. Mixing several different
    * elements into one FESystem is not allowed. In that case, use the
    * initialization function with several DoFHandler arguments.
-   *
-   * The @p IndexSet @p locally_owned_dofs is used to specify the parallel
-   * partitioning with MPI. Usually, this needs not be specified, and the
-   * other initialization function without and @p IndexSet description can be
-   * used, which gets the partitioning information builtin into the
-   * DoFHandler.
-   */
-  template <typename DoFHandlerType, typename QuadratureType>
-  void reinit (const Mapping<dim>     &mapping,
-               const DoFHandlerType   &dof_handler,
-               const ConstraintMatrix &constraint,
-               const IndexSet         &locally_owned_dofs,
-               const QuadratureType   &quad,
-               const AdditionalData    additional_data = AdditionalData());
-
-  /**
-   * Initializes the data structures. Same as above, but with index set stored
-   * in the DoFHandler for describing the locally owned degrees of freedom.
    */
   template <typename DoFHandlerType, typename QuadratureType>
   void reinit (const Mapping<dim>     &mapping,
@@ -320,6 +324,21 @@ public:
                const ConstraintMatrix &constraint,
                const QuadratureType   &quad,
                const AdditionalData    additional_data = AdditionalData());
+
+  /**
+   * Same as above.
+   *
+   * @deprecated Setting the index set specifically is not supported any
+   * more. Use the reinit function without index set argument to choose the
+   * one provided by DoFHandler::locally_owned_dofs().
+   */
+  template <typename DoFHandlerType, typename QuadratureType>
+  void reinit (const Mapping<dim>     &mapping,
+               const DoFHandlerType   &dof_handler,
+               const ConstraintMatrix &constraint,
+               const IndexSet         &locally_owned_dofs,
+               const QuadratureType   &quad,
+               const AdditionalData    additional_data = AdditionalData()) DEAL_II_DEPRECATED;
 
   /**
    * Extracts the information needed to perform loops over cells. The
@@ -340,25 +359,6 @@ public:
    * different degrees. However, the number of different quadrature formulas
    * can be sets independently from the number of DoFHandlers, when several
    * elements are always integrated with the same quadrature formula.
-   *
-   * The @p IndexSet @p locally_owned_dofs is used to specify the parallel
-   * partitioning with MPI. Usually, this needs not be specified, and the
-   * other initialization function without and @p IndexSet description can be
-   * used, which gets the partitioning information from the DoFHandler. This
-   * is the most general initialization function.
-   */
-  template <typename DoFHandlerType, typename QuadratureType>
-  void reinit (const Mapping<dim>                          &mapping,
-               const std::vector<const DoFHandlerType *>   &dof_handler,
-               const std::vector<const ConstraintMatrix *> &constraint,
-               const std::vector<IndexSet>                 &locally_owned_set,
-               const std::vector<QuadratureType>           &quad,
-               const AdditionalData                        additional_data = AdditionalData());
-
-  /**
-   * Initializes the data structures. Same as before, but now the index set
-   * description of the locally owned range of degrees of freedom is taken
-   * from the DoFHandler.
    */
   template <typename DoFHandlerType, typename QuadratureType>
   void reinit (const Mapping<dim>                          &mapping,
@@ -376,6 +376,21 @@ public:
                const std::vector<const ConstraintMatrix *> &constraint,
                const std::vector<QuadratureType>           &quad,
                const AdditionalData                        additional_data = AdditionalData());
+
+  /**
+   * Same as above.
+   *
+   * @deprecated Setting the index set specifically is not supported any
+   * more. Use the reinit function without index set argument to choose the
+   * one provided by DoFHandler::locally_owned_dofs().
+   */
+  template <typename DoFHandlerType, typename QuadratureType>
+  void reinit (const Mapping<dim>                          &mapping,
+               const std::vector<const DoFHandlerType *>   &dof_handler,
+               const std::vector<const ConstraintMatrix *> &constraint,
+               const std::vector<IndexSet>                 &locally_owned_set,
+               const std::vector<QuadratureType>           &quad,
+               const AdditionalData                        additional_data = AdditionalData()) DEAL_II_DEPRECATED;
 
   /**
    * Initializes the data structures. Same as before, but now the index set
@@ -409,7 +424,7 @@ public:
   void copy_from (const MatrixFree<dim,Number> &matrix_free_base);
 
   /**
-   * Clears all data fields and brings the class into a condition similar to
+   * Clear all data fields and brings the class into a condition similar to
    * after having called the default constructor.
    */
   void clear();
@@ -434,11 +449,11 @@ public:
    * to the function object.
    */
   template <typename OutVector, typename InVector>
-  void cell_loop (const std_cxx11::function<void (const MatrixFree<dim,Number> &,
-                                                  OutVector &,
-                                                  const InVector &,
-                                                  const std::pair<unsigned int,
-                                                  unsigned int> &)> &cell_operation,
+  void cell_loop (const std::function<void (const MatrixFree<dim,Number> &,
+                                            OutVector &,
+                                            const InVector &,
+                                            const std::pair<unsigned int,
+                                            unsigned int> &)> &cell_operation,
                   OutVector      &dst,
                   const InVector &src) const;
 
@@ -447,7 +462,7 @@ public:
    * a function pointer to a member function of class @p CLASS with the
    * signature <code>cell_operation (const MatrixFree<dim,Number> &, OutVector
    * &, InVector &, std::pair<unsigned int,unsigned int>&)const</code>. This
-   * method obviates the need to call std_cxx11::bind to bind the class into
+   * method obviates the need to call std::bind to bind the class into
    * the given function in case the local function needs to access data in the
    * class (i.e., it is a non-static member function).
    */
@@ -506,10 +521,22 @@ public:
   /**
    * Initialize function for a general vector. The length of the vector is
    * equal to the total number of degrees in the DoFHandler. If the vector is
-   * of class parallel::distributed::Vector@<Number@>, the ghost entries are
+   * of class LinearAlgebra::distributed::Vector@<Number@>, the ghost entries are
    * set accordingly. For vector-valued problems with several DoFHandlers
    * underlying this class, the parameter @p vector_component defines which
    * component is to be used.
+   *
+   * For the vectors used with MatrixFree and in FEEvaluation, a vector needs
+   * to hold all
+   * @ref GlossLocallyActiveDof "locally active DoFs"
+   * and also some of the
+   * @ref GlossLocallyRelevantDof "locally relevant DoFs".
+   * The selection of DoFs is such that one can read all degrees of freedom on all
+   * locally relevant elements (locally active) plus the degrees of freedom
+   * that contraints expand into from the locally owned cells. However, not
+   * all locally relevant DoFs are stored because most of them would never be
+   * accessed in matrix-vector products and result in too much data sent
+   * around which impacts the performance.
    */
   template <typename VectorType>
   void initialize_dof_vector(VectorType &vec,
@@ -518,17 +545,29 @@ public:
   /**
    * Initialize function for a distributed vector. The length of the vector is
    * equal to the total number of degrees in the DoFHandler. If the vector is
-   * of class parallel::distributed::Vector@<Number@>, the ghost entries are
+   * of class LinearAlgebra::distributed::Vector@<Number@>, the ghost entries are
    * set accordingly. For vector-valued problems with several DoFHandlers
    * underlying this class, the parameter @p vector_component defines which
    * component is to be used.
+   *
+   * For the vectors used with MatrixFree and in FEEvaluation, a vector needs
+   * to hold all
+   * @ref GlossLocallyActiveDof "locally active DoFs"
+   * and also some of the
+   * @ref GlossLocallyRelevantDof "locally relevant DoFs".
+   * The selection of DoFs is such that one can read all degrees of freedom on all
+   * locally relevant elements (locally active) plus the degrees of freedom
+   * that contraints expand into from the locally owned cells. However, not
+   * all locally relevant DoFs are stored because most of them would never be
+   * accessed in matrix-vector products and result in too much data sent
+   * around which impacts the performance.
    */
   template <typename Number2>
-  void initialize_dof_vector(parallel::distributed::Vector<Number2> &vec,
+  void initialize_dof_vector(LinearAlgebra::distributed::Vector<Number2> &vec,
                              const unsigned int vector_component=0) const;
 
   /**
-   * Returns the partitioner that represents the locally owned data and the
+   * Return the partitioner that represents the locally owned data and the
    * ghost indices where access is needed to for the cell loop. The
    * partitioner is constructed from the locally owned dofs and ghost dofs
    * given by the respective fields. If you want to have specific information
@@ -537,23 +576,23 @@ public:
    * usually prefer this data structure as the data exchange information can
    * be reused from one vector to another.
    */
-  const std_cxx11::shared_ptr<const Utilities::MPI::Partitioner> &
+  const std::shared_ptr<const Utilities::MPI::Partitioner> &
   get_vector_partitioner (const unsigned int vector_component=0) const;
 
   /**
-   * Returns the set of cells that are oned by the processor.
+   * Return the set of cells that are oned by the processor.
    */
   const IndexSet &
   get_locally_owned_set (const unsigned int fe_component = 0) const;
 
   /**
-   * Returns the set of ghost cells needed but not owned by the processor.
+   * Return the set of ghost cells needed but not owned by the processor.
    */
   const IndexSet &
   get_ghost_set (const unsigned int fe_component = 0) const;
 
   /**
-   * Returns a list of all degrees of freedom that are constrained. The list
+   * Return a list of all degrees of freedom that are constrained. The list
    * is returned in MPI-local index space for the locally owned range of the
    * vector, not in global MPI index space that spans all MPI processors. To
    * get numbers in global index space, call
@@ -578,12 +617,19 @@ public:
    */
   //@{
   /**
-   * Returns the number of different DoFHandlers specified at initialization.
+   * Returns whether a given FiniteElement @p fe is supported by this class.
+   */
+  template <int spacedim>
+  static
+  bool is_supported (const FiniteElement<dim, spacedim> &fe);
+
+  /**
+   * Return the number of different DoFHandlers specified at initialization.
    */
   unsigned int n_components () const;
 
   /**
-   * Returns the number of cells this structure is based on. If you are using
+   * Return the number of cells this structure is based on. If you are using
    * a usual DoFHandler, it corresponds to the number of (locally owned)
    * active cells. Note that most data structures in this class do not
    * directly act on this number but rather on n_macro_cells() which gives the
@@ -593,7 +639,7 @@ public:
   unsigned int n_physical_cells () const;
 
   /**
-   * Returns the number of macro cells that this structure works on, i.e., the
+   * Return the number of macro cells that this structure works on, i.e., the
    * number of cell chunks that are worked on after the application of
    * vectorization which in general works on several cells at once. The cell
    * range in @p cell_loop runs from zero to n_macro_cells() (exclusive), so
@@ -668,21 +714,21 @@ public:
   n_components_filled (const unsigned int macro_cell_number) const;
 
   /**
-   * Returns the number of degrees of freedom per cell for a given hp index.
+   * Return the number of degrees of freedom per cell for a given hp index.
    */
   unsigned int
   get_dofs_per_cell (const unsigned int fe_component = 0,
                      const unsigned int hp_active_fe_index = 0) const;
 
   /**
-   * Returns the number of quadrature points per cell for a given hp index.
+   * Return the number of quadrature points per cell for a given hp index.
    */
   unsigned int
   get_n_q_points (const unsigned int quad_index = 0,
                   const unsigned int hp_active_fe_index = 0) const;
 
   /**
-   * Returns the number of degrees of freedom on each face of the cell for
+   * Return the number of degrees of freedom on each face of the cell for
    * given hp index.
    */
   unsigned int
@@ -690,7 +736,7 @@ public:
                      const unsigned int hp_active_fe_index = 0) const;
 
   /**
-   * Returns the number of quadrature points on each face of the cell for
+   * Return the number of quadrature points on each face of the cell for
    * given hp index.
    */
   unsigned int
@@ -698,14 +744,14 @@ public:
                        const unsigned int hp_active_fe_index = 0) const;
 
   /**
-   * Returns the quadrature rule for given hp index.
+   * Return the quadrature rule for given hp index.
    */
   const Quadrature<dim> &
   get_quadrature (const unsigned int quad_index = 0,
                   const unsigned int hp_active_fe_index = 0) const;
 
   /**
-   * Returns the quadrature rule for given hp index.
+   * Return the quadrature rule for given hp index.
    */
   const Quadrature<dim-1> &
   get_face_quadrature (const unsigned int quad_index = 0,
@@ -724,7 +770,7 @@ public:
   bool mapping_initialized () const;
 
   /**
-   * Returns an approximation of the memory consumption of this class in
+   * Return an approximation of the memory consumption of this class in
    * bytes.
    */
   std::size_t memory_consumption() const;
@@ -749,43 +795,43 @@ public:
    */
   //@{
   /**
-   * Returns information on task graph.
+   * Return information on task graph.
    */
   const internal::MatrixFreeFunctions::TaskInfo &
   get_task_info () const;
 
   /**
-   * Returns information on system size.
+   * Return information on system size.
    */
   const internal::MatrixFreeFunctions::SizeInfo &
   get_size_info () const;
 
   /*
-   * Returns geometry-dependent information on the cells.
+   * Return geometry-dependent information on the cells.
    */
   const internal::MatrixFreeFunctions::MappingInfo<dim,Number> &
   get_mapping_info () const;
 
   /**
-   * Returns information on indexation degrees of freedom.
+   * Return information on indexation degrees of freedom.
    */
   const internal::MatrixFreeFunctions::DoFInfo &
   get_dof_info (const unsigned int fe_component = 0) const;
 
   /**
-   * Returns the number of weights in the constraint pool.
+   * Return the number of weights in the constraint pool.
    */
   unsigned int n_constraint_pool_entries() const;
 
   /**
-   * Returns a pointer to the first number in the constraint pool data with
+   * Return a pointer to the first number in the constraint pool data with
    * index @p pool_index (to be used together with @p constraint_pool_end()).
    */
   const Number *
   constraint_pool_begin (const unsigned int pool_index) const;
 
   /**
-   * Returns a pointer to one past the last number in the constraint pool data
+   * Return a pointer to one past the last number in the constraint pool data
    * with index @p pool_index (to be used together with @p
    * constraint_pool_begin()).
    */
@@ -793,13 +839,33 @@ public:
   constraint_pool_end (const unsigned int pool_index) const;
 
   /**
-   * Returns the unit cell information for given hp index.
+   * Return the unit cell information for given hp index.
    */
-  const internal::MatrixFreeFunctions::ShapeInfo<Number> &
-  get_shape_info (const unsigned int fe_component = 0,
-                  const unsigned int quad_index   = 0,
-                  const unsigned int hp_active_fe_index = 0,
-                  const unsigned int hp_active_quad_index = 0) const;
+  const internal::MatrixFreeFunctions::ShapeInfo<VectorizedArray<Number>> &
+      get_shape_info (const unsigned int fe_component = 0,
+                      const unsigned int quad_index   = 0,
+                      const unsigned int hp_active_fe_index = 0,
+                      const unsigned int hp_active_quad_index = 0) const;
+
+  /**
+   * Obtains a scratch data object for internal use. Make sure to release it
+   * afterwards by passing the pointer you obtain from this object to the
+   * release_scratch_data() function. This interface is used by FEEvaluation
+   * objects for storing their data structures.
+   *
+   * The organization of the internal data structure is a thread-local storage
+   * of a list of vectors. Multiple threads will each get a separate storage
+   * field and separate vectors, ensuring thread safety. The mechanism to
+   * acquire and release objects is similar to the mechanisms used for the
+   * local contributions of WorkStream, see
+   * @ref workstream_paper "the WorkStream paper".
+   */
+  AlignedVector<VectorizedArray<Number> > *acquire_scratch_data() const;
+
+  /**
+   * Makes the object of the scratchpad available again.
+   */
+  void release_scratch_data(const AlignedVector<VectorizedArray<Number> > *memory) const;
 
   //@}
 
@@ -855,10 +921,26 @@ private:
    */
   struct DoFHandlers
   {
-    DoFHandlers () : n_dof_handlers (0), level (numbers::invalid_unsigned_int) {};
+    DoFHandlers ()
+      :
+      active_dof_handler(usual),
+      n_dof_handlers (0),
+      level (numbers::invalid_unsigned_int)
+    {}
+
     std::vector<SmartPointer<const DoFHandler<dim> > >   dof_handler;
     std::vector<SmartPointer<const hp::DoFHandler<dim> > > hp_dof_handler;
-    enum ActiveDoFHandler { usual, hp } active_dof_handler;
+    enum ActiveDoFHandler
+    {
+      /**
+       * Use DoFHandler.
+       */
+      usual,
+      /**
+       * Use hp::DoFHandler.
+       */
+      hp
+    } active_dof_handler;
     unsigned int n_dof_handlers;
     unsigned int level;
   };
@@ -897,7 +979,7 @@ private:
   /**
    * Contains shape value information on the unit cell.
    */
-  Table<4,internal::MatrixFreeFunctions::ShapeInfo<Number> > shape_info;
+  Table<4,internal::MatrixFreeFunctions::ShapeInfo<VectorizedArray<Number>>> shape_info;
 
   /**
    * Describes how the cells are gone through. With the cell level (first
@@ -927,6 +1009,15 @@ private:
    * Stores whether indices have been initialized.
    */
   bool                               mapping_is_initialized;
+
+  /**
+   * Scratchpad memory for use in evaluation. We allow more than one
+   * evaluation object to attach to this field (this, the outer
+   * std::vector), so we need to keep tracked of whether a certain data
+   * field is already used (first part of pair) and keep a list of
+   * objects.
+   */
+  mutable Threads::ThreadLocalStorage<std::list<std::pair<bool, AlignedVector<VectorizedArray<Number> > > > > scratch_pad;
 };
 
 
@@ -953,7 +1044,7 @@ template <int dim, typename Number>
 template <typename Number2>
 inline
 void
-MatrixFree<dim,Number>::initialize_dof_vector(parallel::distributed::Vector<Number2> &vec,
+MatrixFree<dim,Number>::initialize_dof_vector(LinearAlgebra::distributed::Vector<Number2> &vec,
                                               const unsigned int comp) const
 {
   AssertIndexRange (comp, n_components());
@@ -964,7 +1055,7 @@ MatrixFree<dim,Number>::initialize_dof_vector(parallel::distributed::Vector<Numb
 
 template <int dim, typename Number>
 inline
-const std_cxx11::shared_ptr<const Utilities::MPI::Partitioner> &
+const std::shared_ptr<const Utilities::MPI::Partitioner> &
 MatrixFree<dim,Number>::get_vector_partitioner (const unsigned int comp) const
 {
   AssertIndexRange (comp, n_components());
@@ -1072,7 +1163,7 @@ const Number *
 MatrixFree<dim,Number>::constraint_pool_begin (const unsigned int row) const
 {
   AssertIndexRange (row, constraint_pool_row_index.size()-1);
-  return constraint_pool_data.empty() ? 0 :
+  return constraint_pool_data.empty() ? nullptr :
          &constraint_pool_data[0] + constraint_pool_row_index[row];
 }
 
@@ -1084,7 +1175,7 @@ const Number *
 MatrixFree<dim,Number>::constraint_pool_end (const unsigned int row) const
 {
   AssertIndexRange (row, constraint_pool_row_index.size()-1);
-  return constraint_pool_data.empty() ? 0 :
+  return constraint_pool_data.empty() ? nullptr :
          &constraint_pool_data[0] + constraint_pool_row_index[row+1];
 }
 
@@ -1211,7 +1302,7 @@ MatrixFree<dim,Number>::get_cell_iterator(const unsigned int macro_cell_number,
     AssertIndexRange (vector_number, irreg_filled);
 #endif
 
-  const DoFHandler<dim> *dofh = 0;
+  const DoFHandler<dim> *dofh = nullptr;
   if (dof_handlers.active_dof_handler == DoFHandlers::usual)
     {
       AssertDimension (dof_handlers.dof_handler.size(),
@@ -1360,11 +1451,11 @@ MatrixFree<dim,Number>::get_ghost_set(const unsigned int dof_index) const
 
 template <int dim, typename Number>
 inline
-const internal::MatrixFreeFunctions::ShapeInfo<Number> &
-MatrixFree<dim,Number>::get_shape_info (const unsigned int index_fe,
-                                        const unsigned int index_quad,
-                                        const unsigned int active_fe_index,
-                                        const unsigned int active_quad_index) const
+const internal::MatrixFreeFunctions::ShapeInfo<VectorizedArray<Number>> &
+    MatrixFree<dim,Number>::get_shape_info (const unsigned int index_fe,
+                                            const unsigned int index_quad,
+                                            const unsigned int active_fe_index,
+                                            const unsigned int active_quad_index) const
 {
   AssertIndexRange (index_fe, shape_info.size(0));
   AssertIndexRange (index_quad, shape_info.size(1));
@@ -1418,6 +1509,42 @@ bool
 MatrixFree<dim,Number>::mapping_initialized () const
 {
   return mapping_is_initialized;
+}
+
+
+
+template <int dim,typename Number>
+AlignedVector<VectorizedArray<Number> > *
+MatrixFree<dim,Number>::acquire_scratch_data() const
+{
+  typedef std::list<std::pair<bool, AlignedVector<VectorizedArray<Number> > > > list_type;
+  list_type &data = scratch_pad.get();
+  for (typename list_type::iterator it=data.begin(); it!=data.end(); ++it)
+    if (it->first == false)
+      {
+        it->first = true;
+        return &it->second;
+      }
+  data.push_front(std::make_pair(true,AlignedVector<VectorizedArray<Number> >()));
+  return &data.front().second;
+}
+
+
+
+template <int dim, typename Number>
+void
+MatrixFree<dim,Number>::release_scratch_data(const AlignedVector<VectorizedArray<Number> > *scratch) const
+{
+  typedef std::list<std::pair<bool, AlignedVector<VectorizedArray<Number> > > > list_type;
+  list_type &data = scratch_pad.get();
+  for (typename list_type::iterator it=data.begin(); it!=data.end(); ++it)
+    if (&it->second == scratch)
+      {
+        Assert(it->first == true, ExcInternalError());
+        it->first = false;
+        return;
+      }
+  AssertThrow(false, ExcMessage("Tried to release invalid scratch pad"));
 }
 
 
@@ -1483,8 +1610,12 @@ reinit(const DoFHandlerType                                  &dof_handler,
   std::vector<IndexSet> locally_owned_sets =
     internal::MatrixFree::extract_locally_owned_index_sets
     (dof_handlers, additional_data.level_mg_handler);
-  reinit(StaticMappingQ1<dim>::mapping, dof_handlers,constraints, locally_owned_sets, quads,
-         additional_data);
+
+  std::vector<hp::QCollection<1> > quad_hp;
+  quad_hp.emplace_back (quad);
+
+  internal_reinit(StaticMappingQ1<dim>::mapping, dof_handlers,constraints,
+                  locally_owned_sets, quad_hp, additional_data);
 }
 
 
@@ -1500,17 +1631,19 @@ reinit(const Mapping<dim>                                    &mapping,
 {
   std::vector<const DoFHandlerType *>   dof_handlers;
   std::vector<const ConstraintMatrix *> constraints;
-  std::vector<QuadratureType>           quads;
 
   dof_handlers.push_back(&dof_handler);
   constraints.push_back (&constraints_in);
-  quads.push_back (quad);
 
   std::vector<IndexSet> locally_owned_sets =
     internal::MatrixFree::extract_locally_owned_index_sets
     (dof_handlers, additional_data.level_mg_handler);
-  reinit(mapping, dof_handlers,constraints,locally_owned_sets, quads,
-         additional_data);
+
+  std::vector<hp::QCollection<1> > quad_hp;
+  quad_hp.emplace_back (quad);
+
+  internal_reinit(mapping, dof_handlers,constraints,locally_owned_sets,
+                  quad_hp,  additional_data);
 }
 
 
@@ -1526,9 +1659,11 @@ reinit(const std::vector<const DoFHandlerType *>   &dof_handler,
   std::vector<IndexSet> locally_owned_set =
     internal::MatrixFree::extract_locally_owned_index_sets
     (dof_handler, additional_data.level_mg_handler);
-  reinit(StaticMappingQ1<dim>::mapping, dof_handler,constraint,locally_owned_set,
-         static_cast<const std::vector<Quadrature<1> >&>(quad),
-         additional_data);
+  std::vector<hp::QCollection<1> > quad_hp;
+  for (unsigned int q=0; q<quad.size(); ++q)
+    quad_hp.emplace_back (quad[q]);
+  internal_reinit(StaticMappingQ1<dim>::mapping, dof_handler,constraint,
+                  locally_owned_set, quad_hp, additional_data);
 }
 
 
@@ -1541,13 +1676,13 @@ reinit(const std::vector<const DoFHandlerType *>             &dof_handler,
        const QuadratureType                                  &quad,
        const typename MatrixFree<dim,Number>::AdditionalData additional_data)
 {
-  std::vector<QuadratureType> quads;
-  quads.push_back(quad);
   std::vector<IndexSet> locally_owned_set =
     internal::MatrixFree::extract_locally_owned_index_sets
     (dof_handler, additional_data.level_mg_handler);
-  reinit(StaticMappingQ1<dim>::mapping, dof_handler,constraint,locally_owned_set, quads,
-         additional_data);
+  std::vector<hp::QCollection<1> > quad_hp;
+  quad_hp.emplace_back (quad);
+  internal_reinit(StaticMappingQ1<dim>::mapping, dof_handler,constraint,
+                  locally_owned_set, quad_hp, additional_data);
 }
 
 
@@ -1561,13 +1696,13 @@ reinit(const Mapping<dim>                                    &mapping,
        const QuadratureType                                  &quad,
        const typename MatrixFree<dim,Number>::AdditionalData additional_data)
 {
-  std::vector<QuadratureType> quads;
-  quads.push_back(quad);
   std::vector<IndexSet> locally_owned_set =
     internal::MatrixFree::extract_locally_owned_index_sets
     (dof_handler, additional_data.level_mg_handler);
-  reinit(mapping, dof_handler,constraint,locally_owned_set, quads,
-         additional_data);
+  std::vector<hp::QCollection<1> > quad_hp;
+  quad_hp.emplace_back (quad);
+  internal_reinit(mapping, dof_handler,constraint,
+                  locally_owned_set, quad_hp, additional_data);
 }
 
 
@@ -1584,8 +1719,11 @@ reinit(const Mapping<dim>                                   &mapping,
   std::vector<IndexSet> locally_owned_set =
     internal::MatrixFree::extract_locally_owned_index_sets
     (dof_handler, additional_data.level_mg_handler);
-  reinit(mapping, dof_handler,constraint,locally_owned_set,
-         quad, additional_data);
+  std::vector<hp::QCollection<1> > quad_hp;
+  for (unsigned int q=0; q<quad.size(); ++q)
+    quad_hp.emplace_back (quad[q]);
+  internal_reinit(mapping, dof_handler,constraint,locally_owned_set,
+                  quad_hp, additional_data);
 }
 
 
@@ -1603,7 +1741,7 @@ reinit(const Mapping<dim>                                    &mapping,
   // find out whether we use a hp Quadrature or a standard quadrature
   std::vector<hp::QCollection<1> > quad_hp;
   for (unsigned int q=0; q<quad.size(); ++q)
-    quad_hp.push_back (hp::QCollection<1>(quad[q]));
+    quad_hp.emplace_back (quad[q]);
   internal_reinit (mapping,
                    dof_handler,
                    constraint, locally_owned_set, quad_hp, additional_data);
@@ -1622,70 +1760,70 @@ reinit(const Mapping<dim>                                    &mapping,
 // helper functions to select the blocks and template magic.
 namespace internal
 {
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   bool update_ghost_values_start_block (const VectorStruct &vec,
                                         const unsigned int channel,
-                                        internal::bool2type<true>);
-  template<typename VectorStruct>
+                                        std::integral_constant<bool, true>);
+  template <typename VectorStruct>
   void reset_ghost_values_block (const VectorStruct &vec,
                                  const bool          zero_out_ghosts,
-                                 internal::bool2type<true>);
-  template<typename VectorStruct>
+                                 std::integral_constant<bool, true>);
+  template <typename VectorStruct>
   void update_ghost_values_finish_block (const VectorStruct &vec,
-                                         internal::bool2type<true>);
-  template<typename VectorStruct>
-  void compress_start_block (const VectorStruct &vec,
+                                         std::integral_constant<bool, true>);
+  template <typename VectorStruct>
+  void compress_start_block (VectorStruct       &vec,
                              const unsigned int channel,
-                             internal::bool2type<true>);
-  template<typename VectorStruct>
-  void compress_finish_block (const VectorStruct &vec,
-                              internal::bool2type<true>);
+                             std::integral_constant<bool, true>);
+  template <typename VectorStruct>
+  void compress_finish_block (VectorStruct &vec,
+                              std::integral_constant<bool, true>);
 
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   bool update_ghost_values_start_block (const VectorStruct &,
                                         const unsigned int,
-                                        internal::bool2type<false>)
+                                        std::integral_constant<bool, false>)
   {
     return false;
   }
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   void reset_ghost_values_block (const VectorStruct &,
                                  const bool,
-                                 internal::bool2type<false>)
+                                 std::integral_constant<bool, false>)
   {}
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   void update_ghost_values_finish_block (const VectorStruct &,
-                                         internal::bool2type<false>)
+                                         std::integral_constant<bool, false>)
   {}
-  template<typename VectorStruct>
-  void compress_start_block (const VectorStruct &,
+  template <typename VectorStruct>
+  void compress_start_block (VectorStruct &,
                              const unsigned int,
-                             internal::bool2type<false>)
+                             std::integral_constant<bool, false>)
   {}
-  template<typename VectorStruct>
-  void compress_finish_block (const VectorStruct &,
-                              internal::bool2type<false>)
+  template <typename VectorStruct>
+  void compress_finish_block (VectorStruct &,
+                              std::integral_constant<bool, false>)
   {}
 
 
 
   // returns true if the vector was in a state without ghost values before,
   // i.e., we need to zero out ghosts in the very end
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   inline
   bool update_ghost_values_start (const VectorStruct &vec,
                                   const unsigned int channel = 0)
   {
     return
       update_ghost_values_start_block(vec, channel,
-                                      internal::bool2type<IsBlockVector<VectorStruct>::value>());
+                                      std::integral_constant<bool, IsBlockVector<VectorStruct>::value>());
   }
 
 
 
-  template<typename Number>
+  template <typename Number>
   inline
-  bool update_ghost_values_start (const parallel::distributed::Vector<Number> &vec,
+  bool update_ghost_values_start (const LinearAlgebra::distributed::Vector<Number> &vec,
                                   const unsigned int                  channel = 0)
   {
     bool return_value = !vec.has_ghost_elements();
@@ -1719,11 +1857,11 @@ namespace internal
 
 
 
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   inline
   bool update_ghost_values_start_block (const VectorStruct &vec,
                                         const unsigned int channel,
-                                        internal::bool2type<true>)
+                                        std::integral_constant<bool, true>)
   {
     bool return_value = false;
     for (unsigned int i=0; i<vec.n_blocks(); ++i)
@@ -1736,24 +1874,24 @@ namespace internal
   // if the input vector did not have ghosts imported, clear them here again
   // in order to avoid subsequent operations e.g. in linear solvers to work
   // with ghosts all the time
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   inline
   void reset_ghost_values (const VectorStruct &vec,
                            const bool          zero_out_ghosts)
   {
     reset_ghost_values_block(vec, zero_out_ghosts,
-                             internal::bool2type<IsBlockVector<VectorStruct>::value>());
+                             std::integral_constant<bool, IsBlockVector<VectorStruct>::value>());
   }
 
 
 
-  template<typename Number>
+  template <typename Number>
   inline
-  void reset_ghost_values (const parallel::distributed::Vector<Number> &vec,
+  void reset_ghost_values (const LinearAlgebra::distributed::Vector<Number> &vec,
                            const bool zero_out_ghosts)
   {
     if (zero_out_ghosts)
-      const_cast<parallel::distributed::Vector<Number>&>(vec).zero_out_ghosts();
+      const_cast<LinearAlgebra::distributed::Vector<Number>&>(vec).zero_out_ghosts();
   }
 
 
@@ -1780,11 +1918,11 @@ namespace internal
 
 
 
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   inline
   void reset_ghost_values_block (const VectorStruct &vec,
                                  const bool          zero_out_ghosts,
-                                 internal::bool2type<true>)
+                                 std::integral_constant<bool, true>)
   {
     for (unsigned int i=0; i<vec.n_blocks(); ++i)
       reset_ghost_values(vec.block(i), zero_out_ghosts);
@@ -1797,14 +1935,14 @@ namespace internal
   void update_ghost_values_finish (const VectorStruct &vec)
   {
     update_ghost_values_finish_block(vec,
-                                     internal::bool2type<IsBlockVector<VectorStruct>::value>());
+                                     std::integral_constant<bool, IsBlockVector<VectorStruct>::value>());
   }
 
 
 
   template <typename Number>
   inline
-  void update_ghost_values_finish (const parallel::distributed::Vector<Number> &vec)
+  void update_ghost_values_finish (const LinearAlgebra::distributed::Vector<Number> &vec)
   {
     vec.update_ghost_values_finish();
   }
@@ -1834,7 +1972,7 @@ namespace internal
   template <typename VectorStruct>
   inline
   void update_ghost_values_finish_block (const VectorStruct &vec,
-                                         internal::bool2type<true>)
+                                         std::integral_constant<bool, true>)
   {
     for (unsigned int i=0; i<vec.n_blocks(); ++i)
       update_ghost_values_finish(vec.block(i));
@@ -1848,14 +1986,14 @@ namespace internal
                        const unsigned int channel = 0)
   {
     compress_start_block (vec, channel,
-                          internal::bool2type<IsBlockVector<VectorStruct>::value>());
+                          std::integral_constant<bool, IsBlockVector<VectorStruct>::value>());
   }
 
 
 
   template <typename Number>
   inline
-  void compress_start (parallel::distributed::Vector<Number> &vec,
+  void compress_start (LinearAlgebra::distributed::Vector<Number> &vec,
                        const unsigned int           channel = 0)
   {
     vec.compress_start(channel);
@@ -1887,7 +2025,7 @@ namespace internal
   inline
   void compress_start_block (VectorStruct      &vec,
                              const unsigned int channel,
-                             internal::bool2type<true>)
+                             std::integral_constant<bool, true>)
   {
     for (unsigned int i=0; i<vec.n_blocks(); ++i)
       compress_start(vec.block(i), channel + 500*i);
@@ -1900,14 +2038,14 @@ namespace internal
   void compress_finish (VectorStruct &vec)
   {
     compress_finish_block(vec,
-                          internal::bool2type<IsBlockVector<VectorStruct>::value>());
+                          std::integral_constant<bool, IsBlockVector<VectorStruct>::value>());
   }
 
 
 
   template <typename Number>
   inline
-  void compress_finish (parallel::distributed::Vector<Number> &vec)
+  void compress_finish (LinearAlgebra::distributed::Vector<Number> &vec)
   {
     vec.compress_finish(::dealii::VectorOperation::add);
   }
@@ -1937,7 +2075,7 @@ namespace internal
   template <typename VectorStruct>
   inline
   void compress_finish_block (VectorStruct &vec,
-                              internal::bool2type<true>)
+                              std::integral_constant<bool, true>)
   {
     for (unsigned int i=0; i<vec.n_blocks(); ++i)
       compress_finish(vec.block(i));
@@ -1952,7 +2090,7 @@ namespace internal
 
   namespace partition
   {
-    template<typename Worker>
+    template <typename Worker>
     class CellWork : public tbb::task
     {
     public:
@@ -1961,6 +2099,7 @@ namespace internal
                 const internal::MatrixFreeFunctions::TaskInfo &task_info_in,
                 const bool is_blocked_in)
         :
+        dummy (nullptr),
         worker (worker_in),
         partition (partition_in),
         task_info (task_info_in),
@@ -1974,7 +2113,7 @@ namespace internal
         worker(cell_range);
         if (is_blocked==true)
           dummy->spawn (*dummy);
-        return NULL;
+        return (nullptr);
       }
 
       tbb::empty_task *dummy;
@@ -1988,7 +2127,7 @@ namespace internal
 
 
 
-    template<typename Worker>
+    template <typename Worker>
     class PartitionWork : public tbb::task
     {
     public:
@@ -1997,6 +2136,7 @@ namespace internal
                      const internal::MatrixFreeFunctions::TaskInfo &task_info_in,
                      const bool    is_blocked_in = false)
         :
+        dummy (nullptr),
         function (function_in),
         partition (partition_in),
         task_info (task_info_in),
@@ -2004,7 +2144,7 @@ namespace internal
       {};
       tbb::task *execute ()
       {
-        tbb::empty_task *root = new( tbb::task::allocate_root() )
+        tbb::empty_task *root = new ( tbb::task::allocate_root() )
         tbb::empty_task;
         unsigned int evens = task_info.partition_evens[partition];
         unsigned int odds  = task_info.partition_odds[partition];
@@ -2017,14 +2157,14 @@ namespace internal
         root->set_ref_count(evens+1);
         for (unsigned int j=0; j<evens; j++)
           {
-            worker[j] = new(root->allocate_child())
+            worker[j] = new (root->allocate_child())
             CellWork<Worker>(function, task_info.
                              partition_color_blocks_row_index[partition]+2*j,
                              task_info, false);
             if (j>0)
               {
                 worker[j]->set_ref_count(2);
-                blocked_worker[j-1]->dummy = new(worker[j]->allocate_child())
+                blocked_worker[j-1]->dummy = new (worker[j]->allocate_child())
                 tbb::empty_task;
                 worker[j-1]->spawn(*blocked_worker[j-1]);
               }
@@ -2032,7 +2172,7 @@ namespace internal
               worker[j]->set_ref_count(1);
             if (j<evens-1)
               {
-                blocked_worker[j] = new(worker[j]->allocate_child())
+                blocked_worker[j] = new (worker[j]->allocate_child())
                 CellWork<Worker>(function, task_info.
                                  partition_color_blocks_row_index
                                  [partition] + 2*j+1, task_info, true);
@@ -2041,7 +2181,7 @@ namespace internal
               {
                 if (odds==evens)
                   {
-                    worker[evens] = new(worker[j]->allocate_child())
+                    worker[evens] = new (worker[j]->allocate_child())
                     CellWork<Worker>(function, task_info.
                                      partition_color_blocks_row_index[partition]+2*j+1,
                                      task_info, false);
@@ -2049,7 +2189,7 @@ namespace internal
                   }
                 else
                   {
-                    tbb::empty_task *child = new(worker[j]->allocate_child())
+                    tbb::empty_task *child = new (worker[j]->allocate_child())
                     tbb::empty_task();
                     worker[j]->spawn(*child);
                   }
@@ -2060,7 +2200,7 @@ namespace internal
         root->destroy(*root);
         if (is_blocked==true)
           dummy->spawn (*dummy);
-        return NULL;
+        return (nullptr);
       }
 
       tbb::empty_task *dummy;
@@ -2115,7 +2255,7 @@ namespace internal
     };
 
 
-    template<typename Worker>
+    template <typename Worker>
     class PartitionWork : public tbb::task
     {
     public:
@@ -2124,6 +2264,7 @@ namespace internal
                      const internal::MatrixFreeFunctions::TaskInfo &task_info_in,
                      const bool    is_blocked_in)
         :
+        dummy (nullptr),
         worker (worker_in),
         partition (partition_in),
         task_info (task_info_in),
@@ -2137,7 +2278,7 @@ namespace internal
                      CellWork<Worker> (worker,task_info));
         if (is_blocked==true)
           dummy->spawn (*dummy);
-        return NULL;
+        return (nullptr);
       }
 
       tbb::empty_task *dummy;
@@ -2152,7 +2293,7 @@ namespace internal
   } // end of namespace color
 
 
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   class MPIComDistribute : public tbb::task
   {
   public:
@@ -2164,7 +2305,7 @@ namespace internal
     tbb::task *execute ()
     {
       internal::update_ghost_values_finish(src);
-      return 0;
+      return nullptr;
     }
 
   private:
@@ -2173,7 +2314,7 @@ namespace internal
 
 
 
-  template<typename VectorStruct>
+  template <typename VectorStruct>
   class MPIComCompress : public tbb::task
   {
   public:
@@ -2185,7 +2326,7 @@ namespace internal
     tbb::task *execute ()
     {
       internal::compress_start(dst);
-      return 0;
+      return nullptr;
     }
 
   private:
@@ -2203,11 +2344,11 @@ template <typename OutVector, typename InVector>
 inline
 void
 MatrixFree<dim, Number>::cell_loop
-(const std_cxx11::function<void (const MatrixFree<dim,Number> &,
-                                 OutVector &,
-                                 const InVector &,
-                                 const std::pair<unsigned int,
-                                 unsigned int> &)> &cell_operation,
+(const std::function<void (const MatrixFree<dim,Number> &,
+                           OutVector &,
+                           const InVector &,
+                           const std::pair<unsigned int,
+                           unsigned int> &)> &cell_operation,
  OutVector       &dst,
  const InVector  &src) const
 {
@@ -2223,18 +2364,18 @@ MatrixFree<dim, Number>::cell_loop
       // to simplify the function calls, bind away all arguments except the
       // cell range
       typedef
-      std_cxx11::function<void (const std::pair<unsigned int,unsigned int> &range)>
+      std::function<void (const std::pair<unsigned int,unsigned int> &range)>
       Worker;
 
-      const Worker func = std_cxx11::bind (std_cxx11::ref(cell_operation),
-                                           std_cxx11::cref(*this),
-                                           std_cxx11::ref(dst),
-                                           std_cxx11::cref(src),
-                                           std_cxx11::_1);
+      const Worker func = std::bind (std::ref(cell_operation),
+                                     std::cref(*this),
+                                     std::ref(dst),
+                                     std::cref(src),
+                                     std::placeholders::_1);
 
       if (task_info.use_partition_partition == true)
         {
-          tbb::empty_task *root = new( tbb::task::allocate_root() )
+          tbb::empty_task *root = new ( tbb::task::allocate_root() )
           tbb::empty_task;
           unsigned int evens = task_info.evens;
           unsigned int odds  = task_info.odds;
@@ -2246,18 +2387,18 @@ MatrixFree<dim, Number>::cell_loop
           std::vector<internal::partition::PartitionWork<Worker>*>
           blocked_worker(n_blocked_workers);
           internal::MPIComCompress<OutVector> *worker_compr =
-            new(root->allocate_child())
+            new (root->allocate_child())
           internal::MPIComCompress<OutVector>(dst);
           worker_compr->set_ref_count(1);
           for (unsigned int j=0; j<evens; j++)
             {
               if (j>0)
                 {
-                  worker[j] = new(root->allocate_child())
+                  worker[j] = new (root->allocate_child())
                   internal::partition::PartitionWork<Worker>
                   (func,2*j,task_info,false);
                   worker[j]->set_ref_count(2);
-                  blocked_worker[j-1]->dummy = new(worker[j]->allocate_child())
+                  blocked_worker[j-1]->dummy = new (worker[j]->allocate_child())
                   tbb::empty_task;
                   if (j>1)
                     worker[j-1]->spawn(*blocked_worker[j-1]);
@@ -2266,7 +2407,7 @@ MatrixFree<dim, Number>::cell_loop
                 }
               else
                 {
-                  worker[j] = new(worker_compr->allocate_child())
+                  worker[j] = new (worker_compr->allocate_child())
                   internal::partition::PartitionWork<Worker>
                   (func,2*j,task_info,false);
                   worker[j]->set_ref_count(2);
@@ -2277,7 +2418,7 @@ MatrixFree<dim, Number>::cell_loop
                 }
               if (j<evens-1)
                 {
-                  blocked_worker[j] = new(worker[j]->allocate_child())
+                  blocked_worker[j] = new (worker[j]->allocate_child())
                   internal::partition::PartitionWork<Worker>
                   (func,2*j+1,task_info,true);
                 }
@@ -2285,14 +2426,14 @@ MatrixFree<dim, Number>::cell_loop
                 {
                   if (odds==evens)
                     {
-                      worker[evens] = new(worker[j]->allocate_child())
+                      worker[evens] = new (worker[j]->allocate_child())
                       internal::partition::PartitionWork<Worker>
                       (func,2*j+1,task_info,false);
                       worker[j]->spawn(*worker[evens]);
                     }
                   else
                     {
-                      tbb::empty_task *child = new(worker[j]->allocate_child())
+                      tbb::empty_task *child = new (worker[j]->allocate_child())
                       tbb::empty_task();
                       worker[j]->spawn(*child);
                     }
@@ -2311,7 +2452,7 @@ MatrixFree<dim, Number>::cell_loop
           // tree of partitions
           if (odds > 0)
             {
-              tbb::empty_task *root = new( tbb::task::allocate_root() ) tbb::empty_task;
+              tbb::empty_task *root = new ( tbb::task::allocate_root() ) tbb::empty_task;
               root->set_ref_count(evens+1);
               unsigned int n_blocked_workers = odds-(odds+evens+1)%2;
               unsigned int n_workers = task_info.partition_color_blocks_data.size()-1-
@@ -2319,20 +2460,20 @@ MatrixFree<dim, Number>::cell_loop
               std::vector<internal::color::PartitionWork<Worker>*> worker(n_workers);
               std::vector<internal::color::PartitionWork<Worker>*> blocked_worker(n_blocked_workers);
               unsigned int worker_index = 0, slice_index = 0;
-              unsigned int spawn_index =  0, spawn_index_new = 0;
+              unsigned int spawn_index =  0;
               int spawn_index_child = -2;
-              internal::MPIComCompress<OutVector> *worker_compr = new(root->allocate_child())
+              internal::MPIComCompress<OutVector> *worker_compr = new (root->allocate_child())
               internal::MPIComCompress<OutVector>(dst);
               worker_compr->set_ref_count(1);
               for (unsigned int part=0;
                    part<task_info.partition_color_blocks_row_index.size()-1; part++)
                 {
-                  spawn_index_new = worker_index;
+                  const unsigned int spawn_index_new = worker_index;
                   if (part == 0)
-                    worker[worker_index] = new(worker_compr->allocate_child())
+                    worker[worker_index] = new (worker_compr->allocate_child())
                     internal::color::PartitionWork<Worker>(func,slice_index,task_info,false);
                   else
-                    worker[worker_index] = new(root->allocate_child())
+                    worker[worker_index] = new (root->allocate_child())
                     internal::color::PartitionWork<Worker>(func,slice_index,task_info,false);
                   slice_index++;
                   for (; slice_index<task_info.partition_color_blocks_row_index[part+1];
@@ -2352,9 +2493,11 @@ MatrixFree<dim, Number>::cell_loop
                       if (spawn_index_child == -1)
                         worker[spawn_index]->spawn(*blocked_worker[(part-1)/2]);
                       else
-                        worker[spawn_index]->spawn(*worker[spawn_index_child]);
+                        {
+                          Assert(spawn_index_child>=0, ExcInternalError());
+                          worker[spawn_index]->spawn(*worker[spawn_index_child]);
+                        }
                       spawn_index = spawn_index_new;
-                      spawn_index_child = -2;
                     }
                   else
                     {
@@ -2369,14 +2512,14 @@ MatrixFree<dim, Number>::cell_loop
                     {
                       if (part<task_info.partition_color_blocks_row_index.size()-2)
                         {
-                          blocked_worker[part/2] = new(worker[worker_index-1]->allocate_child())
+                          blocked_worker[part/2] = new (worker[worker_index-1]->allocate_child())
                           internal::color::PartitionWork<Worker>(func,slice_index,task_info,true);
                           slice_index++;
                           if (slice_index<
                               task_info.partition_color_blocks_row_index[part+1])
                             {
                               blocked_worker[part/2]->set_ref_count(1);
-                              worker[worker_index] = new(blocked_worker[part/2]->allocate_child())
+                              worker[worker_index] = new (blocked_worker[part/2]->allocate_child())
                               internal::color::PartitionWork<Worker>(func,slice_index,task_info,false);
                               slice_index++;
                             }
@@ -2410,7 +2553,10 @@ MatrixFree<dim, Number>::cell_loop
                     }
                 }
               if (evens==odds)
-                worker[spawn_index]->spawn(*worker[spawn_index_child]);
+                {
+                  Assert(spawn_index_child>=0, ExcInternalError());
+                  worker[spawn_index]->spawn(*worker[spawn_index_child]);
+                }
               root->wait_for_all();
               root->destroy(*root);
             }
@@ -2493,19 +2639,19 @@ MatrixFree<dim,Number>::cell_loop
  OutVector      &dst,
  const InVector &src) const
 {
-  // here, use std_cxx11::bind to hand a function handler with the appropriate
+  // here, use std::bind to hand a function handler with the appropriate
   // argument to the other loop function
-  std_cxx11::function<void (const MatrixFree<dim,Number> &,
-                            OutVector &,
-                            const InVector &,
-                            const std::pair<unsigned int,
-                            unsigned int> &)>
-  function = std_cxx11::bind<void>(function_pointer,
-                                   owning_class,
-                                   std_cxx11::_1,
-                                   std_cxx11::_2,
-                                   std_cxx11::_3,
-                                   std_cxx11::_4);
+  std::function<void (const MatrixFree<dim,Number> &,
+                      OutVector &,
+                      const InVector &,
+                      const std::pair<unsigned int,
+                      unsigned int> &)>
+  function = std::bind<void>(function_pointer,
+                             owning_class,
+                             std::placeholders::_1,
+                             std::placeholders::_2,
+                             std::placeholders::_3,
+                             std::placeholders::_4);
   cell_loop (function, dst, src);
 }
 
@@ -2525,19 +2671,19 @@ MatrixFree<dim,Number>::cell_loop
  OutVector      &dst,
  const InVector &src) const
 {
-  // here, use std_cxx11::bind to hand a function handler with the appropriate
+  // here, use std::bind to hand a function handler with the appropriate
   // argument to the other loop function
-  std_cxx11::function<void (const MatrixFree<dim,Number> &,
-                            OutVector &,
-                            const InVector &,
-                            const std::pair<unsigned int,
-                            unsigned int> &)>
-  function = std_cxx11::bind<void>(function_pointer,
-                                   owning_class,
-                                   std_cxx11::_1,
-                                   std_cxx11::_2,
-                                   std_cxx11::_3,
-                                   std_cxx11::_4);
+  std::function<void (const MatrixFree<dim,Number> &,
+                      OutVector &,
+                      const InVector &,
+                      const std::pair<unsigned int,
+                      unsigned int> &)>
+  function = std::bind<void>(function_pointer,
+                             owning_class,
+                             std::placeholders::_1,
+                             std::placeholders::_2,
+                             std::placeholders::_3,
+                             std::placeholders::_4);
   cell_loop (function, dst, src);
 }
 

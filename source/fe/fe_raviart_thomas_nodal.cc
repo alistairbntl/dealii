@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2016 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,11 +22,13 @@
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
+#include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_raviart_thomas.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/fe_tools.h>
 
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -52,23 +54,16 @@ FE_RaviartThomasNodal<dim>::FE_RaviartThomasNodal (const unsigned int deg)
   // quadrature weights, since they
   // are required for interpolation.
   initialize_support_points(deg);
-  // Now compute the inverse node
-  //matrix, generating the correct
-  //basis functions from the raw
-  //ones.
 
-  // We use an auxiliary matrix in
-  // this function. Therefore,
-  // inverse_node_matrix is still
-  // empty and shape_value_component
-  // returns the 'raw' shape values.
-  FullMatrix<double> M(n_dofs, n_dofs);
-  FETools::compute_node_matrix(M, *this);
+  // Now compute the inverse node matrix, generating the correct
+  // basis functions from the raw ones. For a discussion of what
+  // exactly happens here, see FETools::compute_node_matrix.
+  const FullMatrix<double> M = FETools::compute_node_matrix(*this);
   this->inverse_node_matrix.reinit(n_dofs, n_dofs);
   this->inverse_node_matrix.invert(M);
-  // From now on, the shape functions
-  // will be the correct ones, not
-  // the raw shape functions anymore.
+  // From now on, the shape functions provided by FiniteElement::shape_value
+  // and similar functions will be the correct ones, not
+  // the raw shape functions from the polynomial space anymore.
 
   // Reinit the vectors of
   // prolongation matrices to the
@@ -108,7 +103,7 @@ std::string
 FE_RaviartThomasNodal<dim>::get_name () const
 {
   // note that the
-  // FETools::get_fe_from_name
+  // FETools::get_fe_by_name
   // function depends on the
   // particular format of the string
   // this function returns, so they
@@ -126,10 +121,10 @@ FE_RaviartThomasNodal<dim>::get_name () const
 
 
 template <int dim>
-FiniteElement<dim> *
+std::unique_ptr<FiniteElement<dim,dim> >
 FE_RaviartThomasNodal<dim>::clone() const
 {
-  return new FE_RaviartThomasNodal<dim>(*this);
+  return std_cxx14::make_unique<FE_RaviartThomasNodal<dim>>(*this);
 }
 
 
@@ -287,29 +282,19 @@ FE_RaviartThomasNodal<dim>::has_support_on_face (
 }
 
 
-template <int dim>
-void
-FE_RaviartThomasNodal<dim>::interpolate(
-  std::vector<double> &,
-  const std::vector<double> &) const
-{
-  Assert(false, ExcNotImplemented());
-}
-
 
 template <int dim>
 void
-FE_RaviartThomasNodal<dim>::interpolate(
-  std::vector<double>    &local_dofs,
-  const std::vector<Vector<double> > &values,
-  unsigned int offset) const
+FE_RaviartThomasNodal<dim>::
+convert_generalized_support_point_values_to_dof_values(const std::vector<Vector<double> > &support_point_values,
+                                                       std::vector<double>    &nodal_values) const
 {
-  Assert (values.size() == this->generalized_support_points.size(),
-          ExcDimensionMismatch(values.size(), this->generalized_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values[0].size() >= offset+this->n_components(),
-          ExcDimensionMismatch(values[0].size(),offset+this->n_components()));
+  Assert (support_point_values.size() == this->generalized_support_points.size(),
+          ExcDimensionMismatch(support_point_values.size(), this->generalized_support_points.size()));
+  Assert (nodal_values.size() == this->dofs_per_cell,
+          ExcDimensionMismatch(nodal_values.size(),this->dofs_per_cell));
+  Assert (support_point_values[0].size() == this->n_components(),
+          ExcDimensionMismatch(support_point_values[0].size(),this->n_components()));
 
   // First do interpolation on
   // faces. There, the component
@@ -322,7 +307,7 @@ FE_RaviartThomasNodal<dim>::interpolate(
     {
       for (unsigned int i=0; i<this->dofs_per_face; ++i)
         {
-          local_dofs[fbase+i] = values[fbase+i](offset+GeometryInfo<dim>::unit_normal_direction[f]);
+          nodal_values[fbase+i] = support_point_values[fbase+i](GeometryInfo<dim>::unit_normal_direction[f]);
         }
     }
 
@@ -336,7 +321,7 @@ FE_RaviartThomasNodal<dim>::interpolate(
     {
       for (unsigned int i=0; i<istep; ++i)
         {
-          local_dofs[fbase+i] = values[fbase+i](offset+f);
+          nodal_values[fbase+i] = support_point_values[fbase+i](f);
         }
       fbase+=istep;
       ++f;
@@ -344,50 +329,6 @@ FE_RaviartThomasNodal<dim>::interpolate(
   Assert (fbase == this->dofs_per_cell, ExcInternalError());
 }
 
-
-template <int dim>
-void
-FE_RaviartThomasNodal<dim>::interpolate(
-  std::vector<double> &local_dofs,
-  const VectorSlice<const std::vector<std::vector<double> > > &values) const
-{
-  Assert (values.size() == this->n_components(),
-          ExcDimensionMismatch(values.size(), this->n_components()));
-  Assert (values[0].size() == this->generalized_support_points.size(),
-          ExcDimensionMismatch(values.size(), this->generalized_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  // First do interpolation on
-  // faces. There, the component
-  // evaluated depends on the face
-  // direction and orientation.
-  unsigned int fbase = 0;
-  unsigned int f=0;
-  for (; f<GeometryInfo<dim>::faces_per_cell;
-       ++f, fbase+=this->dofs_per_face)
-    {
-      for (unsigned int i=0; i<this->dofs_per_face; ++i)
-        {
-          local_dofs[fbase+i] = values[GeometryInfo<dim>::unit_normal_direction[f]][fbase+i];
-        }
-    }
-  // The remaining points form dim
-  // chunks, one for each component.
-  const unsigned int istep = (this->dofs_per_cell - fbase) / dim;
-  Assert ((this->dofs_per_cell - fbase) % dim == 0, ExcInternalError());
-
-  f = 0;
-  while (fbase < this->dofs_per_cell)
-    {
-      for (unsigned int i=0; i<istep; ++i)
-        {
-          local_dofs[fbase+i] = values[f][fbase+i];
-        }
-      fbase+=istep;
-      ++f;
-    }
-  Assert (fbase == this->dofs_per_cell, ExcInternalError());
-}
 
 
 //TODO: There are tests that check that the following few functions don't produce assertion failures, but none that actually check whether they do the right thing. one example for such a test would be to project a function onto an hp space and make sure that the convergence order is correct with regard to the lowest used polynomial degree
@@ -407,10 +348,12 @@ FE_RaviartThomasNodal<dim>::hp_vertex_dof_identities (
 {
   // we can presently only compute these
   // identities if both FEs are
-  // FE_RaviartThomasNodals. in that case, no
-  // dofs are assigned on the vertex, so we
-  // shouldn't be getting here at all.
-  if (dynamic_cast<const FE_RaviartThomasNodal<dim>*>(&fe_other)!=0)
+  // FE_RaviartThomasNodals or the other is FE_Nothing.
+  // In either case, no dofs are assigned on the vertex,
+  // so we shouldn't be getting here at all.
+  if (dynamic_cast<const FE_RaviartThomasNodal<dim>*>(&fe_other)!=nullptr)
+    return std::vector<std::pair<unsigned int, unsigned int> > ();
+  else if (dynamic_cast<const FE_Nothing<dim>*>(&fe_other) != nullptr)
     return std::vector<std::pair<unsigned int, unsigned int> > ();
   else
     {
@@ -428,7 +371,8 @@ hp_line_dof_identities (const FiniteElement<dim> &fe_other) const
 {
   // we can presently only compute
   // these identities if both FEs are
-  // FE_RaviartThomasNodals
+  // FE_RaviartThomasNodals or if the other
+  // one is FE_Nothing
   if (const FE_RaviartThomasNodal<dim> *fe_q_other
       = dynamic_cast<const FE_RaviartThomasNodal<dim>*>(&fe_other))
     {
@@ -463,12 +407,18 @@ hp_line_dof_identities (const FiniteElement<dim> &fe_other) const
 
       if (p==q)
         for (unsigned int i=0; i<p+1; ++i)
-          identities.push_back (std::make_pair(i,i));
+          identities.emplace_back (i, i);
 
       else if (p%2==0 && q%2==0)
-        identities.push_back(std::make_pair(p/2,q/2));
+        identities.emplace_back(p/2, q/2);
 
       return identities;
+    }
+  else if (dynamic_cast<const FE_Nothing<dim>*>(&fe_other) != nullptr)
+    {
+      // the FE_Nothing has no degrees of freedom, so there are no
+      // equivalencies to be recorded
+      return std::vector<std::pair<unsigned int, unsigned int> > ();
     }
   else
     {
@@ -485,7 +435,8 @@ FE_RaviartThomasNodal<dim>::hp_quad_dof_identities (
 {
   // we can presently only compute
   // these identities if both FEs are
-  // FE_RaviartThomasNodals
+  // FE_RaviartThomasNodals or if the other
+  // one is FE_Nothing
   if (const FE_RaviartThomasNodal<dim> *fe_q_other
       = dynamic_cast<const FE_RaviartThomasNodal<dim>*>(&fe_other))
     {
@@ -503,12 +454,18 @@ FE_RaviartThomasNodal<dim>::hp_quad_dof_identities (
 
       if (p==q)
         for (unsigned int i=0; i<p; ++i)
-          identities.push_back (std::make_pair(i,i));
+          identities.emplace_back (i, i);
 
       else if (p%2!=0 && q%2!=0)
-        identities.push_back(std::make_pair(p/2, q/2));
+        identities.emplace_back (p/2, q/2);
 
       return identities;
+    }
+  else if (dynamic_cast<const FE_Nothing<dim>*>(&fe_other) != nullptr)
+    {
+      // the FE_Nothing has no degrees of freedom, so there are no
+      // equivalencies to be recorded
+      return std::vector<std::pair<unsigned int, unsigned int> > ();
     }
   else
     {
@@ -532,6 +489,21 @@ FE_RaviartThomasNodal<dim>::compare_for_face_domination (
         return FiniteElementDomination::either_element_can_dominate;
       else
         return FiniteElementDomination::other_element_dominates;
+    }
+  else if (const FE_Nothing<dim> *fe_q_other
+           = dynamic_cast<const FE_Nothing<dim>*>(&fe_other))
+    {
+      if (fe_q_other->is_dominating())
+        {
+          return FiniteElementDomination::other_element_dominates;
+        }
+      else
+        {
+          // FE_Nothing has no degrees of freedom and is typically
+          // used in a context where there are no continuity
+          // requirements along the interface
+          return FiniteElementDomination::no_requirements;
+        }
     }
 
   Assert (false, ExcNotImplemented());
@@ -573,7 +545,7 @@ FE_RaviartThomasNodal<dim>::get_face_interpolation_matrix (
   // RaviartThomasNodal element
   AssertThrow ((x_source_fe.get_name().find ("FE_RaviartThomasNodal<") == 0)
                ||
-               (dynamic_cast<const FE_RaviartThomasNodal<dim>*>(&x_source_fe) != 0),
+               (dynamic_cast<const FE_RaviartThomasNodal<dim>*>(&x_source_fe) != nullptr),
                typename FiniteElement<dim>::
                ExcInterpolationNotImplemented());
 
@@ -680,7 +652,7 @@ FE_RaviartThomasNodal<dim>::get_subface_interpolation_matrix (
   // RaviartThomasNodal element
   AssertThrow ((x_source_fe.get_name().find ("FE_RaviartThomasNodal<") == 0)
                ||
-               (dynamic_cast<const FE_RaviartThomasNodal<dim>*>(&x_source_fe) != 0),
+               (dynamic_cast<const FE_RaviartThomasNodal<dim>*>(&x_source_fe) != nullptr),
                typename FiniteElement<dim>::
                ExcInterpolationNotImplemented());
 

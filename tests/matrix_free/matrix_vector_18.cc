@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,7 +21,6 @@
 #include "../tests.h"
 
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
@@ -31,7 +30,7 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -120,7 +119,7 @@ void do_test (const DoFHandler<dim> &dof,
           MatrixFree<dim,number>::AdditionalData::partition_partition;
       }
     data.tasks_block_size = 7;
-    data.mapping_update_flags |= update_second_derivatives;
+    data.mapping_update_flags |= update_hessians;
 
     mf_data.reinit (dof, constraints, quad, data);
   }
@@ -145,7 +144,7 @@ void do_test (const DoFHandler<dim> &dof,
   // assemble sparse matrix with (\nabla v, \nabla u + 3.2221 * \nabla^2 u * ones) + (v, 10 * u)
   SparsityPattern sparsity;
   {
-    CompressedSimpleSparsityPattern csp(dof.n_dofs(), dof.n_dofs());
+    DynamicSparsityPattern csp(dof.n_dofs(), dof.n_dofs());
     DoFTools::make_sparsity_pattern (dof, csp, constraints, true);
     sparsity.copy_from(csp);
   }
@@ -155,7 +154,7 @@ void do_test (const DoFHandler<dim> &dof,
 
     FEValues<dim> fe_values (dof.get_fe(), quadrature_formula,
                              update_values    |  update_gradients |
-                             update_JxW_values | update_second_derivatives);
+                             update_JxW_values | update_hessians);
 
     const unsigned int   dofs_per_cell = dof.get_fe().dofs_per_cell;
     const unsigned int   n_q_points    = quadrature_formula.size();
@@ -229,7 +228,7 @@ void test ()
   dof.distribute_dofs(fe);
   ConstraintMatrix constraints;
   DoFTools::make_hanging_node_constraints(dof, constraints);
-  VectorTools::interpolate_boundary_values (dof, 0, ZeroFunction<dim>(),
+  VectorTools::interpolate_boundary_values (dof, 0, Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close();
 
@@ -240,13 +239,11 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   deallog << std::setprecision (3);
 
   {
-    deallog.threshold_double(1.e-9);
     deallog.push("1d");
     test<1,1>();
     test<1,2>();

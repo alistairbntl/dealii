@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2016 - 2016 by the deal.II authors
+// Copyright (C) 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,8 +18,7 @@
 // series of meshes with uniform meshes for FE_Q
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/fe/fe_q.h>
@@ -30,8 +29,6 @@
 template <int dim, typename Number>
 void check(const unsigned int fe_degree)
 {
-  deallog.threshold_double(std::max(5e2*(double)std::numeric_limits<Number>::epsilon(),
-                                    1e-11));
   FE_Q<dim> fe(fe_degree);
   deallog << "FE: " << fe.get_name() << std::endl;
 
@@ -62,16 +59,15 @@ void check(const unsigned int fe_degree)
       mgdof.distribute_dofs(fe);
       mgdof.distribute_mg_dofs(fe);
 
-      ConstraintMatrix hanging_node_constraints;
       MGConstrainedDoFs mg_constrained_dofs;
-      ZeroFunction<dim> zero_function;
+      Functions::ZeroFunction<dim> zero_function;
       typename FunctionMap<dim>::type dirichlet_boundary;
       dirichlet_boundary[0] = &zero_function;
       mg_constrained_dofs.initialize(mgdof, dirichlet_boundary);
 
       // build reference
-      MGTransferPrebuilt<parallel::distributed::Vector<double> >
-      transfer_ref(hanging_node_constraints, mg_constrained_dofs);
+      MGTransferPrebuilt<LinearAlgebra::distributed::Vector<double> >
+      transfer_ref(mg_constrained_dofs);
       transfer_ref.build_matrices(mgdof);
 
       // build matrix-free transfer
@@ -81,8 +77,8 @@ void check(const unsigned int fe_degree)
       // check prolongation for all levels using random vector
       for (unsigned int level=1; level<mgdof.get_triangulation().n_global_levels(); ++level)
         {
-          parallel::distributed::Vector<Number> v1, v2;
-          parallel::distributed::Vector<double> v1_cpy, v2_cpy, v3;
+          LinearAlgebra::distributed::Vector<Number> v1, v2;
+          LinearAlgebra::distributed::Vector<double> v1_cpy, v2_cpy, v3;
           v1.reinit(mgdof.locally_owned_mg_dofs(level-1), MPI_COMM_WORLD);
           v2.reinit(mgdof.locally_owned_mg_dofs(level), MPI_COMM_WORLD);
           v3.reinit(mgdof.locally_owned_mg_dofs(level), MPI_COMM_WORLD);
@@ -99,8 +95,8 @@ void check(const unsigned int fe_degree)
       // check restriction for all levels using random vector
       for (unsigned int level=1; level<mgdof.get_triangulation().n_global_levels(); ++level)
         {
-          parallel::distributed::Vector<Number> v1, v2;
-          parallel::distributed::Vector<double> v1_cpy, v2_cpy, v3;
+          LinearAlgebra::distributed::Vector<Number> v1, v2;
+          LinearAlgebra::distributed::Vector<double> v1_cpy, v2_cpy, v3;
           v1.reinit(mgdof.locally_owned_mg_dofs(level), MPI_COMM_WORLD);
           v2.reinit(mgdof.locally_owned_mg_dofs(level-1), MPI_COMM_WORLD);
           v3.reinit(mgdof.locally_owned_mg_dofs(level-1), MPI_COMM_WORLD);

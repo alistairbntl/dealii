@@ -17,16 +17,12 @@
 // Test projection onto lines
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/qprojector.h>
 #include <deal.II/base/geometry_info.h>
-#include <cmath>
 
-template<int dim>
+template <int dim>
 void check_line(Quadrature<1> &quadrature)
 {
   Point<dim> p1;
@@ -54,7 +50,7 @@ void check_line(Quadrature<1> &quadrature)
   deallog << "length: " << s << std::endl;
 }
 
-template<int dim>
+template <int dim>
 void check_face(Quadrature<1> &q1)
 {
   deallog << "Checking dim " << dim
@@ -86,7 +82,7 @@ void check_face(Quadrature<1> &q1)
       }
 }
 
-template<int dim>
+template <int dim>
 void check_faces (Quadrature<1> &q1)
 {
   const unsigned int nq = q1.size();
@@ -176,11 +172,9 @@ void check(Quadrature<1> &q)
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog << std::setprecision(2);
 
-  deallog.threshold_double(1.e-10);
 
   Quadrature<1> none(0);
   check(none);

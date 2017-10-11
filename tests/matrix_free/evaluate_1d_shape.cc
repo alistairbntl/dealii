@@ -22,7 +22,6 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
 
 #include <deal.II/matrix_free/fe_evaluation.h>
 
@@ -106,9 +105,7 @@ void test()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1e-14);
+  initlog();
 
   deallog.push("values");
   test<4,4,0,false>();

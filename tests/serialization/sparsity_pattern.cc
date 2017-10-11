@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,7 +17,7 @@
 // check serialization for SparsityPattern
 
 #include "serialization.h"
-#include "../lac/testmatrix.h"
+#include "../testmatrix.h"
 #include <deal.II/lac/sparsity_pattern.h>
 
 
@@ -46,7 +46,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

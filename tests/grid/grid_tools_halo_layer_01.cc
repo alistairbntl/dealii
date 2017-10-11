@@ -16,13 +16,12 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_out.h>
 
-template<int dim>
+template <int dim>
 bool
 pred_mat_id(const typename Triangulation<dim>::active_cell_iterator &cell)
 {
@@ -88,7 +87,7 @@ void test ()
     GridOut().write_vtk (tria, f);
   }
 
-  std_cxx11::function<bool (const cell_iterator &)> predicate = pred_mat_id<dim>;
+  std::function<bool (const cell_iterator &)> predicate = pred_mat_id<dim>;
 
   // Compute a halo layer around material id 2 and set it to material id 3
   const std::vector<cell_iterator> active_halo_layer

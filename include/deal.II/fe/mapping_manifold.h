@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mapping_manifold_h
-#define dealii__mapping_manifold_h
+#ifndef dealii_mapping_manifold_h
+#define dealii_mapping_manifold_h
 
 
 #include <deal.II/base/config.h>
@@ -50,6 +50,10 @@ template <int,int> class MappingQ;
  * geometry using a polynomial of some order, and then computes the
  * normals and tangents using the approximated surface.
  *
+ * @warning It is not possible, for mathematical reasons, for one to use this
+ * class with a geometry described by a SphericalManifold: see the note in
+ * that class for more information.
+ *
  * @author Luca Heltai, Wolfgang Bangerth, Alberto Sartori 2016
  */
 template <int dim, int spacedim=dim>
@@ -59,7 +63,7 @@ public:
   /**
    * Constructor.
    */
-  MappingManifold ();
+  MappingManifold () = default;
 
   /**
    * Copy constructor.
@@ -170,7 +174,7 @@ public:
     /**
      * Constructor.
      */
-    InternalData();
+    InternalData() = default;
 
     /**
      * Initialize the object's member variables related to cell data based on
@@ -287,7 +291,7 @@ public:
      *
      * Filled once.
      */
-    std_cxx11::array<std::vector<Tensor<1,dim> >, GeometryInfo<dim>::faces_per_cell *(dim-1)> unit_tangentials;
+    std::array<std::vector<Tensor<1,dim> >, GeometryInfo<dim>::faces_per_cell *(dim-1)> unit_tangentials;
 
     /**
      * Tensors of covariant transformation at each of the quadrature points.
@@ -391,7 +395,7 @@ public:
 
 #ifndef DOXYGEN
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 inline
 void
 MappingManifold<dim,spacedim>::InternalData::store_vertices (const typename Triangulation<dim,spacedim>::cell_iterator &cell) const

@@ -14,13 +14,11 @@
 // ---------------------------------------------------------------------
 
 
-// Tests reinitialisation of square and rectangle LAPACKFullMatrix
+// Tests reinitialization of square and rectangle LAPACKFullMatrix
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/lapack_full_matrix.h>
 
-#include <fstream>
 #include <iostream>
 
 
@@ -95,14 +93,13 @@ int main()
 
   logfile.precision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
-  // Test square matrix initialisation
+  // Test square matrix initialization
   test (4, true);
   test (5, true);
   test (6, true);
 
-  // Test rectangle matrix initialisation
+  // Test rectangle matrix initialization
   test (4, false);
   test (5, false);
   test (6, false);

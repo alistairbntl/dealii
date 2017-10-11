@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 */
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/grid_generator.h>
@@ -51,7 +50,6 @@
 #include <deal.II/lac/precondition.h>
 
 #include <deal.II/numerics/data_out.h>
-#include <fstream>
 
 
 template <typename VectorType, class Matrix, class Sparsity>
@@ -311,7 +309,7 @@ void LaplaceProblem<VectorType,Matrix,Sparsity>::assemble_system ()
   std::map<types::global_dof_index,typename VectorType::value_type> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<2,typename VectorType::value_type>(),
+                                            Functions::ZeroFunction<2,typename VectorType::value_type>(),
                                             boundary_values);
   MatrixTools::apply_boundary_values (boundary_values,
                                       system_matrix,
@@ -359,7 +357,6 @@ int main ()
   deallog << std::setprecision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
 
   // vector of solution vectors

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/logstream.h>
-#include <deal.II/base/std_cxx11/unique_ptr.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/grid_generator.h>
@@ -37,6 +36,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iomanip>
+#include <memory>
 #include <string>
 
 
@@ -46,9 +46,6 @@ template <int dim>
 void
 check_this (const FiniteElement<dim> &fe1,
             const FiniteElement<dim> &fe2);
-
-// forward declaration of a variable with the name of the output file
-extern std::string output_file_name;
 
 
 
@@ -122,6 +119,17 @@ DoFHandler<dim> *make_dof_handler (const Triangulation<dim> &tria,
 
 
 template <int dim>
+hp::DoFHandler<dim> *make_hp_dof_handler (const Triangulation<dim> &tria,
+                                          const hp::FECollection<dim> &fe)
+{
+  hp::DoFHandler<dim> *dof_handler = new hp::DoFHandler<dim>(tria);
+  dof_handler->distribute_dofs (fe);
+  return dof_handler;
+}
+
+
+
+template <int dim>
 void
 check (const FiniteElement<dim> &fe1,
        const FiniteElement<dim> &fe2,
@@ -175,11 +183,10 @@ main()
 {
   try
     {
-      std::ofstream logfile(output_file_name.c_str());
+      std::ofstream logfile("output");
       deallog << std::setprecision (8);
       deallog.attach(logfile);
       deallog.depth_console(0);
-      deallog.threshold_double(1.e-10);
 
       CHECK_ALL(Q,1,Q,1);
       CHECK_ALL(Q,1,Q,2);

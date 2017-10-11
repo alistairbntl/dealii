@@ -19,7 +19,6 @@
 
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -50,7 +49,7 @@
 
 using namespace dealii;
 
-template<int dim>
+template <int dim>
 void test (const unsigned int poly_degree = 1)
 {
 
@@ -191,9 +190,7 @@ void test (const unsigned int poly_degree = 1)
 
 int main (int argc, char *argv[])
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

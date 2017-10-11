@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -37,13 +37,12 @@
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/convergence_table.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/sparse_direct.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/grid/tria.h>
@@ -57,7 +56,6 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
-#include <fstream>
 #include <iostream>
 #include <deal.II/fe/fe_nedelec.h>
 #include <deal.II/grid/grid_out.h>
@@ -94,7 +92,7 @@ private:
   ConvergenceTable     convergence_table;
 };
 // EXACT SOLUTION CLASS
-template<int dim>
+template <int dim>
 class ExactSolution : public Function<dim>
 {
 public:
@@ -130,7 +128,7 @@ private:
 template <int dim> const double RightHandSide<dim>::bc_constant = 0.1;
 
 // DEFINE EXACT SOLUTION MEMBERS
-template<int dim>
+template <int dim>
 double ExactSolution<dim>::value(const Point<dim> &p,
                                  const unsigned int component) const
 {
@@ -148,7 +146,7 @@ double ExactSolution<dim>::value(const Point<dim> &p,
   return val;
 
 }
-template<int dim>
+template <int dim>
 void ExactSolution<dim>::vector_value(const Point<dim> &p,
                                       Vector<double> &result) const
 {
@@ -237,7 +235,7 @@ MaxwellProblem<dim>::~MaxwellProblem ()
   dof_handler.clear ();
 }
 
-template<int dim>
+template <int dim>
 double MaxwellProblem<dim>::dotprod(const Tensor<1,dim> &A, const Tensor<1,dim> &B) const
 {
   double return_val = 0;
@@ -248,7 +246,7 @@ double MaxwellProblem<dim>::dotprod(const Tensor<1,dim> &A, const Tensor<1,dim> 
   return return_val;
 }
 
-template<int dim>
+template <int dim>
 double MaxwellProblem<dim>::dotprod(const Tensor<1,dim> &A, const Vector<double> &B) const
 {
   double return_val = 0;
@@ -272,7 +270,7 @@ void MaxwellProblem<dim>::setup_system ()
   VectorTools::project_boundary_values_curl_conforming(dof_handler, 0, ExactSolution<dim>(), 0, constraints);
 
   constraints.close ();
-  CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
+  DynamicSparsityPattern c_sparsity(dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern(dof_handler,
                                   c_sparsity,
                                   constraints,false);
@@ -362,7 +360,7 @@ void MaxwellProblem<dim>::solve ()
   constraints.distribute (solution);
 
 }
-template<int dim>
+template <int dim>
 void MaxwellProblem<dim>::process_solution(const unsigned int cycle)
 {
   const ExactSolution<dim> exact_solution;
@@ -401,8 +399,7 @@ void MaxwellProblem<dim>::run ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   MaxwellProblem<2> maxwell(4);
   maxwell.run ();

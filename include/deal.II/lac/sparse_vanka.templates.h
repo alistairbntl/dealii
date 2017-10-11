@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparse_vanka_templates_h
-#define dealii__sparse_vanka_templates_h
+#ifndef dealii_sparse_vanka_templates_h
+#define dealii_sparse_vanka_templates_h
 
 
 #include <deal.II/base/memory_consumption.h>
@@ -29,7 +29,7 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-template<typename number>
+template <typename number>
 SparseVanka<number>::SparseVanka()
   :
   matrix (),
@@ -43,7 +43,7 @@ SparseVanka<number>::SparseVanka()
 
 }
 
-template<typename number>
+template <typename number>
 SparseVanka<number>::SparseVanka(const SparseMatrix<number> &M,
                                  const std::vector<bool>    &selected_dofs,
                                  const bool                  conserve_mem,
@@ -53,7 +53,7 @@ SparseVanka<number>::SparseVanka(const SparseMatrix<number> &M,
   conserve_mem (conserve_mem),
   selected (&selected_dofs),
   n_threads (n_threads),
-  inverses (M.m(), 0),
+  inverses (M.m(), nullptr),
   _m (M.m()),
   _n (M.n())
 {
@@ -65,20 +65,20 @@ SparseVanka<number>::SparseVanka(const SparseMatrix<number> &M,
 }
 
 
-template<typename number>
+template <typename number>
 SparseVanka<number>::~SparseVanka()
 {
   typename std::vector<SmartPointer<FullMatrix<float>,SparseVanka<number> > >::iterator i;
   for (i=inverses.begin(); i!=inverses.end(); ++i)
     {
       FullMatrix<float> *p = *i;
-      *i = 0;
-      if (p != 0) delete p;
+      *i = nullptr;
+      if (p != nullptr) delete p;
     }
 }
 
 
-template<typename number>
+template <typename number>
 void
 SparseVanka<number>::initialize(const SparseMatrix<number> &M,
                                 const AdditionalData       &additional_data)
@@ -102,8 +102,8 @@ template <typename number>
 void
 SparseVanka<number>::compute_inverses ()
 {
-  Assert(matrix != 0, ExcNotInitialized());
-  Assert(selected != 0, ExcNotInitialized());
+  Assert(matrix != nullptr, ExcNotInitialized());
+  Assert(selected != nullptr, ExcNotInitialized());
 
 #ifndef DEAL_II_WITH_THREADS
   compute_inverses (0, matrix->m());
@@ -191,8 +191,8 @@ void
 SparseVanka<number>::compute_inverse (const size_type         row,
                                       std::vector<size_type> &local_indices)
 {
-  Assert(matrix != 0, ExcNotInitialized());
-  Assert(selected != 0, ExcNotInitialized());
+  Assert(matrix != nullptr, ExcNotInitialized());
+  Assert(selected != nullptr, ExcNotInitialized());
 
   // first define an alias to the sparsity
   // pattern of the matrix, since this
@@ -220,14 +220,14 @@ SparseVanka<number>::compute_inverse (const size_type         row,
 }
 
 
-template<typename number>
-template<typename number2>
+template <typename number>
+template <typename number2>
 void
 SparseVanka<number>::vmult (Vector<number2>       &dst,
                             const Vector<number2> &src) const
 {
-  Assert(matrix != 0, ExcNotInitialized());
-  Assert(selected != 0, ExcNotInitialized());
+  Assert(matrix != nullptr, ExcNotInitialized());
+  Assert(selected != nullptr, ExcNotInitialized());
 
   // first set output vector to zero
   dst = 0;
@@ -237,8 +237,8 @@ SparseVanka<number>::vmult (Vector<number2>       &dst,
 }
 
 
-template<typename number>
-template<typename number2>
+template <typename number>
+template <typename number2>
 void
 SparseVanka<number>::apply_preconditioner (Vector<number2>         &dst,
                                            const Vector<number2>   &src,
@@ -261,7 +261,7 @@ SparseVanka<number>::apply_preconditioner (Vector<number2>         &dst,
   // blocks. this variable is used to
   // optimize access to vectors a
   // little bit.
-  const bool range_is_restricted = (dof_mask != 0);
+  const bool range_is_restricted = (dof_mask != nullptr);
 
   // space to be used for local
   // systems. allocate as much memory
@@ -389,7 +389,7 @@ SparseVanka<number>::apply_preconditioner (Vector<number2>         &dst,
         // inverses, then unalias the
         // local matrix
         if (conserve_mem == true)
-          inverses[row] = 0;
+          inverses[row] = nullptr;
       }
 }
 
@@ -532,7 +532,6 @@ SparseBlockVanka<number>::compute_dof_masks (const SparseMatrix<number> &M,
       // be used to store the
       // indices each Lagrange dof
       // accesses
-      std::map<size_type, size_type> local_index;
       const SparsityPattern &structure = M.get_sparsity_pattern();
 
       for (size_type row=0; row<M.m(); ++row)

@@ -19,9 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <iomanip>
 #include <limits>
 
 
@@ -31,8 +28,7 @@ int main()
 
   try
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << "OK" << std::endl;
       deallog << "no newline here!";
     }

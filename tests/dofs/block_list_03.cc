@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -53,9 +53,9 @@ int main()
 {
   initlog();
   deallog.push("2D");
-  test_global_refinement<2>(&test_block_list<2>);
+  test_global_refinement<Triangulation<2> >(&test_block_list<2>);
   deallog.pop();
   deallog.push("3D");
-  test_global_refinement<3>(&test_block_list<3>);
+  test_global_refinement<Triangulation<3> >(&test_block_list<3>);
   deallog.pop();
 }

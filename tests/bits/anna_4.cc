@@ -22,7 +22,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 
 #include <deal.II/grid/tria.h>
@@ -44,8 +43,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_dgp.h>
 
-#include <fstream>
-#include <iomanip>
 #include <vector>
 
 
@@ -184,7 +181,7 @@ void FindBug<dim>::dirichlet_conditions ()
   // Here comes the crucial call....
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim> (2),
+                                            Functions::ZeroFunction<dim> (2),
                                             dirichlet_dofs,
                                             component_mask);
 
@@ -245,9 +242,7 @@ void FindBug<dim>::run ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   FindBug<2>().run ();
   FindBug<3>().run ();

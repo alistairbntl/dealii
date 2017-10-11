@@ -18,11 +18,9 @@
 // FEValues::get_function_* had a problem when using FE_Nothing
 
 #include "../tests.h"
-#include <fstream>
 #include <sstream>
 #include <iostream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 
 #include <deal.II/grid/tria.h>
@@ -47,9 +45,7 @@ using namespace dealii;
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<2> triangulation;
   GridGenerator::hyper_cube (triangulation);

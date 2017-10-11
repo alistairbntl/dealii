@@ -20,7 +20,6 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/lac/vector.h>
-#include <fstream>
 
 using namespace dealii;
 
@@ -44,11 +43,11 @@ using namespace dealii;
 // Now the output of mesh and refine indicators in vtu format is disabled to
 // prevent unnecessary outputs during regression test. It you want to see the
 // mesh, uncomment the following macro definition.
-// #define __WRITE_VTU__
+// #define WRITE_VTU
 
-template<int dim> class Location;
+template <int dim> class Location;
 
-template<int dim>
+template <int dim>
 class TriaTest
 {
 private:
@@ -68,7 +67,7 @@ private:
 };
 
 // Equip class Point<dim> with operator < in order to sort the cell center coordinates.
-template<int dim>
+template <int dim>
 class Location: public Point<dim>
 {
 public:
@@ -107,7 +106,6 @@ int main (int argc, char *argv[])
     {
       logfile.open("output");
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
       deallog.push("3d");
     }
 
@@ -172,7 +170,7 @@ int main (int argc, char *argv[])
   return (0);
 }
 
-template<int dim>
+template <int dim>
 TriaTest<dim>::TriaTest(const typename dealii::Triangulation<dim>::MeshSmoothing smoothing_option)
   :
   mpi_communicator(MPI_COMM_WORLD),
@@ -200,7 +198,7 @@ TriaTest<dim>::TriaTest(const typename dealii::Triangulation<dim>::MeshSmoothing
   // triangulation.refine_global(1);
 }
 
-template<int dim>
+template <int dim>
 void TriaTest<dim>::run(std::vector<unsigned int> &n_cell,
                         std::set<Location<dim> > &position_list)
 {
@@ -272,10 +270,10 @@ void TriaTest<dim>::run(std::vector<unsigned int> &n_cell,
   return;
 }
 
-template<int dim>
+template <int dim>
 void TriaTest<dim>::write_vtu(const unsigned int counter) const
 {
-#ifdef __WRITE_VTU__
+#ifdef WRITE_VTU
   // save refine flag
   Vector<float> refine_mark;
   {
@@ -331,4 +329,3 @@ void TriaTest<dim>::write_vtu(const unsigned int counter) const
 #endif
   return;
 }
-

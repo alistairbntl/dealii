@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__path_search_h
-#define dealii__path_search_h
+#ifndef dealii_path_search_h
+#define dealii_path_search_h
 
 
 #include <deal.II/base/config.h>
@@ -177,7 +177,7 @@ public:
                  std::string,
                  << "The class "
                  << arg1
-                 << " must be registered before referring it in PathSearch");
+                 << " must be registered before referring it in PathSearch.");
   /**
    * The PathSearch class could not find a file with this name in its path
    * list.
@@ -185,9 +185,8 @@ public:
    */
   DeclException2(ExcFileNotFound,
                  std::string, std::string,
-                 << "The file \"" << arg1
-                 << "\" was not found in the path for files of class "
-                 << arg2);
+                 << "The file \"" << arg1 << "\" was not found in the path for "
+                 << "files of class " << arg2 << ".");
 
 private:
   /**

@@ -17,10 +17,6 @@
 // test IndexSet::fill_index_vector
 
 #include "../tests.h"
-#include <iomanip>
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 #include <stdlib.h>
 
 #include <deal.II/base/index_set.h>
@@ -58,9 +54,7 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test ();
 }

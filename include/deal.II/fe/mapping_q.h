@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2016 by the deal.II authors
+// Copyright (C) 2001 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mapping_q_h
-#define dealii__mapping_q_h
+#ifndef dealii_mapping_q_h
+#define dealii_mapping_q_h
 
 
 #include <deal.II/base/config.h>
@@ -68,6 +68,12 @@ DEAL_II_NAMESPACE_OPEN
  * of the domain and consequently a higher order mapping is used for all
  * cells; again this class is then equivalent to using MappingQGeneric right
  * away.
+ *
+ * <h4>Behavior along curved boundaries and with different manifolds</h4>
+ *
+ * For the behavior of the mapping and convergence rates in case of mixing
+ * different manifolds, please consult the respective section of
+ * MappingQGeneric.
  *
  * @author Ralf Hartmann, 2000, 2001, 2005; Guido Kanschat 2000, 2001,
  * Wolfgang Bangerth, 2015
@@ -251,13 +257,13 @@ protected:
      * A pointer to a structure to store the information for the pure $Q_1$
      * mapping that is, by default, used on all interior cells.
      */
-    std_cxx11::unique_ptr<typename MappingQGeneric<dim,spacedim>::InternalData> mapping_q1_data;
+    std::unique_ptr<typename MappingQGeneric<dim,spacedim>::InternalData> mapping_q1_data;
 
     /**
      * A pointer to a structure to store the information for the full $Q_p$
      * mapping that is, by default, used on all boundary cells.
      */
-    std_cxx11::unique_ptr<typename MappingQGeneric<dim,spacedim>::InternalData> mapping_qp_data;
+    std::unique_ptr<typename MappingQGeneric<dim,spacedim>::InternalData> mapping_qp_data;
   };
 
 protected:
@@ -346,7 +352,7 @@ protected:
    * the qp_mapping and q1_mapping variables point to the same underlying
    * object.
    */
-  std_cxx11::shared_ptr<const MappingQGeneric<dim,spacedim> > q1_mapping;
+  std::shared_ptr<const MappingQGeneric<dim,spacedim> > q1_mapping;
 
   /**
    * Pointer to a Q_p mapping. This mapping is used on boundary cells unless
@@ -362,7 +368,7 @@ protected:
    * the qp_mapping and q1_mapping variables point to the same underlying
    * object.
    */
-  std_cxx11::shared_ptr<const MappingQGeneric<dim,spacedim> > qp_mapping;
+  std::shared_ptr<const MappingQGeneric<dim,spacedim> > qp_mapping;
 };
 
 /*@}*/

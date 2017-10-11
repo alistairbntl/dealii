@@ -13,8 +13,6 @@
 // the interior boundaries.
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 
 // all include files you need here
@@ -62,9 +60,7 @@ void test(unsigned int ref=1)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<1,1>();
   test<1,2>();

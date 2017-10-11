@@ -71,7 +71,7 @@ void sub_test()
       dof.distribute_dofs(fe);
       ConstraintMatrix constraints;
       DoFTools::make_hanging_node_constraints(dof, constraints);
-      VectorTools::interpolate_boundary_values (dof, 0, ZeroFunction<dim>(),
+      VectorTools::interpolate_boundary_values (dof, 0, Functions::ZeroFunction<dim>(),
                                                 constraints);
       constraints.close();
 
@@ -83,20 +83,18 @@ void sub_test()
       {
         const QGauss<1> quad (fe_degree+1);
         mf_data.reinit (dof, constraints, quad,
-                        typename MatrixFree<dim,number>::AdditionalData(MPI_COMM_SELF,MatrixFree<dim,number>::AdditionalData::none));
+                        typename MatrixFree<dim,number>::AdditionalData(MatrixFree<dim,number>::AdditionalData::none));
 
         // choose block size of 3 which introduces
         // some irregularity to the blocks (stress the
         // non-overlapping computation harder)
         mf_data_color.reinit (dof, constraints, quad,
                               typename MatrixFree<dim,number>::AdditionalData
-                              (MPI_COMM_SELF,
-                               MatrixFree<dim,number>::AdditionalData::partition_color,
+                              (MatrixFree<dim,number>::AdditionalData::partition_color,
                                3));
         mf_data_partition.reinit (dof, constraints, quad,
                                   typename MatrixFree<dim,number>::AdditionalData
-                                  (MPI_COMM_SELF,
-                                   MatrixFree<dim,number>::AdditionalData::partition_partition,
+                                  (MatrixFree<dim,number>::AdditionalData::partition_partition,
                                    3));
       }
 
@@ -147,7 +145,6 @@ void test ()
 {
   deallog << "Test doubles" << std::endl;
   sub_test<dim,fe_degree,double>();
-  deallog.threshold_double(2.e-6);
   deallog << "Test floats" << std::endl;
   sub_test<dim,fe_degree,float>();
 }

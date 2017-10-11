@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,7 +21,6 @@
 #include "../tests.h"
 #include "../grid/mesh_3d.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
@@ -35,7 +34,6 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_q.h>
 
-#include <fstream>
 
 // declare these global in order to reduce time needed upon construction of
 // these objects which is considerable
@@ -43,10 +41,10 @@ FE_DGQ<3> fe(1);
 QGauss<2> quadrature(3);
 MappingQ<3> mapping(2);
 FEFaceValues<3> fe_face_values1 (mapping, fe, quadrature,
-                                 update_q_points | update_JxW_values |
+                                 update_quadrature_points | update_JxW_values |
                                  update_normal_vectors);
 FESubfaceValues<3> fe_face_values2 (mapping, fe, quadrature,
-                                    update_q_points | update_JxW_values |
+                                    update_quadrature_points | update_JxW_values |
                                     update_normal_vectors);
 
 void check_this (Triangulation<3> &tria)
@@ -180,9 +178,7 @@ void check2 (Triangulation<3> &orig_tria)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   {
     Triangulation<3> coarse_grid(Triangulation<3>::allow_anisotropic_smoothing);

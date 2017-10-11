@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mapping_c1_h
-#define dealii__mapping_c1_h
+#ifndef dealii_mapping_c1_h
+#define dealii_mapping_c1_h
 
 
 #include <deal.II/base/config.h>
@@ -33,12 +33,9 @@ DEAL_II_NAMESPACE_OPEN
  * class chooses them such that the discretized boundary is globally
  * continuously differentiable.
  *
- * To use this class, make sure that the Boundary::get_normals_at_vertices()
- * function is implemented for the user's boundary object.
- *
  * @author Wolfgang Bangerth, 2001, 2015
  */
-template<int dim, int spacedim=dim>
+template <int dim, int spacedim=dim>
 class MappingC1 : public MappingQ<dim,spacedim>
 {
 public:

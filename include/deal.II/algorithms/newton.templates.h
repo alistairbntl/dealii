@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -12,6 +12,9 @@
 // the top level of the deal.II distribution.
 //
 // ---------------------------------------------------------------------
+
+#ifndef dealii_newton_templates_h
+#define dealii_newton_templates_h
 
 
 #include <deal.II/algorithms/newton.h>
@@ -93,10 +96,11 @@ namespace Algorithms
 
   template <typename VectorType>
   void
-  Newton<VectorType>::operator() (AnyData &out, const AnyData &in)
+  Newton<VectorType>::operator() (AnyData &out,
+                                  const AnyData &in)
   {
     Assert (out.size() == 1, ExcNotImplemented());
-    deallog.push ("Newton");
+    LogStream::Prefix prefix("Newton");
 
     VectorType &u = *out.entry<VectorType *>(0);
 
@@ -107,17 +111,18 @@ namespace Algorithms
     typename VectorMemory<VectorType>::Pointer Du(mem);
     typename VectorMemory<VectorType>::Pointer res(mem);
 
+    Du->reinit(u);
     res->reinit(u);
     AnyData src1;
     AnyData src2;
     src1.add<const VectorType *>(&u, "Newton iterate");
     src1.merge(in);
-    src2.add<const VectorType *>(res, "Newton residual");
+    src2.add<const VectorType *>(res.get(), "Newton residual");
     src2.merge(src1);
     AnyData out1;
-    out1.add<VectorType *>(res, "Residual");
+    out1.add<VectorType *>(res.get(), "Residual");
     AnyData out2;
-    out2.add<VectorType *>(Du, "Update");
+    out2.add<VectorType *>(Du.get(), "Update");
 
     unsigned int step = 0;
     // fill res with (f(u), v)
@@ -127,15 +132,15 @@ namespace Algorithms
 
     if (debug_vectors)
       {
-        AnyData out;
+        AnyData tmp;
         VectorType *p = &u;
-        out.add<const VectorType *>(p, "solution");
-        p = Du;
-        out.add<const VectorType *>(p, "update");
-        p = res;
-        out.add<const VectorType *>(p, "residual");
+        tmp.add<const VectorType *>(p, "solution");
+        p = Du.get();
+        tmp.add<const VectorType *>(p, "update");
+        p = res.get();
+        tmp.add<const VectorType *>(p, "residual");
         *data_out << step;
-        *data_out << out;
+        *data_out << tmp;
       }
 
     while (control.check(step++, resnorm) == SolverControl::iterate)
@@ -158,15 +163,15 @@ namespace Algorithms
 
         if (debug_vectors)
           {
-            AnyData out;
+            AnyData tmp;
             VectorType *p = &u;
-            out.add<const VectorType *>(p, "solution");
-            p = Du;
-            out.add<const VectorType *>(p, "update");
-            p = res;
-            out.add<const VectorType *>(p, "residual");
+            tmp.add<const VectorType *>(p, "solution");
+            p = Du.get();
+            tmp.add<const VectorType *>(p, "update");
+            p = res.get();
+            tmp.add<const VectorType *>(p, "residual");
             *data_out << step;
-            *data_out << out;
+            *data_out << tmp;
           }
 
         u.add(-1., *Du);
@@ -192,7 +197,6 @@ namespace Algorithms
             resnorm = res->l2_norm();
           }
       }
-    deallog.pop();
 
     // in case of failure: throw exception
     if (control.last_check() != SolverControl::success)
@@ -204,3 +208,5 @@ namespace Algorithms
 
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,7 +21,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -32,7 +31,6 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
 #define PRECISION 8
@@ -92,7 +90,7 @@ transform_grid (Triangulation<2> &tria,
 
 
 
-template<int dim>
+template <int dim>
 void
 plot_shape_functions(const unsigned int degree)
 {
@@ -118,7 +116,7 @@ plot_shape_functions(const unsigned int degree)
       QTrapez<1> q_trapez;
       const unsigned int div=2;
       QIterated<dim> q(q_trapez, div);
-      FEValues<dim> fe(element, q, update_values|update_gradients|update_q_points);
+      FEValues<dim> fe(element, q, update_values|update_gradients|update_quadrature_points);
       fe.reinit(c);
 
       for (unsigned int q_point=0; q_point< q.size(); ++q_point)
@@ -168,7 +166,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   for (unsigned int degree=0; degree<4; ++degree)
     plot_shape_functions<2>(degree);

@@ -45,7 +45,6 @@ author: Anna Schneebeli, February 2003
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 
 #include <deal.II/grid/tria.h>
@@ -68,8 +67,6 @@ author: Anna Schneebeli, February 2003
 #include <deal.II/fe/fe_nedelec.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 template <int dim>
@@ -291,7 +288,6 @@ int main ()
       std::ofstream logfile("output");
       deallog << std::setprecision (2);
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       ImposeBC<2>().run ();
       ImposeBC<3>().run ();

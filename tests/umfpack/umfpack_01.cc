@@ -19,8 +19,6 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
-#include <cstdlib>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
@@ -111,9 +109,7 @@ void test (bool transpose = false)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-9);
+  initlog();
 
   test<1> ();
   test<2> ();

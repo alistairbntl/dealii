@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,860 +13,30 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__parameter_handler_h
-#define dealii__parameter_handler_h
+#ifndef dealii_parameter_handler_h
+#define dealii_parameter_handler_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/subscriptor.h>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
-#include <deal.II/base/std_cxx11/unique_ptr.h>
+#include <deal.II/base/patterns.h>
 
 #include <boost/property_tree/ptree_fwd.hpp>
 #include <boost/serialization/split_member.hpp>
+#include <boost/archive/basic_archive.hpp>
+#include <boost/property_tree/ptree_serialization.hpp>
 
 #include <map>
 #include <vector>
 #include <string>
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
 // forward declarations for interfaces and friendship
 class LogStream;
 class MultipleParameterLoop;
-
-
-/**
- * Namespace for a few classes that act as patterns for the ParameterHandler
- * class. These classes implement an interface that checks whether a parameter
- * in an input file matches a certain pattern, such as "being boolean", "an
- * integer value", etc.
- *
- * @ingroup input
- */
-namespace Patterns
-{
-
-  /**
-   * Base class to declare common interface. The purpose of this class is
-   * mostly to define the interface of patterns, and to force derived classes
-   * to have a <tt>clone</tt> function. It is thus, in the languages of the
-   * "Design Patterns" book (Gamma et al.), a "prototype".
-   */
-  class PatternBase
-  {
-  public:
-    /**
-     * Make destructor of this and all derived classes virtual.
-     */
-    virtual ~PatternBase ();
-
-    /**
-     * Return <tt>true</tt> if the given string matches the pattern.
-     */
-    virtual bool match (const std::string &test_string) const = 0;
-
-    /**
-     * Return a string describing the pattern.
-     */
-    virtual std::string description () const = 0;
-
-    /**
-     * Return a pointer to an exact copy of the object. This is necessary
-     * since we want to store objects of this type in containers, were we need
-     * to copy objects without knowledge of their actual data type (we only
-     * have pointers to the base class).
-     *
-     * Ownership of the objects returned by this function is passed to the
-     * caller of this function.
-     */
-    virtual PatternBase *clone () const = 0;
-
-    /**
-     * Determine an estimate for the memory consumption (in bytes) of this
-     * object. To avoid unnecessary overhead, we do not force derived classes
-     * to provide this function as a virtual overloaded one, but rather try to
-     * cast the present object to one of the known derived classes and if that
-     * fails then take the size of this base class instead and add 32 byte
-     * (this value is arbitrary, it should account for virtual function
-     * tables, and some possible data elements). Since there are usually not
-     * many thousands of objects of this type around, and since the
-     * memory_consumption mechanism is used to find out where memory in the
-     * range of many megabytes is, this seems like a reasonable approximation.
-     *
-     * On the other hand, if you know that your class deviates from this
-     * assumption significantly, you can still overload this function.
-     */
-    virtual std::size_t memory_consumption () const;
-  };
-
-  /**
-   * Returns pointer to the correct derived class based on description.
-   */
-  PatternBase *pattern_factory (const std::string &description);
-
-  /**
-   * Test for the string being an integer. If bounds are given to the
-   * constructor, then the integer given also needs to be within the interval
-   * specified by these bounds. Note that unlike common convention in the C++
-   * standard library, both bounds of this interval are inclusive; the reason
-   * is that in practice in most cases, one needs closed intervals, but these
-   * can only be realized with inclusive bounds for non-integer values. We
-   * thus stay consistent by always using closed intervals.
-   *
-   * If the upper bound given to the constructor is smaller than the lower
-   * bound, then the infinite interval is implied, i.e. every integer is
-   * allowed.
-   *
-   * Giving bounds may be useful if for example a value can only be positive
-   * and less than a reasonable upper bound (for example the number of
-   * refinement steps to be performed), or in many other cases.
-   */
-  class Integer : public PatternBase
-  {
-  public:
-    /**
-     * Minimal integer value. If the numeric_limits class is available use
-     * this information to obtain the extremal values, otherwise set it so
-     * that this class understands that all values are allowed.
-     */
-    static const int min_int_value;
-
-    /**
-     * Maximal integer value. If the numeric_limits class is available use
-     * this information to obtain the extremal values, otherwise set it so
-     * that this class understands that all values are allowed.
-     */
-    static const int max_int_value;
-
-    /**
-     * Constructor. Bounds can be specified within which a valid parameter has
-     * to be. If the upper bound is smaller than the lower bound, then the
-     * infinite interval is meant. The default values are chosen such that no
-     * bounds are enforced on parameters.
-     */
-    Integer (const int lower_bound = min_int_value,
-             const int upper_bound = max_int_value);
-
-    /**
-     * Return <tt>true</tt> if the string is an integer and its value is
-     * within the specified range.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match. If bounds were specified to the constructor, then include them
-     * into this description.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static Integer *create (const std::string &description);
-
-  private:
-    /**
-     * Value of the lower bound. A number that satisfies the
-     * @ref match
-     * operation of this class must be equal to this value or larger, if the
-     * bounds of the interval for a valid range.
-     */
-    const int lower_bound;
-
-    /**
-     * Value of the upper bound. A number that satisfies the
-     * @ref match
-     * operation of this class must be equal to this value or less, if the
-     * bounds of the interval for a valid range.
-     */
-    const int upper_bound;
-
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-  /**
-   * Test for the string being a <tt>double</tt>. If bounds are given to the
-   * constructor, then the integer given also needs to be within the interval
-   * specified by these bounds. Note that unlike common convention in the C++
-   * standard library, both bounds of this interval are inclusive; the reason
-   * is that in practice in most cases, one needs closed intervals, but these
-   * can only be realized with inclusive bounds for non-integer values. We
-   * thus stay consistent by always using closed intervals.
-   *
-   * If the upper bound given to the constructor is smaller than the lower
-   * bound, then the infinite interval is implied, i.e. every integer is
-   * allowed.
-   *
-   * Giving bounds may be useful if for example a value can only be positive
-   * and less than a reasonable upper bound (for example damping parameters
-   * are frequently only reasonable if between zero and one), or in many other
-   * cases.
-   */
-  class Double : public PatternBase
-  {
-  public:
-    /**
-     * Minimal double value. If the <tt>std::numeric_limits</tt> class is
-     * available use this information to obtain the extremal values, otherwise
-     * set it so that this class understands that all values are allowed.
-     */
-    static const double min_double_value;
-
-    /**
-     * Maximal double value. If the numeric_limits class is available use this
-     * information to obtain the extremal values, otherwise set it so that
-     * this class understands that all values are allowed.
-     */
-    static const double max_double_value;
-
-    /**
-     * Constructor. Bounds can be specified within which a valid parameter has
-     * to be. If the upper bound is smaller than the lower bound, then the
-     * infinite interval is meant. The default values are chosen such that no
-     * bounds are enforced on parameters.
-     */
-    Double (const double lower_bound = min_double_value,
-            const double upper_bound = max_double_value);
-
-    /**
-     * Return <tt>true</tt> if the string is a number and its value is within
-     * the specified range.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match. If bounds were specified to the constructor, then include them
-     * into this description.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static Double *create (const std::string &description);
-
-  private:
-    /**
-     * Value of the lower bound. A number that satisfies the
-     * @ref match
-     * operation of this class must be equal to this value or larger, if the
-     * bounds of the interval for a valid range.
-     */
-    const double lower_bound;
-
-    /**
-     * Value of the upper bound. A number that satisfies the
-     * @ref match
-     * operation of this class must be equal to this value or less, if the
-     * bounds of the interval for a valid range.
-     */
-    const double upper_bound;
-
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-  /**
-   * Test for the string being one of a sequence of values given like a
-   * regular expression. For example, if the string given to the constructor
-   * is <tt>"red|blue|black"</tt>, then the
-   * @ref match
-   * function returns <tt>true</tt> exactly if the string is either "red" or
-   * "blue" or "black". Spaces around the pipe signs do not matter and are
-   * eliminated.
-   */
-  class Selection : public PatternBase
-  {
-  public:
-    /**
-     * Constructor. Take the given parameter as the specification of valid
-     * strings.
-     */
-    Selection (const std::string &seq);
-
-    /**
-     * Return <tt>true</tt> if the string is an element of the description
-     * list passed to the constructor.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match. Here, this is the list of valid strings passed to the
-     * constructor.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Determine an estimate for the memory consumption (in bytes) of this
-     * object.
-     */
-    std::size_t memory_consumption () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static Selection *create (const std::string &description);
-
-  private:
-    /**
-     * List of valid strings as passed to the constructor. We don't make this
-     * string constant, as we process it somewhat in the constructor.
-     */
-    std::string sequence;
-
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-
-  /**
-   * This pattern matches a list of values separated by commas (or another
-   * string), each of which have to match a pattern given to the constructor.
-   * With two additional parameters, the number of elements this list has to
-   * have can be specified. If none is specified, the list may have zero or
-   * more entries.
-   */
-  class List : public PatternBase
-  {
-  public:
-    /**
-     * Maximal integer value. If the numeric_limits class is available use
-     * this information to obtain the extremal values, otherwise set it so
-     * that this class understands that all values are allowed.
-     */
-    static const unsigned int max_int_value;
-
-    /**
-     * Constructor. Take the given parameter as the specification of valid
-     * elements of the list.
-     *
-     * The three other arguments can be used to denote minimal and maximal
-     * allowable lengths of the list, and the string that is used as a
-     * separator between elements of the list.
-     */
-    List (const PatternBase  &base_pattern,
-          const unsigned int  min_elements = 0,
-          const unsigned int  max_elements = max_int_value,
-          const std::string  &separator = ",");
-
-    /**
-     * Destructor.
-     */
-    virtual ~List ();
-
-    /**
-     * Return <tt>true</tt> if the string is a comma-separated list of strings
-     * each of which match the pattern given to the constructor.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static List *create (const std::string &description);
-
-    /**
-     * Determine an estimate for the memory consumption (in bytes) of this
-     * object.
-     */
-    std::size_t memory_consumption () const;
-
-    /**
-     * @addtogroup Exceptions
-     * @{
-     */
-
-    /**
-     * Exception.
-     */
-    DeclException2 (ExcInvalidRange,
-                    int, int,
-                    << "The values " << arg1 << " and " << arg2
-                    << " do not form a valid range.");
-    //@}
-  private:
-    /**
-     * Copy of the pattern that each element of the list has to satisfy.
-     */
-    PatternBase *pattern;
-
-    /**
-     * Minimum number of elements the list must have.
-     */
-    const unsigned int min_elements;
-
-    /**
-     * Maximum number of elements the list must have.
-     */
-    const unsigned int max_elements;
-
-    /**
-     * Separator between elements of the list.
-     */
-    const std::string separator;
-
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-
-  /**
-   * This pattern matches a list of comma-separated values each of which
-   * denotes a pair of key and value. Both key and value have to match a
-   * pattern given to the constructor. For each entry of the map, parameters
-   * have to be entered in the form <code>key: value</code>. In other words, a
-   * map is described in the form <code>key1: value1, key2: value2, key3:
-   * value3, ...</code>. A constructor argument allows to choose a delimiter
-   * between pairs other than the comma.
-   *
-   * With two additional parameters, the number of elements this list has to
-   * have can be specified. If none is specified, the map may have zero or
-   * more entries.
-   */
-  class Map : public PatternBase
-  {
-  public:
-    /**
-     * Maximal integer value. If the numeric_limits class is available use
-     * this information to obtain the extremal values, otherwise set it so
-     * that this class understands that all values are allowed.
-     */
-    static const unsigned int max_int_value;
-
-    /**
-     * Constructor. Take the given parameter as the specification of valid
-     * elements of the list.
-     *
-     * The three other arguments can be used to denote minimal and maximal
-     * allowable lengths of the list as well as the separator used to delimit
-     * pairs of the map.
-     */
-    Map (const PatternBase  &key_pattern,
-         const PatternBase  &value_pattern,
-         const unsigned int  min_elements = 0,
-         const unsigned int  max_elements = max_int_value,
-         const std::string  &separator = ",");
-
-    /**
-     * Destructor.
-     */
-    virtual ~Map ();
-
-    /**
-     * Return <tt>true</tt> if the string is a comma-separated list of strings
-     * each of which match the pattern given to the constructor.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static Map *create (const std::string &description);
-
-    /**
-     * Determine an estimate for the memory consumption (in bytes) of this
-     * object.
-     */
-    std::size_t memory_consumption () const;
-
-    /**
-     * @addtogroup Exceptions
-     * @{
-     */
-
-    /**
-     * Exception.
-     */
-    DeclException2 (ExcInvalidRange,
-                    int, int,
-                    << "The values " << arg1 << " and " << arg2
-                    << " do not form a valid range.");
-    //@}
-  private:
-    /**
-     * Copy of the patterns that each key and each value of the map has to
-     * satisfy.
-     */
-    PatternBase *key_pattern;
-    PatternBase *value_pattern;
-
-    /**
-     * Minimum number of elements the list must have.
-     */
-    const unsigned int min_elements;
-
-    /**
-     * Maximum number of elements the list must have.
-     */
-    const unsigned int max_elements;
-
-    /**
-     * Separator between elements of the list.
-     */
-    const std::string separator;
-
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-
-  /**
-   * This class is much like the Selection class, but it allows the input to
-   * be a comma-separated list of values which each have to be given in the
-   * constructor argument. The input is allowed to be empty or contain values
-   * more than once and have an arbitrary number of spaces around commas. Of
-   * course commas are not allowed inside the values given to the constructor.
-   *
-   * For example, if the string to the constructor was <tt>"ucd|gmv|eps"</tt>,
-   * then the following would be legal inputs: "eps", "gmv, eps", or "".
-   */
-  class MultipleSelection : public PatternBase
-  {
-  public:
-    /**
-     * Constructor. @p seq is a list of valid options separated by "|".
-     */
-    MultipleSelection (const std::string &seq);
-
-    /**
-     * Return <tt>true</tt> if the string is an element of the description
-     * list passed to the constructor.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match. Here, this is the list of valid strings passed to the
-     * constructor.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static MultipleSelection *create (const std::string &description);
-
-    /**
-     * Determine an estimate for the memory consumption (in bytes) of this
-     * object.
-     */
-    std::size_t memory_consumption () const;
-
-    /**
-     * @addtogroup Exceptions
-     * @{
-     */
-
-    /**
-     * Exception.
-     */
-    DeclException1 (ExcCommasNotAllowed,
-                    int,
-                    << "A comma was found at position " << arg1
-                    << " of your input string, but commas are not allowed here.");
-    //@}
-  private:
-    /**
-     * List of valid strings as passed to the constructor. We don't make this
-     * string constant, as we process it somewhat in the constructor.
-     */
-    std::string sequence;
-
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-  /**
-   * Test for the string being either "true" or "false". This is mapped to the
-   * Selection class.
-   */
-  class Bool : public Selection
-  {
-  public:
-    /**
-     * Constructor.
-     */
-    Bool ();
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static Bool *create (const std::string &description);
-
-  private:
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-  /**
-   * Always returns <tt>true</tt> when testing a string.
-   */
-  class Anything : public PatternBase
-  {
-  public:
-    /**
-     * Constructor. (Allow for at least one non-virtual function in this
-     * class, as otherwise sometimes no virtual table is emitted.)
-     */
-    Anything ();
-
-    /**
-     * Return <tt>true</tt> if the string matches its constraints, i.e.
-     * always.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match. Here, this is the string <tt>"[Anything]"</tt>.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static Anything *create (const std::string &description);
-
-  private:
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-
-  /**
-   * A pattern that can be used to indicate when a parameter is intended to be
-   * the name of a file. By itself, this class does not check whether the
-   * string that is given in a parameter file actually corresponds to an
-   * existing file (it could, for example, be the name of a file to which you
-   * want to write output). Functionally, the class is therefore equivalent to
-   * the Anything class. However, it allows to specify the <i>intent</i> of a
-   * parameter. The flag given to the constructor also allows to specify
-   * whether the file is supposed to be an input or output file.
-   *
-   * The reason for the existence of this class is to support graphical user
-   * interfaces for editing parameter files. These may open a file selection
-   * dialog if the filename is supposed to represent an input file.
-   */
-  class FileName : public PatternBase
-  {
-  public:
-    /**
-     * Files can be used for input or output. This can be specified in the
-     * constructor by choosing the flag <tt>type</tt>.
-     */
-    enum FileType {input = 0, output = 1};
-
-    /**
-     * Constructor.  The type of the file can be specified by choosing the
-     * flag.
-     */
-    FileName (const FileType type = input);
-
-    /**
-     * Return <tt>true</tt> if the string matches its constraints, i.e.
-     * always.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match. Here, this is the string <tt>"[Filename]"</tt>.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * file type flag
-     */
-    FileType  file_type;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static FileName *create (const std::string &description);
-
-  private:
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-
-
-  /**
-   * A pattern that can be used to indicate when a parameter is intended to be
-   * the name of a directory. By itself, this class does not check whether the
-   * string that is given in a parameter file actually corresponds to an
-   * existing directory. Functionally, the class is therefore equivalent to
-   * the Anything class. However, it allows to specify the <i>intent</i> of a
-   * parameter.
-   *
-   * The reason for the existence of this class is to support graphical user
-   * interfaces for editing parameter files. These may open a file selection
-   * dialog to select or create a directory.
-   */
-  class DirectoryName : public PatternBase
-  {
-  public:
-    /**
-     * Constructor.
-     */
-    DirectoryName ();
-
-    /**
-     * Return <tt>true</tt> if the string matches its constraints, i.e.
-     * always.
-     */
-    virtual bool match (const std::string &test_string) const;
-
-    /**
-     * Return a description of the pattern that valid strings are expected to
-     * match. Here, this is the string <tt>"[Filename]"</tt>.
-     */
-    virtual std::string description () const;
-
-    /**
-     * Return a copy of the present object, which is newly allocated on the
-     * heap. Ownership of that object is transferred to the caller of this
-     * function.
-     */
-    virtual PatternBase *clone () const;
-
-    /**
-     * Creates new object if the start of description matches
-     * description_init.  Ownership of that object is transferred to the
-     * caller of this function.
-     */
-    static DirectoryName *create (const std::string &description);
-
-  private:
-    /**
-     * Initial part of description
-     */
-    static const char *description_init;
-  };
-}
-
 
 /**
  * The ParameterHandler class provides a standard interface to an input file
@@ -1036,7 +206,7 @@ namespace Patterns
  *   @endcode
  * The file so referenced is searched for relative to the current directory
  * (not relative to the directory in which the including parameter file is
- * located, since this is not known to all three versions of the read_input()
+ * located, since this is not known to all three versions of the parse_input()
  * function).
  *
  *
@@ -1051,12 +221,12 @@ namespace Patterns
  *     ...
  *     // declaration of entries
  *     ...
- *     prm.read_input (cin);         // read input from standard in,
+ *     prm.parse_input (std::cin); // read input from standard in,
  *     // or
- *     prm.read_input ("simulation.in");
+ *     prm.parse_input ("simulation.prm");
  *     // or
  *     char *in = "set Time step size = 0.3 \n ...";
- *     prm.read_input_from_string (in);
+ *     prm.parse_input_from_string (in);
  *     ...
  *   @endcode
  * You can use several sources of input successively. Entries which are
@@ -1064,7 +234,7 @@ namespace Patterns
  *
  * You should not try to declare entries using declare_entry() and
  * enter_subsection() with as yet unknown subsection names after using
- * read_input(). The results in this case are unspecified.
+ * parse_input(). The results in this case are unspecified.
  *
  * If an error occurs upon reading the input, error messages are written to
  * <tt>std::cerr</tt> and the reader function returns with a return value of
@@ -1077,29 +247,10 @@ namespace Patterns
  * <h3>Using the %ParameterHandler Graphical User Interface</h3>
  *
  * An alternative to using the hand-written input files shown above is to use
- * the graphical user interface (GUI) that accompanies this class. For this,
- * you first need to write a description of all the parameters, their default
- * values, patterns and documentation strings into a file in a format that the
- * GUI can understand; this is done using the
- * ParameterHandler::print_parameters() function with ParameterHandler::XML as
- * second argument, as discussed in more detail below in the <i>Representation
- * of Parameters</i> section. This file can then be loaded using the
- * executable for the GUI, which should be located in
- * <code>lib/bin/dealii_parameter_gui</code> of your deal.II installation,
- * assuming that you have a sufficiently recent version of the <a
- * href="http://qt.nokia.com/">Qt toolkit</a> installed.
+ * the graphical user interface (GUI) that accompanies this class.
  *
- * Once loaded, the GUI displays subsections and individual parameters in tree
- * form (see also the discussion in the <i>Representation of Parameters</i>
- * section below). Here is a screen shot with some sub-sections expanded and
- * one parameter selected for editing:
- *
- * @image html parameter_gui.png "Parameter GUI"
- *
- * Using the GUI, you can edit the values of individual parameters and save
- * the result in the same format as before. It can then be read in using the
- * ParameterHandler::read_input_from_xml() function.
- *
+ * See <a href="https://github.com/dealii/parameter_gui">the parameter_gui
+ * github repository</a> for further details.
  *
  * <h3>Getting entry values out of a %ParameterHandler object</h3>
  *
@@ -1141,6 +292,110 @@ namespace Patterns
  * know the values of parameters not specified in the input file.
  *
  *
+ *
+ * <h3>Adding Actions to Parameters</h3>
+ *
+ * It is often convenient to have something happen as soon as a parameter
+ * value is read. This could be a check that it is valid -- say, that a
+ * file that is listed in the parameter file exists -- or to initiate
+ * something else in response, such as setting a variable outside the
+ * ParameterHandler (as in the example shown below). In almost all cases,
+ * this "action" could also be initiated once all parameters are read
+ * via parse_input(), but it is sometimes <i>convenient</i> to do it
+ * right away.
+ *
+ * This is facilitated by the add_action() function that can be called
+ * after declaring a parameter via declare_entry(). "Actions" are in essence
+ * pointers to functions that will be called for parameters that have
+ * associated actions. These functions take the value of a parameter as
+ * argument, and can then do whatever they want with it -- e.g., save it
+ * somewhere outside the ParameterHandler object. (Exactly when the
+ * action is called is described in the documentation of the
+ * add_action() function.) Of course, in C++ one doesn't usually pass
+ * around the address of a function, but an action can be a function-like
+ * object (taking a string as argument) that results from calling
+ * @p std::bind, or more conveniently, it can be a
+ * <a href="http://en.cppreference.com/w/cpp/language/lambda">lambda
+ * function</a> that has the form
+ * @code
+ *   [] (const std::string &value) { ... do something with the value ... }
+ * @endcode
+ * and that is attached to a specific parameter.
+ *
+ * A typical example of such an action would be as follows: let's assume
+ * that you have a program that declares a parameter for the number
+ * of iterations it is going to run, say
+ * @code
+ *   class MyAlgorithm
+ *   {
+ *      public:
+ *        void run ();
+ *      private:
+ *        unsigned int n_iterations;
+ *   };
+ * @endcode
+ * then one could obtain this parameter from a parameter file using a
+ * code snippet in @p run() as follows:
+ * @code
+ *   void MyAlgorithm::run ()
+ *   {
+ *     ParameterHandler prm;
+ *     prm.declare_entry ("Number of iterations",  // name of parameter
+ *                        "10",                    // default value
+ *                        Patterns::Integer(1,100),// allowed values: 1...100
+ *                        "The number of ...");    // some documentation, to be completed
+ *
+ *     // next read the parameter from an input file...
+ *     prm.parse_input ("my_algorithm.prm");
+ *
+ *     // ...and finally get the value for use in the program:
+ *     n_iterations = prm.get_integer ("Number of iterations");
+ *
+ *     ... actual code doing something useful follows here...
+ * @endcode
+ *
+ * This two-step process -- first declaring the parameter, and later reading
+ * it -- is a bit cumbersome because one has to first declare <i>all</i>
+ * parameters and at a later time retrieve them from the ParameterHandler
+ * object. In large programs, these two things also often happen in
+ * different functions.
+ *
+ * To avoid this, it would be nice if we could put both the declaration
+ * and the retrieval into the same place. This can be done via actions,
+ * and the function would then look like this:
+ * @code
+ *   void MyAlgorithm::run ()
+ *   {
+ *     ParameterHandler prm;
+ *     prm.declare_entry ("Number of iterations",  // name of parameter
+ *                        "10",                    // default value
+ *                        Patterns::Integer(1,100),// allowed values: 1...100
+ *                        "The number of ...");    // some documentation, to be completed
+ *     prm.add_action ("Number of iterations",
+ *                     [&](const std::string &value) {
+ *                       this->n_iterations = Utilities::string_to_int(value);
+ *                     });
+ *
+ *     // next read the parameter from an input file...
+ *     prm.parse_input ("my_algorithm.prm");
+ *
+ *     ... actual code doing something useful follows here...
+ * @endcode
+ * Here, the action consists of a lambda function that takes the value
+ * for this parameter as a string, and then converts it to an integer
+ * to store in the variable where it belongs. This action is
+ * executed inside the call to <code>prm.parse_input()</code>, and so
+ * there is now no longer a need to extract the parameter's value
+ * at a later time. Furthermore, the code that sets the member variable
+ * is located right next to the place where the parameter is actually
+ * declared, so we no longer need to have two separate parts of the code
+ * base that deal with input parameters.
+ *
+ * Of course, it is possible to execute far more involved actions than
+ * just setting a member variable as shown above, even though that is
+ * a typical case.
+ *
+ *
  * <h3>Style guide for data retrieval</h3>
  *
  * We propose that every class which gets data out of a ParameterHandler
@@ -1170,39 +425,44 @@ namespace Patterns
  *
  * This is the code:
  *   @code
- *     #include <iostream>
- *     #include "../include/parameter_handler.h"
+ *   #include <deal.II/base/parameter_handler.h>
  *
- *     using namespace dealii;
+ *   #include <iostream>
+ *   #include <string>
  *
- *     class LinEq
+ *   using namespace dealii;
+ *   class LinearEquation
+ *   {
+ *   public:
+ *     static void declare_parameters (ParameterHandler &prm);
+ *     void get_parameters (ParameterHandler &prm);
+ *   private:
+ *     std::string method;
+ *     int         max_iterations;
+ *   };
+ *
+ *
+ *
+ *   class Problem
+ *   {
+ *   private:
+ *     LinearEquation eq1, eq2;
+ *     std::string matrix1, matrix2;
+ *     std::string outfile;
+ *   public:
+ *     static void declare_parameters (ParameterHandler &prm);
+ *     void get_parameters (ParameterHandler &prm);
+ *
+ *     void do_something ();
+ *   };
+ *
+ *
+ *
+ *   void LinearEquation::declare_parameters (ParameterHandler &prm)
+ *   {
+ *     // declare parameters for the linear solver in a subsection
+ *     prm.enter_subsection ("Linear solver");
  *     {
- *     public:
- *       static void declare_parameters (ParameterHandler &prm);
- *       void get_parameters (ParameterHandler &prm);
- *     private:
- *       std::string Method;
- *       int    MaxIterations;
- *     };
- *
- *
- *     class Problem
- *     {
- *     private:
- *       LinEq eq1, eq2;
- *       std::string Matrix1, Matrix2;
- *       std::string outfile;
- *     public:
- *       static void declare_parameters (ParameterHandler &prm);
- *       void get_parameters (ParameterHandler &prm);
- *     };
- *
- *
- *
- *     void LinEq::declare_parameters (ParameterHandler &prm)
- *     {
- *       // declare parameters for the linear solver in a subsection
- *       prm.enter_subsection ("Linear solver");
  *       prm.declare_entry ("Solver",
  *                          "CG",
  *                          Patterns::Selection("CG|BiCGStab|GMRES"),
@@ -1210,172 +470,205 @@ namespace Patterns
  *       prm.declare_entry ("Maximum number of iterations",
  *                          "20",
  *                          Patterns::Integer());
- *       prm.leave_subsection ();
  *     }
+ *     prm.leave_subsection ();
+ *   }
  *
  *
- *     void LinEq::get_parameters (ParameterHandler &prm)
+ *
+ *   void LinearEquation::get_parameters (ParameterHandler &prm)
+ *   {
+ *     prm.enter_subsection ("Linear solver");
  *     {
- *       prm.enter_subsection ("Linear solver");
- *       Method        = prm.get ("Solver");
- *       MaxIterations = prm.get_integer ("Maximum number of iterations");
- *       prm.leave_subsection ();
- *       std::cout << "  LinEq: Method=" << Method << ", MaxIterations=" << MaxIterations << std::endl;
+ *       method         = prm.get ("Solver");
+ *       max_iterations = prm.get_integer ("Maximum number of iterations");
  *     }
+ *     prm.leave_subsection ();
+ *     std::cout << "  LinearEquation: method=" << method
+ *               << ", max_iterations=" << max_iterations
+ *               << std::endl;
+ *   }
  *
  *
  *
- *     void Problem::declare_parameters (ParameterHandler &prm)
+ *   void Problem::declare_parameters (ParameterHandler &prm)
+ *   {
+ *     // first some global parameter entries
+ *     prm.declare_entry ("Output file",
+ *                        "out",
+ *                        Patterns::Anything(),
+ *                        "Name of the output file, either relative to the present "
+ *                        "path or absolute");
+ *     prm.declare_entry ("Equation 1",
+ *                        "Laplace",
+ *                        Patterns::Anything(),
+ *                        "String identifying the equation we want to solve");
+ *     prm.declare_entry ("Equation 2",
+ *                        "Elasticity",
+ *                        Patterns::Anything());
+ *
+ *     // declare parameters for the first equation
+ *     prm.enter_subsection ("Equation 1 Settings");
  *     {
- *       // first some global parameter entries
- *       prm.declare_entry ("Output file",
- *                          "out",
- *                          Patterns::Anything(),
- *                          "Name of the output file, either relative to the present"
- *                          "path or absolute");
- *       prm.declare_entry ("Equation 1",
- *                          "Laplace",
- *                          Patterns::Anything(),
- *                          "String identifying the equation we want to solve");
- *       prm.declare_entry ("Equation 2",
- *                          "Elasticity",
- *                          Patterns::Anything());
- *
- *       // declare parameters for the first equation
- *       prm.enter_subsection ("Equation 1");
  *       prm.declare_entry ("Matrix type",
  *                          "Sparse",
  *                          Patterns::Selection("Full|Sparse|Diagonal"),
- *                          "Type of the matrix to be used, either full,"
+ *                          "Type of the matrix to be used, either full, "
  *                          "sparse, or diagonal");
- *       LinEq::declare_parameters (prm);  // for eq1
- *       prm.leave_subsection ();
+ *       LinearEquation::declare_parameters (prm);  // for eq1
+ *     }
+ *     prm.leave_subsection ();
  *
- *       // declare parameters for the second equation
- *       prm.enter_subsection ("Equation 2");
+ *     // declare parameters for the second equation
+ *     prm.enter_subsection ("Equation 2 Settings");
+ *     {
  *       prm.declare_entry ("Matrix type",
  *                          "Sparse",
  *                          Patterns::Selection("Full|Sparse|Diagonal"));
- *       LinEq::declare_parameters (prm);  // for eq2
- *       prm.leave_subsection ();
+ *       LinearEquation::declare_parameters (prm);  // for eq2
  *     }
+ *     prm.leave_subsection ();
+ *   }
  *
  *
- *     void Problem::get_parameters (ParameterHandler &prm)
+ *
+ *   void Problem::get_parameters (ParameterHandler &prm)
+ *   {
+ *     // entries of the problem class
+ *     outfile = prm.get ("Output file");
+ *     std::string equation1 = prm.get ("Equation 1"),
+ *                 equation2 = prm.get ("Equation 2");
+ *
+ *     // get parameters for the first equation
+ *     prm.enter_subsection ("Equation 1 Settings");
  *     {
- *       // entries of the problem class
- *       outfile = prm.get ("Output file");
- *
- *       std::string equation1 = prm.get ("Equation 1"),
- *              equation2 = prm.get ("Equation 2");
- *
- *       // get parameters for the first equation
- *       prm.enter_subsection ("Equation 1");
- *       Matrix1 = prm.get ("Matrix type");
+ *       matrix1 = prm.get ("Matrix type");
  *       eq1.get_parameters (prm); // for eq1
- *       prm.leave_subsection ();
- *
- *       // get parameters for the second equation
- *       prm.enter_subsection ("Equation 2");
- *       Matrix2 = prm.get ("Matrix type");
- *       eq2.get_parameters (prm); // for eq2
- *       prm.leave_subsection ();
- *
- *       std::cout << "  Problem: outfile=" << outfile << '\n'
- *                 << "           eq1="     << equation1 << ", eq2=" << equation2 << '\n'
- *                 << "           Matrix1=" << Matrix1 << ", Matrix2=" << Matrix2 << std::endl;
  *     }
+ *     prm.leave_subsection ();
  *
- *
- *
- *
- *     int main ()
+ *     // get parameters for the second equation
+ *     prm.enter_subsection ("Equation 2 Settings");
  *     {
- *       ParameterHandler prm;
- *       Problem p;
- *
- *       p.declare_parameters (prm);
- *
- *       // read input from "prmtest.prm"; giving argv[1] would also be a
- *       // good idea
- *       prm.read_input ("prmtest.prm");
- *
- *       // print parameters to std::cout as ASCII text
- *       std::cout << std::endl << std::endl;
- *       prm.print_parameters (std::cout, ParameterHandler::Text);
- *
- *       // get parameters into the program
- *       std::cout << std::endl << std::endl
- *                 << "Getting parameters:" << std::endl;
- *       p.get_parameters (prm);
- *
- *       // now run the program with these input parameters
- *       p.do_something ();
+ *       matrix2 = prm.get ("Matrix type");
+ *       eq2.get_parameters (prm); // for eq2
  *     }
+ *     prm.leave_subsection ();
+ *     std::cout << "  Problem: outfile=" << outfile << '\n'
+ *               << "           eq1="     << equation1 << ", eq2=" << equation2 << '\n'
+ *               << "           matrix1=" << matrix1 << ", matrix2=" << matrix2
+ *               << std::endl;
+ *   }
+ *
+ *
+ *
+ *   void Problem::do_something ()
+ *   {
+ *     // While this example does nothing here, at this point in the program
+ *     // all of the parameters are known so we can start doing computations.
+ *   }
+ *
+ *
+ *
+ *   int main ()
+ *   {
+ *     ParameterHandler prm;
+ *     Problem p;
+ *     p.declare_parameters (prm);
+ *     // read input from "prmtest.prm"; giving argv[1] would also be a
+ *     // good idea
+ *     prm.parse_input ("prmtest.prm");
+ *     // print parameters to std::cout as ASCII text
+ *     std::cout << "\n\n";
+ *     prm.print_parameters (std::cout, ParameterHandler::Text);
+ *     // get parameters into the program
+ *     std::cout << "\n\n" << "Getting parameters:" << std::endl;
+ *     p.get_parameters (prm);
+ *     // now run the program with these input parameters
+ *     p.do_something ();
+ *   }
  *   @endcode
  *
  *
  * This is the input file (named "prmtest.prm"):
  *   @code
- *     # first declare the types of equations
- *     set Equation 1 = Poisson
- *     set Equation 2 = Navier-Stokes
+ *   # first declare the types of equations
+ *   set Equation 1 = Poisson
+ *   set Equation 2 = Stokes
  *
- *     subsection Equation 1
- *       set Matrix type = Sparse
- *       subsection Linear solver # parameters for linear solver 1
- *         set Solver                       = Gauss-Seidel
- *         set Maximum number of iterations = 40
- *       end
+ *   subsection Equation 1 Settings
+ *     set Matrix type = Sparse
+ *     subsection Linear solver # parameters for linear solver 1
+ *       set Solver                       = Gauss-Seidel
+ *       set Maximum number of iterations = 40
  *     end
+ *   end
  *
- *     subsection Equation 2
- *       set Matrix type = Full
- *       subsection Linear solver
- *         set Solver                       = CG
- *         set Maximum number of iterations = 100
- *       end
+ *   subsection Equation 2 Settings
+ *     set Matrix type = Full
+ *     subsection Linear solver
+ *       set Solver                       = CG
+ *       set Maximum number of iterations = 100
  *     end
+ *   end
  *   @endcode
  *
  * And here is the output of the program:
  *   @code
- *     Line 8:
- *         The entry value
- *             Gauss-Seidel
- *         for the entry named
- *             Solver
- *         does not match the given regular expression
- *             CG|BiCGStab|GMRES
+ *   Line <8> of file <prmtest.prm>:
+ *       The entry value
+ *           Gauss-Seidel
+ *       for the entry named
+ *           Solver
+ *       does not match the given pattern
+ *           [Selection CG|BiCGStab|GMRES ]
  *
  *
- *     Listing of Parameters
- *     ---------------------
- *       set Equation 1  = Poisson  # Laplace
- *       set Equation 2  = Navier-Stokes  # Elasticity
- *       set Output file = out
- *       subsection Equation 1
- *         set Matrix type = Sparse  # Sparse
- *         subsection Linear solver
- *           set Maximum number of iterations = 40  # 20
- *           set Solver                       = CG
- *         end
- *       end
- *       subsection Equation 2
- *         set Matrix type = Full  # Sparse
- *         subsection Linear solver
- *           set Maximum number of iterations = 100  # 20
- *           set Solver                       = CG   # CG
- *         end
- *       end
+ *   # Listing of Parameters
+ *   # ---------------------
+ *   # String identifying the equation we want to solve
+ *   set Equation 1  = Poisson # default: Laplace
+ *   set Equation 2  = Stokes  # default: Elasticity
+ *
+ *   # Name of the output file, either relative to the present path or absolute
+ *   set Output file = out
  *
  *
- *     Getting parameters:
- *       LinEq: Method=CG, MaxIterations=40
- *       LinEq: Method=CG, MaxIterations=100
- *       Problem: outfile=out
- *                eq1=Poisson, eq2=Navier-Stokes
- *                Matrix1=Sparse, Matrix2=Full
+ *   subsection Equation 1 Settings
+ *     # Type of the matrix to be used, either full, sparse, or diagonal
+ *     set Matrix type = Sparse
+ *
+ *
+ *     subsection Linear solver
+ *       set Maximum number of iterations = 40 # default: 20
+ *       # Name of a linear solver for the inner iteration
+ *       set Solver                       = CG
+ *     end
+ *
+ *   end
+ *
+ *
+ *   subsection Equation 2 Settings
+ *     set Matrix type = Full # default: Sparse
+ *
+ *
+ *     subsection Linear solver
+ *       set Maximum number of iterations = 100 # default: 20
+ *       # Name of a linear solver for the inner iteration
+ *       set Solver                       = CG
+ *     end
+ *
+ *   end
+ *
+ *
+ *
+ *
+ *   Getting parameters:
+ *     LinearEquation: method=CG, max_iterations=40
+ *     LinearEquation: method=CG, max_iterations=100
+ *     Problem: outfile=out
+ *              eq1=Poisson, eq2=Stokes
+ *              matrix1=Sparse, matrix2=Full
  *   @endcode
  *
  *
@@ -1417,15 +710,20 @@ namespace Patterns
  * We can think of the parameters so arranged as a file system in which every
  * parameter is a directory. The name of this directory is the name of the
  * parameter, and in this directory lie files that describe the parameter.
- * These files are: - <code>value</code>: The content of this file is the
- * current value of this parameter; initially, the content of the file equals
- * the default value of the parameter. - <code>default_value</code>: The
- * content of this file is the default value value of the parameter. -
- * <code>pattern</code>: A textual representation of the pattern that
- * describes the parameter's possible values. - <code>pattern_index</code>: A
- * number that indexes the Patterns::PatternBase object that is used to
- * describe the parameter. - <code>documentation</code>: The content of this
- * file is the documentation given for a parameter as the last argument of the
+ * These files are at the time of writing this documentation (other fields,
+ * such as those indicating "actions" may also exist in each directory):
+ *
+ * - <code>value</code>: The content of this file is the current value of this
+ * parameter; initially, the content of the file equals the default value of
+ * the parameter.
+ * - <code>default_value</code>: The content of this file is the default value
+ * value of the parameter.
+ * - <code>pattern</code>: A textual representation of the pattern that
+ * describes the parameter's possible values.
+ * - <code>pattern_index</code>: A number that indexes the Patterns::PatternBase
+ * object that is used to describe the parameter.
+ * - <code>documentation</code>: The content of this file is the documentation
+ * given for a parameter as the last argument of the
  * ParameterHandler::declare_entry call. With the exception of the
  * <code>value</code> file, the contents of files are never changed after
  * declaration of a parameter.
@@ -1494,7 +792,7 @@ namespace Patterns
  *
  *
  * @ingroup input
- * @author Wolfgang Bangerth, October 1997, revised February 1998, 2010, 2011
+ * @author Wolfgang Bangerth, October 1997, revised February 1998, 2010, 2011, 2017
  * @author Alberto Sartori, 2015
  * @author David Wells, 2016
  */
@@ -1504,20 +802,16 @@ private:
   /**
    * Inhibit automatic CopyConstructor.
    */
-  ParameterHandler (const ParameterHandler &);
+  ParameterHandler (const ParameterHandler &) = delete;
 
   /**
    * Inhibit automatic assignment operator.
    */
-  ParameterHandler &operator= (const ParameterHandler &);
+  ParameterHandler &operator= (const ParameterHandler &) = delete;
 
 public:
   /**
-   * List of possible output formats.
-   *
-   * The formats down the list with prefix <em>Short</em> and bit 6 and 7 set
-   * reproduce the old behavior of not writing comments or original values to
-   * the files.
+   * List of possible output formats used for ParameterHandler::print_parameters().
    */
   enum OutputStyle
   {
@@ -1526,6 +820,7 @@ public:
      * again.
      */
     Text = 1,
+
     /**
      * Write parameters as a LaTeX table.
      */
@@ -1568,52 +863,105 @@ public:
    * safer as we have virtual functions.  It actually does nothing
    * spectacular.
    */
-  virtual ~ParameterHandler ();
+  virtual ~ParameterHandler () = default;
 
   /**
-   * Read input from a stream until the stream returns the <tt>eof</tt>
-   * condition or error. The second argument can be used to denote the name of
-   * the file (if that's what the input stream represents) we are reading
-   * from; this is only used when creating output for error messages.
+   * Parse each line from a stream until the stream returns the <tt>eof</tt>
+   * condition or error to provide values for known parameter fields. The second
+   * argument can be used to denote the name of the file (if that's what the
+   * input stream represents) we are reading from; this is only used when
+   * creating output for exceptions.
    *
-   * Return whether the read was successful.
+   * If non-empty @p last_line is provided, the ParameterHandler object
+   * will stop parsing lines after encountering @p last_line .
+   * This is handy when adding extra data that shall be parsed manually.
+   *
+   * The function sets the value of all parameters it encounters in the
+   * input file to the provided value. Parameters not explicitly listed
+   * in the input file are left at the value they previously held, which
+   * will be the default value provided to declare_entry() unless one
+   * has previously read a different input file.
+   *
+   * Each parameter value is matched against the pattern for this
+   * parameter that was provided to declare_entry(), and for each parameter
+   * all associated actions that may previously have been set by
+   * add_action() are executed. If a parameter does not satisfy its
+   * pattern, or if an associated action throws an exception, then the
+   * value provided for the parameter is not set and the current
+   * object reverts to the subsection it was in before the current
+   * function was called. No further processing of the input stream
+   * occurs, that is everything that comes after the parameter whose
+   * value does not satisfy its pattern is ignored.
    */
-  virtual bool read_input (std::istream &input,
-                           const std::string &filename = "input file");
+  virtual void parse_input (std::istream &input,
+                            const std::string &filename = "input file",
+                            const std::string &last_line = "");
 
   /**
-   * Read input from a file the name of which is given. The PathSearch class
-   * "PARAMETERS" is used to find the file.
+   * Parse the given file to provide values for known parameter fields. The
+   * PathSearch class "PARAMETERS" is used to find the file.
    *
-   * Return whether the read was successful.
+   * The function in essence reads the entire file into a stream and
+   * then calls the other parse_input() function with that stream. See
+   * there for more information.
    *
-   * Unless <tt>optional</tt> is <tt>true</tt>, this function will
-   * automatically generate the requested file with default values if the file
-   * did not exist. This file will not contain additional comments if
-   * <tt>write_stripped_file</tt> is <tt>true</tt>.
+   * Previous versions of deal.II included a similar function named
+   * <code>read_input</code> which, if the parameter file could not be found
+   * by PathSearch::find, would not modify the calling ParameterHandler (i.e.,
+   * the parameters would all be set to their default values) and would
+   * (optionally) create a parameter file with default values. In order to
+   * obtain that behavior one should catch the PathSearch::ExcFileNotFound
+   * exception and then optionally call ParameterHandler::print_parameters,
+   * e.g.,
+   *
+   * @code
+   * const std::string filename = "parameters.prm";
+   * const bool print_default_prm_file = true;
+   * try
+   *   {
+   *     parameter_handler.parse_input (filename);
+   *   }
+   * catch (const PathSearch::ExcFileNotFound &)
+   *   {
+   *     std::cerr << "ParameterHandler::parse_input: could not open file <"
+   *               << filename
+   *               << "> for reading."
+   *               << std::endl;
+   *     if (print_default_prm_file)
+   *       {
+   *         std::cerr << "Trying to make file <"
+   *                   << filename
+   *                   << "> with default values for you."
+   *                   << std::endl;
+   *         std::ofstream output (filename);
+   *         parameter_handler.print_parameters (output,
+   *                                             ParameterHandler::OutputStyle::Text);
+   *       }
+   *   }
+   * @endcode
    */
-  virtual bool read_input (const std::string &filename,
-                           const bool optional = false,
-                           const bool write_stripped_file = false);
+  virtual void parse_input (const std::string &filename,
+                            const std::string &last_line = "");
 
   /**
-   * Read input from a string in memory. The lines in memory have to be
-   * separated by <tt>@\n</tt> characters.
+   * Parse input from a string to populate known parameter fields. The lines
+   * in the string must be separated by <tt>@\n</tt> characters.
    *
-   * Return whether the read was successful.
+   * The function in essence reads the entire file into a stream and
+   * then calls the other parse_input() function with that stream. See
+   * there for more information.
    */
-  virtual bool read_input_from_string (const char *s);
+  virtual void parse_input_from_string (const char *s,
+                                        const std::string &last_line = "");
 
   /**
-   * Read a parameter file in XML format. This could be from a file originally
-   * written by the print_parameters() function using the XML output style and
-   * then modified by hand as necessary; or from a file written using this
-   * method and then modified by the graphical parameter GUI (see the general
-   * documentation of this class).
-   *
-   * Return whether the read was successful.
+   * Parse input from an XML stream to populate known parameter fields. This
+   * could be from a file originally written by the print_parameters() function
+   * using the XML output style and then modified by hand as necessary, or from
+   * a file written using this method and then modified by the graphical
+   * parameter GUI (see the general documentation of this class).
    */
-  virtual bool read_input_from_xml (std::istream &input);
+  virtual void parse_input_from_xml (std::istream &input);
 
   /**
    * Clear all contents.
@@ -1644,6 +992,67 @@ public:
                       const std::string           &default_value,
                       const Patterns::PatternBase &pattern = Patterns::Anything(),
                       const std::string           &documentation = std::string());
+
+  /**
+   * Attach an action to the parameter with name @p entry in the current
+   * section. The action needs to be a function-like object that takes the
+   * value of the parameter as a (string) argument. See the general documentation
+   * of this class for a longer description of actions, as well as examples.
+   *
+   * The action is executed in three different circumstances:
+   * - With the default value of the parameter with name @p name, at
+   *   the end of the current function. This is useful because it allows
+   *   for the action to execute whatever it needs to do at least once
+   *   for each parameter, even those that are not actually specified in
+   *   the input file (and thus remain at their default values).
+   * - Within the ParameterHandler::set() functions that explicitly
+   *   set a value for a parameter.
+   * - Within the parse_input() function and similar functions such
+   *   as parse_input_from_string(). Here, the action is executed
+   *   whenever the parameter with which it is associated is read
+   *   from the input, after it has been established that the value
+   *   so read matches the pattern that corresponds to this parameter,
+   *   and before the value is actually saved.
+   *
+   * It is valid to add multiple actions to the same parameter. They will
+   * in that case be executed in the same order in which they were added.
+   *
+   * @note Actions may modify all sorts of variables in their scope. The
+   *  only thing an action should not modify is the ParameterHandler object
+   *  it is attached to. In other words, it is not allowed to enter or
+   *  leave sections of the current ParameterHandler object. It is, in
+   *  principle, acceptable to call ParameterHandler::get() and related
+   *  functions on other parameters in the current section, but since
+   *  there is no guarantee about the order in which they will be read
+   *  from an input file, you will not want to rely on the values these
+   *  functions would return.
+   *
+   * @note Throwing an exception in an action is generally not a good
+   *  idea, but yields fundamentally the same result as if one tries to
+   *  read a parameter from a file for which the value does not satisfy
+   *  the pattern associated with the parameter. In other words, the
+   *  value just read is discarded, and ParameterHandler::parse_input()
+   *  stops to read any further content from the file. See
+   *  ParameterHandler::parse_input() for more information.
+   */
+  void add_action (const std::string &entry,
+                   const std::function<void (const std::string &value)> &action);
+
+  /**
+   * Declare a new entry name @p entry, set its default value to the content of
+   * the variable @p parameter, and create an action that will fill @p
+   * parameter with updated values when a file is parsed, or the entry is set
+   * to a new value.
+   *
+   * By default, the pattern to use is obtained by calling the function
+   * Patterns::Tools::Convert<T>::to_pattern(), but a custom one can be used.
+   */
+  template <class ParameterType>
+  void add_parameter(const std::string &entry,
+                     ParameterType &parameter,
+                     const std::string &documentation = std::string(),
+                     const Patterns::PatternBase &pattern =
+                       *Patterns::Tools::Convert<ParameterType>::to_pattern());
 
   /**
    * Create an alias for an existing entry. This provides a way to refer to a
@@ -1795,8 +1204,7 @@ public:
 
 
   /**
-   * Print all parameters with the given style to <tt>out</tt>. Presently only
-   * <tt>Text</tt>, <tt>LaTeX</tt> and <tt>XML</tt> are implemented.
+   * Print all parameters with the given style to <tt>out</tt>.
    *
    * In <tt>Text</tt> format, the output is formatted in such a way that it is
    * possible to use it for later input again. This is most useful to record
@@ -1837,8 +1245,9 @@ public:
    * \printindex[prmindexfull]
    * @endcode
    */
-  std::ostream &print_parameters (std::ostream      &out,
-                                  const OutputStyle  style);
+  std::ostream &
+  print_parameters (std::ostream      &out,
+                    const OutputStyle  style) const;
 
   /**
    * Print out the parameters of the present subsection as given by the
@@ -1853,11 +1262,14 @@ public:
    *
    * In most cases, you will not want to use this function directly, but have
    * it called recursively by the previous function.
+   *
+   * @deprecated This function is deprecated because, even though it only
+   *   outputs information, it is not a <code>const</code> function.
    */
   void print_parameters_section (std::ostream       &out,
                                  const OutputStyle   style,
                                  const unsigned int  indent_level,
-                                 const bool          include_top_level_elements = false);
+                                 const bool          include_top_level_elements = false) DEAL_II_DEPRECATED;
 
   /**
    * Print parameters to a logstream. This function allows to print all
@@ -1914,24 +1326,103 @@ public:
    */
   DeclException1 (ExcEntryAlreadyExists,
                   std::string,
-                  << "The following entry already exists: " << arg1);
+                  << "The following entry already exists: " << arg1 << ".");
   /**
    * Exception
    */
   DeclException2 (ExcValueDoesNotMatchPattern,
                   std::string, std::string,
                   << "The string <" << arg1
-                  << "> does not match the given pattern <" << arg2 << ">");
+                  << "> does not match the given pattern <" << arg2 << ">.");
   /**
    * Exception
    */
-  DeclException0 (ExcAlreadyAtTopLevel);
+  DeclExceptionMsg (ExcAlreadyAtTopLevel,
+                    "You can't leave a subsection if you are already at the top level "
+                    "of the subsection hierarchy.");
   /**
    * Exception
    */
   DeclException1 (ExcEntryUndeclared,
                   std::string,
-                  << "You can't ask for entry <" << arg1 << "> you have not yet declared");
+                  << "You can't ask for entry <" << arg1 << "> you have not yet declared.");
+
+  /**
+   * Exception for when there are an unequal number of 'subsection' and 'end'
+   * statements. The first argument is the name of the file and the second
+   * argument is a formatted list of the subsection path before and after
+   * entering the parser.
+   */
+  DeclException2 (ExcUnbalancedSubsections,
+                  std::string, std::string,
+                  << "There are unequal numbers of 'subsection' and 'end' "
+                  "statements in the parameter file <" << arg1 << ">."
+                  << (arg2.size() > 0 ? "\n" + arg2 : ""));
+
+  /**
+   * Exception for when, during parsing of a parameter file, the parser
+   * encounters a subsection in the file that was not previously declared.
+   */
+  DeclException3 (ExcNoSubsection,
+                  int, std::string, std::string,
+                  << "Line <" << arg1 << "> of file <" << arg2 << ": There is "
+                  "no such subsection to be entered: " << arg3);
+
+  /**
+   * General exception for a line that could not be parsed, taking, as
+   * arguments, the line number, file name, and a brief description of why the
+   * line cannot be parsed.
+   */
+  DeclException3 (ExcCannotParseLine,
+                  int, std::string, std::string, << "Line <" << arg1 <<
+                  "> of file <" << arg2 << ">: " << arg3);
+
+  /**
+   * Exception for an an entry in a parameter file that does not match the
+   * provided pattern. The arguments are, in order, the line number, file
+   * name, entry value, entry name, and a description of the pattern.
+   */
+  DeclException5 (ExcInvalidEntryForPattern,
+                  int, std::string, std::string, std::string, std::string,
+                  << "Line <" << arg1 << "> of file <" << arg2 << ">:\n"
+                  "    The entry value \n" << "        " << arg3 << '\n' <<
+                  "    for the entry named\n" << "        " << arg4 << '\n' <<
+                  "    does not match the given pattern:\n" << "        " <<
+                  arg5);
+
+  /**
+   * Exception for when an XML file cannot be read at all. This happens when
+   * there is no top-level XML element called "ParameterHandler" or when there
+   * are multiple top level elements.
+   */
+  DeclExceptionMsg (ExcInvalidXMLParameterFile,
+                    "The provided file could not be parsed as a "
+                    "ParameterHandler description.");
+
+  /**
+   * Exception for when an entry in an XML parameter file does not match the
+   * provided pattern. The arguments are, in order, the entry value, entry
+   * name, and a description of the pattern.
+   */
+  DeclException3 (ExcInvalidEntryForPatternXML,
+                  std::string, std::string, std::string,
+                  << "    The entry value \n" << "        " << arg1 << '\n' <<
+                  "    for the entry named\n" << "        " << arg2 << '\n' <<
+                  "    does not match the given pattern:\n" << "        " <<
+                  arg3);
+
+  /**
+   * Exception for when the file given in an include statement cannot be
+   * open. The arguments are, in order, the line number of the include
+   * statement, current parameter file name, and the name of the file intended
+   * for inclusion.
+   */
+  DeclException3 (ExcCannotOpenIncludeStatementFile,
+                  int, std::string, std::string,
+                  << "Line <" << arg1 << "> of file <" << arg2 << ">: This line "
+                  "contains an 'include' or 'INCLUDE' statement, but the given "
+                  "file to include <" << arg3 << "> cannot be opened.");
+
   //@}
 private:
   /**
@@ -1941,6 +1432,11 @@ private:
   static const char path_separator = '.';
 
   /**
+   * Path of presently selected subsections; empty list means top level
+   */
+  std::vector<std::string> subsection_path;
+
+  /**
    * The complete tree of sections and entries. See the general documentation
    * of this class for a description how data is stored in this variable.
    *
@@ -1948,13 +1444,22 @@ private:
    * than having to include all of the property_tree stuff from boost. This
    * works around a problem with gcc 4.5.
    */
-  std_cxx11::unique_ptr<boost::property_tree::ptree> entries;
+  std::unique_ptr<boost::property_tree::ptree> entries;
 
   /**
    * A list of patterns that are used to describe the parameters of this
-   * object. The are indexed by nodes in the property tree.
+   * object. Every nodes in the property tree corresponding to a parameter
+   * stores an index into this array.
    */
-  std::vector<std_cxx11::shared_ptr<const Patterns::PatternBase> > patterns;
+  std::vector<std::shared_ptr<const Patterns::PatternBase> > patterns;
+
+  /**
+   * A list of actions that are associated with parameters. These
+   * are added by the add_action() function. Nodes in the property
+   * tree corresponding to individual parameters
+   * store indices into this array in order to reference specific actions.
+   */
+  std::vector<std::function<void (const std::string &)> > actions;
 
   /**
    * Mangle a string so that it doesn't contain any special characters or
@@ -1968,14 +1473,22 @@ private:
   static std::string demangle (const std::string &s);
 
   /**
-   * Path of presently selected subsections; empty list means top level
+   * Given a list of directories and subdirectories that identify
+   * a particular place in the tree, return the string that identifies
+   * this place in the way the BOOST property tree libraries likes
+   * to identify things.
    */
-  std::vector<std::string> subsection_path;
+  static
+  std::string
+  collate_path_string (const std::vector<std::string> &subsection_path);
 
   /**
    * Return the string that identifies the current path into the property
    * tree. This is only a path, i.e. it is not terminated by the
    * path_separator character.
+   *
+   * This function simply calls collate_path_string() with
+   * @p subsection_path as argument
    */
   std::string get_current_path () const;
 
@@ -1987,20 +1500,35 @@ private:
 
   /**
    * Scan one line of input. <tt>input_filename</tt> and
-   * <tt>current_line_n</tt> are the name of the input file and the current
-   * number of the line presently scanned (for the logs if there are
-   * messages). Return <tt>false</tt> if line contained stuff that could not
-   * be understood, the uppermost subsection was to be left by an <tt>END</tt>
-   * or <tt>end</tt> statement, a value for a non-declared entry was given or
-   * the entry value did not match the regular expression. <tt>true</tt>
-   * otherwise.
+   * <tt>current_line_n</tt> are the name of the input file and the number of
+   * the line presently scanned (these are used in exception messages to show
+   * where parse errors occurred). This function will raise an exception if
+   * the line contains an undeclared subsection or entry, if the line's entry
+   * does not match its given pattern, or if the line could not be understood
+   * as a valid parameter file expression.
    *
    * The function modifies its argument, but also takes it by value, so the
    * caller's variable is not changed.
    */
-  bool scan_line (std::string         line,
+  void scan_line (std::string         line,
                   const std::string  &input_filename,
                   const unsigned int  current_line_n);
+
+  /**
+   * Print out the parameters of the subsection given by the
+   * @p target_subsection_path argument, as well as all subsections
+   * within it recursively. This function is called from the
+   * print_parameters() function, and is implemented for all @p style
+   * arguments other than XML and JSON (where we can output the
+   * entire set of parameters via BOOST functions). The @p indent_level
+   * argument indicates how many spaces the output should be indented,
+   * so that subsections properly nest inside the output of higher
+   * sections.
+   */
+  void recursively_print_parameters (const std::vector<std::string> &target_subsection_path,
+                                     const OutputStyle               style,
+                                     const unsigned int              indent_level,
+                                     std::ostream                   &out) const;
 
   friend class MultipleParameterLoop;
 };
@@ -2073,7 +1601,7 @@ private:
  *
  *       static void declare_parameters (ParameterHandler &prm);
  *     private:
- *       std_cxx11::shared_ptr<Problem> p;
+ *       std::shared_ptr<Problem> p;
  *     };
  *
  *
@@ -2105,7 +1633,7 @@ private:
  *       class MultipleParameterLoop prm;
  *       HelperClass h;
  *       HelperClass::declare_parameters (prm);
- *       prm.read_input ("prmtest.prm");
+ *       prm.parse_input ("prmtest.prm");
  *       prm.loop (h);
  *       return 0;
  *     }
@@ -2237,7 +1765,7 @@ public:
      * Destructor. It doesn't actually do anything, but is declared to force
      * derived classes to have a virtual destructor.
      */
-    virtual ~UserClass ();
+    virtual ~UserClass () = default;
 
     /**
      * <tt>create_new</tt> must provide a clean object, either by creating a
@@ -2260,7 +1788,7 @@ public:
    * Destructor. Declare this only to have a virtual destructor, which is
    * safer as we have virtual functions. It actually does nothing spectacular.
    */
-  virtual ~MultipleParameterLoop ();
+  virtual ~MultipleParameterLoop () = default;
 
   /**
    * Read input from a stream until the stream returns the <tt>eof</tt>
@@ -2268,24 +1796,27 @@ public:
    * the file (if that's what the input stream represents) we are reading
    * from; this is only used when creating output for error messages.
    *
-   * Return whether the read was successful.
+   * If non-empty @p last_line is provided, the ParameterHandler object
+   * will stop parsing lines after encountering @p last_line .
+   * This is handy when adding extra data that shall be parsed manually.
    *
-   * @note Of the three <tt>read_input</tt> functions implemented by
-   * ParameterHandler, this is the only one overridden with new behavior by
-   * this class. This is because the other two <tt>read_input</tt> functions
+   * @note This is the only overload of the three <tt>parse_input</tt>
+   * functions implemented by ParameterHandler overridden with new behavior by
+   * this class. This is because the other two <tt>parse_input</tt> functions
    * just reformat their inputs and then call this version.
    */
-  virtual bool read_input (std::istream &input,
-                           const std::string &filename = "input file");
+  virtual void parse_input (std::istream &input,
+                            const std::string &filename = "input file",
+                            const std::string &last_line = "") override;
 
   /**
    * Overriding virtual functions which are overloaded (like
-   * ParameterHandler::read_input, which has two different sets of input
+   * ParameterHandler::parse_input, which has two different sets of input
    * argument types) causes the non-overridden functions to be hidden. Get
    * around this by explicitly using both variants of
-   * ParameterHandler::read_input and then overriding the one we care about.
+   * ParameterHandler::parse_input and then overriding the one we care about.
    */
-  using ParameterHandler::read_input;
+  using ParameterHandler::parse_input;
 
   /**
    * run the central loop.
@@ -2307,13 +1838,20 @@ private:
   {
   public:
     /**
-     * Declare what a multiple entry is: a variant * entry (in curly braces
+     * Declare what a multiple entry is: a variant entry (in curly braces
      * <tt>{</tt>, <tt>}</tt>) or an array (in double curly braces
      * <tt>{{</tt>, <tt>}}</tt>).
      */
     enum MultipleEntryType
     {
-      variant, array
+      /**
+       * A variant entry.
+       */
+      variant,
+      /**
+       * An array entry.
+       */
+      array
     };
 
     /**
@@ -2399,6 +1937,7 @@ private:
 };
 
 
+// ---------------------- inline and template functions --------------------
 template <class Archive>
 inline
 void
@@ -2435,9 +1974,38 @@ ParameterHandler::load (Archive &ar, const unsigned int)
 
   patterns.clear ();
   for (unsigned int j=0; j<descriptions.size(); ++j)
-    patterns.push_back (std_cxx11::shared_ptr<const Patterns::PatternBase>(Patterns::pattern_factory(descriptions[j])));
+    patterns.push_back (std::shared_ptr<const Patterns::PatternBase>(Patterns::pattern_factory(descriptions[j])));
 }
 
+
+template <class ParameterType>
+void ParameterHandler::add_parameter(const std::string &entry,
+                                     ParameterType &parameter,
+                                     const std::string &documentation,
+                                     const Patterns::PatternBase &pattern)
+{
+
+  static_assert(std::is_const<ParameterType>::value == false,
+                "You tried to add a parameter using a type "
+                "that is const. Use a non-const type.");
+
+  declare_entry(entry,
+                Patterns::Tools::Convert<ParameterType>::to_string(
+                  parameter, pattern.clone()),
+                pattern,
+                documentation);
+
+  std::string path = get_current_full_path(entry);
+  const unsigned int pattern_index
+    = entries->get<unsigned int> (path + path_separator + "pattern");
+
+  auto action = [ &, pattern_index](const std::string &val)
+  {
+    parameter =
+      Patterns::Tools::Convert<ParameterType>::to_value(val, patterns[pattern_index]->clone());
+  };
+  add_action(entry, action);
+}
 
 DEAL_II_NAMESPACE_CLOSE
 

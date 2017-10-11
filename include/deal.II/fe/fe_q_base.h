@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2016 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_q_base_h
-#define dealii__fe_q_base_h
+#ifndef dealii_fe_q_base_h
+#define dealii_fe_q_base_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/fe/fe_poly.h>
@@ -29,7 +29,7 @@ DEAL_II_NAMESPACE_OPEN
 /**
  * This class collects the basic methods used in FE_Q, FE_Q_DG0 and
  * FE_Q_Bubbles. There is no public constructor for this class as it is not
- * functional as a stand- alone. The completion of definitions is left to the
+ * functional as a stand-alone. The completion of definitions is left to the
  * derived classes.
  *
  * @author Wolfgang Bangerth, 1998, 2003; Guido Kanschat, 2001; Ralf Hartmann,
@@ -165,7 +165,7 @@ public:
    * Code implementing this would then look like this:
    * @code
    * for (i=0; i<dofs_per_face; ++i)
-   *  if (fe.is_primitive(fe.face_to_equivalent_cell_index(i, some_face_no)))
+   *  if (fe.is_primitive(fe.face_to_cell_index(i, some_face_no)))
    *   ... do whatever
    * @endcode
    * The function takes additional arguments that account for the fact that
@@ -197,7 +197,7 @@ public:
                                    const bool face_rotation    = false) const;
 
   /**
-   * Returns a list of constant modes of the element. For this element, the
+   * Return a list of constant modes of the element. For this element, the
    * list consists of true arguments for all components.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
@@ -258,14 +258,25 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
   FiniteElementDomination::Domination
   compare_for_face_domination (const FiniteElement<dim,spacedim> &fe_other) const;
   //@}
+
+  /**
+   * Attempt to construct an FE_Q object of degree 0
+   *
+   * @ingroup Exceptions
+   */
+  DeclExceptionMsg (ExcFEQCannotHaveDegree0,
+                    "FE_Q can only be used for polynomial degrees "
+                    "greater than zero. If you want an element of polynomial "
+                    "degree zero, then it cannot be continuous and you "
+                    "will want to use FE_DGQ<dim>(0).");
 
 protected:
   /**

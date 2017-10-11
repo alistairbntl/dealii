@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -41,7 +41,7 @@ namespace internal
                   const unsigned int n_subdivisions,
                   const std::vector<unsigned int> &n_postprocessor_outputs,
                   const Mapping<dim,spacedim> &mapping,
-                  const std::vector<std_cxx11::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
+                  const std::vector<std::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
                   const UpdateFlags update_flags,
                   const std::vector<std::vector<unsigned int> > &cell_to_patch_index_map)
       :
@@ -66,15 +66,13 @@ build_one_patch
 (const std::pair<cell_iterator, unsigned int>                                                *cell_and_index,
  internal::DataOut::ParallelData<DoFHandlerType::dimension, DoFHandlerType::space_dimension> &scratch_data,
  const unsigned int                                                                           n_subdivisions,
- const CurvedCellRegion                                                                       curved_cell_region,
- std::vector<DataOutBase::Patch<DoFHandlerType::dimension, DoFHandlerType::space_dimension> > &patches)
+ const CurvedCellRegion                                                                       curved_cell_region)
 {
   // first create the output object that we will write into
   ::dealii::DataOutBase::Patch<DoFHandlerType::dimension, DoFHandlerType::space_dimension> patch;
   patch.n_subdivisions = n_subdivisions;
 
-  // use ucd_to_deal map as patch vertices are in the old, unnatural
-  // ordering. if the mapping does not preserve locations
+  // set the vertices of the patch. if the mapping does not preserve locations
   // (e.g. MappingQEulerian), we need to compute the offset of the vertex for
   // the graphical output. Otherwise, we can just use the vertex info.
   for (unsigned int vertex=0; vertex<GeometryInfo<DoFHandlerType::dimension>::vertices_per_cell; ++vertex)
@@ -85,51 +83,54 @@ build_one_patch
                                (cell_and_index->first,
                                 GeometryInfo<DoFHandlerType::dimension>::unit_cell_vertex (vertex));
 
+  // create DoFHandlerType::active_cell_iterator and initialize FEValues
+  scratch_data.reinit_all_fe_values(this->dof_data, cell_and_index->first);
+
+  const FEValuesBase<DoFHandlerType::dimension,DoFHandlerType::space_dimension> &fe_patch_values
+    = scratch_data.get_present_fe_values (0);
+
+  const unsigned int n_q_points = fe_patch_values.n_quadrature_points;
+
+  // depending on the requested output of curved cells, if necessary
+  // append the quadrature points to the last rows of the patch.data
+  // member. This is the case if we want to produce curved cells at the
+  // boundary and this cell actually is at the boundary, or else if we
+  // want to produce curved cells everywhere
+  //
+  // note: a cell is *always* at the boundary if dim<spacedim
+  if (curved_cell_region==curved_inner_cells
+      ||
+      (curved_cell_region==curved_boundary
+       &&
+       (cell_and_index->first->at_boundary()
+        ||
+        (DoFHandlerType::dimension != DoFHandlerType::space_dimension))))
+    {
+      Assert(patch.space_dim==DoFHandlerType::space_dimension, ExcInternalError());
+
+      // set the flag indicating that for this cell the points are
+      // explicitly given
+      patch.points_are_available = true;
+
+      // then resize the patch.data member in order to have enough memory for
+      // the quadrature points as well, and copy the quadrature points there
+      const std::vector<Point<DoFHandlerType::space_dimension> > &q_points
+        = fe_patch_values.get_quadrature_points();
+
+      patch.data.reinit (scratch_data.n_datasets+DoFHandlerType::space_dimension, n_q_points);
+      for (unsigned int i=0; i<DoFHandlerType::space_dimension; ++i)
+        for (unsigned int q=0; q<n_q_points; ++q)
+          patch.data(patch.data.size(0)-DoFHandlerType::space_dimension+i,q) = q_points[q][i];
+    }
+  else
+    {
+      patch.data.reinit(scratch_data.n_datasets, n_q_points);
+      patch.points_are_available = false;
+    }
+
+
   if (scratch_data.n_datasets > 0)
     {
-      // create DoFHandlerType::active_cell_iterator and initialize FEValues
-      scratch_data.reinit_all_fe_values(this->dof_data, cell_and_index->first);
-
-      const FEValuesBase<DoFHandlerType::dimension,DoFHandlerType::space_dimension> &fe_patch_values
-        = scratch_data.get_present_fe_values (0);
-
-      const unsigned int n_q_points = fe_patch_values.n_quadrature_points;
-
-      // depending on the requested output of curved cells, if necessary
-      // append the quadrature points to the last rows of the patch.data
-      // member. This is the case if we want to produce curved cells at the
-      // boundary and this cell actually is at the boundary, or else if we
-      // want to produce curved cells everywhere
-      //
-      // note: a cell is *always* at the boundary if dim<spacedim
-      if (curved_cell_region==curved_inner_cells
-          ||
-          (curved_cell_region==curved_boundary
-           &&
-           (cell_and_index->first->at_boundary()
-            ||
-            (DoFHandlerType::dimension != DoFHandlerType::space_dimension))))
-        {
-          Assert(patch.space_dim==DoFHandlerType::space_dimension, ExcInternalError());
-          const std::vector<Point<DoFHandlerType::space_dimension> > &q_points=fe_patch_values.get_quadrature_points();
-          // resize the patch.data member in order to have enough memory for
-          // the quadrature points as well
-          patch.data.reinit (scratch_data.n_datasets+DoFHandlerType::space_dimension, n_q_points);
-          // set the flag indicating that for this cell the points are
-          // explicitly given
-          patch.points_are_available=true;
-          // copy points to patch.data
-          for (unsigned int i=0; i<DoFHandlerType::space_dimension; ++i)
-            for (unsigned int q=0; q<n_q_points; ++q)
-              patch.data(patch.data.size(0)-DoFHandlerType::space_dimension+i,q)=q_points[q][i];
-        }
-      else
-        {
-          patch.data.reinit(scratch_data.n_datasets, n_q_points);
-          patch.points_are_available = false;
-        }
-
-
       // counter for data records
       unsigned int offset=0;
 
@@ -141,9 +142,10 @@ build_one_patch
           const unsigned int n_components =
             this_fe_patch_values.get_fe().n_components();
 
-          const DataPostprocessor<DoFHandlerType::space_dimension> *postprocessor=this->dof_data[dataset]->postprocessor;
+          const DataPostprocessor<DoFHandlerType::space_dimension> *postprocessor
+            = this->dof_data[dataset]->postprocessor;
 
-          if (postprocessor != 0)
+          if (postprocessor != nullptr)
             {
               // we have to postprocess the data, so determine, which fields
               // have to be updated
@@ -154,26 +156,26 @@ build_one_patch
                   // gradient etc.
                   if (update_flags & update_values)
                     this->dof_data[dataset]->get_function_values (this_fe_patch_values,
-                                                                  scratch_data.patch_values);
+                                                                  scratch_data.patch_values_scalar.solution_values);
                   if (update_flags & update_gradients)
                     this->dof_data[dataset]->get_function_gradients (this_fe_patch_values,
-                                                                     scratch_data.patch_gradients);
+                                                                     scratch_data.patch_values_scalar.solution_gradients);
                   if (update_flags & update_hessians)
                     this->dof_data[dataset]->get_function_hessians (this_fe_patch_values,
-                                                                    scratch_data.patch_hessians);
+                                                                    scratch_data.patch_values_scalar.solution_hessians);
 
                   if (update_flags & update_quadrature_points)
-                    scratch_data.patch_evaluation_points = this_fe_patch_values.get_quadrature_points();
+                    scratch_data.patch_values_scalar.evaluation_points = this_fe_patch_values.get_quadrature_points();
 
+                  const typename DoFHandlerType::active_cell_iterator dh_cell(&cell_and_index->first->get_triangulation(),
+                                                                              cell_and_index->first->level(),
+                                                                              cell_and_index->first->index(),
+                                                                              this->dof_data[dataset]->dof_handler);
+                  scratch_data.patch_values_scalar.template set_cell<DoFHandlerType> (dh_cell);
 
-                  std::vector<Point<DoFHandlerType::space_dimension> > dummy_normals;
                   postprocessor->
-                  compute_derived_quantities_scalar(scratch_data.patch_values,
-                                                    scratch_data.patch_gradients,
-                                                    scratch_data.patch_hessians,
-                                                    dummy_normals,
-                                                    scratch_data.patch_evaluation_points,
-                                                    scratch_data.postprocessed_values[dataset]);
+                  evaluate_scalar_field(scratch_data.patch_values_scalar,
+                                        scratch_data.postprocessed_values[dataset]);
                 }
               else
                 {
@@ -183,26 +185,26 @@ build_one_patch
                   // derivative...
                   if (update_flags & update_values)
                     this->dof_data[dataset]->get_function_values (this_fe_patch_values,
-                                                                  scratch_data.patch_values_system);
+                                                                  scratch_data.patch_values_system.solution_values);
                   if (update_flags & update_gradients)
                     this->dof_data[dataset]->get_function_gradients (this_fe_patch_values,
-                                                                     scratch_data.patch_gradients_system);
+                                                                     scratch_data.patch_values_system.solution_gradients);
                   if (update_flags & update_hessians)
                     this->dof_data[dataset]->get_function_hessians (this_fe_patch_values,
-                                                                    scratch_data.patch_hessians_system);
+                                                                    scratch_data.patch_values_system.solution_hessians);
 
                   if (update_flags & update_quadrature_points)
-                    scratch_data.patch_evaluation_points = this_fe_patch_values.get_quadrature_points();
+                    scratch_data.patch_values_system.evaluation_points = this_fe_patch_values.get_quadrature_points();
 
-                  std::vector<Point<DoFHandlerType::space_dimension> > dummy_normals;
+                  const typename DoFHandlerType::active_cell_iterator dh_cell(&cell_and_index->first->get_triangulation(),
+                                                                              cell_and_index->first->level(),
+                                                                              cell_and_index->first->index(),
+                                                                              this->dof_data[dataset]->dof_handler);
+                  scratch_data.patch_values_system.template set_cell<DoFHandlerType> (dh_cell);
 
                   postprocessor->
-                  compute_derived_quantities_vector(scratch_data.patch_values_system,
-                                                    scratch_data.patch_gradients_system,
-                                                    scratch_data.patch_hessians_system,
-                                                    dummy_normals,
-                                                    scratch_data.patch_evaluation_points,
-                                                    scratch_data.postprocessed_values[dataset]);
+                  evaluate_vector_field(scratch_data.patch_values_system,
+                                        scratch_data.postprocessed_values[dataset]);
                 }
 
               for (unsigned int q=0; q<n_q_points; ++q)
@@ -219,20 +221,20 @@ build_one_patch
             if (n_components == 1)
               {
                 this->dof_data[dataset]->get_function_values (this_fe_patch_values,
-                                                              scratch_data.patch_values);
+                                                              scratch_data.patch_values_scalar.solution_values);
                 for (unsigned int q=0; q<n_q_points; ++q)
-                  patch.data(offset,q) = scratch_data.patch_values[q];
+                  patch.data(offset,q) = scratch_data.patch_values_scalar.solution_values[q];
               }
             else
               {
                 scratch_data.resize_system_vectors(n_components);
                 this->dof_data[dataset]->get_function_values (this_fe_patch_values,
-                                                              scratch_data.patch_values_system);
+                                                              scratch_data.patch_values_system.solution_values);
                 for (unsigned int component=0; component<n_components;
                      ++component)
                   for (unsigned int q=0; q<n_q_points; ++q)
                     patch.data(offset+component,q) =
-                      scratch_data.patch_values_system[q](component);
+                      scratch_data.patch_values_system.solution_values[q](component);
               }
           // increment the counter for the actual data record
           offset+=this->dof_data[dataset]->n_output_variables;
@@ -300,13 +302,13 @@ build_one_patch
   const unsigned int patch_idx =
     (*scratch_data.cell_to_patch_index_map)[cell_and_index->first->level()][cell_and_index->first->index()];
   // did we mess up the indices?
-  Assert(patch_idx < patches.size(), ExcInternalError());
+  Assert(patch_idx < this->patches.size(), ExcInternalError());
   patch.patch_index = patch_idx;
 
   // Put the patch into the patches vector. instead of copying the data,
   // simply swap the contents to avoid the penalty of writing into another
   // processor's memory
-  patches[patch_idx].swap (patch);
+  this->patches[patch_idx].swap (patch);
 }
 
 
@@ -329,7 +331,7 @@ void DataOut<dim,DoFHandlerType>::build_patches
   // Check consistency of redundant template parameter
   Assert (dim==DoFHandlerType::dimension, ExcDimensionMismatch(dim, DoFHandlerType::dimension));
 
-  Assert (this->triangulation != 0,
+  Assert (this->triangulation != nullptr,
           Exceptions::DataOut::ExcNoTriangulationSelected());
 
   const unsigned int n_subdivisions = (n_subdivisions_ != 0)
@@ -337,6 +339,8 @@ void DataOut<dim,DoFHandlerType>::build_patches
                                       : this->default_subdivisions;
   Assert (n_subdivisions >= 1,
           Exceptions::DataOut::ExcInvalidNumberOfSubdivisions(n_subdivisions));
+
+  this->validate_dataset_names();
 
   // First count the cells we want to create patches of. Also fill the object
   // that maps the cell indices to the patch numbers, as this will be needed
@@ -402,7 +406,7 @@ void DataOut<dim,DoFHandlerType>::build_patches
                 ExcInternalError());
         cell_to_patch_index_map[cell->level()][cell->index()] = all_cells.size();
 
-        all_cells.push_back (std::make_pair(cell, active_index));
+        all_cells.emplace_back (cell, active_index);
       }
   }
 
@@ -441,7 +445,7 @@ void DataOut<dim,DoFHandlerType>::build_patches
   thread_data (n_datasets, n_subdivisions,
                n_postprocessor_outputs,
                mapping,
-               this->get_finite_elements(),
+               this->get_fes(),
                update_flags,
                cell_to_patch_index_map);
 
@@ -449,18 +453,17 @@ void DataOut<dim,DoFHandlerType>::build_patches
   if (all_cells.size() > 0)
     WorkStream::run (&all_cells[0],
                      &all_cells[0]+all_cells.size(),
-                     std_cxx11::bind(&DataOut<dim,DoFHandlerType>::build_one_patch,
-                                     this,
-                                     std_cxx11::_1,
-                                     std_cxx11::_2,
-                                     /* no std_cxx11::_3, since this function doesn't actually need a
-                                        copy data object -- it just writes everything right into the
-                                        output array */
-                                     n_subdivisions,
-                                     curved_cell_region,
-                                     std_cxx11::ref(this->patches)),
+                     std::bind(&DataOut<dim,DoFHandlerType>::build_one_patch,
+                               this,
+                               std::placeholders::_1,
+                               std::placeholders::_2,
+                               /* no std::placeholders::_3, since this function doesn't actually need a
+                                  copy data object -- it just writes everything right into the
+                                  output array */
+                               n_subdivisions,
+                               curved_cell_region),
                      // no copy-local-to-global function needed here
-                     std_cxx11::function<void (const int &)>(),
+                     std::function<void (const int &)>(),
                      thread_data,
                      /* dummy CopyData object = */ 0,
                      // experimenting shows that we can make things run a bit

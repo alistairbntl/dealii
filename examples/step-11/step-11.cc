@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2001 - 2015 by the deal.II authors
+ * Copyright (C) 2001 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -279,7 +279,7 @@ namespace Step11
                                         system_matrix);
     VectorTools::create_right_hand_side (mapping, dof_handler,
                                          QGauss<dim>(gauss_degree),
-                                         ConstantFunction<dim>(-2),
+                                         Functions::ConstantFunction<dim>(-2),
                                          system_rhs);
     // That's quite simple, right?
     //
@@ -296,13 +296,13 @@ namespace Step11
     //
     // The second remark concerns the quadrature formula we use: we want to
     // integrate over bilinear shape functions, so we know that we have to use
-    // at least a Gauss2 quadrature formula. On the other hand, we want to
-    // have the quadrature rule to have at least the order of the boundary
-    // approximation. Since the order of Gauss-r is 2r, and the order of the
-    // boundary approximation using polynomials of degree p is p+1, we know
-    // that 2r@>=p+1. Since r has to be an integer and (as mentioned above)
-    // has to be at least 2, this makes up for the formula above computing
-    // <code>gauss_degree</code>.
+    // at least an order two Gauss quadrature formula. On the other hand, we
+    // want the quadrature rule to have at least the order of the boundary
+    // approximation. Since the order of Gauss rule with $r$ points is $2r -
+    // 1$, and the order of the boundary approximation using polynomials of
+    // degree $p$ is $p+1$, we know that $2r \geq p$. Since r has to be an
+    // integer and (as mentioned above) has to be at least $2$, this makes up
+    // for the formula above computing <code>gauss_degree</code>.
     //
     // Since the generation of the body force contributions to the right hand
     // side vector was so simple, we do that all over again for the boundary
@@ -314,7 +314,7 @@ namespace Step11
     Vector<double> tmp (system_rhs.size());
     VectorTools::create_boundary_right_hand_side (mapping, dof_handler,
                                                   QGauss<dim-1>(gauss_degree),
-                                                  ConstantFunction<dim>(1),
+                                                  Functions::ConstantFunction<dim>(1),
                                                   tmp);
     // Then add the contributions from the boundary to those from the interior
     // of the domain:
@@ -361,15 +361,16 @@ namespace Step11
     Vector<float> norm_per_cell (triangulation.n_active_cells());
     VectorTools::integrate_difference (mapping, dof_handler,
                                        solution,
-                                       ZeroFunction<dim>(),
+                                       Functions::ZeroFunction<dim>(),
                                        norm_per_cell,
                                        QGauss<dim>(gauss_degree+1),
                                        VectorTools::H1_seminorm);
     // Then, the function just called returns its results as a vector of
     // values each of which denotes the norm on one cell. To get the global
-    // norm, a simple computation shows that we have to take the l2 norm of
-    // the vector:
-    const double norm = norm_per_cell.l2_norm();
+    // norm, we do the following:
+    const double norm = VectorTools::compute_global_error(triangulation,
+                                                          norm_per_cell,
+                                                          VectorTools::H1_seminorm);
 
     // Last task -- generate output:
     output_table.add_value ("cells", triangulation.n_active_cells());

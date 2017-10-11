@@ -20,7 +20,6 @@
    this is now fixed. */
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -28,7 +27,6 @@
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/dofs/dof_handler.h>
 
-#include <fstream>
 
 
 int main ()
@@ -37,7 +35,6 @@ int main ()
   deallog << std::setprecision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   const unsigned int dim=2;
   Triangulation<dim> tria;

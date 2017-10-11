@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,11 +18,8 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/matrix_out.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
-#include <fstream>
-#include <iomanip>
 
 int main (int argc, char **argv)
 {
@@ -32,7 +29,6 @@ int main (int argc, char **argv)
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // test for a rectangular sparse
   // matrix

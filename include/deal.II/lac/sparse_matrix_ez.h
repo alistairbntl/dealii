@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparse_matrix_ez_h
-#define dealii__sparse_matrix_ez_h
+#ifndef dealii_sparse_matrix_ez_h
+#define dealii_sparse_matrix_ez_h
 
 
 #include <deal.II/base/config.h>
@@ -26,8 +26,8 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-template<typename number> class Vector;
-template<typename number> class FullMatrix;
+template <typename number> class Vector;
+template <typename number> class FullMatrix;
 
 /**
  * @addtogroup Matrix1
@@ -38,39 +38,43 @@ template<typename number> class FullMatrix;
  * Sparse matrix without sparsity pattern.
  *
  * Instead of using a pre-assembled sparsity pattern, this matrix builds the
- * pattern on the fly. Filling the matrix may consume more time as with @p
- * SparseMatrix, since large memory movements may be involved. To help
- * optimizing things, an expected row-length may be provided to the
+ * pattern on the fly. Filling the matrix may consume more time than for
+ * @p SparseMatrix, since large memory movements may be involved when new
+ * matrix elements are inserted somewhere in the middle of the matrix and no
+ * currently unused memory locations are available for the row into which
+ * the new entry is to be inserted. To help
+ * optimize things, an expected row-length may be provided to the
  * constructor, as well as an increment size for rows.
  *
- * The storage structure: like with the usual sparse matrix, it is attempted
- * to store only non-zero elements. these are stored in a single data array @p
- * data. They are ordered by row and inside each row by column number. Each
- * row is described by its starting point in the data array and its length.
- * These are stored in the @p row_info array, together with additional useful
- * information.
+ * This class uses a storage structure that, similar to the usual sparse matrix
+ * format, only stores non-zero elements. These are stored in a single data array
+ * for the entire matrix, and are ordered by row and, within each row, by column
+ * number. A separate array describes where in the long data array each row
+ * starts and how long it is.
  *
- * Due to the structure, gaps may occur between rows. Whenever a new entry
- * must be created, an attempt is made to use the gap in its row. If the gap
- * is full, the row must be extended and all subsequent rows must be shifted
- * backwards. This is a very expensive operation and should be avoided as much
- * as possible.
+ * Due to this structure, gaps may occur between rows. Whenever a new entry
+ * must be created, an attempt is made to use the gap in its row. If no gap
+ * is left, the row must be extended and all subsequent rows must be shifted
+ * backwards. This is a very expensive operation and explains the inefficiency
+ * of this data structure and why it is useful to pre-allocate a sparsity
+ * pattern as the SparseMatrix class does.
  *
- * This is, where the optimization parameters, provided to the constructor or
- * to the function @p reinit come in. @p default_row_length is the amount of
+ * This is where the optimization parameters, provided to the constructor or
+ * to the reinit() functions come in. @p default_row_length is the number of
  * entries that will be allocated for each row on initialization (the actual
  * length of the rows is still zero). This means, that @p default_row_length
- * entries can be added to this row without shifting other rows. If less
- * entries are added, the additional memory will be wasted.
+ * entries can be added to this row without shifting other rows. If fewer
+ * entries are added, the additional memory will of course be wasted.
  *
- * If the space for a row is not sufficient, then it is enlarged by @p
- * default_increment entries. This way, the subsequent rows are not shifted by
+ * If the space for a row is not sufficient, then it is enlarged by
+ * @p default_increment entries. This way, subsequent rows are not shifted by
  * single entries very often.
  *
  * Finally, the @p default_reserve allocates extra space at the end of the
- * data array. This space is used whenever a row must be enlarged. Since @p
- * std::vector doubles the capacity every time it must increase it, this value
- * should allow for all the growth needed.
+ * data array. This space is used whenever any row must be enlarged. It is
+ * important because otherwise not only the following rows must be moved, but
+ * in fact <i>all</i> rows after allocating sufficiently much space for the
+ * entire data array.
  *
  * Suggested settings: @p default_row_length should be the length of a typical
  * row, for instance the size of the stencil in regular parts of the grid.
@@ -80,16 +84,14 @@ template<typename number> class FullMatrix;
  * then be an estimate for the number of hanging nodes times @p
  * default_increment.
  *
- * Letting @p default_increment zero causes an exception whenever a row
+ * Letting @p default_increment be zero causes an exception whenever a row
  * overflows.
  *
  * If the rows are expected to be filled more or less from first to last,
  * using a @p default_row_length of zero may not be such a bad idea.
  *
- * The name of this matrix is in reference to a publication of the Internal
- * Revenue Service of the United States of America. I hope some other aliens
- * will appreciate it. By the way, the suffix makes sense by pronouncing it
- * the American way.
+ * @note The name of the class makes sense by pronouncing it the American way,
+ *   where "EZ" is pronounced the same way as the word "easy".
  *
  * @author Guido Kanschat
  * @date 2002, 2010
@@ -145,7 +147,7 @@ public:
     /**
      * Constructor.
      */
-    RowInfo (size_type start = Entry::invalid);
+    RowInfo (const size_type start = Entry::invalid);
 
     /**
      * Index of first entry of the row in the data field.
@@ -324,10 +326,9 @@ public:
                            const unsigned int default_increment = 1);
 
   /**
-   * Destructor. Free all memory, but do not release the memory of the
-   * sparsity structure.
+   * Destructor. Free all memory.
    */
-  ~SparseMatrixEZ ();
+  ~SparseMatrixEZ () = default;
 
   /**
    * Pseudo operator only copying empty objects.
@@ -374,13 +375,13 @@ public:
   bool empty () const;
 
   /**
-   * Return the dimension of the codomain (or range) space. To remember: the
+   * Return the dimension of the codomain (or range) space. Note that the
    * matrix is of dimension $m \times n$.
    */
   size_type m () const;
 
   /**
-   * Return the dimension of the domain space. To remember: the matrix is of
+   * Return the dimension of the domain space. Note that the matrix is of
    * dimension $m \times n$.
    */
   size_type n () const;
@@ -541,7 +542,8 @@ public:
    */
   template <typename MatrixType>
   SparseMatrixEZ<number> &
-  copy_from (const MatrixType &source, const bool elide_zero_values = true);
+  copy_from (const MatrixType &source,
+             const bool elide_zero_values = true);
 
   /**
    * Add @p matrix scaled by @p factor to this matrix.
@@ -892,7 +894,7 @@ SparseMatrixEZ<number>::Entry::Entry()
 
 template <typename number>
 inline
-SparseMatrixEZ<number>::RowInfo::RowInfo(size_type start)
+SparseMatrixEZ<number>::RowInfo::RowInfo(const size_type start)
   :
   start(start),
   length(0),
@@ -1099,9 +1101,9 @@ SparseMatrixEZ<number>::locate (const size_type row,
       if (entry->column == col)
         return entry;
       if (entry->column == Entry::invalid)
-        return 0;
+        return nullptr;
     }
-  return 0;
+  return nullptr;
 }
 
 
@@ -1230,7 +1232,7 @@ void SparseMatrixEZ<number>::set (const size_type i,
   if (elide_zero_values && value == 0.)
     {
       Entry *entry = locate(i,j);
-      if (entry != 0)
+      if (entry != nullptr)
         entry->value = 0.;
     }
   else
@@ -1391,7 +1393,7 @@ SparseMatrixEZ<number>::end (const size_type r) const
   return result;
 }
 
-template<typename number>
+template <typename number>
 template <typename MatrixType>
 inline
 SparseMatrixEZ<number> &
@@ -1416,7 +1418,7 @@ SparseMatrixEZ<number>::copy_from (const MatrixType &M, const bool elide_zero_va
   return *this;
 }
 
-template<typename number>
+template <typename number>
 template <typename MatrixType>
 inline
 void
@@ -1444,7 +1446,7 @@ SparseMatrixEZ<number>::add (const number      factor,
 
 
 
-template<typename number>
+template <typename number>
 template <typename MatrixTypeA, typename MatrixTypeB>
 inline void
 SparseMatrixEZ<number>::conjugate_add (const MatrixTypeA &A,

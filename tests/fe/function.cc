@@ -17,10 +17,8 @@
 // Test the different FEValuesBase::get_function_values
 
 #include "../tests.h"
-#include <fstream>
 
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/lac/vector.h>
 
@@ -37,7 +35,7 @@
 
 // Call this function with a system consisting of several copies of
 // the SAME element
-template<int dim>
+template <int dim>
 void vector_values(const FiniteElement<dim> &fe)
 {
   Assert(fe.n_base_elements() == 1, ExcNotImplemented());
@@ -85,7 +83,7 @@ void vector_values(const FiniteElement<dim> &fe)
   deallog.pop();
 }
 
-template<int dim>
+template <int dim>
 void test_vectors()
 {
   FE_Q<dim> q1(1);
@@ -97,9 +95,7 @@ void test_vectors()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test_vectors<2>();
 

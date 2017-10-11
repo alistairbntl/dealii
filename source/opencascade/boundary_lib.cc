@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2016 by the deal.II authors
+// Copyright (C) 2014 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -31,8 +31,11 @@ DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #include <BRepTools.hxx>
 #include <ShapeAnalysis_Surface.hxx>
 #include <TopoDS.hxx>
-#include <Adaptor3d_HCurve.hxx>
-#include <Handle_Adaptor3d_HCurve.hxx>
+
+#include <Standard_Version.hxx>
+#if (OCC_VERSION_MAJOR < 7)
+#  include <Handle_Adaptor3d_HCurve.hxx>
+#endif
 
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
@@ -56,12 +59,12 @@ namespace OpenCASCADE
               (shape.ShapeType() == TopAbs_EDGE),
               ExcUnsupportedShape());
       if (shape.ShapeType() == TopAbs_WIRE)
-        return (Handle(BRepAdaptor_HCompCurve(new BRepAdaptor_HCompCurve(TopoDS::Wire(shape)))));
+        return Handle(BRepAdaptor_HCompCurve)(new BRepAdaptor_HCompCurve(TopoDS::Wire(shape)));
       else if (shape.ShapeType() == TopAbs_EDGE)
-        return (Handle(BRepAdaptor_HCurve(new BRepAdaptor_HCurve(TopoDS::Edge(shape)))));
+        return Handle(BRepAdaptor_HCurve)(new BRepAdaptor_HCurve(TopoDS::Edge(shape)));
 
       Assert(false, ExcInternalError());
-      return Handle(BRepAdaptor_HCurve(new BRepAdaptor_HCurve()));
+      return Handle(BRepAdaptor_HCurve)(new BRepAdaptor_HCurve());
     }
 
 
@@ -87,8 +90,8 @@ namespace OpenCASCADE
 
   template <int dim, int spacedim>
   Point<spacedim>  NormalProjectionBoundary<dim,spacedim>::
-  project_to_manifold (const std::vector<Point<spacedim> > &surrounding_points,
-                       const Point<spacedim> &candidate) const
+  project_to_manifold (const ArrayView<const Point<spacedim>> &surrounding_points,
+                       const Point<spacedim>                  &candidate) const
   {
     (void)surrounding_points;
 #ifdef DEBUG
@@ -117,8 +120,8 @@ namespace OpenCASCADE
 
   template <int dim, int spacedim>
   Point<spacedim>  DirectionalProjectionBoundary<dim,spacedim>::
-  project_to_manifold (const std::vector<Point<spacedim> > &surrounding_points,
-                       const Point<spacedim> &candidate) const
+  project_to_manifold (const ArrayView<const Point<spacedim>> &surrounding_points,
+                       const Point<spacedim>                  &candidate) const
   {
     (void)surrounding_points;
 #ifdef DEBUG
@@ -141,15 +144,15 @@ namespace OpenCASCADE
     tolerance(tolerance)
   {
     Assert(spacedim == 3, ExcNotImplemented());
-    Assert(std_cxx11::get<0>(count_elements(sh)) > 0,
+    Assert(std::get<0>(count_elements(sh)) > 0,
            ExcMessage("NormalToMeshProjectionBoundary needs a shape containing faces to operate."));
   }
 
 
   template <int dim, int spacedim>
   Point<spacedim>  NormalToMeshProjectionBoundary<dim,spacedim>::
-  project_to_manifold (const std::vector<Point<spacedim> > &surrounding_points,
-                       const Point<spacedim> &candidate) const
+  project_to_manifold (const ArrayView<const Point<spacedim>> &surrounding_points,
+                       const Point<spacedim>                  &candidate) const
   {
     TopoDS_Shape out_shape;
     Tensor<1,3> average_normal;
@@ -169,12 +172,12 @@ namespace OpenCASCADE
       {
         for (unsigned int i=0; i<surrounding_points.size(); ++i)
           {
-            std_cxx11::tuple<Point<3>,  Tensor<1,3>, double, double>
+            std::tuple<Point<3>,  Tensor<1,3>, double, double>
             p_and_diff_forms =
               closest_point_and_differential_forms(sh,
                                                    surrounding_points[i],
                                                    tolerance);
-            average_normal += std_cxx11::get<1>(p_and_diff_forms);
+            average_normal += std::get<1>(p_and_diff_forms);
           }
 
         average_normal/=2.0;
@@ -283,7 +286,7 @@ namespace OpenCASCADE
     tolerance(tolerance)
   {}
 
-  template<>
+  template <>
   Point<2>
   NURBSPatchManifold<2, 3>::
   pull_back(const Point<3> &space_point) const
@@ -299,7 +302,7 @@ namespace OpenCASCADE
     return Point<2>(u,v);
   }
 
-  template<>
+  template <>
   Point<3>
   NURBSPatchManifold<2, 3>::
   push_forward(const Point<2> &chart_point) const
@@ -307,7 +310,7 @@ namespace OpenCASCADE
     return ::dealii::OpenCASCADE::push_forward(face, chart_point[0], chart_point[1]);
   }
 
-  template<>
+  template <>
   DerivativeForm<1,2,3>
   NURBSPatchManifold<2, 3>::
   push_forward_gradient(const Point<2> &chart_point) const
@@ -329,14 +332,14 @@ namespace OpenCASCADE
     return DX;
   }
 
-  template<>
-  std_cxx11::tuple<double, double, double, double>
+  template <>
+  std::tuple<double, double, double, double>
   NURBSPatchManifold<2, 3>::
   get_uv_bounds() const
   {
     Standard_Real umin, umax, vmin, vmax;
     BRepTools::UVBounds(face, umin, umax, vmin, vmax);
-    return std_cxx11::make_tuple(umin, umax, vmin, vmax);
+    return std::make_tuple(umin, umax, vmin, vmax);
   }
 
 // Explicit instantiations

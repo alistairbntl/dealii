@@ -18,7 +18,6 @@
 // common framework for the various fe_tools_*.cc tests
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/grid_generator.h>
@@ -27,9 +26,6 @@
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <string>
 
 
@@ -93,7 +89,6 @@ main()
       std::ofstream logfile("output");
       deallog << std::setprecision (2);
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       CHECK_ALL(Q,1);
       CHECK_ALL(Q,2);

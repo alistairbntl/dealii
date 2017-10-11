@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,12 +20,8 @@
 
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
-#include "../lac/testmatrix.h"
-#include <cmath>
-#include <fstream>
+#include "../testmatrix.h"
 #include <iostream>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/lac/solver_control.h>
@@ -39,40 +35,12 @@
 #include <deal.II/lac/vector_memory.h>
 #include <typeinfo>
 
-template<typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
-void
-check_solve (SolverType          &solver,
-             const SolverControl &solver_control,
-             const MatrixType    &A,
-             VectorType          &u,
-             VectorType          &f,
-             const PRECONDITION  &P)
-{
-  deallog << "Solver type: " << typeid(solver).name() << std::endl;
-
-  u = 0.;
-  f = 1.;
-  try
-    {
-      solver.solve(A,u,f,P);
-    }
-  catch (std::exception &e)
-    {
-      deallog << e.what() << std::endl;
-      abort ();
-    }
-
-  deallog << "Solver stopped after " << solver_control.last_step()
-          << " iterations" << std::endl;
-}
-
 
 int main(int argc, char **argv)
 {
   std::ofstream logfile("output");
   logfile.precision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 
@@ -87,22 +55,28 @@ int main(int argc, char **argv)
 
     // Make matrix
     FDMatrix testproblem(size, size);
-    CompressedSimpleSparsityPattern csp (dim, dim);
+    DynamicSparsityPattern csp (dim, dim);
     testproblem.five_point_structure(csp);
     TrilinosWrappers::SparseMatrix  A;
     A.reinit(csp);
     testproblem.five_point(A);
 
-    TrilinosWrappers::Vector  f(dim);
-    TrilinosWrappers::Vector  u(dim);
+    TrilinosWrappers::MPI::Vector f;
+    f.reinit(complete_index_set(dim),MPI_COMM_WORLD);
+    TrilinosWrappers::MPI::Vector u;
+    u.reinit(complete_index_set(dim),MPI_COMM_WORLD);
     f = 1.;
     A.compress (VectorOperation::insert);
     f.compress (VectorOperation::insert);
     u.compress (VectorOperation::insert);
 
-    GrowingVectorMemory<TrilinosWrappers::Vector> mem;
-    SolverGMRES<TrilinosWrappers::Vector> solver(control,mem);
+    GrowingVectorMemory<TrilinosWrappers::MPI::Vector> mem;
+    SolverGMRES<TrilinosWrappers::MPI::Vector> solver(control,mem);
     PreconditionIdentity preconditioner;
-    check_solve (solver, control, A,u,f, preconditioner);
+
+    deallog << "Solver type: " << typeid(solver).name() << std::endl;
+
+    check_solver_within_range(solver.solve(A,u,f,preconditioner),
+                              control.last_step(), 74, 76);
   }
 }

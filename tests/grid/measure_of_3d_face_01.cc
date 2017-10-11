@@ -23,8 +23,6 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_tools.h>
-#include <fstream>
-#include <iomanip>
 
 
 // move backward two adjacent vertices of the top face up by one
@@ -104,7 +102,6 @@ int main()
   std::ofstream logfile ("output");
   deallog << std::setprecision (5);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // run the tests but continue when finding an exception: we will try
   // out a distorted cell for which TriaAccessor::measure() will error

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,7 +17,6 @@
 // Test DoFRenumbering::block_wise(dh, level)
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/grid/tria.h>
@@ -30,9 +29,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/dofs/dof_accessor.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -42,7 +38,7 @@ void check(FiniteElement<dim> &fe)
 {
   deallog << std::endl << "**** " << fe.get_name() << std::endl;
 
-  Triangulation<dim> tria;
+  Triangulation<dim> tria(Triangulation<dim>::limit_level_difference_at_vertices);
   GridGenerator::hyper_cube(tria);
   tria.refine_global(1);
   tria.begin_active()->set_refine_flag();

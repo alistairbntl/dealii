@@ -19,16 +19,16 @@
 
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
-#include <deal.II/lac/trilinos_block_vector.h>
-#include <fstream>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <iostream>
 
 
 void test ()
 {
-  TrilinosWrappers::BlockVector v(2);
+  TrilinosWrappers::MPI::BlockVector v;
+  v.reinit(2);
   for (unsigned int i=0; i<v.n_blocks(); ++i)
-    v.block(i).reinit(1);
+    v.block(i).reinit(complete_index_set(1),MPI_COMM_WORLD);
   v.collect_sizes();
 
   v(0) = 1;
@@ -37,7 +37,7 @@ void test ()
   // first check reading through a const
   // iterator
   {
-    TrilinosWrappers::BlockVector::const_iterator i=v.begin();
+    TrilinosWrappers::MPI::BlockVector::const_iterator i=v.begin();
     AssertThrow (i[0] == 1, ExcInternalError());
     AssertThrow (i[1] == 2, ExcInternalError());
   }
@@ -45,29 +45,29 @@ void test ()
   // same, but create iterator in a different
   // way
   {
-    TrilinosWrappers::BlockVector::const_iterator
-    i=const_cast<const TrilinosWrappers::BlockVector &>(v).begin();
+    TrilinosWrappers::MPI::BlockVector::const_iterator
+    i=const_cast<const TrilinosWrappers::MPI::BlockVector &>(v).begin();
     AssertThrow (i[0] == 1, ExcInternalError());
     AssertThrow (i[1] == 2, ExcInternalError());
   }
 
   // read through a read-write iterator
   {
-    TrilinosWrappers::BlockVector::iterator i = v.begin();
+    TrilinosWrappers::MPI::BlockVector::iterator i = v.begin();
     AssertThrow (i[0] == 1, ExcInternalError());
     AssertThrow (i[1] == 2, ExcInternalError());
   }
 
   // write through a read-write iterator
   {
-    TrilinosWrappers::BlockVector::iterator i = v.begin();
+    TrilinosWrappers::MPI::BlockVector::iterator i = v.begin();
     i[0] = 2;
     i[1] = 3;
   }
 
   // and read again
   {
-    TrilinosWrappers::BlockVector::iterator i = v.begin();
+    TrilinosWrappers::MPI::BlockVector::iterator i = v.begin();
     AssertThrow (i[0] == 2, ExcInternalError());
     AssertThrow (i[1] == 3, ExcInternalError());
   }
@@ -79,9 +79,7 @@ void test ()
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 

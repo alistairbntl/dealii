@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2016 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -30,15 +30,16 @@ MACRO(FEATURE_PETSC_FIND_EXTERNAL var)
     SET(${var} TRUE)
 
     #
-    # We support petsc from version 3.x.x onwards
+    # We support petsc from version 3.3.x onwards
     #
-    IF(PETSC_VERSION_MAJOR LESS 3)
-      MESSAGE(STATUS "Could not find a sufficient modern PETSc installation: "
-        "Version >=3.0.0 required!"
+    IF(PETSC_VERSION_MAJOR LESS 3 OR
+        ((PETSC_VERSION_MAJOR EQUAL 3) AND (PETSC_VERSION_MINOR LESS 3)))
+      MESSAGE(STATUS "Could not find a sufficiently modern PETSc installation: "
+        "Version >=3.3.0 required!"
         )
       SET(PETSC_ADDITIONAL_ERROR_STRING
-        "Could not find a sufficient modern PETSc installation: "
-        "Version >=3.0.0 required!\n"
+        "Could not find a sufficiently modern PETSc installation: "
+        "Version >=3.3.0 required!\n"
         )
       SET(${var} FALSE)
     ENDIF()
@@ -99,16 +100,12 @@ ENDMACRO()
 
 
 MACRO(FEATURE_PETSC_CONFIGURE_EXTERNAL)
-  SET(DEAL_II_EXPAND_PETSC_VECTOR "PETScWrappers::Vector")
-  SET(DEAL_II_EXPAND_PETSC_BLOCKVECTOR "PETScWrappers::BlockVector")
   SET(DEAL_II_EXPAND_PETSC_MPI_VECTOR "PETScWrappers::MPI::Vector")
   SET(DEAL_II_EXPAND_PETSC_MPI_BLOCKVECTOR "PETScWrappers::MPI::BlockVector")
   #
   # FIXME:
   # temporary variable until deal.II fully support complex-valued PETSc
   IF( NOT PETSC_WITH_COMPLEX )
-    SET(DEAL_II_EXPAND_PETSC_VECTOR_REAL "PETScWrappers::Vector")
-    SET(DEAL_II_EXPAND_PETSC_BLOCKVECTOR_REAL "PETScWrappers::BlockVector")
     SET(DEAL_II_EXPAND_PETSC_MPI_VECTOR_REAL "PETScWrappers::MPI::Vector")
     SET(DEAL_II_EXPAND_PETSC_MPI_BLOCKVECTOR_REAL "PETScWrappers::MPI::BlockVector")
   ELSE()
@@ -121,7 +118,7 @@ MACRO(FEATURE_PETSC_ERROR_MESSAGE)
   MESSAGE(FATAL_ERROR "\n"
     "Could not find the petsc library!\n"
     ${PETSC_ADDITIONAL_ERROR_STRING}
-    "\nPlease ensure that the petsc library version 3.0.0 or newer is "
+    "\nPlease ensure that the petsc library version 3.3.0 or newer is "
     "installed on your computer and is configured with the same mpi options "
     "as deal.II\n"
     "If the library is not at a default location, either provide some hints\n"
@@ -139,3 +136,5 @@ ENDMACRO()
 
 CONFIGURE_FEATURE(PETSC)
 SET(DEAL_II_PETSC_WITH_COMPLEX ${PETSC_WITH_COMPLEX})
+SET(DEAL_II_PETSC_WITH_HYPRE ${PETSC_WITH_HYPRE})
+SET(DEAL_II_PETSC_WITH_MUMPS ${PETSC_WITH_MUMPS})

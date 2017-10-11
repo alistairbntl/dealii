@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__function_map_h
-#define dealii__function_map_h
+#ifndef dealii_function_map_h
+#define dealii_function_map_h
 
 #include <deal.II/base/config.h>
 #include <map>
@@ -70,7 +70,7 @@ template <int spacedim, typename Number> class Function;
  * @ingroup functions
  * @author Wolfgang Bangerth, Ralf Hartmann, 2001
  */
-template<int dim,typename Number=double>
+template <int dim,typename Number=double>
 struct FunctionMap
 {
   /**

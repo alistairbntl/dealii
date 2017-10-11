@@ -18,9 +18,8 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/base/std_cxx11/bind.h>
 
-#include <fstream>
+#include <functional>
 #include <ostream>
 
 // Test on whether signals post_refinement_on_cell and pre_coarsening_on_cell
@@ -29,7 +28,7 @@
 // calls and then compare the result against n_active_cells reported by Tria
 // object. Absolute value change in n_active_cells is not concerned in this test.
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 class SignalListener
 {
 public:
@@ -39,14 +38,14 @@ public:
     tria(tria_in)
   {
     tria_in.signals.post_refinement_on_cell.connect
-    (std_cxx11::bind (&SignalListener<dim, spacedim>::count_on_refine,
-                      this,
-                      std_cxx11::placeholders::_1));
+    (std::bind (&SignalListener<dim, spacedim>::count_on_refine,
+                this,
+                std::placeholders::_1));
 
     tria_in.signals.pre_coarsening_on_cell.connect
-    (std_cxx11::bind (&SignalListener<dim, spacedim>::count_on_coarsen,
-                      this,
-                      std_cxx11::placeholders::_1));
+    (std::bind (&SignalListener<dim, spacedim>::count_on_coarsen,
+                this,
+                std::placeholders::_1));
   }
 
   int n_active_cell_gap()
@@ -77,7 +76,7 @@ private:
 };
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void test()
 {
   typedef parallel::distributed::Triangulation<dim, spacedim> TriaType;

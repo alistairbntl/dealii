@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__function_time_h
-#define dealii__function_time_h
+#ifndef dealii_function_time_h
+#define dealii_function_time_h
 
 
 #include <deal.II/base/config.h>
@@ -81,7 +81,7 @@ public:
   /**
    * Virtual destructor.
    */
-  virtual ~FunctionTime();
+  virtual ~FunctionTime() = default;
 
   /**
    * Return the value of the time variable.
@@ -111,7 +111,7 @@ private:
 
 #ifndef DOXYGEN
 
-template<typename Number>
+template <typename Number>
 inline Number
 FunctionTime<Number>::get_time () const
 {

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,7 +21,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/hp/fe_collection.h>
@@ -35,7 +34,6 @@
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 
-#include <fstream>
 #include <numeric>
 
 
@@ -87,7 +85,7 @@ void test ()
   // the sum over the elements of the
   // resulting rhs vector, you need to get
   // four
-  ConstantFunction< 2 > rhs_function(1);
+  Functions::ConstantFunction< 2 > rhs_function(1);
 
   VectorTools::create_boundary_right_hand_side ( hp_dof_handler2,
                                                  quadrature,
@@ -120,7 +118,6 @@ int main ()
   deallog << std::setprecision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

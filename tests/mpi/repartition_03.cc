@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,8 +18,6 @@
 // test that a second call to repartition() doesn't do anything
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -30,9 +28,8 @@
 #include <deal.II/base/utilities.h>
 
 
-#include <fstream>
 
-template<int dim>
+template <int dim>
 void print_cells(parallel::distributed::Triangulation<dim> &tr)
 {
   for (typename Triangulation<dim>::active_cell_iterator
@@ -42,7 +39,7 @@ void print_cells(parallel::distributed::Triangulation<dim> &tr)
       deallog << cell->id() << std::endl;
 }
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);

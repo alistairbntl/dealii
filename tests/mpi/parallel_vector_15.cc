@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,8 +21,7 @@
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/index_set.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <fstream>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
@@ -45,7 +44,7 @@ void test ()
   if (numproc > 1)
     local_relevant.add_range(3,4);
 
-  parallel::distributed::Vector<double> v(local_owned, local_relevant, MPI_COMM_WORLD);
+  LinearAlgebra::distributed::Vector<double> v(local_owned, local_relevant, MPI_COMM_WORLD);
 
   // set local values
   if (myid < 2)
@@ -59,7 +58,7 @@ void test ()
   if (myid==0)
     deallog << "v has ghost elements: " << v.has_ghost_elements() << std::endl;
 
-  parallel::distributed::Vector<double> w, x;
+  LinearAlgebra::distributed::Vector<double> w, x;
   w = v;
   if (myid==0)
     deallog << "w has ghost elements: " << w.has_ghost_elements() << std::endl;
@@ -103,10 +102,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       test();
     }

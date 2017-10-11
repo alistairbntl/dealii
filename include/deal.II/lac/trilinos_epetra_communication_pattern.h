@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015-2016 by the deal.II authors
+// Copyright (C) 2015 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__trilinos_epetra_communication_pattern_h
-#define dealii__trilinos_epetra_communication_pattern_h
+#ifndef dealii_trilinos_epetra_communication_pattern_h
+#define dealii_trilinos_epetra_communication_pattern_h
 
 
 #include <deal.II/base/config.h>
@@ -23,9 +23,13 @@
 
 #ifdef DEAL_II_WITH_MPI
 
-#include <deal.II/base/std_cxx11/shared_ptr.h>
 #include <deal.II/lac/communication_pattern_base.h>
-#include "Epetra_Import.h"
+
+DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
+#  include <Epetra_Import.h>
+DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
+
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -71,12 +75,12 @@ namespace LinearAlgebra
       /**
        * Shared pointer to the MPI communicator used.
        */
-      std_cxx11::shared_ptr<const MPI_Comm> comm;
+      std::shared_ptr<const MPI_Comm> comm;
 
       /**
        * Shared pointer to the Epetra_Import object used.
        */
-      std_cxx11::shared_ptr<Epetra_Import> import;
+      std::shared_ptr<Epetra_Import> import;
     };
   } // end of namespace EpetraWrappers
 } // end of namespace LinearAlgebra

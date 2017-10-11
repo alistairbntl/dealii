@@ -17,7 +17,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 
 #include <deal.II/grid/tria.h>
@@ -33,12 +32,11 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/mapping_q1.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
 
-template<int dim>
+template <int dim>
 class MyFunction : public Function<dim>
 {
 public:
@@ -132,7 +130,6 @@ int main()
   deallog << std::setprecision (4);
   logfile << std::setprecision (4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   transfer<2>(logfile);
   transfer<3>(logfile);

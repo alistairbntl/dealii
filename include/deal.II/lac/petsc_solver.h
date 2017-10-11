@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2016 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_solver_h
-#define dealii__petsc_solver_h
+#ifndef dealii_petsc_solver_h
+#define dealii_petsc_solver_h
 
 
 #include <deal.II/base/config.h>
@@ -23,9 +23,10 @@
 
 #  include <deal.II/lac/exceptions.h>
 #  include <deal.II/lac/solver_control.h>
-#  include <deal.II/base/std_cxx11/shared_ptr.h>
 
 #  include <petscksp.h>
+
+#  include <memory>
 
 #ifdef DEAL_II_WITH_SLEPC
 #include <deal.II/lac/slepc_spectral_transformation.h>
@@ -121,7 +122,7 @@ namespace PETScWrappers
     /**
      * Destructor.
      */
-    virtual ~SolverBase ();
+    virtual ~SolverBase () = default;
 
     /**
      * Solve the linear system <tt>Ax=b</tt>. Depending on the information
@@ -163,12 +164,15 @@ namespace PETScWrappers
     void initialize(const PreconditionerBase &preconditioner);
 
     /**
-     * Exception
+     * Exception.
+     *
+     * @deprecated This function has been deprecated in favor of the more
+     * general LACExceptions::ExcPETScError exception class.
      */
     DeclException1 (ExcPETScError,
                     int,
                     << "An error with error number " << arg1
-                    << " occurred while calling a PETSc function");
+                    << " occurred while calling a PETSc function") DEAL_II_DEPRECATED;
 
   protected:
 
@@ -247,7 +251,7 @@ namespace PETScWrappers
      * Pointer to an object that stores the solver context. This is recreated
      * in the main solver routine if necessary.
      */
-    std_cxx11::shared_ptr<SolverData> solver_data;
+    std::shared_ptr<SolverData> solver_data;
 
 #ifdef DEAL_II_WITH_SLEPC
     /**
@@ -919,8 +923,7 @@ namespace PETScWrappers
    *
    * @note The class internally calls KSPSetFromOptions thus you are able to
    * use all the PETSc parameters for MATSOLVERMUMPS package. See
-   * http://www.mcs.anl.gov/petsc/petsc-
-   * current/docs/manualpages/Mat/MATSOLVERMUMPS.html
+   * http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/Mat/MATSOLVERMUMPS.html
    *
    * @ingroup PETScWrappers
    * @author Daniel Brauss, Alexander Grayver, 2012
@@ -992,7 +995,7 @@ namespace PETScWrappers
       PC  pc;
     };
 
-    std_cxx11::shared_ptr<SolverDataMUMPS> solver_data;
+    std::shared_ptr<SolverDataMUMPS> solver_data;
 
     /**
      * Flag specifies whether matrix being factorized is symmetric or not. It

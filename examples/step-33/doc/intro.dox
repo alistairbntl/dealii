@@ -138,7 +138,7 @@ above equations. For simplicity, we define $ \mathbf{B}({\mathbf{w}_{n}})(\mathb
 \int_{\partial \Omega} \left(\mathbf{H}(\mathbf{w}_n^+,
 \mathbf{w}^-(\mathbf{w}_n^+), \mathbf{n}), \mathbf{z}\right)
 -
-\int_{\partial \Omega} \left(\mathbf{G}(\mathbf{w}_n),
+\int_{\Omega} \left(\mathbf{G}(\mathbf{w}_n),
 \mathbf{z}\right) .
 @f}
 
@@ -297,6 +297,14 @@ all other tutorial programs so far.  In this way, the example combines
 the continuous and DG methodologies. It also simplifies the generation
 of the Jacobian because we do not have to track constrained degrees of
 freedom through the automatic differentiation used to compute it.
+
+@note Whereas this program was written in 2008, we were unaware of any
+publication that would actually have used this approach. However, a
+more recent paper by A. Dedner, R. Kl&ouml;fkorn, and M. Kr&auml;nkel
+("Continuous Finite-Elements on Non-Conforming Grids Using
+Discontinuous Galerkin Stabilization", Proceedings of Finite Volumes
+for Complex Applications VII - Methods and Theoretical Aspects,
+Springer, 2014) comes close.
 
 Further, we enforce a maximum number of refinement levels to keep refinement under check.  It is the
 author's experience that for adaptivity for a time dependent problem, refinement can easily lead the simulation to

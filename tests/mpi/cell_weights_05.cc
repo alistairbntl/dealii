@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -30,8 +30,6 @@
 // remaining cells even close to equally
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -41,7 +39,6 @@
 #include <deal.II/base/utilities.h>
 
 
-#include <fstream>
 
 template <int dim>
 unsigned int
@@ -64,7 +61,7 @@ cell_weight(const typename parallel::distributed::Triangulation<dim>::cell_itera
            0);
 }
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -79,9 +76,9 @@ void test()
 
 
   // repartition the mesh; attach different weights to all cells
-  tr.signals.cell_weight.connect(std_cxx11::bind(&cell_weight<dim>,
-                                                 std_cxx11::_1,
-                                                 std_cxx11::_2));
+  tr.signals.cell_weight.connect(std::bind(&cell_weight<dim>,
+                                           std::placeholders::_1,
+                                           std::placeholders::_2));
 
   tr.repartition ();
 
@@ -119,9 +116,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

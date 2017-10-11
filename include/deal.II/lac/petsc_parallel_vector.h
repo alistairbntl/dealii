@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2016 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_parallel_vector_h
-#define dealii__petsc_parallel_vector_h
+#ifndef dealii_petsc_parallel_vector_h
+#define dealii_petsc_parallel_vector_h
 
 
 #include <deal.II/base/config.h>
@@ -26,6 +26,7 @@
 #  include <deal.II/lac/vector.h>
 #  include <deal.II/lac/petsc_vector_base.h>
 #  include <deal.II/base/index_set.h>
+#  include <deal.II/lac/vector_type_traits.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -47,7 +48,7 @@ namespace PETScWrappers
 
     /**
      * Implementation of a parallel vector class based on PETSC and using MPI
-     * communication to synchronise distributed operations. All the
+     * communication to synchronize distributed operations. All the
      * functionality is actually in the base class, except for the calls to
      * generate a parallel vector. This is possible since PETSc only works on
      * an abstract vector type and internally distributes to functions that do
@@ -104,7 +105,7 @@ namespace PETScWrappers
      * time, all these additions are executed. However, if one process adds to
      * an element, and another overwrites to it, the order of execution would
      * yield non-deterministic behavior if we don't make sure that a
-     * synchronisation with compress() happens in between.
+     * synchronization with compress() happens in between.
      *
      * In order to make sure these calls to compress() happen at the
      * appropriate time, the deal.II wrappers keep a state variable that store
@@ -115,17 +116,16 @@ namespace PETScWrappers
      * @code
      *   PETScWrappers::MPI::Vector vector;
      *   ...
-     *                   // do some write operations on the vector
+     *   // do some write operations on the vector
      *   for (unsigned int i=0; i<vector.size(); ++i)
      *     vector(i) = i;
      *
-     *                   // do some additions to vector elements, but
-     *                   // only for some elements
+     *   // do some additions to vector elements, but only for some elements
      *   for (unsigned int i=0; i<vector.size(); ++i)
      *     if (some_condition(i) == true)
      *       vector(i) += 1;
      *
-     *                   // do another collective operation
+     *   // do another collective operation
      *   const double norm = vector.l2_norm();
      * @endcode
      *
@@ -161,18 +161,6 @@ namespace PETScWrappers
        * Declare type for container size.
        */
       typedef types::global_dof_index size_type;
-
-      /**
-       * A variable that indicates whether this vector supports distributed
-       * data storage. If true, then this vector also needs an appropriate
-       * compress() function that allows communicating recent set or add
-       * operations to individual elements to be communicated to other
-       * processors.
-       *
-       * For the current class, the variable equals true, since it does
-       * support parallel data storage.
-       */
-      static const bool supports_distributed_data = true;
 
       /**
        * Default constructor. Initialize the vector as empty.
@@ -224,16 +212,20 @@ namespace PETScWrappers
        *
        * @arg communicator denotes the MPI communicator over which the
        * different parts of the vector shall communicate
+       *
+       * @deprecated The use of objects that are explicitly of type VectorBase
+       * is deprecated: use PETScWrappers::MPI::Vector instead.
        */
       explicit Vector (const MPI_Comm     &communicator,
                        const VectorBase   &v,
-                       const size_type     local_size);
+                       const size_type     local_size) DEAL_II_DEPRECATED;
 
       /**
-       * Constructs a new parallel ghosted PETSc vector from an IndexSet. Note
-       * that @p local must be contiguous and the global size of the vector is
-       * determined by local.size(). The global indices in @p ghost are
-       * supplied as ghost indices that can also be read locally.
+       * Construct a new parallel ghosted PETSc vector from an IndexSet.
+       * Note that @p local must be ascending and 1:1.
+       * The global size of the vector is determined by local.size().
+       * The global indices in @p ghost are supplied as ghost indices
+       * that can also be read locally.
        *
        * Note that the @p ghost IndexSet may be empty and that any indices
        * already contained in @p local are ignored during construction. That
@@ -250,7 +242,7 @@ namespace PETScWrappers
               const MPI_Comm &communicator);
 
       /**
-       * Constructs a new parallel PETSc vector from an IndexSet. This creates
+       * Construct a new parallel PETSc vector from an IndexSet. This creates
        * a non ghosted vector.
        */
       explicit Vector (const IndexSet &local,
@@ -267,23 +259,6 @@ namespace PETScWrappers
        * take over the MPI communicator of @p v.
        */
       Vector &operator= (const Vector &v);
-
-      /**
-       * Copy the given sequential (non-distributed) vector into the present
-       * parallel vector. It is assumed that they have the same size, and this
-       * operation does not change the partitioning of the parallel vector by
-       * which its elements are distributed across several MPI processes. What
-       * this operation therefore does is to copy that chunk of the given
-       * vector @p v that corresponds to elements of the target vector that
-       * are stored locally, and copies them. Elements that are not stored
-       * locally are not touched.
-       *
-       * This being a parallel vector, you must make sure that @em all
-       * processes call this function at the same time. It is not possible to
-       * change the local part of a parallel vector on only one process,
-       * independent of what other processes do, with this function.
-       */
-      Vector &operator= (const PETScWrappers::Vector &v);
 
       /**
        * Set all components of the vector to the given number @p s. Simply
@@ -339,7 +314,7 @@ namespace PETScWrappers
                    const bool    omit_zeroing_entries = false);
 
       /**
-       * Reinit as a vector without ghost elements. See the constructor with
+       * Reinit as a vector with ghost elements. See the constructor with
        * same signature for more details.
        *
        * @see
@@ -464,69 +439,6 @@ namespace PETScWrappers
 
 
 
-    inline
-    Vector &
-    Vector::operator= (const Vector &v)
-    {
-      // make sure left- and right-hand side of the assignment are compress()'ed:
-      Assert(v.last_action == VectorOperation::unknown,
-             internal::VectorReference::ExcWrongMode (VectorOperation::unknown,
-                                                      v.last_action));
-      Assert(last_action == VectorOperation::unknown,
-             internal::VectorReference::ExcWrongMode (VectorOperation::unknown,
-                                                      last_action));
-
-
-      if (v.size()==0)
-        {
-          // this happens if v has not been initialized to something useful:
-          // Vector x,v;x=v;
-          // we skip the code below and create a simple serial vector of
-          // length 0
-
-          int ierr;
-#if DEAL_II_PETSC_VERSION_LT(3,2,0)
-          ierr = VecDestroy (vector);
-#else
-          ierr = VecDestroy (&vector);
-#endif
-          AssertThrow (ierr == 0, ExcPETScError(ierr));
-
-          const int n = 0;
-          ierr = VecCreateSeq (PETSC_COMM_SELF, n, &vector);
-          AssertThrow (ierr == 0, ExcPETScError(ierr));
-          ghosted = false;
-          ghost_indices.clear();
-          return *this;
-        }
-
-      // if the vectors have different sizes,
-      // then first resize the present one
-      if (size() != v.size())
-        {
-          if (v.has_ghost_elements())
-            reinit( v.locally_owned_elements(), v.ghost_indices, v.communicator);
-          else
-            reinit (v.communicator, v.size(), v.local_size(), true);
-        }
-
-      const int ierr = VecCopy (v.vector, vector);
-      AssertThrow (ierr == 0, ExcPETScError(ierr));
-
-      if (has_ghost_elements())
-        {
-          int ierr;
-
-          ierr = VecGhostUpdateBegin(vector, INSERT_VALUES, SCATTER_FORWARD);
-          AssertThrow (ierr == 0, ExcPETScError(ierr));
-          ierr = VecGhostUpdateEnd(vector, INSERT_VALUES, SCATTER_FORWARD);
-          AssertThrow (ierr == 0, ExcPETScError(ierr));
-        }
-      return *this;
-    }
-
-
-
     template <typename number>
     inline
     Vector &
@@ -592,7 +504,7 @@ namespace internal
      * A helper class used internally in linear_operator.h. Specialization for
      * PETScWrappers::MPI::Vector.
      */
-    template<>
+    template <>
     class ReinitHelper<PETScWrappers::MPI::Vector>
     {
     public:
@@ -600,7 +512,7 @@ namespace internal
       static
       void reinit_range_vector (const Matrix &matrix,
                                 PETScWrappers::MPI::Vector &v,
-                                bool omit_zeroing_entries)
+                                bool /*omit_zeroing_entries*/)
       {
         v.reinit(matrix.locally_owned_range_indices(), matrix.get_mpi_communicator());
       }
@@ -609,7 +521,7 @@ namespace internal
       static
       void reinit_domain_vector(const Matrix &matrix,
                                 PETScWrappers::MPI::Vector &v,
-                                bool omit_zeroing_entries)
+                                bool /*omit_zeroing_entries*/)
       {
         v.reinit(matrix.locally_owned_domain_indices(), matrix.get_mpi_communicator());
       }
@@ -619,6 +531,18 @@ namespace internal
 } /* namespace internal */
 
 /**@}*/
+
+
+/**
+ * Declare dealii::PETScWrappers::MPI::Vector as distributed vector.
+ *
+ * @author Uwe Koecher, 2017
+ */
+template <>
+struct is_serial_vector< PETScWrappers::MPI::Vector > : std::false_type
+{
+};
+
 
 DEAL_II_NAMESPACE_CLOSE
 

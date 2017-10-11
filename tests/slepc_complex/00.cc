@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------
-// $Id$
 //
-// Copyright (C) 2013 by the deal.II authors
+// Copyright (C) 2013 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,9 +21,7 @@
 
 #include "../tests.h"
 #include <deal.II/lac/slepc_solver.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/numbers.h>
-#include <fstream>
 #include <iostream>
 
 
@@ -40,7 +37,7 @@ int main (int argc, char **argv)
       logfile << "Initializing SLEPc (PETSc): "
               << std::flush;
 
-      SlepcInitialize (&argc, &argv, 0, 0);
+      SlepcInitialize (&argc, &argv, nullptr, nullptr);
       {
         logfile << "ok"
                 << std::endl;

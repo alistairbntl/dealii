@@ -23,7 +23,6 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -36,15 +35,11 @@
 
 
 
-#include <cmath>
-#include <cstdlib>
 
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 #include <map>
 
-template<int dim>
+template <int dim>
 void check_parallelepiped (bool colorize, bool log, const unsigned int (&subd)[dim])
 {
   deallog << "* checking dim=" << dim
@@ -128,7 +123,7 @@ void check_parallelepiped (bool colorize, bool log, const unsigned int (&subd)[d
       for (unsigned int c=0; c<6; ++c)
         VectorTools::interpolate_boundary_values (dh,
                                                   c,
-                                                  ConstantFunction<dim>(c),
+                                                  Functions::ConstantFunction<dim>(c),
                                                   constraints);
       constraints.close();
       constraints.distribute(vec);

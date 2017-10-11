@@ -33,6 +33,7 @@
 // The domain is a distorted quad after 1 refinement. The distortion is
 // performed by GridTools::distort_random.
 
+#include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 
@@ -63,7 +64,6 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 
-#include <fstream>
 #include <iostream>
 #include <sstream>
 
@@ -72,7 +72,7 @@ using namespace dealii;
 
 namespace polytest
 {
-  template<int dim>
+  template <int dim>
   class SimplePolynomial : public Function<dim>
   {
   public:
@@ -84,7 +84,7 @@ namespace polytest
                          std::vector<Vector<double> >   &values) const;
 
   };
-  template<int dim>
+  template <int dim>
   void SimplePolynomial<dim>::vector_value_list (const std::vector<Point<dim> > &points,
                                                  std::vector<Vector<double> >   &values) const
   {
@@ -102,7 +102,7 @@ namespace polytest
 
   }
 
-  template<int dim>
+  template <int dim>
   void SimplePolynomial<dim>::rhs_value_list (const std::vector<Point<dim> > &points,
                                               std::vector<Vector<double> >   &values) const
   {
@@ -120,7 +120,7 @@ namespace polytest
 
   }
 
-  template<int dim>
+  template <int dim>
   class polytest
   {
   public:
@@ -150,7 +150,7 @@ namespace polytest
 
   };
 
-  template<int dim>
+  template <int dim>
   polytest<dim>::polytest (unsigned int degree)
     :
     p_order(degree),
@@ -165,7 +165,7 @@ namespace polytest
     dof_handler.clear ();
   }
 
-  template<int dim>
+  template <int dim>
   void polytest<dim>::setup_system()
   {
     dof_handler.distribute_dofs (fe);
@@ -191,7 +191,7 @@ namespace polytest
     system_matrix.reinit (sparsity_pattern);
   }
 
-  template<int dim>
+  template <int dim>
   void polytest<dim>::assemble_system()
   {
     const QGauss<dim> test_quad(quad_order);
@@ -265,7 +265,7 @@ namespace polytest
       }
   }
 
-  template<int dim>
+  template <int dim>
   void polytest<dim>::solve()
   {
     SparseDirectUMFPACK direct;
@@ -275,7 +275,7 @@ namespace polytest
     constraints.distribute (solution);
   }
 
-  template<int dim>
+  template <int dim>
   void polytest<dim>::output_error()
   {
     SimplePolynomial<dim> exact_solution;
@@ -287,7 +287,7 @@ namespace polytest
     deallog << "p=" << p_order << " L2_error: " << L2_error << std::endl;
   }
 
-  template<int dim>
+  template <int dim>
   void polytest<dim>::run()
   {
     GridGenerator::hyper_cube (tria, -1.2, 1.3);
@@ -307,8 +307,7 @@ int main ()
 {
   const unsigned int dim(2);
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   for (unsigned int p=0; p<3; ++p)
     {

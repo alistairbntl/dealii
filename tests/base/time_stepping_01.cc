@@ -115,9 +115,9 @@ double my5(double const t)
 }
 
 void test(TimeStepping::RungeKutta<Vector<double> > &solver,
-          std_cxx11::function<Vector<double> (double const, Vector<double> const &)> f,
-          std_cxx11::function<Vector<double> (double const, double const, Vector<double> const &)> id_minus_tau_J_inv,
-          std_cxx11::function<double (double const)> my)
+          std::function<Vector<double> (double const, Vector<double> const &)> f,
+          std::function<Vector<double> (double const, double const, Vector<double> const &)> id_minus_tau_J_inv,
+          std::function<double (double const)> my)
 {
   unsigned int n_time_steps = 1;
   unsigned int size = 1;
@@ -142,9 +142,9 @@ void test(TimeStepping::RungeKutta<Vector<double> > &solver,
 }
 
 void test2(TimeStepping::EmbeddedExplicitRungeKutta<Vector<double> > &solver,
-           std_cxx11::function<Vector<double> (double const, Vector<double> const &)> f,
-           std_cxx11::function<Vector<double> (double const, double const, Vector<double> const &)> id_minus_tau_J_inv,
-           std_cxx11::function<double (double const)> my)
+           std::function<Vector<double> (double const, Vector<double> const &)> f,
+           std::function<Vector<double> (double const, double const, Vector<double> const &)> id_minus_tau_J_inv,
+           std::function<double (double const)> my)
 {
   double initial_time = 0.0, final_time = 1.0;
   double time_step = 1.0;
@@ -176,9 +176,7 @@ void test2(TimeStepping::EmbeddedExplicitRungeKutta<Vector<double> > &solver,
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   deallog<<"Forward Euler"<<std::endl;
   TimeStepping::ExplicitRungeKutta<Vector<double> > fe(TimeStepping::FORWARD_EULER);

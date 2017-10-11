@@ -23,7 +23,6 @@
 // associated with the geometry
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -35,7 +34,6 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_cartesian.h>
 
-#include <fstream>
 
 
 
@@ -96,9 +94,7 @@ void check (const Triangulation<dim> &tria)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   {
     Triangulation<2> coarse_grid;

@@ -12,8 +12,6 @@
 // Copy from boundary ids to manifold ids
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 
 // all include files you need here
@@ -25,7 +23,7 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_out.h>
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void print_info(Triangulation<dim,spacedim> &tria)
 {
   typename Triangulation<dim,spacedim>::active_cell_iterator cell;
@@ -34,16 +32,16 @@ void print_info(Triangulation<dim,spacedim> &tria)
     {
       deallog << "cell: " << cell
               << ", material_id: "
-              << (int)cell->material_id()
+              << cell->material_id()
               << ", manifold_id: "
-              << (int)cell->manifold_id() << std::endl;
+              << cell->manifold_id() << std::endl;
 
       for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
         deallog << "face: " << cell->face(f)
                 << ", boundary_id: "
-                << (int)cell->face(f)->boundary_id()
+                << cell->face(f)->boundary_id()
                 << ", manifold_id: "
-                << (int)cell->face(f)->manifold_id() << std::endl;
+                << cell->face(f)->manifold_id() << std::endl;
     }
 }
 
@@ -82,4 +80,3 @@ int main ()
 
   return 0;
 }
-

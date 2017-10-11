@@ -26,7 +26,7 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 
-template<int dim>
+template <int dim>
 void test()
 {
   Triangulation<dim> tria;
@@ -341,7 +341,6 @@ main()
   std::ofstream logfile ("output");
   deallog << std::setprecision(8) << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<2>();
   test<3>();

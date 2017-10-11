@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,17 +15,15 @@
 
 
 
-// Test parallel::distributed::Vector::operator=(TrilinosWrappers::MPI::BlockVector&)
+// Test LinearAlgebra::distributed::Vector::operator=(TrilinosWrappers::MPI::BlockVector&)
 
 #include "../tests.h"
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/base/index_set.h>
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 #include <vector>
 
 
@@ -48,7 +46,7 @@ void test ()
   TrilinosWrappers::MPI::Vector vb_one(local_active, MPI_COMM_WORLD);
   TrilinosWrappers::MPI::Vector v_one(local_active, local_relevant, MPI_COMM_WORLD);
 
-  parallel::distributed::Vector<double> copied_one(local_active, local_relevant, MPI_COMM_WORLD);
+  LinearAlgebra::distributed::Vector<double> copied_one(local_active, local_relevant, MPI_COMM_WORLD);
 
   // set local values
   vb_one(myid*2)=myid*2.0;
@@ -59,7 +57,7 @@ void test ()
   v_one=vb_one;
 
   TrilinosWrappers::MPI::BlockVector vb(2), v(2);
-  parallel::distributed::BlockVector<double> copied(2);
+  LinearAlgebra::distributed::BlockVector<double> copied(2);
   for (unsigned int bl=0; bl<2; ++bl)
     {
       vb.block(bl) = vb_one;
@@ -85,7 +83,7 @@ void test ()
       Assert(copied.block(bl)(myid*2+1) == myid*4.0+2.0, ExcInternalError());
     }
 
-  copied = v;
+  copied.update_ghost_values();
 
   // check ghost values
   if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
@@ -122,10 +120,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       test();
     }

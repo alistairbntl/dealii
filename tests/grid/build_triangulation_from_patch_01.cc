@@ -21,7 +21,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -29,10 +28,9 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 
-#include <fstream>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   Triangulation<dim> triangulation (Triangulation<dim>::limit_level_difference_at_vertices);
@@ -50,7 +48,7 @@ void test()
         = GridTools::get_patch_around_cell<Triangulation<dim> > (cell);
 
       Triangulation<dim> local_triangulation(Triangulation<dim>::limit_level_difference_at_vertices);
-      std::map<typename Triangulation<dim>::active_cell_iterator ,
+      std::map<typename Triangulation<dim>::active_cell_iterator,
           typename Triangulation<dim>::active_cell_iterator> patch_to_global_tria_map;
 
       GridTools::build_triangulation_from_patch <Triangulation<dim> >
@@ -87,7 +85,6 @@ void test()
 int main()
 {
   initlog();
-  deallog.threshold_double(1.e-10);
 
   deallog.push("1d");
   test<1>();

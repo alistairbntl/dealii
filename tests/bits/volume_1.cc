@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 // the volume of this body times the space dimension
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -30,7 +29,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 
 
 
@@ -45,11 +43,11 @@ void check (const Triangulation<dim> &tria)
 
   FEFaceValues<dim>    fe_face_values (fe, q_face,
                                        update_normal_vectors |
-                                       update_q_points |
+                                       update_quadrature_points |
                                        update_JxW_values);
   FESubfaceValues<dim> fe_subface_values (fe, q_face,
                                           update_normal_vectors |
-                                          update_q_points |
+                                          update_quadrature_points |
                                           update_JxW_values);
 
   double v1=0, v2=0;
@@ -98,9 +96,7 @@ void check (const Triangulation<dim> &tria)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   {
     Triangulation<2> coarse_grid;

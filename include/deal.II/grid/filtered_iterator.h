@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2016 by the deal.II authors
+// Copyright (C) 2002 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__filtered_iterator_h
-#define dealii__filtered_iterator_h
+#ifndef dealii_filtered_iterator_h
+#define dealii_filtered_iterator_h
 
 
 #include <deal.II/base/config.h>
@@ -23,9 +23,7 @@
 #include <deal.II/grid/tria_iterator_base.h>
 
 #include <set>
-#ifdef DEAL_II_WITH_CXX11
 #include <tuple>
-#endif
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -236,7 +234,7 @@ namespace IteratorFilters
      * have to be evaluated to true and state if the iterator must be locally
      * owned.
      */
-    MaterialIdEqualTo (const std::set<types::material_id> material_ids,
+    MaterialIdEqualTo (const std::set<types::material_id> &material_ids,
                        const bool only_locally_owned = false);
 
     /**
@@ -282,7 +280,7 @@ namespace IteratorFilters
      * shall have to be evaluated to true and state if the iterator must be
      * locally owned.
      */
-    ActiveFEIndexEqualTo (const std::set<unsigned int> active_fe_indices,
+    ActiveFEIndexEqualTo (const std::set<unsigned int> &active_fe_indices,
                           const bool only_locally_owned = false);
 
     /**
@@ -376,11 +374,11 @@ namespace IteratorFilters
  * @endcode
  * then
  * @code
- *   std::bind2nd (std::ptr_fun(&level_equal_to<active_cell_iterator>), 3)
+ *   std::bind (&level_equal_to<active_cell_iterator>, std::placeholders::_1, 3)
  * @endcode
  * is another valid predicate (here: a function that returns true if either
  * the iterator is past the end or the level is equal to the second argument;
- * this second argument is bound to a fixed value using the @p std::bind2nd
+ * this second argument is bound to a fixed value using the @p std::bind
  * function).
  *
  * Finally, classes can be predicates. The following class is one:
@@ -530,7 +528,7 @@ public:
    * iterator with the given value.
    *
    * If the initial value @p bi does not satisfy the predicate @p p then it is
-   * advanced until we either hit the the past-the-end iterator, or the
+   * advanced until we either hit the past-the-end iterator, or the
    * predicate is satisfied. This allows, for example, to write code like
    * @code
    *   FilteredIterator<typename Triangulation<dim>::active_cell_iterator>
@@ -693,11 +691,11 @@ private:
      * Mark the destructor virtual to allow destruction through pointers to
      * the base class.
      */
-    virtual ~PredicateBase () {}
+    virtual ~PredicateBase () = default;
 
     /**
      * Abstract function which in derived classes denotes the evaluation of
-     * the predicate on the give iterator.
+     * the predicate on the given iterator.
      */
     virtual bool operator () (const BaseIterator &bi) const = 0;
 
@@ -775,7 +773,6 @@ make_filtered_iterator (const BaseIterator &i,
 
 
 
-#ifdef DEAL_II_WITH_CXX11
 namespace internal
 {
   namespace FilteredIterator
@@ -824,7 +821,7 @@ namespace internal
  *   DoFHandler<dim> dof_handler;
  *   ...
  *   for (auto cell : filter_iterators(dof_handler.active_cell_iterators(),
- *                                    IteratorFilters::LocallyOwned())
+ *                                    IteratorFilters::LocallyOwnedCell())
  *     {
  *       fe_values.reinit (cell);
  *       ...do the local integration on 'cell'...;
@@ -871,7 +868,7 @@ filter_iterators (IteratorRange<BaseIterator> i,
  *   DoFHandler<dim> dof_handler;
  *   ...
  *   for (auto cell : filter_iterators(dof_handler.active_cell_iterators(),
- *                                    IteratorFilters::LocallyOwned(),
+ *                                    IteratorFilters::LocallyOwnedCell(),
  *                                    IteratorFilters::AtBoundary())
  *     {
  *       fe_values.reinit (cell);
@@ -894,7 +891,6 @@ filter_iterators (IteratorRange<BaseIterator> i,
   auto fi = filter_iterators(i,p);
   return filter_iterators(fi, args...);
 }
-#endif
 
 
 /* ------------------ Inline functions and templates ------------ */
@@ -949,7 +945,7 @@ FilteredIterator<BaseIterator>::
 ~FilteredIterator ()
 {
   delete predicate;
-  predicate = 0;
+  predicate = nullptr;
 }
 
 
@@ -960,10 +956,13 @@ FilteredIterator<BaseIterator> &
 FilteredIterator<BaseIterator>::
 operator = (const FilteredIterator &fi)
 {
-  Assert ((fi.state() != IteratorState::valid) || (*predicate)(fi),
-          ExcInvalidElement(fi));
-  BaseIterator::operator = (fi);
-  return *this;
+  // Using equivalent code to the one for 'operator=(const BaseIterator &bi)'
+  // below, some compiler would not cast fi to the base class of type
+  // BaseIterator but try to go through constructing a new Accessor from fi
+  // which fails. Hence, we just use an explicit upcast and call the above-
+  // mentioned method.
+  const BaseIterator &bi = fi;
+  return operator = (bi);
 }
 
 
@@ -1302,7 +1301,7 @@ namespace IteratorFilters
 
 
   inline
-  MaterialIdEqualTo::MaterialIdEqualTo (const std::set<types::material_id> material_ids,
+  MaterialIdEqualTo::MaterialIdEqualTo (const std::set<types::material_id> &material_ids,
                                         const bool only_locally_owned)
     :
     material_ids (material_ids),
@@ -1340,7 +1339,7 @@ namespace IteratorFilters
 
 
   inline
-  ActiveFEIndexEqualTo::ActiveFEIndexEqualTo (const std::set<unsigned int> active_fe_indices,
+  ActiveFEIndexEqualTo::ActiveFEIndexEqualTo (const std::set<unsigned int> &active_fe_indices,
                                               const bool only_locally_owned)
     :
     active_fe_indices (active_fe_indices),

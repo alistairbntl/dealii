@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,8 +20,6 @@
 // Mesh: shell with random refinement
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/function.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -44,11 +42,10 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
 #include <sstream>
 
 
-template<int dim>
+template <int dim>
 class FilteredDataOut : public DataOut<dim>
 {
 public:
@@ -93,7 +90,7 @@ private:
 
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -158,7 +155,7 @@ void test()
 
   VectorTools::interpolate_boundary_values (dofh,
                                             0,
-                                            ZeroFunction<dim>(dim+1),
+                                            Functions::ZeroFunction<dim>(dim+1),
                                             cm,
                                             velocity_mask);
 
@@ -199,9 +196,9 @@ void test()
   std::ofstream output (filename.c_str());
   data_out.write_deal_II_intermediate (output);
 
-  TrilinosWrappers::Vector x_dub;
-  x_dub.reinit(dof_set.size());
-  x_dub = x_rel;
+  TrilinosWrappers::MPI::Vector x_dub;
+  x_dub.reinit(complete_index_set(dof_set.size()));
+  x_dub.reinit(x_rel, false, true);
 
   if (myid==0)
     {
@@ -233,9 +230,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

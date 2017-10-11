@@ -48,9 +48,9 @@ void check2 ()
     q[d] = d;
 
   ScalarFunctionFromFunctionObject<dim>
-  object (std_cxx11::bind (&Point<dim>::distance,
-                           q,
-                           std_cxx11::_1));
+  object (std::bind (&Point<dim>::distance,
+                     q,
+                     std::placeholders::_1));
 
   for (unsigned int i=0; i<10; ++i)
     {
@@ -71,7 +71,6 @@ int main()
   std::string logname = "output";
   std::ofstream logfile(logname.c_str());
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check1<1> ();
   check1<2> ();

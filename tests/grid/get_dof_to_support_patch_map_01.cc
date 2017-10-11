@@ -25,7 +25,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/point.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -34,13 +33,12 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 
-#include <fstream>
 #include <string>
 
 using namespace dealii;
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   using namespace dealii;
@@ -175,7 +173,6 @@ int main()
   using namespace dealii;
 
   initlog();
-  deallog.threshold_double(1.e-10);
 
   deallog.push("1d");
   test<1>();

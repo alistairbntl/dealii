@@ -1,7 +1,6 @@
 /* ---------------------------------------------------------------------
- * $Id$
  *
- * Copyright (C) 1999 - 2015 by the deal.II authors
+ * Copyright (C) 1999 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -44,12 +43,11 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
 
 #include <deal.II/numerics/data_out.h>
-#include <fstream>
 #include <iostream>
 
 using namespace dealii;
@@ -175,7 +173,7 @@ void Step3<dim>::setup_system ()
             << dof_handler.n_dofs()
             << std::endl;
 
-  CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
+  DynamicSparsityPattern c_sparsity(dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern (dof_handler, c_sparsity);
   sparsity_pattern.copy_from(c_sparsity);
 
@@ -322,31 +320,42 @@ int main ()
 {
   initlog();
   deallog.depth_file (1);
-  deallog.threshold_double(1.e-11);
   for (unsigned int degree = 1; degree <=3; ++degree)
     {
 //     {
 //       FiniteElement<2> *fe = new FE_Q<2>(degree);
-//       Step3<2> laplace_problem(fe, degree);
-//       laplace_problem.run();
+//       {
+//         Step3<2> laplace_problem(fe, degree);
+//         laplace_problem.run();
+//        }
+//        delete fe;
 //     }
 
       {
         FiniteElement<2> *fe = new FE_Q_Bubbles<2>(degree);
-        Step3<2> laplace_problem(fe, degree);
-        laplace_problem.run();
+        {
+          Step3<2> laplace_problem(fe, degree);
+          laplace_problem.run();
+        }
+        delete fe;
       }
 
 //     {
 //       FiniteElement<3> *fe = new FE_Q<3>(degree);
-//       Step3<3> laplace_problem(fe, degree);
-//       laplace_problem.run();
+//       {
+//         Step3<3> laplace_problem(fe, degree);
+//         laplace_problem.run();
+//        }
+//        delete fe;
 //     }
 
       {
         FiniteElement<3> *fe = new FE_Q_Bubbles<3>(degree);
-        Step3<3> laplace_problem(fe, degree);
-        laplace_problem.run();
+        {
+          Step3<3> laplace_problem(fe, degree);
+          laplace_problem.run();
+        }
+        delete fe;
       }
     }
   return 0;

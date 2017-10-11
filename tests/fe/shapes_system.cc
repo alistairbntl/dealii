@@ -22,12 +22,11 @@
 #include <deal.II/fe/fe_nedelec.h>
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/mapping_q1.h>
-#include <fstream>
 #include <string>
 
 #define PRECISION 8
 
-template<int dim>
+template <int dim>
 void plot_FE_System_shape_functions()
 {
   MappingQGeneric<dim> m(1);
@@ -86,7 +85,6 @@ main()
   std::ofstream logfile ("output");
   deallog << std::setprecision(PRECISION) << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
   deallog << "FE_System<1>" << std::endl;
   plot_FE_System_shape_functions<1>();
   deallog << "FE_System<2>" << std::endl;

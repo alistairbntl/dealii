@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -76,13 +76,13 @@ void test ()
           shift(0) = 0.121;
           shift(1) = -0.005;
         }
-      MappingQEulerian<dim> mapping(2,shift,dofh_eulerian);
+      MappingQEulerian<dim> mapping(2, dofh_eulerian, shift);
 
       {
         const QGauss<1> quad (fe_degree+1);
         typename MatrixFree<dim,double>::AdditionalData data;
         data.tasks_parallel_scheme = MatrixFree<dim,double>::AdditionalData::none;
-        data.mapping_update_flags = update_gradients | update_second_derivatives;
+        data.mapping_update_flags = update_gradients | update_hessians;
         if (i==1)
           data.initialize_indices = false;
         mf_data.reinit (mapping, dof, constraints, quad, data);

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,16 +16,13 @@
 
 
 #include "../tests.h"
-#include "testmatrix.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_memory.h>
 #include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_cg.h>
+#include <deal.II/lac/solver_fire.h>
 #include <deal.II/lac/solver_gmres.h>
 #include <deal.II/lac/solver_minres.h>
 #include <deal.II/lac/solver_bicgstab.h>
@@ -33,7 +30,7 @@
 #include <deal.II/lac/solver_qmrs.h>
 #include <deal.II/lac/precondition.h>
 
-template<typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
+template <typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
 void
 check_solve (SolverType         &solver,
              const MatrixType   &A,
@@ -53,7 +50,7 @@ check_solve (SolverType         &solver,
     }
 }
 
-template<typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
+template <typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
 void
 check_Tsolve (SolverType         &solver,
               const MatrixType   &A,
@@ -79,7 +76,6 @@ int main()
 //  logfile.setf(std::ios::fixed);
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   GrowingVectorMemory<> mem;
   SolverControl control(100, 1.e-3);
@@ -93,6 +89,7 @@ int main()
   SolverBicgstab<> bicgstab(control, mem);
   SolverRichardson<> rich(control, mem);
   SolverQMRS<> qmrs(control, mem);
+  SolverFIRE<> fire(control, mem);
 
   for (unsigned int size=4; size <= 30; size *= 3)
     {
@@ -165,6 +162,10 @@ int main()
           check_solve(gmresright,A,u,f,prec_no);
 //    check_solve(minres,A,u,f,prec_no);
           check_solve(qmrs,A,u,f,prec_no);
+
+          control.set_max_steps(50);
+          check_solve(fire,A,u,f,prec_no);
+
           control.set_max_steps(100);
 
           deallog.pop();
@@ -178,6 +179,7 @@ int main()
           check_solve(gmres,A,u,f,prec_no);
           check_solve(gmresright,A,u,f,prec_no);
           check_solve(qmrs,A,u,f,prec_no);
+          check_solve(fire,A,u,f,prec_no);
           rich.set_omega(1.);
 
           deallog.pop();
@@ -191,6 +193,7 @@ int main()
           check_solve(gmres,A,u,f,prec_richardson);
           check_solve(gmresright,A,u,f,prec_richardson);
           check_solve(qmrs,A,u,f,prec_richardson);
+          check_solve(fire,A,u,f,prec_richardson);
           rich.set_omega(1.);
 
           deallog.pop();
@@ -204,6 +207,7 @@ int main()
           check_solve(gmres,A,u,f,prec_ssor);
           check_solve(gmresright,A,u,f,prec_ssor);
           check_solve(qmrs,A,u,f,prec_ssor);
+          check_solve(fire,A,u,f,prec_ssor);
 
           deallog.pop();
 
@@ -215,6 +219,7 @@ int main()
           check_solve(bicgstab,A,u,f,prec_sor);
           check_solve(gmres,A,u,f,prec_sor);
           check_solve(gmresright,A,u,f,prec_sor);
+          check_solve(fire,A,u,f,prec_sor);
 
           deallog.pop();
 
@@ -226,6 +231,7 @@ int main()
           check_solve(bicgstab,A,u,f,prec_psor);
           check_solve(gmres,A,u,f,prec_psor);
           check_solve(gmresright,A,u,f,prec_psor);
+          check_solve(fire,A,u,f,prec_psor);
 
           deallog.pop();
         }

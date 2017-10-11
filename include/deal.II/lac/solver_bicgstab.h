@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__solver_bicgstab_h
-#define dealii__solver_bicgstab_h
+#ifndef dealii_solver_bicgstab_h
+#define dealii_solver_bicgstab_h
 
 
 #include <deal.II/base/config.h>
@@ -23,6 +23,7 @@
 #include <deal.II/lac/solver_control.h>
 #include <cmath>
 #include <deal.II/base/subscriptor.h>
+#include <deal.II/base/signaling_nan.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -128,12 +129,12 @@ public:
   /**
    * Solve primal problem only.
    */
-  template<typename MatrixType, typename PreconditionerType>
+  template <typename MatrixType, typename PreconditionerType>
   void
   solve (const MatrixType         &A,
          VectorType               &x,
          const VectorType         &b,
-         const PreconditionerType &precondition);
+         const PreconditionerType &preconditioner);
 
 protected:
   /**
@@ -145,7 +146,7 @@ protected:
   /**
    * Interface for derived class.  This function gets the current iteration
    * vector, the residual and the update vector in each step. It can be used
-   * for a graphical output of the convergence history.
+   * for graphical output of the convergence history.
    */
   virtual void print_vectors(const unsigned int step,
                              const VectorType   &x,
@@ -159,31 +160,31 @@ protected:
   /**
    * Auxiliary vector.
    */
-  VectorType *Vr;
+  typename VectorMemory<VectorType>::Pointer Vr;
   /**
    * Auxiliary vector.
    */
-  VectorType *Vrbar;
+  typename VectorMemory<VectorType>::Pointer Vrbar;
   /**
    * Auxiliary vector.
    */
-  VectorType *Vp;
+  typename VectorMemory<VectorType>::Pointer Vp;
   /**
    * Auxiliary vector.
    */
-  VectorType *Vy;
+  typename VectorMemory<VectorType>::Pointer Vy;
   /**
    * Auxiliary vector.
    */
-  VectorType *Vz;
+  typename VectorMemory<VectorType>::Pointer Vz;
   /**
    * Auxiliary vector.
    */
-  VectorType *Vt;
+  typename VectorMemory<VectorType>::Pointer Vt;
   /**
    * Auxiliary vector.
    */
-  VectorType *Vv;
+  typename VectorMemory<VectorType>::Pointer Vv;
   /**
    * Right hand side vector.
    */
@@ -253,10 +254,10 @@ private:
    * The iteration loop itself. The function returns a structure indicating
    * what happened in this function.
    */
-  template<typename MatrixType, typename PreconditionerType>
+  template <typename MatrixType, typename PreconditionerType>
   IterationResult
   iterate(const MatrixType         &A,
-          const PreconditionerType &precondition);
+          const PreconditionerType &preconditioner);
 };
 
 /*@}*/
@@ -265,7 +266,7 @@ private:
 #ifndef DOXYGEN
 
 
-template<typename VectorType>
+template <typename VectorType>
 SolverBicgstab<VectorType>::IterationResult::IterationResult
 (const bool                 breakdown,
  const SolverControl::State state,
@@ -279,7 +280,7 @@ SolverBicgstab<VectorType>::IterationResult::IterationResult
 {}
 
 
-template<typename VectorType>
+template <typename VectorType>
 SolverBicgstab<VectorType>::SolverBicgstab (SolverControl            &cn,
                                             VectorMemory<VectorType> &mem,
                                             const AdditionalData     &data)
@@ -290,17 +291,24 @@ SolverBicgstab<VectorType>::SolverBicgstab (SolverControl            &cn,
 
 
 
-template<typename VectorType>
+template <typename VectorType>
 SolverBicgstab<VectorType>::SolverBicgstab (SolverControl        &cn,
                                             const AdditionalData &data)
   :
   Solver<VectorType>(cn),
+  alpha(0.),
+  beta(0.),
+  omega(0.),
+  rho(0.),
+  rhobar(0.),
+  step(numbers::invalid_unsigned_int),
+  res(numbers::signaling_nan<double>()),
   additional_data(data)
 {}
 
 
 
-template<typename VectorType>
+template <typename VectorType>
 SolverBicgstab<VectorType>::~SolverBicgstab ()
 {}
 
@@ -336,7 +344,7 @@ SolverBicgstab<VectorType>::start (const MatrixType &A)
 
 
 
-template<typename VectorType>
+template <typename VectorType>
 void
 SolverBicgstab<VectorType>::print_vectors(const unsigned int,
                                           const VectorType &,
@@ -346,11 +354,11 @@ SolverBicgstab<VectorType>::print_vectors(const unsigned int,
 
 
 
-template<typename VectorType>
-template<typename MatrixType, typename PreconditionerType>
+template <typename VectorType>
+template <typename MatrixType, typename PreconditionerType>
 typename SolverBicgstab<VectorType>::IterationResult
 SolverBicgstab<VectorType>::iterate(const MatrixType         &A,
-                                    const PreconditionerType &precondition)
+                                    const PreconditionerType &preconditioner)
 {
 //TODO:[GK] Implement "use the length of the computed orthogonal residual" in the BiCGStab method.
   SolverControl::State state = SolverControl::iterate;
@@ -385,7 +393,7 @@ SolverBicgstab<VectorType>::iterate(const MatrixType         &A,
           p.add(-beta*omega, v);
         }
 
-      precondition.vmult(y,p);
+      preconditioner.vmult(y,p);
       A.vmult(v,y);
       rhobar = rbar * v;
 
@@ -411,7 +419,7 @@ SolverBicgstab<VectorType>::iterate(const MatrixType         &A,
           return IterationResult(false, SolverControl::success, step, res);
         }
 
-      precondition.vmult(z,r);
+      preconditioner.vmult(z,r);
       A.vmult(t,z);
       rhobar = t*r;
       omega = rhobar/(t*t);
@@ -433,28 +441,29 @@ SolverBicgstab<VectorType>::iterate(const MatrixType         &A,
 }
 
 
-template<typename VectorType>
-template<typename MatrixType, typename PreconditionerType>
+template <typename VectorType>
+template <typename MatrixType, typename PreconditionerType>
 void
 SolverBicgstab<VectorType>::solve(const MatrixType         &A,
                                   VectorType               &x,
                                   const VectorType         &b,
-                                  const PreconditionerType &precondition)
+                                  const PreconditionerType &preconditioner)
 {
-  deallog.push("Bicgstab");
-  Vr    = this->memory.alloc();
+  LogStream::Prefix prefix("Bicgstab");
+  Vr    = typename VectorMemory<VectorType>::Pointer(this->memory);
+  Vrbar = typename VectorMemory<VectorType>::Pointer(this->memory);
+  Vp    = typename VectorMemory<VectorType>::Pointer(this->memory);
+  Vy    = typename VectorMemory<VectorType>::Pointer(this->memory);
+  Vz    = typename VectorMemory<VectorType>::Pointer(this->memory);
+  Vt    = typename VectorMemory<VectorType>::Pointer(this->memory);
+  Vv    = typename VectorMemory<VectorType>::Pointer(this->memory);
+
   Vr->reinit(x, true);
-  Vrbar = this->memory.alloc();
   Vrbar->reinit(x, true);
-  Vp    = this->memory.alloc();
   Vp->reinit(x, true);
-  Vy    = this->memory.alloc();
   Vy->reinit(x, true);
-  Vz    = this->memory.alloc();
   Vz->reinit(x, true);
-  Vt    = this->memory.alloc();
   Vt->reinit(x, true);
-  Vv    = this->memory.alloc();
   Vv->reinit(x, true);
 
   Vx = &x;
@@ -474,19 +483,10 @@ SolverBicgstab<VectorType>::solve(const MatrixType         &A,
           state.state = SolverControl::success;
           break;
         }
-      state = iterate(A, precondition);
+      state = iterate(A, preconditioner);
+      ++step;
     }
   while (state.breakdown == true);
-
-  this->memory.free(Vr);
-  this->memory.free(Vrbar);
-  this->memory.free(Vp);
-  this->memory.free(Vy);
-  this->memory.free(Vz);
-  this->memory.free(Vt);
-  this->memory.free(Vv);
-
-  deallog.pop();
 
   // in case of failure: throw exception
   AssertThrow(state.state == SolverControl::success,

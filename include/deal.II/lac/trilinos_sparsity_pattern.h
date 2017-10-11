@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__trilinos_sparsity_pattern_h
-#define dealii__trilinos_sparsity_pattern_h
+#ifndef dealii_trilinos_sparsity_pattern_h
+#define dealii_trilinos_sparsity_pattern_h
 
 
 #include <deal.II/base/config.h>
@@ -29,16 +29,15 @@
 #  include <cmath>
 #  include <memory>
 
-#  include <deal.II/base/std_cxx11/shared_ptr.h>
 
 DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #  include <Epetra_FECrsGraph.h>
 #  include <Epetra_Map.h>
 #  ifdef DEAL_II_WITH_MPI
 #    include <Epetra_MpiComm.h>
-#    include "mpi.h"
+#    include <mpi.h>
 #  else
-#    include "Epetra_SerialComm.h"
+#    include <Epetra_SerialComm.h>
 #  endif
 DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
@@ -53,6 +52,7 @@ namespace TrilinosWrappers
 {
   // forward declarations
   class SparsityPattern;
+  class SparseMatrix;
 
   namespace SparsityPatternIterators
   {
@@ -86,11 +86,6 @@ namespace TrilinosWrappers
       Accessor (const SparsityPattern *sparsity_pattern,
                 const size_type        row,
                 const size_type        index);
-
-      /**
-       * Copy constructor.
-       */
-      Accessor (const Accessor &a);
 
       /**
        * Row number of the element represented by this object.
@@ -150,7 +145,7 @@ namespace TrilinosWrappers
        * performance, we keep a shared pointer to these entries so that more
        * than one accessor can access this data if necessary.
        */
-      std_cxx11::shared_ptr<const std::vector<size_type> > colnum_cache;
+      std::shared_ptr<const std::vector<size_type> > colnum_cache;
 
       /**
        * Discard the old row caches (they may still be used by other
@@ -330,7 +325,7 @@ namespace TrilinosWrappers
     /**
      * Destructor. Made virtual so that one can use pointers to this class.
      */
-    virtual ~SparsityPattern ();
+    virtual ~SparsityPattern () = default;
 
     /**
      * Initialize a sparsity pattern that is completely stored locally, having
@@ -373,7 +368,7 @@ namespace TrilinosWrappers
      * parallel, this function uses an ad-hoc partitioning of the rows and
      * columns.
      */
-    template<typename SparsityPatternType>
+    template <typename SparsityPatternType>
     void
     copy_from (const SparsityPatternType &nontrilinos_sparsity_pattern);
 
@@ -568,7 +563,7 @@ namespace TrilinosWrappers
      *
      * @deprecated Use the respective method with IndexSet argument instead.
      */
-    template<typename SparsityPatternType>
+    template <typename SparsityPatternType>
     void
     reinit (const Epetra_Map          &row_parallel_partitioning,
             const Epetra_Map          &col_parallel_partitioning,
@@ -585,7 +580,7 @@ namespace TrilinosWrappers
      *
      * @deprecated Use the respective method with IndexSet argument instead.
      */
-    template<typename SparsityPatternType>
+    template <typename SparsityPatternType>
     void
     reinit (const Epetra_Map          &parallel_partitioning,
             const SparsityPatternType &nontrilinos_sparsity_pattern,
@@ -800,7 +795,7 @@ namespace TrilinosWrappers
      * constructed. This feature is only implemented for input sparsity
      * patterns of type DynamicSparsityPattern.
      */
-    template<typename SparsityPatternType>
+    template <typename SparsityPatternType>
     void
     reinit (const IndexSet            &row_parallel_partitioning,
             const IndexSet            &col_parallel_partitioning,
@@ -816,7 +811,7 @@ namespace TrilinosWrappers
      * that is not fully constructed. This feature is only implemented for
      * input sparsity patterns of type DynamicSparsityPattern.
      */
-    template<typename SparsityPatternType>
+    template <typename SparsityPatternType>
     void
     reinit (const IndexSet            &parallel_partitioning,
             const SparsityPatternType &nontrilinos_sparsity_pattern,
@@ -829,7 +824,7 @@ namespace TrilinosWrappers
 //@{
 
     /**
-     * Returns the state of the sparsity pattern, i.e., whether compress()
+     * Return the state of the sparsity pattern, i.e., whether compress()
      * needs to be called after an operation requiring data exchange.
      */
     bool is_compressed () const;
@@ -1147,14 +1142,14 @@ namespace TrilinosWrappers
      * Pointer to the user-supplied Epetra Trilinos mapping of the matrix
      * columns that assigns parts of the matrix to the individual processes.
      */
-    std_cxx11::shared_ptr<Epetra_Map> column_space_map;
+    std::shared_ptr<Epetra_Map> column_space_map;
 
     /**
      * A sparsity pattern object in Trilinos to be used for finite element
      * based problems which allows for adding non-local elements to the
      * pattern.
      */
-    std_cxx11::shared_ptr<Epetra_FECrsGraph> graph;
+    std::shared_ptr<Epetra_FECrsGraph> graph;
 
     /**
      * A sparsity pattern object for the non-local part of the sparsity
@@ -1162,9 +1157,9 @@ namespace TrilinosWrappers
      * when the particular constructor or reinit method with writable_rows
      * argument is set
      */
-    std_cxx11::shared_ptr<Epetra_CrsGraph> nonlocal_graph;
+    std::shared_ptr<Epetra_CrsGraph> nonlocal_graph;
 
-    friend class SparseMatrix;
+    friend class TrilinosWrappers::SparseMatrix;
     friend class SparsityPatternIterators::Accessor;
     friend class SparsityPatternIterators::Iterator;
   };
@@ -1191,15 +1186,6 @@ namespace TrilinosWrappers
       visit_present_row ();
     }
 
-
-    inline
-    Accessor::Accessor (const Accessor &a)
-      :
-      sparsity_pattern(a.sparsity_pattern),
-      a_row(a.a_row),
-      a_index(a.a_index),
-      colnum_cache (a.colnum_cache)
-    {}
 
 
     inline
@@ -1242,10 +1228,7 @@ namespace TrilinosWrappers
 
 
     inline
-    Iterator::Iterator(const Iterator &i)
-      :
-      accessor(i.accessor)
-    {}
+    Iterator::Iterator(const Iterator &) = default;
 
 
 
@@ -1468,7 +1451,7 @@ namespace TrilinosWrappers
     int ierr;
     if ( graph->RowMap().LID(static_cast<TrilinosWrappers::types::int_type>(row)) != -1)
       ierr = graph->InsertGlobalIndices (row, n_cols, col_index_ptr);
-    else if (nonlocal_graph.get() != 0)
+    else if (nonlocal_graph.get() != nullptr)
       {
         // this is the case when we have explicitly set the off-processor rows
         // and want to create a separate matrix object for them (to retain

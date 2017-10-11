@@ -21,11 +21,8 @@
 
 
 #include "../tests.h"
-#include <fstream>
 #include <deal.II/base/subscriptor.h>
 #include <deal.II/base/smartpointer.h>
-#include <deal.II/base/logstream.h>
-#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -61,9 +58,7 @@ int main()
 {
   deal_II_exceptions::disable_abort_on_exception();
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

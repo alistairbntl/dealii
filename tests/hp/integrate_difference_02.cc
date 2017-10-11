@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -36,7 +35,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 
 
 
@@ -88,7 +86,7 @@ void test ()
   {
     VectorTools::integrate_difference (dof_handler,
                                        vec,
-                                       ZeroFunction<dim>(),
+                                       Functions::ZeroFunction<dim>(),
                                        diff,
                                        q_collection,
                                        VectorTools::L1_norm);
@@ -100,7 +98,7 @@ void test ()
   {
     VectorTools::integrate_difference (dof_handler,
                                        vec,
-                                       ZeroFunction<dim>(),
+                                       Functions::ZeroFunction<dim>(),
                                        diff,
                                        q_collection,
                                        VectorTools::H1_seminorm);
@@ -113,7 +111,7 @@ void test ()
   {
     VectorTools::integrate_difference (dof_handler,
                                        vec,
-                                       ZeroFunction<dim>(),
+                                       Functions::ZeroFunction<dim>(),
                                        diff,
                                        q_collection,
                                        VectorTools::W1infty_seminorm);
@@ -130,7 +128,7 @@ void test ()
   {
     VectorTools::integrate_difference (dof_handler,
                                        vec,
-                                       ZeroFunction<dim>(),
+                                       Functions::ZeroFunction<dim>(),
                                        diff,
                                        q_collection,
                                        VectorTools::W1infty_norm);
@@ -148,7 +146,6 @@ int main ()
   deallog << std::setprecision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1> ();
   test<2> ();

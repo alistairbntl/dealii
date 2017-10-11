@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -26,6 +26,9 @@ template Vector<double> &Vector<double>::operator=<int> (const dealii::Vector<in
 template
 void Vector<int>::reinit<double>(const Vector<double> &, const bool);
 
+// instantiate for long double manually because we use it in a few places:
+template class Vector<long double>;
+template long double Vector<long double>::operator *<long double>(const Vector<long double> &) const;
 
 // do a few functions that currently don't fit the scheme because they have
 // two template arguments that need to be different (the case of same
@@ -36,27 +39,11 @@ void Vector<int>::reinit<double>(const Vector<double> &, const bool);
   template Vector<S1>::Vector (const Vector<S2> &);             \
   template Vector<S1>& Vector<S1>::operator=<S2> (const Vector<S2> &)
 
-#ifndef DEAL_II_EXPLICIT_CONSTRUCTOR_BUG
 TEMPL_COPY_CONSTRUCTOR(double,float);
 TEMPL_COPY_CONSTRUCTOR(float,double);
 
-TEMPL_COPY_CONSTRUCTOR(long double,double);
-TEMPL_COPY_CONSTRUCTOR(double,long double);
-
-TEMPL_COPY_CONSTRUCTOR(long double,float);
-TEMPL_COPY_CONSTRUCTOR(float,long double);
-
-
 TEMPL_COPY_CONSTRUCTOR(std::complex<double>,std::complex<float>);
 TEMPL_COPY_CONSTRUCTOR(std::complex<float>,std::complex<double>);
-
-TEMPL_COPY_CONSTRUCTOR(std::complex<long double>,std::complex<double>);
-TEMPL_COPY_CONSTRUCTOR(std::complex<double>,std::complex<long double>);
-
-TEMPL_COPY_CONSTRUCTOR(std::complex<long double>,std::complex<float>);
-TEMPL_COPY_CONSTRUCTOR(std::complex<float>,std::complex<long double>);
-
-#endif
 
 #undef TEMPL_COPY_CONSTRUCTOR
 
@@ -68,22 +55,20 @@ TEMPL_COPY_CONSTRUCTOR(std::complex<float>,std::complex<long double>);
 TEMPL_OP_EQ(double,float);
 TEMPL_OP_EQ(float,double);
 
-TEMPL_OP_EQ(long double,double);
-TEMPL_OP_EQ(double,long double);
-
-TEMPL_OP_EQ(long double,float);
-TEMPL_OP_EQ(float,long double);
-
 
 TEMPL_OP_EQ(std::complex<double>,std::complex<float>);
 TEMPL_OP_EQ(std::complex<float>,std::complex<double>);
 
-TEMPL_OP_EQ(std::complex<long double>,std::complex<double>);
-TEMPL_OP_EQ(std::complex<double>,std::complex<long double>);
-
-TEMPL_OP_EQ(std::complex<long double>,std::complex<float>);
-TEMPL_OP_EQ(std::complex<float>,std::complex<long double>);
-
 #undef TEMPL_OP_EQ
+
+
+
+template <>
+Vector<int>::real_type
+Vector<int>::lp_norm (const real_type) const
+{
+  Assert(false, ExcMessage("No lp norm for integer vectors"));
+  return -1;
+}
 
 DEAL_II_NAMESPACE_CLOSE

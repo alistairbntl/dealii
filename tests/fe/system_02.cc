@@ -18,21 +18,19 @@
 // check what happens with an FE_System if we hand it 0 components
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_tools.h>
 
-#include <fstream>
 #include <string>
 
 #define PRECISION 5
 
 
 
-template<int dim>
+template <int dim>
 void
 check(FESystem<dim> &fe)
 {
@@ -50,7 +48,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   {
     FESystem<2> fe(FE_Q<2>(1), 2, FE_Q<2>(1), 1);

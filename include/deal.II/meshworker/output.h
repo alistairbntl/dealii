@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__mesh_worker_output_h
-#define dealii__mesh_worker_output_h
+#ifndef dealii_mesh_worker_output_h
+#define dealii_mesh_worker_output_h
 
 #include <deal.II/meshworker/dof_info.h>
 #include <deal.II/base/smartpointer.h>
@@ -93,13 +93,13 @@ namespace MeshWorker
       /**
        * Write the patch to the output stream.
        */
-      template<int dim>
+      template <int dim>
       void assemble(const DoFInfo<dim> &info);
 
       /**
        * @warning Not implemented yet
        */
-      template<int dim>
+      template <int dim>
       void assemble(const DoFInfo<dim> &info1,
                     const DoFInfo<dim> &info2);
 
@@ -108,7 +108,7 @@ namespace MeshWorker
        * Write the object T either to the stream #os, if initialize_stream()
        * has been called, or to @p deallog if no pointer has been set.
        */
-      template<typename T>
+      template <typename T>
       void write(const T &t) const;
 
       /**
@@ -139,7 +139,7 @@ namespace MeshWorker
     inline void
     GnuplotPatch::write(const T &d) const
     {
-      if (os == 0)
+      if (os == nullptr)
         deallog << d;
       else
         (*os) << d;
@@ -149,7 +149,7 @@ namespace MeshWorker
     inline void
     GnuplotPatch::write_endl() const
     {
-      if (os == 0)
+      if (os == nullptr)
         deallog << std::endl;
       else
         (*os) << std::endl;
@@ -159,7 +159,7 @@ namespace MeshWorker
     inline
     GnuplotPatch::GnuplotPatch()
       :
-      os(0)
+      os(nullptr)
     {}
 
 

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__occ_boundary_lib_h
-#define dealii__occ_boundary_lib_h
+#ifndef dealii_occ_boundary_lib_h
+#define dealii_occ_boundary_lib_h
 
 #include <deal.II/base/config.h>
 
@@ -27,8 +27,9 @@
 
 // opencascade needs "HAVE_CONFIG_H" to be exported...
 #define HAVE_CONFIG_H
-#include <BRepAdaptor_Curve.hxx>
 #include <Adaptor3d_Curve.hxx>
+#include <Adaptor3d_HCurve.hxx>
+#include <BRepAdaptor_Curve.hxx>
 #undef HAVE_CONFIG_H
 
 DEAL_II_NAMESPACE_OPEN
@@ -59,6 +60,9 @@ namespace OpenCASCADE
    * face would be collapsed to the edge, and your surrounding points would
    * not be lying on the given shape, raising an exception.
    *
+   * @deprecated This class has been deprecated in favor of the equivalent
+   * Manifold class.
+   *
    * @author Luca Heltai, Andrea Mola, 2011--2014.
    */
   template <int dim, int spacedim>
@@ -86,8 +90,8 @@ namespace OpenCASCADE
      * algorithms.
      */
     virtual Point<spacedim>
-    project_to_manifold (const std::vector<Point<spacedim> > &surrounding_points,
-                         const Point<spacedim> &candidate) const;
+    project_to_manifold (const ArrayView<const Point<spacedim>> &surrounding_points,
+                         const Point<spacedim>                  &candidate) const;
 
 
   private:
@@ -103,7 +107,7 @@ namespace OpenCASCADE
      * Relative tolerance used by this class to compute distances.
      */
     const double tolerance;
-  };
+  } DEAL_II_DEPRECATED;
 
   /**
    * A Boundary object based on OpenCASCADE TopoDS_Shape where new points are
@@ -123,6 +127,9 @@ namespace OpenCASCADE
    * the triangulation to be refined is close to the boundary of the given
    * TopoDS_Shape, or when the direction you use at construction time does not
    * intersect the shape. An exception is thrown when this happens.
+   *
+   * @deprecated This class has been deprecated in favor of the equivalent
+   * Manifold class.
    *
    * @author Luca Heltai, Andrea Mola, 2011--2014.
    */
@@ -148,8 +155,8 @@ namespace OpenCASCADE
      * projection algorithms.
      */
     virtual Point<spacedim>
-    project_to_manifold (const std::vector<Point<spacedim> > &surrounding_points,
-                         const Point<spacedim> &candidate) const;
+    project_to_manifold (const ArrayView<const Point<spacedim>> &surrounding_points,
+                         const Point<spacedim>                  &candidate) const;
 
   private:
     /**
@@ -163,13 +170,13 @@ namespace OpenCASCADE
     /**
      * Direction used to project new points on the shape.
      */
-    const Point<3> direction;
+    const Tensor<1, spacedim> direction;
 
     /**
      * Relative tolerance used by this class to compute distances.
      */
     const double tolerance;
-  };
+  } DEAL_II_DEPRECATED;
 
 
   /**
@@ -214,6 +221,9 @@ namespace OpenCASCADE
    * points does not intersect the shape.  An exception is thrown when this
    * happens.
    *
+   * @deprecated This class has been deprecated in favor of the equivalent
+   * Manifold class.
+   *
    * @author Luca Heltai, Andrea Mola, 2011--2014.
    */
   template <int dim, int spacedim>
@@ -235,8 +245,8 @@ namespace OpenCASCADE
      * exception is thrown.
      */
     virtual Point<spacedim>
-    project_to_manifold (const std::vector<Point<spacedim> > &surrounding_points,
-                         const Point<spacedim> &candidate) const;
+    project_to_manifold (const ArrayView<const Point<spacedim>> &surrounding_points,
+                         const Point<spacedim>                  &candidate) const;
 
   private:
     /**
@@ -248,15 +258,10 @@ namespace OpenCASCADE
     const TopoDS_Shape sh;
 
     /**
-     * Direction used to project new points on the shape.
-     */
-    const Point<3> direction;
-
-    /**
      * Relative tolerance used by this class to compute distances.
      */
     const double tolerance;
-  };
+  } DEAL_II_DEPRECATED;
 
   /**
    * A Boundary object based on OpenCASCADE TopoDS_Shape objects which have
@@ -373,7 +378,7 @@ namespace OpenCASCADE
      * Return a tuple representing the minimum and maximum values of u
      * and v.  Precisely, it returns (u_min, u_max, v_min, v_max)
      */
-    std_cxx11::tuple<double, double, double, double>
+    std::tuple<double, double, double, double>
     get_uv_bounds() const;
 
     /**

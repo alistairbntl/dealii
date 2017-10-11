@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mg_tools_h
-#define dealii__mg_tools_h
+#ifndef dealii_mg_tools_h
+#define dealii_mg_tools_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/index_set.h>
@@ -178,6 +178,9 @@ namespace MGTools
    * indices of degrees of freedom for each level that are at the part of the
    * boundary identified by the function_map argument. Its length has to match
    * the number of levels in the dof handler object.
+   *
+   * Previous content in @p boundary_indices is not overwritten,
+   * but added to.
    */
   template <int dim, int spacedim>
   void
@@ -189,11 +192,28 @@ namespace MGTools
   /**
    * The same function as above, but return an IndexSet rather than a
    * std::set<unsigned int> on each level.
+   *
+   * Previous content in @p boundary_indices is not overwritten,
+   * but added to.
    */
   template <int dim, int spacedim>
   void
   make_boundary_list (const DoFHandler<dim,spacedim>      &mg_dof,
                       const typename FunctionMap<dim>::type &function_map,
+                      std::vector<IndexSet>                 &boundary_indices,
+                      const ComponentMask               &component_mask = ComponentMask());
+
+  /**
+   * The same function as above, but return an IndexSet rather than a
+   * std::set<unsigned int> on each level and use a std::set of boundary_ids
+   * as input.
+   *
+   * Previous content in @p boundary_indices is not overwritten, but added to.
+   */
+  template <int dim, int spacedim>
+  void
+  make_boundary_list (const DoFHandler<dim,spacedim>      &mg_dof,
+                      const std::set<types::boundary_id> &boundary_ids,
                       std::vector<IndexSet>                 &boundary_indices,
                       const ComponentMask               &component_mask = ComponentMask());
 

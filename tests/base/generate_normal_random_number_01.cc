@@ -19,10 +19,6 @@
 // normality holds for the numbers produced on different threads
 
 #include "../tests.h"
-#include <iomanip>
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
 #include <deal.II/base/utilities.h>
 
@@ -54,9 +50,7 @@ std::pair<double,double> test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   // create 4 threads, run the test function on them
   Threads::Thread<std::pair<double,double> > tg[4];

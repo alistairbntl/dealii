@@ -19,10 +19,7 @@
 
 #include "../tests.h"
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
-#include <fstream>
-#include <iomanip>
 #include <complex>
 
 int main ()
@@ -30,7 +27,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   double a_double[3][3][2] = {{{1,-1}, {2,0}, {3,0}},
     {{3,0}, {4,0}, {5,0}},

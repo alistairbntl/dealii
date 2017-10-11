@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,7 @@
 An error occurred in line <1344> of file </scratch/deal-trunk/deal.II/source/dofs/dof_handler_policy.cc> in function
     void dealii::internal::DoFHandler::Policy::{anonymous}::set_mg_dofindices_recursively(const dealii::parallel::distributed::Triangulation<dim, spacedim>&, const typename dealii::internal::p4est::types<dim>::quadrant&, const typename dealii::DoFHandler<dim, spacedim>::level_cell_iterator&, const typename dealii::internal::p4est::types<dim>::quadrant&, unsigned int*, unsigned int) [with int dim = 2; int spacedim = 2; typename dealii::internal::p4est::types<dim>::quadrant = p4est_quadrant; typename dealii::DoFHandler<dim, spacedim>::level_cell_iterator = dealii::TriaIterator<dealii::DoFCellAccessor<dealii::DoFHandler<2>, true> >]
 The violated condition was:
-    (dof_indices[i] == (DoFHandler<dim,spacedim>::invalid_dof_index)) || (dof_indices[i]==dofs[i])
+    (dof_indices[i] == (numbers::invalid_dof_index)) || (dof_indices[i]==dofs[i])
 The name and call sequence of the exception was:
     ExcInternalError()
 Additional Information:
@@ -28,8 +28,6 @@ Additional Information:
 */
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -47,9 +45,8 @@ Additional Information:
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/lac/trilinos_vector.h>
 
-#include <fstream>
 
-template<int dim>
+template <int dim>
 void output(parallel::distributed::Triangulation<dim> &tr)
 {
   const std::string filename = ("mesh." +
@@ -60,7 +57,7 @@ void output(parallel::distributed::Triangulation<dim> &tr)
 
 }
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -69,7 +66,7 @@ void test()
     deallog << "hyper_cube" << std::endl;
 
   parallel::distributed::Triangulation<dim> tr(MPI_COMM_WORLD,
-                                               Triangulation<dim>::none,
+                                               Triangulation<dim>:: limit_level_difference_at_vertices,
                                                parallel::distributed::Triangulation<dim>::construct_multigrid_hierarchy);
   GridGenerator::hyper_cube(tr);
   tr.refine_global(2);

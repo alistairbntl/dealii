@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,9 +22,7 @@
 #include "../tests.h"
 #include <deal.II/lac/generic_linear_algebra.h>
 #include <deal.II/base/index_set.h>
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 #include <vector>
 
 #include <deal.II/lac/full_matrix.h>
@@ -74,7 +72,7 @@ void test ()
   IndexSet relevant;
   DoFTools::extract_locally_relevant_dofs (dof_handler, relevant);
 
-  CompressedSimpleSparsityPattern sp (relevant);
+  DynamicSparsityPattern sp (relevant);
   typename LA::MPI::SparseMatrix matrix;
   DoFTools::make_sparsity_pattern (dof_handler, sp,
                                    cm, false,

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,8 +18,7 @@
 //TODO: [GK] Produce some useful output!
 
 #include "../tests.h"
-#include "testmatrix.h"
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/block_sparse_matrix.h>
 #include <deal.II/lac/sparse_matrix_ez.h>
@@ -31,8 +30,6 @@
 #include <deal.II/lac/sparse_matrix_ez.templates.h>
 #include <deal.II/lac/precondition_block.templates.h>
 
-#include <fstream>
-#include <cstdio>
 
 
 #define PREC_CHECK(solver, method, precond) \
@@ -41,7 +38,7 @@
   deallog.pop(); \
   residuals.push_back(control.last_value())
 
-template<typename MatrixType>
+template <typename MatrixType>
 void
 check_vmult_quadratic (std::vector<double> &residuals,
                        const MatrixType    &A,
@@ -279,19 +276,8 @@ int main()
   deallog << std::setprecision(3);
   deallog.attach(logfile);
 
-  // Switch between regression test
-  // and benchmark
-//#ifdef DEBUG
-  deallog.threshold_double(1.e-10);
   const unsigned int size = 5;
   const unsigned int row_length = 3;
-  /*#else
-    deallog.depth_console(1000);
-    deallog.log_execution_time(true);
-    deallog.log_time_differences(true);
-    const unsigned int size = 50;
-    const unsigned int row_length = 9;
-    #endif*/
 
   check_ez_iterator();
   check_conjugate(logfile);
@@ -313,9 +299,7 @@ int main()
     deallog << "Assemble" << std::endl;
     testproblem.five_point(A, true);
     check_vmult_quadratic(A_res, A, "5-SparseMatrix<double>");
-//#ifdef DEBUG
     check_iterator(A);
-//#endif
   }
 
   // block sparse matrix with only
@@ -332,9 +316,7 @@ int main()
     testproblem.five_point(block_A, true);
     std::vector<double> block_A_res;
     check_vmult_quadratic(block_A_res, block_A, "5-BlockSparseMatrix<double>");
-//#ifdef DEBUG
     check_iterator(block_A);
-//#endif
   }
 
   // ez sparse matrix
@@ -343,9 +325,7 @@ int main()
     deallog << "Assemble" << std::endl;
     testproblem.five_point(E, true);
     check_vmult_quadratic(E_res, E, "5-SparseMatrixEZ<double>");
-//#ifdef DEBUG
     check_iterator(E);
-//#endif
     E.print_statistics(deallog, true);
     E.add(-1., A);
     if (E.l2_norm() < 1.e-14)

@@ -19,7 +19,6 @@
 // exception if we have distorted cells
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -30,7 +29,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 
 
 // create a (i) pinched cell (where two vertices coincide), or (ii)
@@ -88,9 +86,7 @@ void check (const unsigned int testcase)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   for (unsigned int testcase=1; testcase<=2; ++testcase)
     {

@@ -18,7 +18,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/data_out_base.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/job_identifier.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function_lib.h>
@@ -29,11 +28,9 @@
 #include "functions.h"
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 #include <string>
 
-template<int dim>
+template <int dim>
 void
 check_function_consistency(
   const Function<dim> &f,
@@ -73,7 +70,7 @@ check_function_consistency(
 }
 
 
-template<int dim>
+template <int dim>
 void
 check_function_derivative(const Functions::FlowFunction<dim> &f,
                           unsigned int sub,
@@ -224,7 +221,7 @@ check_function_derivative(const Functions::FlowFunction<dim> &f,
 
   DataOutBase::DXFlags dxflags;
   DataOutBase::GnuplotFlags gflags;
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > vectors;
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> > vectors;
   if (dim==2)
     DataOutBase::write_gnuplot(patches, names, vectors, gflags, out);
   else

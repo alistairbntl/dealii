@@ -17,10 +17,6 @@
 // test WorkStream with empty functions
 
 #include "../tests.h"
-#include <iomanip>
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
 #include <deal.II/base/work_stream.h>
 
@@ -48,14 +44,14 @@ void test ()
   // first run with only a worker
   WorkStream::run (v.begin(), v.end(),
                    &foo,
-                   std_cxx11::function<void(const unsigned int &)>(),
+                   std::function<void(const unsigned int &)>(),
                    ScratchData(),
                    0U);
 
   // next run with only a copier
   WorkStream::run (v.begin(), v.end(),
-                   std_cxx11::function<void(const std::vector<unsigned int>::iterator,
-                                            ScratchData &,unsigned int &)>(),
+                   std::function<void(const std::vector<unsigned int>::iterator,
+                                      ScratchData &,unsigned int &)>(),
                    &bar,
                    ScratchData(),
                    0U);
@@ -66,9 +62,7 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test ();
 }

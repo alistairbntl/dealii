@@ -34,10 +34,7 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/fe/fe_q.h>
-#include <fstream>
-#include <cmath>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 
@@ -53,7 +50,6 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
 #include <vector>
 
 using namespace dealii;
@@ -124,7 +120,6 @@ int main ()
 {
   std::ofstream logfile ("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.0e-10);
 
   Triangulation<3> triangulation;
   GridIn<3> grid_in;

@@ -32,7 +32,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_q.h>
@@ -52,7 +51,6 @@
 #include <deal.II/numerics/vector_tools.h>
 
 
-#include <fstream>
 
 
 template <int dim>
@@ -125,7 +123,6 @@ int main ()
   logfile.precision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<2> ();
 

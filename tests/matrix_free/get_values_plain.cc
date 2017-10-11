@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,13 +24,12 @@
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria_boundary_lib.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -38,7 +37,6 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <iostream>
 
 std::ofstream logfile("output");
@@ -90,7 +88,6 @@ public:
     data.cell_loop (&MatrixFreeTest<dim,fe_degree,n_q_points_1d,Number>::operator(),
                     this, dst_dummy, src);
 
-    deallog.threshold_double(1e-10);
     deallog << "Error read_dof_values vs read_dof_values_plain: "
             << error/total << std::endl << std::endl;
   };
@@ -140,11 +137,11 @@ void do_test (const DoFHandler<dim> &dof,
 template <int dim, int fe_degree>
 void test ()
 {
+  const SphericalManifold<dim> manifold;
   Triangulation<dim> tria;
   GridGenerator::hyper_shell (tria, Point<dim>(), 1., 2., 96, true);
-  static const HyperShellBoundary<dim> boundary;
-  tria.set_boundary (0, boundary);
-  tria.set_boundary (1, boundary);
+  tria.set_all_manifold_ids(0);
+  tria.set_manifold (0, manifold);
 
   // refine a few cells
   for (unsigned int i=0; i<11-3*dim; ++i)
@@ -165,7 +162,7 @@ void test ()
 
   ConstraintMatrix constraints;
   DoFTools::make_hanging_node_constraints(dof, constraints);
-  VectorTools::interpolate_boundary_values (dof, 1, ZeroFunction<dim>(),
+  VectorTools::interpolate_boundary_values (dof, 1, Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close();
 
@@ -191,4 +188,3 @@ int main ()
     deallog.pop();
   }
 }
-

@@ -17,10 +17,6 @@
 // like _05, but with graph coloring
 
 #include "../tests.h"
-#include <iomanip>
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
 #include <deal.II/base/work_stream.h>
 #include <deal.II/lac/vector.h>
@@ -75,7 +71,7 @@ void test ()
     v.push_back (i);
 
   WorkStream::run (GraphColoring::make_graph_coloring (v.begin(), v.end(),
-                                                       std_cxx11::function<std::vector<types::global_dof_index>
+                                                       std::function<std::vector<types::global_dof_index>
                                                        (const std::vector<unsigned int>::iterator &)>
                                                        (&conflictor)),
                    &worker, &copier,
@@ -105,9 +101,7 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test ();
 }

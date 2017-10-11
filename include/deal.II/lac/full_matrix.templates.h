@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2016 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__full_matrix_templates_h
-#define dealii__full_matrix_templates_h
+#ifndef dealii_full_matrix_templates_h
+#define dealii_full_matrix_templates_h
 
 
 // TODO: this file has a lot of operations between matrices and matrices or
@@ -66,13 +66,6 @@ FullMatrix<number>::FullMatrix (const size_type m,
 }
 
 
-template <typename number>
-FullMatrix<number>::FullMatrix (const FullMatrix &m)
-  :
-  Table<2,number> (m)
-{}
-
-
 
 template <typename number>
 FullMatrix<number>::FullMatrix (const IdentityMatrix &id)
@@ -83,14 +76,6 @@ FullMatrix<number>::FullMatrix (const IdentityMatrix &id)
     (*this)(i,i) = 1;
 }
 
-
-template <typename number>
-FullMatrix<number> &
-FullMatrix<number>::operator = (const FullMatrix<number> &M)
-{
-  Table<2,number>::operator=(M);
-  return *this;
-}
 
 
 template <typename number>
@@ -542,11 +527,11 @@ void FullMatrix<number>::mmult (FullMatrix<number2>       &dst,
   // works for us (it is usually not efficient to use BLAS for very small
   // matrices):
 #ifdef DEAL_II_WITH_LAPACK
-  if ((types_are_equal<number,double>::value
+  if ((std::is_same<number,double>::value
        ||
-       types_are_equal<number,float>::value)
+       std::is_same<number,float>::value)
       &&
-      types_are_equal<number,number2>::value)
+      std::is_same<number,number2>::value)
     if (this->n()*this->m()*src.n() > 300)
       {
         // In case we have the BLAS function gemm detected by CMake, we
@@ -612,11 +597,11 @@ void FullMatrix<number>::Tmmult (FullMatrix<number2>       &dst,
   // works for us (it is usually not efficient to use BLAS for very small
   // matrices):
 #ifdef DEAL_II_WITH_LAPACK
-  if ((types_are_equal<number,double>::value
+  if ((std::is_same<number,double>::value
        ||
-       types_are_equal<number,float>::value)
+       std::is_same<number,float>::value)
       &&
-      types_are_equal<number,number2>::value)
+      std::is_same<number,number2>::value)
     if (this->n()*this->m()*src.n() > 300)
       {
         // In case we have the BLAS function gemm detected by CMake, we
@@ -702,11 +687,11 @@ void FullMatrix<number>::mTmult (FullMatrix<number2>       &dst,
   // works for us (it is usually not efficient to use BLAS for very small
   // matrices):
 #ifdef DEAL_II_WITH_LAPACK
-  if ((types_are_equal<number,double>::value
+  if ((std::is_same<number,double>::value
        ||
-       types_are_equal<number,float>::value)
+       std::is_same<number,float>::value)
       &&
-      types_are_equal<number,number2>::value)
+      std::is_same<number,number2>::value)
     if (this->n()*this->m()*src.m() > 300)
       {
         // In case we have the BLAS function gemm detected by CMake, we
@@ -790,11 +775,11 @@ void FullMatrix<number>::TmTmult (FullMatrix<number2>       &dst,
   // works for us (it is usually not efficient to use BLAS for very small
   // matrices):
 #ifdef DEAL_II_WITH_LAPACK
-  if ((types_are_equal<number,double>::value
+  if ((std::is_same<number,double>::value
        ||
-       types_are_equal<number,float>::value)
+       std::is_same<number,float>::value)
       &&
-      types_are_equal<number,number2>::value)
+      std::is_same<number,number2>::value)
     if (this->n()*this->m()*src.m() > 300)
       {
         // In case we have the BLAS function gemm detected by CMake, we
@@ -915,13 +900,12 @@ FullMatrix<number>::matrix_norm_square (const Vector<number2> &v) const
   number2 sum = 0.;
   const size_type n_rows = m();
   const number *val_ptr = &this->values[0];
-  const number2 *v_ptr;
 
   for (size_type row=0; row<n_rows; ++row)
     {
       number s = 0.;
       const number *const val_end_of_row = val_ptr+n_rows;
-      v_ptr = v.begin();
+      const number2 *v_ptr = v.begin();
       while (val_ptr != val_end_of_row)
         s += number(*val_ptr++) * number(*v_ptr++);
 
@@ -947,13 +931,12 @@ FullMatrix<number>::matrix_scalar_product (const Vector<number2> &u,
   const size_type n_rows = m();
   const size_type n_cols = n();
   const number *val_ptr = &this->values[0];
-  const number2 *v_ptr;
 
   for (size_type row=0; row<n_rows; ++row)
     {
       number s = 0.;
       const number *const val_end_of_row = val_ptr+n_cols;
-      v_ptr = v.begin();
+      const number2 *v_ptr = v.begin();
       while (val_ptr != val_end_of_row)
         s += number(*val_ptr++) * number(*v_ptr++);
 
@@ -1182,6 +1165,52 @@ FullMatrix<number>::operator == (const FullMatrix<number> &M) const
 }
 
 
+namespace internal
+{
+  namespace
+  {
+    // LAPACKFullMatrix is not implemented for
+    // complex numbers or long doubles
+    template <typename number, typename = void>
+    struct Determinant
+    {
+      static number value (const FullMatrix<number> &)
+      {
+        AssertThrow(false, ExcNotImplemented());
+        return 0.0;
+      }
+    };
+
+
+    // LAPACKFullMatrix is only implemented for
+    // floats and doubles
+    template <typename number>
+    struct Determinant<number, typename std::enable_if<
+      std::is_same<number,float>::value ||
+      std::is_same<number,double>::value
+      >::type>
+    {
+#ifdef DEAL_II_WITH_LAPACK
+      static number value (const FullMatrix<number> &A)
+      {
+        LAPACKFullMatrix<number> lp_A (A.m(), A.n());
+        lp_A = A;
+        lp_A.compute_lu_factorization();
+        return lp_A.determinant();
+      }
+#else
+      static number value (const FullMatrix<number> &)
+      {
+        AssertThrow(false, ExcNeedsLAPACK());
+        return 0.0;
+      }
+#endif
+    };
+
+  }
+}
+
+
 template <typename number>
 number
 FullMatrix<number>::determinant () const
@@ -1205,8 +1234,7 @@ FullMatrix<number>::determinant () const
                +(*this)(2,0)*(*this)(0,1)*(*this)(1,2)
                -(*this)(2,0)*(*this)(0,2)*(*this)(1,1));
     default:
-      Assert (false, ExcNotImplemented());
-      return 0;
+      return internal::Determinant<number>::value(*this);
     };
 }
 
@@ -1466,13 +1494,12 @@ FullMatrix<number>::cholesky (const FullMatrix<number2> &A)
       /* reinit *this to 0 */
       this->reinit(A.m(), A.n());
 
-      double SLik2 = 0.0, SLikLjk = 0.0;
       for (size_type i=0; i< this->n_cols(); i++)
         {
-          SLik2 = 0.0;
+          double SLik2 = 0.0;
           for (size_type j = 0; j < i; j++)
             {
-              SLikLjk = 0.0;
+              double SLikLjk = 0.0;
               for (size_type k =0; k<j; k++)
                 {
                   SLikLjk += (*this)(i,k)*(*this)(j,k);
@@ -1514,6 +1541,17 @@ void
 FullMatrix<number>::left_invert (const FullMatrix<number2> &A)
 {
   Assert (!A.empty(), ExcEmptyMatrix());
+
+  // If the matrix is square, simply do a
+  // standard inversion
+  if (A.m() == A.n())
+    {
+      FullMatrix<number2> left_inv(A.n(),A.m());
+      left_inv.invert(A);
+      *this = std::move(left_inv);
+      return;
+    }
+
   Assert(A.m()>A.n(), ExcDimensionMismatch(A.m(), A.n()));
   Assert(this->m()==A.n(), ExcDimensionMismatch(this->m(), A.n()));
   Assert(this->n()==A.m(), ExcDimensionMismatch(this->n(), A.m()));
@@ -1542,6 +1580,17 @@ void
 FullMatrix<number>::right_invert (const FullMatrix<number2> &A)
 {
   Assert (!A.empty(), ExcEmptyMatrix());
+
+  // If the matrix is square, simply do a
+  // standard inversion
+  if (A.m() == A.n())
+    {
+      FullMatrix<number2> right_inv(A.n(),A.m());
+      right_inv.invert(A);
+      *this = std::move(right_inv);
+      return;
+    }
+
   Assert(A.n()>A.m(), ExcDimensionMismatch(A.n(), A.m()));
   Assert(this->m()==A.n(), ExcDimensionMismatch(this->m(), A.n()));
   Assert(this->n()==A.m(), ExcDimensionMismatch(this->n(), A.m()));
@@ -1681,7 +1730,11 @@ FullMatrix<number>::print_formatted (
   for (size_type i=0; i<m(); ++i)
     {
       for (size_type j=0; j<n(); ++j)
-        if (std::abs((*this)(i,j)) > threshold)
+        // we might have complex numbers, so use abs also to check for nan
+        // since there is no isnan on complex numbers
+        if (std::isnan(std::abs((*this)(i,j))))
+          out << std::setw(width) << (*this)(i,j) << ' ';
+        else if (std::abs((*this)(i,j)) > threshold)
           out << std::setw(width)
               << (*this)(i,j) * number(denominator) << ' ';
         else
@@ -1709,9 +1762,9 @@ FullMatrix<number>::gauss_jordan ()
   // efficient to use Lapack for very small
   // matrices):
 #ifdef DEAL_II_WITH_LAPACK
-  if (types_are_equal<number,double>::value
+  if (std::is_same<number,double>::value
       ||
-      types_are_equal<number,float>::value)
+      std::is_same<number,float>::value)
     if (this->n_cols() > 15)
       {
         // In case we have the LAPACK functions

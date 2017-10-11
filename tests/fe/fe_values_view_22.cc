@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,7 +16,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/block_sparse_matrix.h>
@@ -35,7 +34,6 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
 #include <iostream>
 
 using namespace dealii;
@@ -118,7 +116,7 @@ void MixedElastoPlasticity<dim>::make_grid_and_dofs()
           << std::endl;
 
   {
-    BlockCompressedSimpleSparsityPattern csp(2, 2);
+    BlockDynamicSparsityPattern csp(2, 2);
 
     csp.block(0, 0).reinit(n_stress_dof, n_stress_dof);
     csp.block(1, 0).reinit(n_gamma_dof, n_stress_dof);
@@ -241,7 +239,6 @@ int main()
   deallog << std::setprecision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   MixedElastoPlasticity < 3 > elasto_plasticity(1);
   elasto_plasticity.run();

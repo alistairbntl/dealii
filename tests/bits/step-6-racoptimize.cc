@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,15 +20,12 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -47,8 +44,6 @@ std::ofstream logfile("output");
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <fstream>
-#include <iomanip>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/grid/grid_out.h>
@@ -200,7 +195,7 @@ void LaplaceProblem<dim>::assemble_system ()
 
   FEValues<dim> x_fe_values (fe, quadrature_formula,
                              update_values    |  update_gradients |
-                             update_q_points  |  update_JxW_values);
+                             update_quadrature_points  |  update_JxW_values);
 
   const unsigned int   dofs_per_cell = fe.dofs_per_cell;
   const unsigned int   n_q_points    = quadrature_formula.size();
@@ -259,7 +254,7 @@ void LaplaceProblem<dim>::assemble_system ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim>(),
+                                            Functions::ZeroFunction<dim>(),
                                             boundary_values);
   MatrixTools::apply_boundary_values (boundary_values,
                                       system_matrix,
@@ -378,42 +373,10 @@ void LaplaceProblem<dim>::run ()
 
 int main ()
 {
-  deallog << std::setprecision(2);
-  logfile << std::setprecision(2);
+  initlog();
 
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
-
-  try
-    {
-
-      LaplaceProblem<2> laplace_problem_2d;
-      laplace_problem_2d.run ();
-    }
-  catch (std::exception &exc)
-    {
-      deallog << std::endl << std::endl
-              << "----------------------------------------------------"
-              << std::endl;
-      deallog << "Exception on processing: " << std::endl
-              << exc.what() << std::endl
-              << "Aborting!" << std::endl
-              << "----------------------------------------------------"
-              << std::endl;
-
-      return 1;
-    }
-  catch (...)
-    {
-      deallog << std::endl << std::endl
-              << "----------------------------------------------------"
-              << std::endl;
-      deallog << "Unknown exception!" << std::endl
-              << "Aborting!" << std::endl
-              << "----------------------------------------------------"
-              << std::endl;
-      return 1;
-    }
+  LaplaceProblem<2> laplace_problem_2d;
+  laplace_problem_2d.run ();
 
   return 0;
 }

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,15 +19,12 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/thread_management.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
@@ -52,8 +49,6 @@ std::ofstream logfile("output");
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/error_estimator.h>
 
-#include <iomanip>
-#include <fstream>
 #include <list>
 #include <algorithm>
 #include <numeric>
@@ -190,7 +185,7 @@ namespace Evaluation
     QTrapez<dim>  vertex_quadrature;
     FEValues<dim> fe_values (dof_handler.get_fe(),
                              vertex_quadrature,
-                             update_gradients | update_q_points);
+                             update_gradients | update_quadrature_points);
     std::vector<Tensor<1,dim> >
     solution_gradients (vertex_quadrature.size());
 
@@ -670,7 +665,7 @@ namespace LaplaceSolver
   assemble_rhs (Vector<double> &rhs) const
   {
     FEValues<dim> fe_values (*this->fe, *this->quadrature,
-                             update_values  | update_q_points  |
+                             update_values  | update_quadrature_points  |
                              update_JxW_values);
 
     const unsigned int   dofs_per_cell = this->fe->dofs_per_cell;
@@ -1017,12 +1012,12 @@ namespace Data
   template <int dim>
   struct Exercise_2_3
   {
-    typedef ZeroFunction<dim> BoundaryValues;
+    typedef Functions::ZeroFunction<dim> BoundaryValues;
 
-    class RightHandSide : public ConstantFunction<dim>
+    class RightHandSide : public Functions::ConstantFunction<dim>
     {
     public:
-      RightHandSide () : ConstantFunction<dim> (1.) {}
+      RightHandSide () : Functions::ConstantFunction<dim> (1.) {}
     };
 
     static
@@ -1223,7 +1218,7 @@ namespace DualFunctional
     QGauss<dim> quadrature(4);
     FEValues<dim>  fe_values (dof_handler.get_fe(), quadrature,
                               update_gradients |
-                              update_q_points  |
+                              update_quadrature_points  |
                               update_JxW_values);
     const unsigned int n_q_points = fe_values.n_quadrature_points;
     const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
@@ -1296,13 +1291,13 @@ namespace LaplaceSolver
     const SmartPointer<const DualFunctional::DualFunctionalBase<dim> > dual_functional;
     virtual void assemble_rhs (Vector<double> &rhs) const;
 
-    static const ZeroFunction<dim> boundary_values;
+    static const Functions::ZeroFunction<dim> boundary_values;
 
     friend class WeightedResidual<dim>;
   };
 
   template <int dim>
-  const ZeroFunction<dim> DualSolver<dim>::boundary_values;
+  const Functions::ZeroFunction<dim> DualSolver<dim>::boundary_values;
 
   template <int dim>
   DualSolver<dim>::
@@ -1474,8 +1469,8 @@ namespace LaplaceSolver
     :
     fe_values (fe, quadrature,
                update_values             |
-               update_second_derivatives |
-               update_q_points           |
+               update_hessians |
+               update_quadrature_points           |
                update_JxW_values),
     right_hand_side (&right_hand_side)
   {
@@ -2019,7 +2014,7 @@ void Framework<dim>::run (const ProblemDescription &descriptor)
   const QGauss<dim>   quadrature(descriptor.dual_fe_degree+1);
   const QGauss<dim-1> face_quadrature(descriptor.dual_fe_degree+1);
 
-  LaplaceSolver::Base<dim> *solver = 0;
+  LaplaceSolver::Base<dim> *solver = nullptr;
   switch (descriptor.refinement_criterion)
     {
     case ProblemDescription::dual_weighted_error_estimator:
@@ -2106,7 +2101,7 @@ void Framework<dim>::run (const ProblemDescription &descriptor)
 
   deallog << std::endl;
   delete solver;
-  solver = 0;
+  solver = nullptr;
 }
 
 
@@ -2121,9 +2116,13 @@ int main ()
       logfile << std::setprecision(2);
 
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       const unsigned int dim = 2;
+
+      Data::SetUp<Data::Exercise_2_3<dim>,dim> setup;
+      const Point<dim> evaluation_point (0.75, 0.75);
+      DualFunctional::PointValueEvaluation<dim> eval(evaluation_point);
+
       Framework<dim>::ProblemDescription descriptor;
 
       descriptor.refinement_criterion
@@ -2132,11 +2131,8 @@ int main ()
       descriptor.primal_fe_degree = 1;
       descriptor.dual_fe_degree   = 2;
 
-      descriptor.data = new Data::SetUp<Data::Exercise_2_3<dim>,dim> ();
-
-      const Point<dim> evaluation_point (0.75, 0.75);
-      descriptor.dual_functional
-        = new DualFunctional::PointValueEvaluation<dim> (evaluation_point);
+      descriptor.data = &setup;
+      descriptor.dual_functional = &eval;
 
       Evaluation::PointValueEvaluation<dim>
       postprocessor1 (evaluation_point);

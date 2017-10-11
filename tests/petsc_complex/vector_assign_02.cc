@@ -15,18 +15,17 @@
 
 
 
-// this is equivalent to the petsc_vector_assign_01 test, except that we use
+// this is equivalent to the petsc_parallel_vector_assign_01 test, except that we use
 // operator+= instead of operator=. This is also not exciting...
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
 
-void test (PETScWrappers::Vector &v,
-           PETScWrappers::Vector &w)
+void test (PETScWrappers::MPI::Vector &v,
+           PETScWrappers::MPI::Vector &w)
 {
   // set the first vector
   for (unsigned int k=0; k<v.size(); ++k)
@@ -48,14 +47,13 @@ int main (int argc, char **argv)
   std::ofstream logfile ("output");
   deallog.attach(logfile);
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        PETScWrappers::Vector v (20);
-        PETScWrappers::Vector w (20);
+        PETScWrappers::MPI::Vector v (MPI_COMM_WORLD, 20, 20);
+        PETScWrappers::MPI::Vector w (MPI_COMM_WORLD, 20, 20);
         test (v,w);
 
         // Some output

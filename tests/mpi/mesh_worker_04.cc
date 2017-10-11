@@ -26,8 +26,6 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/filtered_iterator.h>
 
-#include <fstream>
-#include <iomanip>
 
 using namespace dealii;
 
@@ -80,9 +78,9 @@ class DoNothingAssembler
 public:
   template <class DOFINFO>
   void initialize_info(DOFINFO &info, bool face) const {}
-  template<class DOFINFO>
+  template <class DOFINFO>
   void assemble(const DOFINFO &info) {}
-  template<class DOFINFO>
+  template <class DOFINFO>
   void assemble(const DOFINFO &info1,
                 const DOFINFO &info2) {}
 
@@ -102,9 +100,9 @@ test_simple(DoFHandler<dim> &dofs, MeshWorker::LoopControl &lctrl)
 //                typename identity<ITERATOR>::type end,
 //                DOFINFO &dinfo,
 //                INFOBOX &info,
-//                const std_cxx11::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &cell_worker,
-//                const std_cxx11::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &boundary_worker,
-//                const std_cxx11::function<void (DOFINFO &, DOFINFO &,
+//                const std::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &cell_worker,
+//                const std::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &boundary_worker,
+//                const std::function<void (DOFINFO &, DOFINFO &,
 //                                                typename INFOBOX::CellInfo &,
 //                                                typename INFOBOX::CellInfo &)> &face_worker,
 //                ASSEMBLER &assembler,
@@ -122,14 +120,14 @@ test_simple(DoFHandler<dim> &dofs, MeshWorker::LoopControl &lctrl)
 //  MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
 //    (dofs.begin_active(), dofs.end(),
 //   dof_info, info_box,
-//       std_cxx11::bind (&Integrator<dim>::cell, local, std_cxx11::_1, std_cxx11::_2),
-//   std_cxx11::bind (&Integrator<dim>::bdry, local, std_cxx11::_1, std_cxx11::_2),
-//   std_cxx11::bind (&Integrator<dim>::face, local, std_cxx11::_1, std_cxx11::_2, std_cxx11::_3, std_cxx11::_4),
+//       std::bind (&Integrator<dim>::cell, local, std::placeholders::_1, std::placeholders::_2),
+//   std::bind (&Integrator<dim>::bdry, local, std::placeholders::_1, std::placeholders::_2),
+//   std::bind (&Integrator<dim>::face, local, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4),
 //     local,
 //     lctrl);
 }
 
-template<int dim>
+template <int dim>
 void test_loop(DoFHandler<dim> &dofs, MeshWorker::LoopControl &lctrl)
 {
   deallog << "* own_cells=" << lctrl.own_cells
@@ -140,7 +138,7 @@ void test_loop(DoFHandler<dim> &dofs, MeshWorker::LoopControl &lctrl)
   test_simple(dofs, lctrl);
 }
 
-template<int dim>
+template <int dim>
 void
 test()
 {

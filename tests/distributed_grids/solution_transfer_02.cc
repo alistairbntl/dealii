@@ -19,7 +19,6 @@
 
 #include "../tests.h"
 #include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -31,17 +30,14 @@
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/intergrid_map.h>
 
-#include <deal.II/lac/petsc_vector.h>
 #include <deal.II/fe/fe_q.h>
 
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/fe/mapping_q1.h>
 #include <deal.II/base/function.h>
 
-#include <fstream>
-#include <cstdlib>
 
-template<int dim>
+template <int dim>
 class MyFunction : public Function<dim>
 {
 public:
@@ -59,7 +55,7 @@ public:
   };
 };
 
-template<int dim>
+template <int dim>
 void test(std::ostream & /*out*/)
 {
   MyFunction<dim> func;
@@ -85,7 +81,7 @@ void test(std::ostream & /*out*/)
 
   Vector<double> solution(dofh.n_dofs());
   VectorTools::interpolate (mapping,
-                            * static_cast<dealii::DoFHandler<dim>* >(&dofh),
+                            dofh,
                             func,
                             solution);
 
@@ -124,7 +120,6 @@ int main(int argc, char *argv[])
 
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("2d");
   test<2>(logfile);

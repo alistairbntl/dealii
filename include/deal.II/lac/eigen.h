@@ -13,19 +13,19 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__eigen_h
-#define dealii__eigen_h
+#ifndef dealii_eigen_h
+#define dealii_eigen_h
 
 
 #include <deal.II/base/config.h>
-#include <deal.II/lac/shifted_matrix.h>
-#include <deal.II/lac/solver.h>
-#include <deal.II/lac/solver_control.h>
+#include <deal.II/lac/linear_operator.h>
+#include <deal.II/lac/precondition.h>
 #include <deal.II/lac/solver_cg.h>
+#include <deal.II/lac/solver_control.h>
 #include <deal.II/lac/solver_gmres.h>
+#include <deal.II/lac/solver.h>
 #include <deal.II/lac/solver_minres.h>
 #include <deal.II/lac/vector_memory.h>
-#include <deal.II/lac/precondition.h>
 
 #include <cmath>
 
@@ -237,12 +237,12 @@ EigenPower<VectorType>::solve (double           &value,
 {
   SolverControl::State conv=SolverControl::iterate;
 
-  deallog.push("Power method");
+  LogStream::Prefix prefix("Power method");
 
-  VectorType *Vy = this->memory.alloc ();
+  typename VectorMemory<VectorType>::Pointer Vy (this->memory);
   VectorType &y = *Vy;
   y.reinit (x);
-  VectorType *Vr = this->memory.alloc ();
+  typename VectorMemory<VectorType>::Pointer Vr (this->memory);
   VectorType &r = *Vr;
   r.reinit (x);
 
@@ -291,11 +291,6 @@ EigenPower<VectorType>::solve (double           &value,
       conv = this->iteration_status (iter, std::fabs(1./length-1./old_length), x);
     }
 
-  this->memory.free(Vy);
-  this->memory.free(Vr);
-
-  deallog.pop();
-
   // in case of failure: throw exception
   AssertThrow(conv == SolverControl::success, SolverControl::NoConvergence (iter,
               std::fabs(1./length-1./old_length)));
@@ -329,12 +324,14 @@ EigenInverse<VectorType>::solve (double           &value,
                                  const MatrixType &A,
                                  VectorType       &x)
 {
-  deallog.push("Wielandt");
+  LogStream::Prefix prefix("Wielandt");
 
   SolverControl::State conv=SolverControl::iterate;
 
   // Prepare matrix for solver
-  ShiftedMatrix <MatrixType> A_s(A, -value);
+  auto A_op = linear_operator(A);
+  double current_shift = -value;
+  auto A_s = A_op + current_shift * identity_operator(A_op);
 
   // Define solver
   ReductionControl inner_control (5000, 1.e-16, 1.e-5, false, false);
@@ -346,10 +343,10 @@ EigenInverse<VectorType>::solve (double           &value,
   unsigned int goal = additional_data.start_adaption;
 
   // Auxiliary vector
-  VectorType *Vy = this->memory.alloc ();
+  typename VectorMemory<VectorType>::Pointer Vy (this->memory);
   VectorType &y = *Vy;
   y.reinit (x);
-  VectorType *Vr = this->memory.alloc ();
+  typename VectorMemory<VectorType>::Pointer Vr (this->memory);
   VectorType &r = *Vr;
   r.reinit (x);
 
@@ -383,15 +380,17 @@ EigenInverse<VectorType>::solve (double           &value,
       --i;
 
       // Compute unshifted eigenvalue
-      value = (entry * x (i) < 0.) ? -length : length;
-      value = 1./value;
-      value -= A_s.shift ();
+      value = (entry * x(i) < 0. ? -1. : 1.) / length - current_shift;
 
       if (iter==goal)
         {
-          const double new_shift = - additional_data.relaxation * value
-                                   + (1.-additional_data.relaxation) * A_s.shift();
-          A_s.shift(new_shift);
+          const auto &relaxation = additional_data.relaxation;
+          const double new_shift =
+            relaxation * (-value) + (1. - relaxation) * current_shift;
+
+          A_s = A_op + new_shift * identity_operator(A_op);
+          current_shift = new_shift;
+
           ++goal;
         }
 
@@ -414,11 +413,6 @@ EigenInverse<VectorType>::solve (double           &value,
         }
       old_value = value;
     }
-
-  this->memory.free(Vy);
-  this->memory.free(Vr);
-
-  deallog.pop();
 
   // in case of failure: throw
   // exception

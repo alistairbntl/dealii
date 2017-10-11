@@ -19,15 +19,11 @@
 // but to miscompare
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <cstdlib>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   deallog << "FAIL!" << std::endl;
 }

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,6 +16,7 @@
 
 #include <deal.II/base/quadrature.h>
 #include <deal.II/base/quadrature_lib.h>
+#include <deal.II/lac/vector.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_tools.h>
@@ -23,19 +24,27 @@
 
 #include <iostream>
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
+
 
 DEAL_II_NAMESPACE_OPEN
 
 
-namespace
+namespace internal
 {
-  std::vector<Point<1> >
-  get_QGaussLobatto_points (const unsigned int degree)
+  namespace FE_DGQ
   {
-    if (degree > 0)
-      return QGaussLobatto<1>(degree+1).get_points();
-    else
-      return std::vector<Point<1> >(1, Point<1>(0.5));
+    namespace
+    {
+      std::vector<Point<1> >
+      get_QGaussLobatto_points (const unsigned int degree)
+      {
+        if (degree > 0)
+          return QGaussLobatto<1>(degree+1).get_points();
+        else
+          return std::vector<Point<1> >(1, Point<1>(0.5));
+      }
+    }
   }
 }
 
@@ -45,14 +54,15 @@ template <int dim, int spacedim>
 FE_DGQ<dim, spacedim>::FE_DGQ (const unsigned int degree)
   :
   FE_Poly<TensorProductPolynomials<dim>, dim, spacedim>
-  (TensorProductPolynomials<dim>(Polynomials::generate_complete_Lagrange_basis(get_QGaussLobatto_points(degree))),
+  (TensorProductPolynomials<dim>(Polynomials::generate_complete_Lagrange_basis
+                                 (internal::FE_DGQ::get_QGaussLobatto_points(degree))),
    FiniteElementData<dim>(get_dpo_vector(degree), 1, degree, FiniteElementData<dim>::L2),
    std::vector<bool>(FiniteElementData<dim>(get_dpo_vector(degree),1, degree).dofs_per_cell, true),
    std::vector<ComponentMask>(FiniteElementData<dim>(get_dpo_vector(degree),1, degree).dofs_per_cell, std::vector<bool>(1,true)))
 {
   // Compute support points, which are the tensor product of the Lagrange
   // interpolation points in the constructor.
-  Quadrature<dim> support_quadrature(get_QGaussLobatto_points(degree));
+  Quadrature<dim> support_quadrature(internal::FE_DGQ::get_QGaussLobatto_points(degree));
   Assert (support_quadrature.get_points().size() > 0,
           (typename FiniteElement<dim, spacedim>::ExcFEHasNoSupportPoints ()));
   this->unit_support_points = support_quadrature.get_points();
@@ -67,21 +77,16 @@ FE_DGQ<dim, spacedim>::FE_DGQ (const unsigned int degree)
 
 
 template <int dim, int spacedim>
-FE_DGQ<dim, spacedim>::FE_DGQ (const Quadrature<1> &points)
+FE_DGQ<dim, spacedim>::FE_DGQ (const std::vector<Polynomials::Polynomial<double> > &polynomials)
   :
   FE_Poly<TensorProductPolynomials<dim>, dim, spacedim> (
-    TensorProductPolynomials<dim>(Polynomials::generate_complete_Lagrange_basis(points.get_points())),
-    FiniteElementData<dim>(get_dpo_vector(points.size()-1), 1, points.size()-1, FiniteElementData<dim>::L2),
-    std::vector<bool>(FiniteElementData<dim>(get_dpo_vector(points.size()-1),1, points.size()-1).dofs_per_cell, true),
-    std::vector<ComponentMask>(FiniteElementData<dim>(get_dpo_vector(points.size()-1),1, points.size()-1).dofs_per_cell, std::vector<bool>(1,true)))
+    TensorProductPolynomials<dim>(polynomials),
+    FiniteElementData<dim>(get_dpo_vector(polynomials.size()-1), 1, polynomials.size()-1, FiniteElementData<dim>::L2),
+    std::vector<bool>(FiniteElementData<dim>(get_dpo_vector(polynomials.size()-1),1, polynomials.size()-1).dofs_per_cell, true),
+    std::vector<ComponentMask>(FiniteElementData<dim>(get_dpo_vector(polynomials.size()-1),1, polynomials.size()-1).dofs_per_cell, std::vector<bool>(1,true)))
 {
-  // Compute support points, which are the tensor product of the Lagrange
-  // interpolation points in the constructor.
-  Assert (points.size() > 0,
-          (typename FiniteElement<dim, spacedim>::ExcFEHasNoSupportPoints ()));
-  Quadrature<dim> support_quadrature(points);
-  this->unit_support_points = support_quadrature.get_points();
-
+  // No support points can be defined in general. Derived classes might define
+  // support points like the class FE_DGQArbitraryNodes
 
   // do not initialize embedding and restriction here. these matrices are
   // initialized on demand in get_restriction_matrix and
@@ -94,7 +99,7 @@ template <int dim, int spacedim>
 std::string
 FE_DGQ<dim, spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in sync
 
@@ -108,10 +113,33 @@ FE_DGQ<dim, spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+void
+FE_DGQ<dim,spacedim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                        std::vector<double>                &nodal_values) const
+{
+  AssertDimension (support_point_values.size(),
+                   this->get_unit_support_points().size());
+  AssertDimension (support_point_values.size(),
+                   nodal_values.size());
+  AssertDimension (this->dofs_per_cell,
+                   nodal_values.size());
+
+  for (unsigned int i=0; i<this->dofs_per_cell; ++i)
+    {
+      AssertDimension (support_point_values[i].size(), 1);
+
+      nodal_values[i] = support_point_values[i](0);
+    }
+}
+
+
+
+template <int dim, int spacedim>
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_DGQ<dim, spacedim>::clone() const
 {
-  return new FE_DGQ<dim, spacedim>(*this);
+  return std_cxx14::make_unique<FE_DGQ<dim, spacedim>>(*this);
 }
 
 
@@ -220,7 +248,7 @@ get_interpolation_matrix (const FiniteElement<dim, spacedim> &x_source_fe,
   // source FE is also a
   // DGQ element
   typedef FiniteElement<dim, spacedim> FE;
-  AssertThrow ((dynamic_cast<const FE_DGQ<dim, spacedim>*>(&x_source_fe) != 0),
+  AssertThrow ((dynamic_cast<const FE_DGQ<dim, spacedim>*>(&x_source_fe) != nullptr),
                typename FE::ExcInterpolationNotImplemented() );
 
   // ok, source is a Q element, so
@@ -307,7 +335,7 @@ get_face_interpolation_matrix (const FiniteElement<dim, spacedim> &x_source_fe,
   // much we need to do here.
   (void)interpolation_matrix;
   typedef FiniteElement<dim,spacedim> FE;
-  AssertThrow ((dynamic_cast<const FE_DGQ<dim, spacedim>*>(&x_source_fe) != 0),
+  AssertThrow ((dynamic_cast<const FE_DGQ<dim, spacedim>*>(&x_source_fe) != nullptr),
                typename FE::ExcInterpolationNotImplemented());
 
   Assert (interpolation_matrix.m() == 0,
@@ -324,7 +352,7 @@ template <int dim, int spacedim>
 void
 FE_DGQ<dim, spacedim>::
 get_subface_interpolation_matrix (const FiniteElement<dim, spacedim> &x_source_fe,
-                                  const unsigned int ,
+                                  const unsigned int,
                                   FullMatrix<double>           &interpolation_matrix) const
 {
   // this is only implemented, if the source
@@ -335,7 +363,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim, spacedim> &x_source_f
   // much we need to do here.
   (void)interpolation_matrix;
   typedef FiniteElement<dim, spacedim> FE;
-  AssertThrow ((dynamic_cast<const FE_DGQ<dim, spacedim>*>(&x_source_fe) != 0),
+  AssertThrow ((dynamic_cast<const FE_DGQ<dim, spacedim>*>(&x_source_fe) != nullptr),
                typename FE::ExcInterpolationNotImplemented());
 
   Assert (interpolation_matrix.m() == 0,
@@ -558,6 +586,12 @@ FE_DGQ<dim, spacedim>::has_support_on_face (const unsigned int shape_index,
 
   unsigned int n = this->degree+1;
 
+  // For DGQ elements that do not define support points, we cannot define
+  // whether they have support at the boundary easily, so return true in any
+  // case
+  if (this->unit_support_points.empty())
+    return true;
+
   // for DGQ(0) elements or arbitrary node DGQ with support points not located
   // at the element boundary, the single shape functions is constant and
   // therefore lives on the boundary
@@ -656,10 +690,17 @@ FE_DGQ<dim, spacedim>::memory_consumption () const
 
 
 
+// ------------------------------ FE_DGQArbitraryNodes -----------------------
+
 template <int dim, int spacedim>
 FE_DGQArbitraryNodes<dim,spacedim>::FE_DGQArbitraryNodes (const Quadrature<1> &points)
-  : FE_DGQ<dim,spacedim>(points)
-{}
+  : FE_DGQ<dim,spacedim>(Polynomials::generate_complete_Lagrange_basis(points.get_points()))
+{
+  Assert (points.size() > 0,
+          (typename FiniteElement<dim, spacedim>::ExcFEHasNoSupportPoints ()));
+  Quadrature<dim> support_quadrature(points);
+  this->unit_support_points = support_quadrature.get_points();
+}
 
 
 
@@ -667,7 +708,7 @@ template <int dim, int spacedim>
 std::string
 FE_DGQArbitraryNodes<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function does not work for
+  // note that the FETools::get_fe_by_name function does not work for
   // FE_DGQArbitraryNodes since there is no initialization by a degree value.
   std::ostringstream namebuf;
   bool equidistant = true;
@@ -752,7 +793,31 @@ FE_DGQArbitraryNodes<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+void
+FE_DGQArbitraryNodes<dim,spacedim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                        std::vector<double>                &nodal_values) const
+{
+  AssertDimension (support_point_values.size(),
+                   this->get_unit_support_points().size());
+  AssertDimension (support_point_values.size(),
+                   nodal_values.size());
+  AssertDimension (this->dofs_per_cell,
+                   nodal_values.size());
+
+  for (unsigned int i=0; i<this->dofs_per_cell; ++i)
+    {
+      AssertDimension (support_point_values[i].size(), 1);
+
+      nodal_values[i] = support_point_values[i](0);
+    }
+}
+
+
+
+
+template <int dim, int spacedim>
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_DGQArbitraryNodes<dim,spacedim>::clone() const
 {
   // Construct a dummy quadrature formula containing the FE's nodes:
@@ -762,7 +827,105 @@ FE_DGQArbitraryNodes<dim,spacedim>::clone() const
     qpoints[i] = Point<1>(this->unit_support_points[lexicographic[i]][0]);
   Quadrature<1> pquadrature(qpoints);
 
-  return new FE_DGQArbitraryNodes<dim,spacedim>(pquadrature);
+  return std_cxx14::make_unique<FE_DGQArbitraryNodes<dim,spacedim>>(pquadrature);
+}
+
+
+
+// ---------------------------------- FE_DGQLegendre -------------------------
+
+template <int dim, int spacedim>
+FE_DGQLegendre<dim,spacedim>::FE_DGQLegendre (const unsigned int degree)
+  : FE_DGQ<dim,spacedim>(Polynomials::Legendre::generate_complete_basis(degree))
+{}
+
+
+
+template <int dim, int spacedim>
+std::pair<Table<2,bool>, std::vector<unsigned int> >
+FE_DGQLegendre<dim,spacedim>::get_constant_modes () const
+{
+  // Legendre represents a constant function by one in the first basis
+  // function and zero in all others
+  Table<2,bool> constant_modes(1, this->dofs_per_cell);
+  constant_modes(0,0) = true;
+  return std::pair<Table<2,bool>, std::vector<unsigned int> >
+         (constant_modes, std::vector<unsigned int>(1, 0));
+}
+
+
+
+template <int dim, int spacedim>
+std::string
+FE_DGQLegendre<dim,spacedim>::get_name () const
+{
+  return "FE_DGQLegendre<" + Utilities::dim_string(dim,spacedim) + ">("
+         + Utilities::int_to_string(this->degree) + ")";
+}
+
+
+
+template <int dim, int spacedim>
+std::unique_ptr<FiniteElement<dim,spacedim> >
+FE_DGQLegendre<dim,spacedim>::clone() const
+{
+  return std_cxx14::make_unique<FE_DGQLegendre<dim,spacedim>>(this->degree);
+}
+
+
+
+// ---------------------------------- FE_DGQHermite --------------------------
+
+template <int dim, int spacedim>
+FE_DGQHermite<dim,spacedim>::FE_DGQHermite (const unsigned int degree)
+  : FE_DGQ<dim,spacedim>(degree < 3 ?
+                         Polynomials::generate_complete_Lagrange_basis
+                         (internal::FE_DGQ::get_QGaussLobatto_points(degree))
+                         :
+                         Polynomials::HermiteInterpolation::generate_complete_basis(degree))
+{}
+
+
+
+template <int dim, int spacedim>
+std::pair<Table<2,bool>, std::vector<unsigned int> >
+FE_DGQHermite<dim,spacedim>::get_constant_modes () const
+{
+  if (this->degree < 3)
+    return this->FE_DGQ<dim,spacedim>::get_constant_modes();
+  else
+    {
+      // The first two basis functions in the Hermite polynomials represent
+      // the value 1 in the left and right end point of the element. Expand
+      // them into the tensor product.
+      AssertThrow(dim<=3, ExcNotImplemented());
+      Table<2,bool> constant_modes(1, this->dofs_per_cell);
+      for (unsigned int i=0; i<(dim>2?2:1); ++i)
+        for (unsigned int j=0; j<(dim>1?2:1); ++j)
+          for (unsigned int k=0; k<2; ++k)
+            constant_modes(0,i*(this->degree+1)*(this->degree+1)+j*(this->degree+1)+k) = true;
+      return std::pair<Table<2,bool>, std::vector<unsigned int> >
+             (constant_modes, std::vector<unsigned int>(1, 0));
+    }
+}
+
+
+
+template <int dim, int spacedim>
+std::string
+FE_DGQHermite<dim,spacedim>::get_name () const
+{
+  return "FE_DGQHermite<" + Utilities::dim_string(dim,spacedim) + ">("
+         + Utilities::int_to_string(this->degree) + ")";
+}
+
+
+
+template <int dim, int spacedim>
+std::unique_ptr<FiniteElement<dim,spacedim> >
+FE_DGQHermite<dim,spacedim>::clone() const
+{
+  return std_cxx14::make_unique<FE_DGQHermite<dim,spacedim>>(this->degree);
 }
 
 

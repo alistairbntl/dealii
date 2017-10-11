@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tria_levels_h
-#define dealii__tria_levels_h
+#ifndef dealii_tria_levels_h
+#define dealii_tria_levels_h
 
 
 #include <deal.II/base/config.h>
@@ -212,7 +212,7 @@ namespace internal
      * instead of TriaObjects. Refer to the documentation of the general class
      * template for details.
      */
-    template<>
+    template <>
     class TriaLevel<3>
     {
     public:

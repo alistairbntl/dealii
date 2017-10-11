@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,7 +16,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
@@ -31,9 +30,6 @@
 #include <deal.II/multigrid/mg_transfer_component.h>
 #include <deal.II/multigrid/mg_tools.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -50,7 +46,7 @@ void check_select(const FiniteElement<dim> &fe,
           << " (global) and " << mg_selected
           << " (mg)" << std::endl;
 
-  Triangulation<dim> tr;
+  Triangulation<dim> tr(Triangulation<dim>::limit_level_difference_at_vertices);
   GridGenerator::hyper_cube(tr);
   tr.refine_global(2);
 
@@ -127,7 +123,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   std::vector<unsigned int> v1(4);
   std::vector<unsigned int> v2(4);

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2016 by the deal.II authors
+// Copyright (C) 2014 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,14 +13,12 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__packaged_operation_h
-#define dealii__packaged_operation_h
+#ifndef dealii_packaged_operation_h
+#define dealii_packaged_operation_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/lac/vector_memory.h>
-
-#ifdef DEAL_II_WITH_CXX11
 
 #include <functional>
 
@@ -28,7 +26,7 @@ DEAL_II_NAMESPACE_OPEN
 
 // Forward declarations:
 template <typename Number> class Vector;
-template <typename Range, typename Domain> class LinearOperator;
+template <typename Range, typename Domain, typename Payload> class LinearOperator;
 template <typename Range = Vector<double> > class PackagedOperation;
 
 
@@ -504,7 +502,7 @@ namespace
     // type is std::true_type if Matrix provides vmult_add and Tvmult_add,
     // otherwise it is std::false_type
 
-    typedef decltype(test<T>(0, 0, 0)) type;
+    typedef decltype(test<T>(nullptr, nullptr, nullptr)) type;
   };
 }
 
@@ -660,9 +658,9 @@ PackagedOperation<Range> operator*(typename Range::value_type number,
  *
  * @ingroup LAOperators
  */
-template <typename Range, typename Domain>
+template <typename Range, typename Domain, typename Payload>
 PackagedOperation<Range>
-operator*(const LinearOperator<Range, Domain> &op,
+operator*(const LinearOperator<Range, Domain, Payload> &op,
           const Domain &u)
 {
   PackagedOperation<Range> return_comp;
@@ -702,10 +700,10 @@ operator*(const LinearOperator<Range, Domain> &op,
  *
  * @ingroup LAOperators
  */
-template <typename Range, typename Domain>
+template <typename Range, typename Domain, typename Payload>
 PackagedOperation<Domain>
 operator*(const Range &u,
-          const LinearOperator<Range, Domain> &op)
+          const LinearOperator<Range, Domain, Payload> &op)
 {
   PackagedOperation<Range> return_comp;
 
@@ -736,9 +734,9 @@ operator*(const Range &u,
  *
  * @ingroup LAOperators
  */
-template <typename Range, typename Domain>
+template <typename Range, typename Domain, typename Payload>
 PackagedOperation<Range>
-operator*(const LinearOperator<Range, Domain> &op,
+operator*(const LinearOperator<Range, Domain, Payload> &op,
           const PackagedOperation<Domain> &comp)
 {
   PackagedOperation<Range> return_comp;
@@ -750,28 +748,24 @@ operator*(const LinearOperator<Range, Domain> &op,
 
   return_comp.apply = [op, comp](Domain &v)
   {
-    static GrowingVectorMemory<Range> vector_memory;
+    GrowingVectorMemory<Range> vector_memory;
 
-    Range *i = vector_memory.alloc();
+    typename VectorMemory<Range>::Pointer i (vector_memory);
     op.reinit_domain_vector(*i, /*bool omit_zeroing_entries =*/ true);
 
     comp.apply(*i);
     op.vmult(v, *i);
-
-    vector_memory.free(i);
   };
 
   return_comp.apply_add = [op, comp](Domain &v)
   {
-    static GrowingVectorMemory<Range> vector_memory;
+    GrowingVectorMemory<Range> vector_memory;
 
-    Range *i = vector_memory.alloc();
+    typename VectorMemory<Range>::Pointer i (vector_memory);
     op.reinit_range_vector(*i, /*bool omit_zeroing_entries =*/ true);
 
     comp.apply(*i);
     op.vmult_add(v, *i);
-
-    vector_memory.free(i);
   };
 
   return return_comp;
@@ -786,10 +780,10 @@ operator*(const LinearOperator<Range, Domain> &op,
  *
  * @ingroup LAOperators
  */
-template <typename Range, typename Domain>
+template <typename Range, typename Domain, typename Payload>
 PackagedOperation<Domain>
 operator*(const PackagedOperation<Range> &comp,
-          const LinearOperator<Range, Domain> &op)
+          const LinearOperator<Range, Domain, Payload> &op)
 {
   PackagedOperation<Range> return_comp;
 
@@ -800,28 +794,24 @@ operator*(const PackagedOperation<Range> &comp,
 
   return_comp.apply = [op, comp](Domain &v)
   {
-    static GrowingVectorMemory<Range> vector_memory;
+    GrowingVectorMemory<Range> vector_memory;
 
-    Range *i = vector_memory.alloc();
+    typename VectorMemory<Range>::Pointer i (vector_memory);
     op.reinit_range_vector(*i, /*bool omit_zeroing_entries =*/ true);
 
     comp.apply(*i);
     op.Tvmult(v, *i);
-
-    vector_memory.free(i);
   };
 
   return_comp.apply_add = [op, comp](Domain &v)
   {
-    static GrowingVectorMemory<Range> vector_memory;
+    GrowingVectorMemory<Range> vector_memory;
 
-    Range *i = vector_memory.alloc();
+    typename VectorMemory<Range>::Pointer i (vector_memory);
     op.reinit_range_vector(*i, /*bool omit_zeroing_entries =*/ true);
 
     comp.apply(*i);
     op.Tvmult_add(v, *i);
-
-    vector_memory.free(i);
   };
 
   return return_comp;
@@ -831,5 +821,4 @@ operator*(const PackagedOperation<Range> &comp,
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif // DEAL_II_WITH_CXX11
 #endif

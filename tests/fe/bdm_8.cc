@@ -19,7 +19,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
@@ -33,7 +32,6 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
 #define PRECISION 5
@@ -41,7 +39,7 @@
 
 std::ofstream logfile ("output");
 
-template<int dim>
+template <int dim>
 void
 test (const unsigned int degree)
 {
@@ -99,7 +97,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   for (unsigned int i=1; i<4; ++i)
     {

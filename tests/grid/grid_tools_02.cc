@@ -19,14 +19,11 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_out.h>
 
-#include <fstream>
-#include <iomanip>
 
 std::ofstream logfile("output");
 
@@ -61,7 +58,6 @@ int main ()
   deallog << std::setprecision(4);
   logfile << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test1<1> ();
   test1<2> ();

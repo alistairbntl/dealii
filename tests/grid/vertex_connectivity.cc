@@ -21,7 +21,6 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 
 
@@ -46,9 +45,7 @@ void test()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<1>();
   test<2>();

@@ -17,17 +17,13 @@
 
 #include "../tests.h"
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
-#include <fstream>
-#include <iomanip>
 
 int main ()
 {
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   double a[3][3] = {{1, 2, 3}, {3, 4, 5}, {6, 7, 8}};
   double b[3][3] = {{25,31,37}, {45,57,69}, {75,96,117}};

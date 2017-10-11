@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2007 - 2015 by the deal.II authors
+// Copyright (C) 2007 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,12 +19,7 @@
 // success
 
 #include "../tests.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
-#include "testmatrix.h"
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/sparse_ilu.h>
 #include <deal.II/lac/solver_bicgstab.h>
@@ -37,7 +32,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   GrowingVectorMemory<> mem;
   SolverControl control(100, 1.e-3);

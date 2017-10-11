@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -32,10 +32,18 @@ template <int dim, int fe_degree>
 void test ()
 {
   typedef double number;
+  const SphericalManifold<dim> manifold;
   Triangulation<dim> tria;
   GridGenerator::hyper_ball (tria);
-  static const HyperBallBoundary<dim> boundary;
-  tria.set_boundary (0, boundary);
+  typename Triangulation<dim>::active_cell_iterator
+  cell = tria.begin_active (),
+  endc = tria.end();
+  for (; cell!=endc; ++cell)
+    for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+      if (cell->at_boundary(f))
+        cell->face(f)->set_all_manifold_ids(0);
+  tria.set_manifold (0, manifold);
+
   // refine first and last cell
   tria.begin(tria.n_levels()-1)->set_refine_flag();
   tria.last()->set_refine_flag();
@@ -77,7 +85,7 @@ void test ()
     const QGauss<1> quad (fe_degree+1);
     typename MatrixFree<dim,number>::AdditionalData data;
     data.tasks_parallel_scheme = MatrixFree<dim,number>::AdditionalData::none;
-    data.mapping_update_flags = update_gradients | update_second_derivatives;
+    data.mapping_update_flags = update_gradients | update_hessians;
     mf_data.reinit (mapping, dof, constraints, quad, data);
   }
 
@@ -85,4 +93,3 @@ void test ()
   mf.test_functions(solution);
   deallog << std::endl;
 }
-

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__matrix_free_dof_info_h
-#define dealii__matrix_free_dof_info_h
+#ifndef dealii_matrix_free_dof_info_h
+#define dealii_matrix_free_dof_info_h
 
 
 #include <deal.II/base/exceptions.h>
@@ -26,8 +26,7 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/matrix_free/helper_functions.h>
 
-#include <deal.II/base/std_cxx11/array.h>
-
+#include <array>
 #include <memory>
 
 
@@ -67,64 +66,64 @@ namespace internal
       /**
        * Copy constructor.
        */
-      DoFInfo (const DoFInfo &dof_info);
+      DoFInfo (const DoFInfo &) = default;
 
       /**
-       * Clears all data fields in this class.
+       * Clear all data fields in this class.
        */
       void clear ();
 
 
       /**
-       * Returns a pointer to the first index in the DoF row @p row.
+       * Return a pointer to the first index in the DoF row @p row.
        */
       const unsigned int *begin_indices (const unsigned int row) const;
 
       /**
-       * Returns a pointer to the one past the last DoF index in the row @p
+       * Return a pointer to the one past the last DoF index in the row @p
        * row.
        */
       const unsigned int *end_indices (const unsigned int row) const;
 
       /**
-       * Returns the number of entries in the indices field for the given row.
+       * Return the number of entries in the indices field for the given row.
        */
       unsigned int row_length_indices (const unsigned int row) const;
 
       /**
-       * Returns a pointer to the first constraint indicator in the row @p
+       * Return a pointer to the first constraint indicator in the row @p
        * row.
        */
       const std::pair<unsigned short,unsigned short> *
       begin_indicators (const unsigned int row) const;
 
       /**
-       * Returns a pointer to the one past the last constraint indicator in
+       * Return a pointer to the one past the last constraint indicator in
        * the row @p row.
        */
       const std::pair<unsigned short,unsigned short> *
       end_indicators (const unsigned int row) const;
 
       /**
-       * Returns the number of entries in the constraint indicator field for
+       * Return the number of entries in the constraint indicator field for
        * the given row.
        */
       unsigned int row_length_indicators (const unsigned int row) const;
 
       /**
-       * Returns a pointer to the first index in the DoF row @p row for plain
+       * Return a pointer to the first index in the DoF row @p row for plain
        * indices (i.e., the entries where constraints are not embedded).
        */
       const unsigned int *begin_indices_plain (const unsigned int row) const;
 
       /**
-       * Returns a pointer to the one past the last DoF index in the row @p
+       * Return a pointer to the one past the last DoF index in the row @p
        * row (i.e., the entries where constraints are not embedded).
        */
       const unsigned int *end_indices_plain (const unsigned int row) const;
 
       /**
-       * Returns the FE index for a given finite element degree. If not in hp
+       * Return the FE index for a given finite element degree. If not in hp
        * mode, this function always returns index 0. If an index is not found
        * in hp mode, it returns max_fe_degree, i.e., one index past the last
        * valid one.
@@ -133,7 +132,7 @@ namespace internal
 
 
       /**
-       * Returns the FE index for a given finite element degree. If not in hp
+       * Return the FE index for a given finite element degree. If not in hp
        * mode or if the index is not found, this function always returns index
        * 0. Hence, this function does not check whether the given degree is
        * actually present.
@@ -186,7 +185,7 @@ namespace internal
                                        std::vector<unsigned int> &irregular_cells);
 
       /**
-       * Computes the initial renumbering of cells such that all cells with
+       * Compute the initial renumbering of cells such that all cells with
        * ghosts are put first. This is the first step before building the
        * thread graph and used to overlap computations and communication.
        */
@@ -276,7 +275,7 @@ namespace internal
       void renumber_dofs (std::vector<types::global_dof_index> &renumbering);
 
       /**
-       * Returns the memory consumption in bytes of this class.
+       * Return the memory consumption in bytes of this class.
        */
       std::size_t memory_consumption() const;
 
@@ -307,7 +306,7 @@ namespace internal
        * certain structure in the indices, like indices for vector-valued
        * problems or for cells where not all vector components are filled.
        */
-      std::vector<std_cxx11::array<unsigned int, 3> > row_starts;
+      std::vector<std::array<unsigned int, 3> > row_starts;
 
       /**
        * Stores the indices of the degrees of freedom for each cell. These
@@ -343,7 +342,7 @@ namespace internal
        * in the vector, and also includes how the ghosts look like. This
        * enables initialization of vectors based on the DoFInfo field.
        */
-      std_cxx11::shared_ptr<const Utilities::MPI::Partitioner> vector_partitioner;
+      std::shared_ptr<const Utilities::MPI::Partitioner> vector_partitioner;
 
       /**
        * This stores a (sorted) list of all locally owned degrees of freedom
@@ -433,7 +432,7 @@ namespace internal
       AssertIndexRange (row, row_starts.size()-1);
       const unsigned int index = row_starts[row][0];
       AssertIndexRange(index, dof_indices.size()+1);
-      return dof_indices.empty() ? 0 : &dof_indices[0] + index;
+      return dof_indices.empty() ? nullptr : &dof_indices[0] + index;
     }
 
 
@@ -445,7 +444,7 @@ namespace internal
       AssertIndexRange (row, row_starts.size()-1);
       const unsigned int index = row_starts[row+1][0];
       AssertIndexRange(index, dof_indices.size()+1);
-      return dof_indices.empty() ? 0 : &dof_indices[0] + index;
+      return dof_indices.empty() ? nullptr : &dof_indices[0] + index;
     }
 
 
@@ -467,7 +466,7 @@ namespace internal
       AssertIndexRange (row, row_starts.size()-1);
       const unsigned int index = row_starts[row][1];
       AssertIndexRange (index, constraint_indicator.size()+1);
-      return constraint_indicator.empty() ? 0 : &constraint_indicator[0] + index;
+      return constraint_indicator.empty() ? nullptr : &constraint_indicator[0] + index;
     }
 
 
@@ -479,7 +478,7 @@ namespace internal
       AssertIndexRange (row, row_starts.size()-1);
       const unsigned int index = row_starts[row+1][1];
       AssertIndexRange (index, constraint_indicator.size()+1);
-      return constraint_indicator.empty() ? 0 : &constraint_indicator[0] + index;
+      return constraint_indicator.empty() ? nullptr : &constraint_indicator[0] + index;
     }
 
 
@@ -510,7 +509,7 @@ namespace internal
           AssertDimension (row_starts.size(), row_starts_plain_indices.size());
           const unsigned int index = row_starts_plain_indices[row];
           AssertIndexRange(index, plain_dof_indices.size()+1);
-          return plain_dof_indices.empty() ? 0 : &plain_dof_indices[0] + index;
+          return plain_dof_indices.empty() ? nullptr : &plain_dof_indices[0] + index;
         }
     }
 

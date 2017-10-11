@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,12 +18,7 @@
 
 
 #include "../tests.h"
-#include "../lac/testmatrix.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_memory.h>
@@ -37,7 +32,7 @@
 #include <deal.II/lac/precondition.h>
 #include <typeinfo>
 
-template<typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
+template <typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
 void
 check_solve(SolverType          &solver,
             const SolverControl &solver_control,
@@ -70,7 +65,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   GrowingVectorMemory<> mem;
   SolverControl control(100, 1.e-3);

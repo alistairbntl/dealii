@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -90,25 +90,25 @@ public:
     return 1;
   };
 
-  template<typename OutVector, typename InVector>
+  template <typename OutVector, typename InVector>
   void vmult(OutVector &, const InVector &) const
   {
     deallog << "MyMatrix3::vmult" << std::endl;
   }
 
-  template<typename OutVector, typename InVector>
+  template <typename OutVector, typename InVector>
   void Tvmult(OutVector &, const InVector &) const
   {
     deallog << "MyMatrix3::Tvmult" << std::endl;
   }
 
-  template<typename OutVector, typename InVector>
+  template <typename OutVector, typename InVector>
   void vmult_add(OutVector &, const InVector &) const
   {
     deallog << "MyMatrix3::vmult_add" << std::endl;
   }
 
-  template<typename OutVector, typename InVector>
+  template <typename OutVector, typename InVector>
   void Tvmult_add(OutVector &, const InVector &) const
   {
     deallog << "MyMatrix3::Tvmult_add" << std::endl;
@@ -127,25 +127,25 @@ public:
     return 1;
   };
 
-  template<typename OutVector, typename InVector>
+  template <typename OutVector, typename InVector>
   void vmult(OutVector &, const InVector &, bool = true) const
   {
     deallog << "MyMatrix4::vmult" << std::endl;
   }
 
-  template<typename OutVector, typename InVector>
+  template <typename OutVector, typename InVector>
   void Tvmult(OutVector &, const InVector &, bool = true) const
   {
     deallog << "MyMatrix4::Tvmult" << std::endl;
   }
 
-  template<typename OutVector, typename InVector>
+  template <typename OutVector, typename InVector>
   void vmult_add(OutVector &, const InVector &, bool = true) const
   {
     deallog << "MyMatrix4::vmult_add" << std::endl;
   }
 
-  template<typename OutVector, typename InVector>
+  template <typename OutVector, typename InVector>
   void Tvmult_add(OutVector &, const InVector &, bool = true) const
   {
     deallog << "MyMatrix4::Tvmult_add" << std::endl;
@@ -164,25 +164,25 @@ public:
     return 1;
   };
 
-  template<typename number>
+  template <typename number>
   void vmult(Vector<number> &, const Vector<number> &, bool = true) const
   {
     deallog << "MyMatrix5::vmult" << std::endl;
   }
 
-  template<typename number>
+  template <typename number>
   void Tvmult(Vector<number> &, const Vector<number> &, bool = true) const
   {
     deallog << "MyMatrix5::Tvmult" << std::endl;
   }
 
-  template<typename number>
+  template <typename number>
   void vmult_add(Vector<number> &, const Vector<number> &, bool = true) const
   {
     deallog << "MyMatrix5::vmult_add" << std::endl;
   }
 
-  template<typename number>
+  template <typename number>
   void Tvmult_add(Vector<number> &, const Vector<number> &, bool = true) const
   {
     deallog << "MyMatrix5::Tvmult_add" << std::endl;
@@ -201,28 +201,22 @@ public:
     return 1;
   };
 
-  template<typename number, typename number2>
+  template <typename number, typename number2>
   void vmult(Vector<number> &, const Vector<number2> &, bool = true) const
   {
     deallog << "MyMatrix6::vmult" << std::endl;
   }
 
-  template<typename number, typename number2>
+  template <typename number, typename number2>
   void Tvmult(Vector<number> &, const Vector<number2> &, bool = true) const
   {
     deallog << "MyMatrix6::Tvmult" << std::endl;
   }
 
-  template<typename number, typename number2>
+  template <typename number, typename number2>
   void vmult_add(Vector<number> &, const Vector<number2> &, bool = true) const
   {
     deallog << "MyMatrix6::vmult_add" << std::endl;
-  }
-
-  template<typename number, typename number2>
-  void Tvmult_add(Vector<number> &, const Vector<number2> &, bool = true) const
-  {
-    deallog << "MyMatrix6::Tvmult_add" << std::endl;
   }
 };
 
@@ -253,8 +247,6 @@ int main()
   linear_operator(m2).vmult_add(v, u);
   linear_operator(m2).Tvmult_add(v, u);
 
-#ifndef DEAL_II_ICC_SFINAE_BUG
-
   linear_operator(m3).vmult(v, u);
   linear_operator(m3).Tvmult(v, u);
   linear_operator(m3).vmult_add(v, u);
@@ -274,28 +266,4 @@ int main()
   linear_operator(m6).Tvmult(v, u);
   linear_operator(m6).vmult_add(v, u);
   linear_operator(m6).Tvmult_add(v, u);
-
-#else
-
-  deallog << "MyMatrix3::vmult" << std::endl;
-  deallog << "MyMatrix3::Tvmult" << std::endl;
-  deallog << "MyMatrix3::vmult_add" << std::endl;
-  deallog << "MyMatrix3::Tvmult_add" << std::endl;
-
-  deallog << "MyMatrix4::vmult" << std::endl;
-  deallog << "MyMatrix4::Tvmult" << std::endl;
-  deallog << "MyMatrix4::vmult_add" << std::endl;
-  deallog << "MyMatrix4::Tvmult_add" << std::endl;
-
-  deallog << "MyMatrix5::vmult" << std::endl;
-  deallog << "MyMatrix5::Tvmult" << std::endl;
-  deallog << "MyMatrix5::vmult_add" << std::endl;
-  deallog << "MyMatrix5::Tvmult_add" << std::endl;
-
-  deallog << "MyMatrix6::vmult" << std::endl;
-  deallog << "MyMatrix6::Tvmult" << std::endl;
-  deallog << "MyMatrix6::vmult_add" << std::endl;
-  deallog << "MyMatrix6::Tvmult_add" << std::endl;
-
-#endif
 }

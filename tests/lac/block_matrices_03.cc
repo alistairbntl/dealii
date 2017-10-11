@@ -25,12 +25,9 @@
 // phase of the moon :-)
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
 #include <deal.II/lac/block_sparse_matrix.h>
 #include <deal.II/lac/block_vector.h>
-#include <fstream>
-#include <iomanip>
 #include <algorithm>
 
 
@@ -62,7 +59,6 @@ void test ()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   BlockSparsityPattern bsp(2,2);
   // set sizes

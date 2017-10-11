@@ -23,12 +23,8 @@
 // exception as well
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/signaling_nan.h>
-#include <fstream>
-#include <iomanip>
 #include <limits>
-#include <fenv.h>
 
 
 template <typename T>
@@ -47,7 +43,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check<float> ();
   check<double> ();

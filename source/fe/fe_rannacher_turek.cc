@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,13 +20,14 @@
 #include <algorithm>
 
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 
 DEAL_II_NAMESPACE_OPEN
 
 
 template <int dim>
-FE_RannacherTurek<dim>::FE_RannacherTurek(const unsigned int degree,
+FE_RannacherTurek<dim>::FE_RannacherTurek(const unsigned int order,
                                           const unsigned int n_face_support_points) :
   FE_Poly<PolynomialsRannacherTurek<dim>, dim>(
     PolynomialsRannacherTurek<dim>(),
@@ -36,11 +37,11 @@ FE_RannacherTurek<dim>::FE_RannacherTurek(const unsigned int degree,
                            FiniteElementData<dim>::L2),
     std::vector<bool>(4, false), // restriction not implemented
     std::vector<ComponentMask>(4, std::vector<bool>(1, true))),
-  degree(degree),
+  order(order),
   n_face_support_points(n_face_support_points)
 {
   Assert(dim == 2, ExcNotImplemented());
-  Assert(degree == 0, ExcNotImplemented());
+  Assert(order == 0, ExcNotImplemented());
   this->initialize_support_points();
 }
 
@@ -63,16 +64,17 @@ std::string FE_RannacherTurek<dim>::get_name() const
   std::ostringstream namebuf;
   namebuf << "FE_RannacherTurek"
           << "<" << dim << ">"
-          << "(" << this->degree << ", " << this->n_face_support_points << ")";
+          << "(" << this->order << ", " << this->n_face_support_points << ")";
   return namebuf.str();
 }
 
 
 
 template <int dim>
-FiniteElement<dim> *FE_RannacherTurek<dim>::clone() const
+std::unique_ptr<FiniteElement<dim,dim> >
+FE_RannacherTurek<dim>::clone() const
 {
-  return new FE_RannacherTurek<dim>(this->degree, this->n_face_support_points);
+  return std_cxx14::make_unique<FE_RannacherTurek<dim>>(this->order, this->n_face_support_points);
 }
 
 
@@ -102,17 +104,18 @@ void FE_RannacherTurek<dim>::initialize_support_points()
 
 
 template <int dim>
-void FE_RannacherTurek<dim>::interpolate(
-  std::vector<double> &local_dofs,
-  const std::vector<double> &values) const
+void
+FE_RannacherTurek<dim>::
+convert_generalized_support_point_values_to_dof_values(const std::vector<Vector<double> > &support_point_values,
+                                                       std::vector<double> &nodal_values) const
 {
-  AssertDimension(values.size(), this->generalized_support_points.size());
-  AssertDimension(local_dofs.size(), this->dofs_per_cell);
+  AssertDimension(support_point_values.size(), this->generalized_support_points.size());
+  AssertDimension(nodal_values.size(), this->dofs_per_cell);
 
   const unsigned int q_points_per_face = this->weights.size();
-  std::fill(local_dofs.begin(), local_dofs.end(), 0.0);
+  std::fill(nodal_values.begin(), nodal_values.end(), 0.0);
 
-  std::vector<double>::const_iterator value = values.begin();
+  std::vector<Vector<double> >::const_iterator value = support_point_values.begin();
   for (unsigned int face = 0;
        face < dealii::GeometryInfo<dim>::faces_per_cell;
        ++face)
@@ -121,50 +124,10 @@ void FE_RannacherTurek<dim>::interpolate(
            q < q_points_per_face;
            ++q)
         {
-          local_dofs[face] += (*value) * this->weights[q];
+          nodal_values[face] += (*value)[0] * this->weights[q];
           ++value;
         }
     }
-}
-
-
-
-template <int dim>
-void FE_RannacherTurek<dim>::interpolate(
-  std::vector<double> &local_dofs,
-  const std::vector<Vector<double> > &values,
-  unsigned int offset) const
-{
-  AssertDimension(values.size(), this->generalized_support_points.size());
-  AssertDimension(local_dofs.size(), this->dofs_per_cell);
-
-  // extract component at offset and call scalar version of this function
-  std::vector<double> scalar_values(values.size());
-  for (unsigned int q = 0; q < values.size(); ++q)
-    {
-      scalar_values[q] = values[q][offset];
-    }
-  this->interpolate(local_dofs, scalar_values);
-}
-
-
-
-template <int dim>
-void FE_RannacherTurek<dim>::interpolate(
-  std::vector<double> &local_dofs,
-  const VectorSlice<const std::vector<std::vector<double> > > &values) const
-{
-  AssertDimension(values.size(), 1);
-  AssertDimension(values[0].size(), this->generalized_support_points.size());
-  AssertDimension(local_dofs.size(), this->dofs_per_cell);
-
-  // convert data structure to use scalar version of this function
-  std::vector<double> scalar_values(values[0].size());
-  for (unsigned int q = 0; q < values[0].size(); ++q)
-    {
-      scalar_values[q] = values[0][q];
-    }
-  this->interpolate(local_dofs, scalar_values);
 }
 
 

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__partitioner_h
-#define dealii__partitioner_h
+#ifndef dealii_partitioner_h
+#define dealii_partitioner_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/index_set.h>
@@ -22,6 +22,7 @@
 #include <deal.II/base/types.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/memory_consumption.h>
+#include <deal.II/lac/communication_pattern_base.h>
 
 #include <limits>
 
@@ -42,9 +43,9 @@ namespace Utilities
      * allows the inclusion of ghost indices (i.e. indices that a current
      * processor needs to have access to, but are owned by another process)
      * through an IndexSet. In addition, it also stores the other processors'
-     * ghost indices belonging to the current processor, which are the indices
-     * where other processors might require information from. In a sense,
-     * these import indices form the dual of the ghost indices. This
+     * ghost indices belonging to the current processor (see import_targets()),
+     * which are the indices where other processors might require information from.
+     * In a sense, these import indices form the dual of the ghost indices. This
      * information is gathered once when constructing the partitioner, which
      * obviates subsequent global communication steps when exchanging data.
      *
@@ -58,7 +59,7 @@ namespace Utilities
      *
      * @author Katharina Kormann, Martin Kronbichler, 2010, 2011
      */
-    class Partitioner
+    class Partitioner : public ::dealii::LinearAlgebra::CommunicationPatternBase
     {
     public:
       /**
@@ -94,7 +95,18 @@ namespace Utilities
                    const MPI_Comm  communicator_in);
 
       /**
-       * Sets the locally owned indices. Used in the constructor.
+       * Reinitialize the communication pattern. The first argument @p
+       * vector_space_vector_index_set is the index set associated to a
+       * VectorSpaceVector object. The second argument @p
+       * read_write_vector_index_set is the index set associated to a
+       * ReadWriteVector object.
+       */
+      virtual void reinit(const IndexSet &vector_space_vector_index_set,
+                          const IndexSet &read_write_vector_index_set,
+                          const MPI_Comm &communicator);
+
+      /**
+       * Set the locally owned indices. Used in the constructor.
        */
       void set_owned_indices (const IndexSet &locally_owned_indices);
 
@@ -105,18 +117,18 @@ namespace Utilities
       void set_ghost_indices (const IndexSet &ghost_indices);
 
       /**
-       * Returns the global size.
+       * Return the global size.
        */
       types::global_dof_index size() const;
 
       /**
-       * Returns the local size, i.e. local_range().second minus
+       * Return the local size, i.e. local_range().second minus
        * local_range().first.
        */
       unsigned int local_size() const;
 
       /**
-       * Returns an IndexSet representation of the local range. This class
+       * Return an IndexSet representation of the local range. This class
        * only supports contiguous local ranges, so the IndexSet actually only
        * consists of one single range of data, and is equivalent to the result
        * of local_range().
@@ -124,7 +136,7 @@ namespace Utilities
       const IndexSet &locally_owned_range() const;
 
       /**
-       * Returns the local range. The returned pair consists of the index of
+       * Return the local range. The returned pair consists of the index of
        * the first element and the index of the element one past the last
        * locally owned one.
        */
@@ -132,13 +144,13 @@ namespace Utilities
       local_range() const;
 
       /**
-       * Returns true if the given global index is in the local range of this
+       * Return true if the given global index is in the local range of this
        * processor.
        */
       bool in_local_range (const types::global_dof_index global_index) const;
 
       /**
-       * Returns the local index corresponding to the given global index. If
+       * Return the local index corresponding to the given global index. If
        * the given global index is neither locally owned nor a ghost, an
        * exception is thrown.
        *
@@ -150,7 +162,7 @@ namespace Utilities
       global_to_local (const types::global_dof_index global_index) const;
 
       /**
-       * Returns the global index corresponding to the given local index.
+       * Return the global index corresponding to the given local index.
        *
        * Note that the local index for locally owned indices is between 0 and
        * local_size()-1, and the local index for ghosts is between
@@ -160,36 +172,39 @@ namespace Utilities
       local_to_global (const unsigned int local_index) const;
 
       /**
-       * Returns whether the given global index is a ghost index on the
+       * Return whether the given global index is a ghost index on the
        * present processor. Returns false for indices that are owned locally
        * and for indices not present at all.
        */
       bool is_ghost_entry (const types::global_dof_index global_index) const;
 
       /**
-       * Returns an IndexSet representation of all ghost indices.
+       * Return an IndexSet representation of all ghost indices.
        */
       const IndexSet &ghost_indices() const;
 
       /**
-       * Returns the number of ghost indices. Same as
+       * Return the number of ghost indices. Same as
        * ghost_indices().n_elements(), but cached for simpler access.
        */
       unsigned int n_ghost_indices() const;
 
       /**
-       * Returns a list of processors (first entry) and the number of degrees
-       * of freedom for the individual processor on the ghost elements present
-       * (second entry).
+       * Return a list of processors (first entry) and the number of ghost degrees
+       * of freedom owned by that processor (second entry). The sum of the
+       * latter over all processors equals n_ghost_indices().
        */
       const std::vector<std::pair<unsigned int, unsigned int> > &
       ghost_targets() const;
 
       /**
-       * The set of (local) indices that we are importing during compress(),
-       * i.e., others' ghosts that belong to the local range. Similar
+       * Return a vector of ranges of local indices that we are importing during
+       * compress(), i.e., others' ghosts that belong to the local range. Similar
        * structure as in an IndexSet, but tailored to be iterated over, and
-       * some indices may be duplicates.
+       * some indices may be duplicated.
+       * The returned pairs consists of the index of
+       * the first element and the index of the element one past the last
+       * one in a range.
        */
       const std::vector<std::pair<unsigned int, unsigned int> > &
       import_indices() const;
@@ -201,16 +216,19 @@ namespace Utilities
       unsigned int n_import_indices() const;
 
       /**
-       * Returns a list of processors (first entry) and the number of degrees
-       * of freedom for all the processors that data is obtained from (second
-       * entry), i.e., locally owned indices that are ghosts on other
-       * processors.
+       * Return a list of processors (first entry) and the number of degrees
+       * of freedom imported from it during compress() operation (second entry)
+       * for all the processors that data is obtained from, i.e., locally owned
+       * indices that are ghosts on other processors.
+       *
+       * @note the returned vector only contains those processor id's for which
+       * the second entry is non-zero.
        */
       const std::vector<std::pair<unsigned int, unsigned int> > &
       import_targets() const;
 
       /**
-       * Checks whether the given partitioner is compatible with the
+       * Check whether the given partitioner is compatible with the
        * partitioner used for this vector. Two partitioners are compatible if
        * they have the same local size and the same ghost indices. They do not
        * necessarily need to be the same data field. This is a local operation
@@ -221,7 +239,7 @@ namespace Utilities
       bool is_compatible (const Partitioner &part) const;
 
       /**
-       * Checks whether the given partitioner is compatible with the
+       * Check whether the given partitioner is compatible with the
        * partitioner used for this vector. Two partitioners are compatible if
        * they have the same local size and the same ghost indices. They do not
        * necessarily need to be the same data field. As opposed to
@@ -236,31 +254,36 @@ namespace Utilities
       bool is_globally_compatible (const Partitioner &part) const;
 
       /**
-       * Returns the MPI ID of the calling processor. Cached to have simple
+       * Return the MPI ID of the calling processor. Cached to have simple
        * access.
        */
       unsigned int this_mpi_process () const;
 
       /**
-       * Returns the total number of MPI processor participating in the given
+       * Return the total number of MPI processor participating in the given
        * partitioner. Cached to have simple access.
        */
       unsigned int n_mpi_processes () const;
 
       /**
-       * Returns the MPI communicator underlying the partitioner object.
+       * Return the MPI communicator underlying the partitioner object.
        */
-      const MPI_Comm &get_communicator() const;
+      const MPI_Comm &get_communicator() const DEAL_II_DEPRECATED;
 
       /**
-       * Returns whether ghost indices have been explicitly added as a @p
+       * Return the MPI communicator underlying the partitioner object.
+       */
+      virtual const MPI_Comm &get_mpi_communicator() const;
+
+      /**
+       * Return whether ghost indices have been explicitly added as a @p
        * ghost_indices argument. Only true if a reinit call or constructor
        * provided that argument.
        */
       bool ghost_indices_initialized() const;
 
       /**
-       * Computes the memory consumption of this structure.
+       * Compute the memory consumption of this structure.
        */
       std::size_t memory_consumption() const;
 
@@ -271,13 +294,13 @@ namespace Utilities
                       types::global_dof_index,
                       unsigned int,
                       << "Global index " << arg1
-                      << " neither owned nor ghost on proc " << arg2);
+                      << " neither owned nor ghost on proc " << arg2 << ".");
 
     private:
       /**
        * The global size of the vector over all processors
        */
-      const types::global_dof_index global_size;
+      types::global_dof_index global_size;
 
       /**
        * The range of the vector that is stored locally.
@@ -341,7 +364,7 @@ namespace Utilities
       /**
        * The MPI communicator involved in the problem
        */
-      const MPI_Comm communicator;
+      MPI_Comm communicator;
 
       /**
        * Stores whether the ghost indices have been explicitly set.
@@ -527,6 +550,15 @@ namespace Utilities
     inline
     const MPI_Comm &
     Partitioner::get_communicator() const
+    {
+      return communicator;
+    }
+
+
+
+    inline
+    const MPI_Comm &
+    Partitioner::get_mpi_communicator() const
     {
       return communicator;
     }

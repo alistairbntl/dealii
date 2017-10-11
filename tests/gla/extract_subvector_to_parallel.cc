@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,10 +21,8 @@
 #include "../tests.h"
 #include <deal.II/lac/generic_linear_algebra.h>
 #include <deal.II/base/index_set.h>
-#include <deal.II/lac/parallel_block_vector.h>
-#include <fstream>
+#include <deal.II/lac/la_parallel_block_vector.h>
 #include <iostream>
-#include <iomanip>
 #include <vector>
 
 
@@ -87,9 +85,9 @@ int main (int argc, char **argv)
 
     {
       deallog.push("deal.II");
-      parallel::distributed::Vector<double> w(local, MPI_COMM_WORLD);
+      LinearAlgebra::distributed::Vector<double> w(local, MPI_COMM_WORLD);
       set (w);
-      parallel::distributed::Vector<double> v(local, dense_local, MPI_COMM_WORLD);
+      LinearAlgebra::distributed::Vector<double> v(local, dense_local, MPI_COMM_WORLD);
       v = w; // get copy of vector including ghost elements
       test (v);
       deallog.pop();
@@ -149,9 +147,9 @@ int main (int argc, char **argv)
 
     {
       deallog.push("deal.II");
-      parallel::distributed::BlockVector<double> w(partitioning, MPI_COMM_WORLD);
+      LinearAlgebra::distributed::BlockVector<double> w(partitioning, MPI_COMM_WORLD);
       set (w);
-      parallel::distributed::BlockVector<double> v(partitioning, dense_partitioning, MPI_COMM_WORLD);
+      LinearAlgebra::distributed::BlockVector<double> v(partitioning, dense_partitioning, MPI_COMM_WORLD);
       v = w; // get copy of vector including ghost elements
       test (v);
       deallog.pop();

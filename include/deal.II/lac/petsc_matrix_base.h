@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2016 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_matrix_base_h
-#define dealii__petsc_matrix_base_h
+#ifndef dealii_petsc_matrix_base_h
+#define dealii_petsc_matrix_base_h
 
 
 #include <deal.II/base/config.h>
@@ -22,15 +22,16 @@
 #ifdef DEAL_II_WITH_PETSC
 
 #  include <deal.II/base/subscriptor.h>
-#  include <deal.II/lac/full_matrix.h>
 #  include <deal.II/lac/exceptions.h>
+#  include <deal.II/lac/full_matrix.h>
+#  include <deal.II/lac/petsc_compatibility.h>
 #  include <deal.II/lac/vector.h>
 
 #  include <petscmat.h>
-#  include <deal.II/base/std_cxx11/shared_ptr.h>
 
 #  include <vector>
 #  include <cmath>
+#  include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -80,11 +81,6 @@ namespace PETScWrappers
         Accessor (const MatrixBase *matrix,
                   const size_type   row,
                   const size_type   index);
-
-        /**
-         * Copy constructor.
-         */
-        Accessor (const Accessor &a);
 
         /**
          * Row number of the element represented by this object.
@@ -148,12 +144,12 @@ namespace PETScWrappers
          * performance, we keep a shared pointer to these entries so that more
          * than one accessor can access this data if necessary.
          */
-        std_cxx11::shared_ptr<const std::vector<size_type> > colnum_cache;
+        std::shared_ptr<const std::vector<size_type> > colnum_cache;
 
         /**
          * Similar cache for the values of this row.
          */
-        std_cxx11::shared_ptr<const std::vector<PetscScalar> > value_cache;
+        std::shared_ptr<const std::vector<PetscScalar> > value_cache;
 
         /**
          * Discard the old row caches (they may still be used by other
@@ -682,14 +678,11 @@ namespace PETScWrappers
     PetscScalar matrix_scalar_product (const VectorBase &u,
                                        const VectorBase &v) const;
 
-
-#if DEAL_II_PETSC_VERSION_GTE(3,1,0)
     /**
      * Return the trace of the matrix, i.e. the sum of all diagonal entries in
      * the matrix.
      */
     PetscScalar trace () const;
-#endif
 
     /**
      * Multiply the entire matrix by a fixed factor.
@@ -701,12 +694,22 @@ namespace PETScWrappers
      */
     MatrixBase &operator /= (const PetscScalar factor);
 
+
     /**
      * Add the matrix @p other scaled by the factor @p factor to the current
      * matrix.
      */
+    MatrixBase &add (const PetscScalar factor,
+                     const MatrixBase &other);
+
+
+    /**
+     * Add the matrix @p other scaled by the factor @p factor to the current
+     * matrix.
+     * @deprecated Use the function with order of arguments reversed instead.
+     */
     MatrixBase &add (const MatrixBase &other,
-                     const PetscScalar factor);
+                     const PetscScalar factor) DEAL_II_DEPRECATED;
 
     /**
      * Matrix-vector multiplication: let <i>dst = M*src</i> with <i>M</i>
@@ -831,11 +834,7 @@ namespace PETScWrappers
      * Test whether a matrix is symmetric.  Default tolerance is
      * $1000\times32$-bit machine precision.
      */
-#if DEAL_II_PETSC_VERSION_LT(3,2,0)
-    PetscTruth
-#else
     PetscBool
-#endif
     is_symmetric (const double tolerance = 1.e-12);
 
     /**
@@ -843,19 +842,14 @@ namespace PETScWrappers
      * its transpose. Default tolerance is $1000\times32$-bit machine
      * precision.
      */
-#if DEAL_II_PETSC_VERSION_LT(3,2,0)
-    PetscTruth
-#else
     PetscBool
-#endif
     is_hermitian (const double tolerance = 1.e-12);
 
     /**
      * Print the PETSc matrix object values using PETSc internal matrix viewer
      * function <tt>MatView</tt>. The default format prints the non- zero
      * matrix elements. For other valid view formats, consult
-     * http://www.mcs.anl.gov/petsc/petsc-
-     * current/docs/manualpages/Mat/MatView.html
+     * http://www.mcs.anl.gov/petsc/petsc-current/docs/manualpages/Mat/MatView.html
      */
     void write_ascii (const PetscViewerFormat format = PETSC_VIEWER_DEFAULT);
 
@@ -870,17 +864,10 @@ namespace PETScWrappers
                 const bool    alternative_output = false) const;
 
     /**
-     * Returns the number bytes consumed by this matrix on this CPU.
+     * Return the number bytes consumed by this matrix on this CPU.
      */
     std::size_t memory_consumption() const;
 
-    /**
-     * Exception
-     */
-    DeclException1 (ExcPETScError,
-                    int,
-                    << "An error with error number " << arg1
-                    << " occurred while calling a PETSc function");
     /**
      * Exception
      */
@@ -954,11 +941,11 @@ namespace PETScWrappers
     /**
      * purposefully not implemented
      */
-    MatrixBase(const MatrixBase &);
+    MatrixBase(const MatrixBase &) = delete;
     /**
      * purposefully not implemented
      */
-    MatrixBase &operator=(const MatrixBase &);
+    MatrixBase &operator=(const MatrixBase &) = delete;
 
     /**
      * An internal array of integer values that is used to store the column
@@ -1003,17 +990,6 @@ namespace PETScWrappers
       visit_present_row ();
     }
 
-
-    inline
-    const_iterator::Accessor::
-    Accessor (const Accessor &a)
-      :
-      matrix(a.matrix),
-      a_row(a.a_row),
-      a_index(a.a_index),
-      colnum_cache (a.colnum_cache),
-      value_cache (a.value_cache)
-    {}
 
 
     inline
@@ -1229,26 +1205,22 @@ namespace PETScWrappers
                    const PetscScalar  *values,
                    const bool         elide_zero_values)
   {
-    (void)elide_zero_values;
-
     prepare_action(VectorOperation::insert);
 
     const PetscInt petsc_i = row;
-    PetscInt *col_index_ptr;
+    PetscInt const *col_index_ptr;
 
     PetscScalar const *col_value_ptr;
     int n_columns;
 
     // If we don't elide zeros, the pointers are already available...
-#ifndef PETSC_USE_64BIT_INDICES
     if (elide_zero_values == false)
       {
-        col_index_ptr = (int *)col_indices;
+        col_index_ptr = reinterpret_cast<const PetscInt *>(col_indices);
         col_value_ptr = values;
         n_columns = n_cols;
       }
     else
-#endif
       {
         // Otherwise, extract nonzero values in each row and get the
         // respective index.
@@ -1276,9 +1248,9 @@ namespace PETScWrappers
         col_value_ptr = &column_values[0];
       }
 
-    const int ierr
-      = MatSetValues (matrix, 1, &petsc_i, n_columns, col_index_ptr,
-                      col_value_ptr, INSERT_VALUES);
+    const PetscErrorCode ierr = MatSetValues (matrix, 1, &petsc_i, n_columns,
+                                              col_index_ptr,
+                                              col_value_ptr, INSERT_VALUES);
     AssertThrow (ierr == 0, ExcPETScError(ierr));
   }
 
@@ -1296,8 +1268,7 @@ namespace PETScWrappers
     if (value == PetscScalar())
       {
         // we have to check after using Insert/Add in any case to be
-        // consistent with the MPI communication model (see the comments in
-        // the documentation of TrilinosWrappers::Vector), but we can save
+        // consistent with the MPI communication model, but we can save
         // some work if the addend is zero. However, these actions are done
         // in case we pass on to the other function.
         prepare_action(VectorOperation::add);
@@ -1376,21 +1347,19 @@ namespace PETScWrappers
     prepare_action(VectorOperation::add);
 
     const PetscInt petsc_i = row;
-    PetscInt *col_index_ptr;
+    PetscInt const *col_index_ptr;
 
     PetscScalar const *col_value_ptr;
     int n_columns;
 
     // If we don't elide zeros, the pointers are already available...
-#ifndef PETSC_USE_64BIT_INDICES
     if (elide_zero_values == false)
       {
-        col_index_ptr = (int *)col_indices;
+        col_index_ptr = reinterpret_cast<const PetscInt *>(col_indices);
         col_value_ptr = values;
         n_columns = n_cols;
       }
     else
-#endif
       {
         // Otherwise, extract nonzero values in each row and get the
         // respective index.
@@ -1418,9 +1387,9 @@ namespace PETScWrappers
         col_value_ptr = &column_values[0];
       }
 
-    const int ierr
-      = MatSetValues (matrix, 1, &petsc_i, n_columns, col_index_ptr,
-                      col_value_ptr, ADD_VALUES);
+    const PetscErrorCode ierr = MatSetValues (matrix, 1, &petsc_i, n_columns,
+                                              col_index_ptr, col_value_ptr,
+                                              ADD_VALUES);
     AssertThrow (ierr == 0, ExcPETScError(ierr));
   }
 
@@ -1493,8 +1462,8 @@ namespace PETScWrappers
   {
     PetscInt begin, end;
 
-    const int ierr = MatGetOwnershipRange (static_cast<const Mat &>(matrix),
-                                           &begin, &end);
+    const PetscErrorCode ierr = MatGetOwnershipRange (static_cast<const Mat &>(matrix),
+                                                      &begin, &end);
     AssertThrow (ierr == 0, ExcPETScError(ierr));
 
     return ((index >= static_cast<size_type>(begin)) &&

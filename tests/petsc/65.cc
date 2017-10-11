@@ -21,7 +21,6 @@
 #include "../tests.h"
 #include <deal.II/lac/petsc_parallel_vector.h>
 
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -40,9 +39,7 @@ void test ()
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

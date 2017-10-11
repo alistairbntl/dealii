@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/sparsity_pattern.h>
 #include <deal.II/lac/vector.h>
@@ -39,7 +38,6 @@
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/hp/q_collection.h>
 
-#include <fstream>
 #include <vector>
 
 
@@ -223,7 +221,7 @@ void diffusionMechanics<dim>::run ()
 
   //Initial conditions
   VectorTools::interpolate(dof_handler, InitialConditions<dim>(), Un);
-  //  VectorTools::interpolate(dof_handler, ZeroFunction<dim>(fe_collection.n_components()), Un);
+  //  VectorTools::interpolate(dof_handler, Functions::ZeroFunction<dim>(fe_collection.n_components()), Un);
   U=Un;
   U0=Un;
 
@@ -238,7 +236,6 @@ int main ()
   deallog << std::setprecision(3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   diffusionMechanics<DIMS> problem(1,1);
   problem.run ();

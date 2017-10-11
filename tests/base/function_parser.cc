@@ -19,10 +19,7 @@
 // wrapper.
 
 #include "../tests.h"
-#include <fstream>
-#include <iomanip>
 #include <map>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/point.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/base/function_parser.h>
@@ -30,9 +27,7 @@
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   // Define some constants that will be used by the function parser
   std::map<std::string, double> constants;

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,20 +23,15 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/logstream.h>
-#include <cmath>
-#include <cstdlib>
 
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 
 // Output
 std::ofstream logfile ("output");
 
 // The simplest test case is to create a parallelepiped grid, output
 // the result, and hope for the best.
-template<int dim>
+template <int dim>
 void check_parallelepiped (bool colorize, bool log)
 {
   // Data structure defining dim coordinates that make up a
@@ -51,8 +46,8 @@ void check_parallelepiped (bool colorize, bool log)
       break;
 
     case 2:
-      corners[0] = Point<dim> (0.0, 0.5);
-      corners[1] = Point<dim> (0.5, 0.0);
+      corners[0] = Point<dim> (0.5, 0.0);
+      corners[1] = Point<dim> (0.0, 0.5);
       break;
 
     case 3:

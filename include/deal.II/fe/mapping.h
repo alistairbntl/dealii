@@ -13,21 +13,21 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mapping_h
-#define dealii__mapping_h
+#ifndef dealii_mapping_h
+#define dealii_mapping_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/derivative_form.h>
-#include <deal.II/base/std_cxx11/array.h>
-#include <deal.II/base/array_view.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/fe/fe_update_flags.h>
 
+#include <array>
 #include <cmath>
 
 DEAL_II_NAMESPACE_OPEN
 
+template <typename ElementType> class ArrayView;
 template <int dim> class Quadrature;
 template <int dim, int spacedim> class FEValues;
 template <int dim, int spacedim> class FEValuesBase;
@@ -291,7 +291,7 @@ public:
   /**
    * Virtual destructor.
    */
-  virtual ~Mapping ();
+  virtual ~Mapping () = default;
 
   /**
    * Return a pointer to a copy of the present object. The caller of this copy
@@ -320,11 +320,11 @@ public:
    * <code>cell-@>vertex(v)</code>.
    */
   virtual
-  std_cxx11::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
+  std::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
   get_vertices (const typename Triangulation<dim,spacedim>::cell_iterator &cell) const;
 
   /**
-   * Returns whether the mapping preserves vertex locations. In other words,
+   * Return whether the mapping preserves vertex locations. In other words,
    * this function returns whether the mapped location of the reference cell
    * vertices (given by GeometryInfo::unit_cell_vertex()) equals the result of
    * <code>cell-@>vertex()</code> (i.e., information stored by the
@@ -525,12 +525,6 @@ public:
    */
   class InternalDataBase
   {
-  private:
-    /**
-     * Copy construction is forbidden.
-     */
-    InternalDataBase (const InternalDataBase &);
-
   public:
     /**
      * Constructor. Sets update_flags to @p update_default and @p first_cell
@@ -539,9 +533,14 @@ public:
     InternalDataBase ();
 
     /**
+     * Copy construction is forbidden.
+     */
+    InternalDataBase (const InternalDataBase &) = delete;
+
+    /**
      * Virtual destructor for derived classes
      */
-    virtual ~InternalDataBase ();
+    virtual ~InternalDataBase () = default;
 
     /**
      * A set of update flags specifying the kind of information that an

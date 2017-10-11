@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 //TODO:[GK] Add checks for RT again!
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
@@ -37,9 +36,6 @@
 #include <deal.II/multigrid/mg_transfer.h>
 #include <deal.II/multigrid/mg_tools.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -59,7 +55,7 @@ reinit_vector (const dealii::DoFHandler<dim,spacedim> &mg_dof,
 }
 
 
-template<int dim>
+template <int dim>
 void refine_mesh (Triangulation<dim> &triangulation)
 {
   bool cell_refined = false;
@@ -89,7 +85,7 @@ void check_simple(const FiniteElement<dim> &fe)
 {
   deallog << fe.get_name() << std::endl;
 
-  Triangulation<dim> tr;
+  Triangulation<dim> tr(Triangulation<dim>::limit_level_difference_at_vertices);
   GridGenerator::hyper_cube(tr);
   refine_mesh(tr);
   refine_mesh(tr);
@@ -171,7 +167,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(6);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check_simple (FE_DGP<2>(0));
   check_simple (FE_DGP<2>(1));

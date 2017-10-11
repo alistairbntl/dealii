@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,11 +19,7 @@
 // should be zero.
 
 #include "../tests.h"
-#include "testmatrix.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_memory.h>
@@ -33,7 +29,7 @@
 #include <deal.II/lac/precondition_block.h>
 #include <deal.II/lac/relaxation_block.h>
 
-template<typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
+template <typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
 double
 check_solve (SolverType         &solver,
              const MatrixType   &A,
@@ -62,7 +58,6 @@ int main()
 //  logfile.setf(std::ios::fixed);
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   SolverControl control(10, 1.e-3);
   SolverRichardson<> rich(control);

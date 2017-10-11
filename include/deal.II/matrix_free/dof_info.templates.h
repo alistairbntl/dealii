@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -12,6 +12,9 @@
 // the top level of the deal.II distribution.
 //
 // ---------------------------------------------------------------------
+
+#ifndef dealii_matrix_free_dof_info_templates_h
+#define dealii_matrix_free_dof_info_templates_h
 
 
 #include <deal.II/base/memory_consumption.h>
@@ -127,27 +130,6 @@ namespace internal
     }
 
 
-    DoFInfo::DoFInfo (const DoFInfo &dof_info_in)
-      :
-      row_starts (dof_info_in.row_starts),
-      dof_indices (dof_info_in.dof_indices),
-      constraint_indicator (dof_info_in.constraint_indicator),
-      vector_partitioner (dof_info_in.vector_partitioner),
-      constrained_dofs (dof_info_in.constrained_dofs),
-      row_starts_plain_indices (dof_info_in.row_starts_plain_indices),
-      plain_dof_indices (dof_info_in.plain_dof_indices),
-      dimension (dof_info_in.dimension),
-      n_components (dof_info_in.n_components),
-      dofs_per_cell (dof_info_in.dofs_per_cell),
-      dofs_per_face (dof_info_in.dofs_per_face),
-      store_plain_indices (dof_info_in.store_plain_indices),
-      cell_active_fe_index (dof_info_in.cell_active_fe_index),
-      max_fe_index (dof_info_in.max_fe_index),
-      fe_index_conversion (dof_info_in.fe_index_conversion),
-      ghost_dofs (dof_info_in.ghost_dofs)
-    {}
-
-
 
     void
     DoFInfo::clear ()
@@ -179,7 +161,7 @@ namespace internal
                                ConstraintValues<double> &constraint_values,
                                bool                            &cell_at_boundary)
     {
-      Assert (vector_partitioner.get() !=0, ExcInternalError());
+      Assert (vector_partitioner.get() != nullptr, ExcInternalError());
       const unsigned int n_mpi_procs = vector_partitioner->n_mpi_processes();
       const types::global_dof_index first_owned = vector_partitioner->local_range().first;
       const types::global_dof_index last_owned  = vector_partitioner->local_range().second;
@@ -200,7 +182,7 @@ namespace internal
             constraints.get_constraint_entries(current_dof);
 
           // dof is constrained
-          if (entries_ptr != 0)
+          if (entries_ptr != nullptr)
             {
               // in case we want to access plain indices, we need to know
               // about the location of constrained indices as well (all the
@@ -335,7 +317,6 @@ no_constraint:
       const unsigned int n_owned  = (vector_partitioner->local_range().second-
                                      vector_partitioner->local_range().first);
       const std::size_t n_ghosts = ghost_dofs.size();
-      unsigned int      n_unique_ghosts= 0;
 #ifdef DEBUG
       for (std::vector<unsigned int>::iterator dof = dof_indices.begin();
            dof!=dof_indices.end(); ++dof)
@@ -346,6 +327,7 @@ no_constraint:
       IndexSet ghost_indices (vector_partitioner->size());
       if (n_ghosts > 0)
         {
+          unsigned int n_unique_ghosts = 0;
           // since we need to go back to the local_to_global indices and
           // replace the temporary numbering of ghosts by the real number in
           // the index set, we need to store these values
@@ -608,7 +590,7 @@ no_constraint:
           std::swap (new_active_fe_index, cell_active_fe_index);
         }
 
-      std::vector<std_cxx11::array<unsigned int, 3> > new_row_starts;
+      std::vector<std::array<unsigned int, 3> > new_row_starts;
       std::vector<unsigned int> new_dof_indices;
       std::vector<std::pair<unsigned short,unsigned short> >
       new_constraint_indicator;
@@ -700,8 +682,7 @@ no_constraint:
                 else
                   {
                     const unsigned short constraint_loc = constr_ind[j]->second;
-                    new_constraint_indicator.push_back
-                    (std::pair<unsigned short,unsigned short> (m_index, constraint_loc));
+                    new_constraint_indicator.emplace_back (m_index, constraint_loc);
                     for (unsigned int k=constraint_pool_row_index[constraint_loc];
                          k<constraint_pool_row_index[constraint_loc+1];
                          ++k, ++glob_indices[j])
@@ -837,13 +818,11 @@ no_constraint:
             std::min(((size_info.boundary_cells_end+task_info.block_size-1)/
                       task_info.block_size)*task_info.block_size,
                      size_info.n_macro_cells);
-          start_up = start_nonboundary;
           size_info.boundary_cells_end = start_nonboundary;
         }
       else
         {
           start_nonboundary = size_info.n_macro_cells;
-          start_up = size_info.n_macro_cells;
           size_info.boundary_cells_start = 0;
           size_info.boundary_cells_end = size_info.n_macro_cells;
         }
@@ -946,10 +925,11 @@ no_constraint:
         {
           // put all cells up to begin_inner_cells into first partition. if
           // the numbers do not add up exactly, assign an additional block
-          if (start_nonboundary>0 && start_up == start_nonboundary)
+          if (start_nonboundary>0)
             {
               unsigned int n_blocks = ((start_nonboundary+task_info.block_size-1)
                                        /task_info.block_size);
+              start_nonboundary = 0;
               for (unsigned int cell=0; cell<n_blocks; ++cell)
                 {
                   cell_partition[cell] = partition;
@@ -1218,6 +1198,7 @@ no_constraint:
 
               // adjust end of boundary cells to the remainder
               size_info.boundary_cells_end += (remainder+vectorization_length-1)/vectorization_length;
+              start_nonboundary = 0;
             }
           else
             {
@@ -1922,7 +1903,7 @@ not_connect:
     DoFInfo::memory_consumption () const
     {
       std::size_t memory = sizeof(*this);
-      memory += (row_starts.capacity()*sizeof(std_cxx11::array<unsigned int,3>));
+      memory += (row_starts.capacity()*sizeof(std::array<unsigned int,3>));
       memory += MemoryConsumption::memory_consumption (dof_indices);
       memory += MemoryConsumption::memory_consumption (row_starts_plain_indices);
       memory += MemoryConsumption::memory_consumption (plain_dof_indices);
@@ -1940,7 +1921,7 @@ not_connect:
     {
       out << "       Memory row starts indices:    ";
       size_info.print_memory_statistics
-      (out, (row_starts.capacity()*sizeof(std_cxx11::array<unsigned int, 3>)));
+      (out, (row_starts.capacity()*sizeof(std::array<unsigned int, 3>)));
       out << "       Memory dof indices:           ";
       size_info.print_memory_statistics
       (out, MemoryConsumption::memory_consumption (dof_indices));
@@ -2007,3 +1988,5 @@ not_connect:
 } // end of namespace internal
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

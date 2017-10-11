@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 #include "../tests.h"
 
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/lac/vector.h>
@@ -33,22 +32,21 @@
 #include <deal.II/base/utilities.h>
 
 
-#include <fstream>
 
 
 // make sure if i is in s on proc j, j is in s on proc i
-void mpi_check(const std::set<unsigned int> &s)
+void mpi_check(const std::set<types::subdomain_id> &s)
 {
   MPI_Barrier(MPI_COMM_WORLD);
   unsigned int tag = 1234;
-  for (std::set<unsigned int>::iterator it = s.begin();
+  for (std::set<types::subdomain_id>::iterator it = s.begin();
        it != s.end(); ++it)
-    MPI_Send(NULL, 0, MPI_INT, *it, tag, MPI_COMM_WORLD);
+    MPI_Send(nullptr, 0, MPI_INT, *it, tag, MPI_COMM_WORLD);
 
   for (unsigned int i=0; i<s.size(); ++i)
     {
       MPI_Status status;
-      MPI_Recv(NULL, 0, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
+      MPI_Recv(nullptr, 0, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
       if ((s.end() == s.find(status.MPI_SOURCE)))
         deallog << status.MPI_SOURCE <<  " NOTOKAY" << std::endl;
       Assert(s.end() != s.find(status.MPI_SOURCE), ExcInternalError());
@@ -84,16 +82,16 @@ void test()
       deallog << "* cycle " << ref << std::endl;
 
       deallog << "ghost owners: ";
-      std::set<unsigned int> ghost_owners = tr.ghost_owners();
-      for (std::set<unsigned int>::iterator it = ghost_owners.begin(); it!=ghost_owners.end(); ++it)
+      std::set<types::subdomain_id> ghost_owners = tr.ghost_owners();
+      for (std::set<types::subdomain_id>::iterator it = ghost_owners.begin(); it!=ghost_owners.end(); ++it)
         deallog << *it << " ";
       deallog << std::endl;
 
       mpi_check(ghost_owners);
 
       deallog << "level ghost owners: ";
-      std::set<unsigned int> level_ghost_owners = tr.level_ghost_owners();
-      for (std::set<unsigned int>::iterator it = level_ghost_owners.begin(); it!=level_ghost_owners.end(); ++it)
+      std::set<types::subdomain_id> level_ghost_owners = tr.level_ghost_owners();
+      for (std::set<types::subdomain_id>::iterator it = level_ghost_owners.begin(); it!=level_ghost_owners.end(); ++it)
         deallog << *it << " ";
       deallog << std::endl;
 
@@ -104,7 +102,7 @@ void test()
       Assert(is_subset, ExcInternalError());
 
       Vector<float> indicators (tr.n_active_cells());
-      std::set<unsigned int> neighbors;
+      std::set<types::subdomain_id> neighbors;
       {
         for (typename Triangulation<dim>::active_cell_iterator
              cell = tr.begin_active(); cell != tr.end(); ++cell)

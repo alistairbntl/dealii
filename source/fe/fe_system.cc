@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2016 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,24 +22,29 @@
 #include <deal.II/fe/mapping.h>
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_values.h>
+#include <deal.II/fe/fe_tools.h>
 
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 
 DEAL_II_NAMESPACE_OPEN
 
-namespace
+namespace internal
 {
-  bool IsNonZero (unsigned int i)
+  namespace FESystem
   {
-    return i>0;
+    namespace
+    {
+      unsigned int count_nonzeros(const std::vector<unsigned int> &vec)
+      {
+        return std::count_if(vec.begin(), vec.end(), [](const unsigned int i)
+        {
+          return i > 0;
+        });
+      }
+    }
   }
-
-  unsigned int count_nonzeros(const std::vector<unsigned int> &vec)
-  {
-    return std::count_if(vec.begin(), vec.end(), IsNonZero);
-  }
-
 }
 /* ----------------------- FESystem::InternalData ------------------- */
 
@@ -61,7 +66,7 @@ FESystem<dim,spacedim>::InternalData::~InternalData()
     if (base_fe_datas[i])
       {
         delete base_fe_datas[i];
-        base_fe_datas[i] = 0;
+        base_fe_datas[i] = nullptr;
       }
 }
 
@@ -110,505 +115,13 @@ InternalData::get_fe_output_object (const unsigned int base_no) const
 template <int dim, int spacedim>
 const unsigned int FESystem<dim,spacedim>::invalid_face_number;
 
-namespace
-{
-
-  /**
-   * Take vectors of finite elements and multiplicities and multiply out
-   * how many degrees of freedom the composed element has per vertex,
-   * line, etc.
-   */
-  template <int dim, int spacedim>
-  FiniteElementData<dim>
-  multiply_dof_numbers (const std::vector<const FiniteElement<dim,spacedim>*> &fes,
-                        const std::vector<unsigned int>                       &multiplicities)
-  {
-    AssertDimension(fes.size(), multiplicities.size());
-
-    unsigned int multiplied_dofs_per_vertex = 0;
-    unsigned int multiplied_dofs_per_line = 0;
-    unsigned int multiplied_dofs_per_quad = 0;
-    unsigned int multiplied_dofs_per_hex = 0;
-
-    unsigned int multiplied_n_components = 0;
-
-    unsigned int degree = 0; // degree is the maximal degree of the components
-
-    for (unsigned int i=0; i<fes.size(); i++)
-      if (multiplicities[i]>0)
-        {
-          multiplied_dofs_per_vertex += fes[i]->dofs_per_vertex * multiplicities[i];
-          multiplied_dofs_per_line   += fes[i]->dofs_per_line * multiplicities[i];
-          multiplied_dofs_per_quad   += fes[i]->dofs_per_quad * multiplicities[i];
-          multiplied_dofs_per_hex    += fes[i]->dofs_per_hex * multiplicities[i];
-
-          multiplied_n_components+=fes[i]->n_components() * multiplicities[i];
-
-          degree = std::max(degree, fes[i]->tensor_degree() );
-        }
-
-    // assume conformity of the first finite element and then take away
-    // bits as indicated by the base elements. if all multiplicities
-    // happen to be zero, then it doesn't matter what we set it to.
-    typename FiniteElementData<dim>::Conformity total_conformity
-      = typename FiniteElementData<dim>::Conformity();
-    {
-      unsigned int index = 0;
-      for (index=0; index<fes.size(); ++index)
-        if (multiplicities[index]>0)
-          {
-            total_conformity = fes[index]->conforming_space;
-            break;
-          }
-
-      for (; index<fes.size(); ++index)
-        if (multiplicities[index]>0)
-          total_conformity =
-            typename FiniteElementData<dim>::Conformity(total_conformity
-                                                        &
-                                                        fes[index]->conforming_space);
-    }
-
-    std::vector<unsigned int> dpo;
-    dpo.push_back(multiplied_dofs_per_vertex);
-    dpo.push_back(multiplied_dofs_per_line);
-    if (dim>1) dpo.push_back(multiplied_dofs_per_quad);
-    if (dim>2) dpo.push_back(multiplied_dofs_per_hex);
-
-    BlockIndices block_indices (0,0);
-
-    for (unsigned int base=0; base < fes.size(); ++base)
-      for (unsigned int m = 0; m < multiplicities[base]; ++m)
-        block_indices.push_back(fes[base]->dofs_per_cell);
-
-    return FiniteElementData<dim> (dpo,
-                                   multiplied_n_components,
-                                   degree,
-                                   total_conformity,
-                                   block_indices);
-  }
-
-  /**
-   * Same as above but for a specific number of sub-elements.
-   */
-  template <int dim, int spacedim>
-  FiniteElementData<dim>
-  multiply_dof_numbers (const FiniteElement<dim,spacedim> *fe1,
-                        const unsigned int            N1,
-                        const FiniteElement<dim,spacedim> *fe2=NULL,
-                        const unsigned int            N2=0,
-                        const FiniteElement<dim,spacedim> *fe3=NULL,
-                        const unsigned int            N3=0,
-                        const FiniteElement<dim,spacedim> *fe4=NULL,
-                        const unsigned int            N4=0,
-                        const FiniteElement<dim,spacedim> *fe5=NULL,
-                        const unsigned int            N5=0)
-  {
-    std::vector<const FiniteElement<dim,spacedim>*> fes;
-    fes.push_back(fe1);
-    fes.push_back(fe2);
-    fes.push_back(fe3);
-    fes.push_back(fe4);
-    fes.push_back(fe5);
-
-    std::vector<unsigned int> mult;
-    mult.push_back(N1);
-    mult.push_back(N2);
-    mult.push_back(N3);
-    mult.push_back(N4);
-    mult.push_back(N5);
-    return multiply_dof_numbers(fes, mult);
-  }
-
-
-
-  /**
-   * Compute the named flags for a list of finite elements with multiplicities
-   * given in the second argument. This function is called from all the above
-   * functions.
-   */
-  template <int dim, int spacedim>
-  std::vector<bool>
-  compute_restriction_is_additive_flags (const std::vector<const FiniteElement<dim,spacedim>*> &fes,
-                                         const std::vector<unsigned int>              &multiplicities)
-  {
-    AssertDimension(fes.size(), multiplicities.size());
-
-    // first count the number of dofs and components that will emerge from the
-    // given FEs
-    unsigned int n_shape_functions = 0;
-    for (unsigned int i=0; i<fes.size(); ++i)
-      if (multiplicities[i]>0) // check needed as fe might be NULL
-        n_shape_functions += fes[i]->dofs_per_cell * multiplicities[i];
-
-    // generate the array that will hold the output
-    std::vector<bool> retval (n_shape_functions, false);
-
-    // finally go through all the shape functions of the base elements, and copy
-    // their flags. this somehow copies the code in build_cell_table, which is
-    // not nice as it uses too much implicit knowledge about the layout of the
-    // individual bases in the composed FE, but there seems no way around...
-    //
-    // for each shape function, copy the flags from the base element to this
-    // one, taking into account multiplicities, and other complications
-    unsigned int total_index = 0;
-    for (unsigned int vertex_number=0;
-         vertex_number<GeometryInfo<dim>::vertices_per_cell;
-         ++vertex_number)
-      {
-        for (unsigned int base=0; base<fes.size(); ++base)
-          for (unsigned int m=0; m<multiplicities[base]; ++m)
-            for (unsigned int local_index = 0;
-                 local_index < fes[base]->dofs_per_vertex;
-                 ++local_index, ++total_index)
-              {
-                const unsigned int index_in_base
-                  = (fes[base]->dofs_per_vertex*vertex_number +
-                     local_index);
-
-                Assert (index_in_base < fes[base]->dofs_per_cell,
-                        ExcInternalError());
-                retval[total_index] = fes[base]->restriction_is_additive(index_in_base);
-              }
-      }
-
-    // 2. Lines
-    if (GeometryInfo<dim>::lines_per_cell > 0)
-      for (unsigned int line_number= 0;
-           line_number != GeometryInfo<dim>::lines_per_cell;
-           ++line_number)
-        {
-          for (unsigned int base=0; base<fes.size(); ++base)
-            for (unsigned int m=0; m<multiplicities[base]; ++m)
-              for (unsigned int local_index = 0;
-                   local_index < fes[base]->dofs_per_line;
-                   ++local_index, ++total_index)
-                {
-                  const unsigned int index_in_base
-                    = (fes[base]->dofs_per_line*line_number +
-                       local_index +
-                       fes[base]->first_line_index);
-
-                  Assert (index_in_base < fes[base]->dofs_per_cell,
-                          ExcInternalError());
-                  retval[total_index] = fes[base]->restriction_is_additive(index_in_base);
-                }
-        }
-
-    // 3. Quads
-    if (GeometryInfo<dim>::quads_per_cell > 0)
-      for (unsigned int quad_number= 0;
-           quad_number != GeometryInfo<dim>::quads_per_cell;
-           ++quad_number)
-        {
-          for (unsigned int base=0; base<fes.size(); ++base)
-            for (unsigned int m=0; m<multiplicities[base]; ++m)
-              for (unsigned int local_index = 0;
-                   local_index < fes[base]->dofs_per_quad;
-                   ++local_index, ++total_index)
-                {
-                  const unsigned int index_in_base
-                    = (fes[base]->dofs_per_quad*quad_number +
-                       local_index +
-                       fes[base]->first_quad_index);
-
-                  Assert (index_in_base < fes[base]->dofs_per_cell,
-                          ExcInternalError());
-                  retval[total_index] = fes[base]->restriction_is_additive(index_in_base);
-                }
-        }
-
-    // 4. Hexes
-    if (GeometryInfo<dim>::hexes_per_cell > 0)
-      for (unsigned int hex_number= 0;
-           hex_number != GeometryInfo<dim>::hexes_per_cell;
-           ++hex_number)
-        {
-          for (unsigned int base=0; base<fes.size(); ++base)
-            for (unsigned int m=0; m<multiplicities[base]; ++m)
-              for (unsigned int local_index = 0;
-                   local_index < fes[base]->dofs_per_hex;
-                   ++local_index, ++total_index)
-                {
-                  const unsigned int index_in_base
-                    = (fes[base]->dofs_per_hex*hex_number +
-                       local_index +
-                       fes[base]->first_hex_index);
-
-                  Assert (index_in_base < fes[base]->dofs_per_cell,
-                          ExcInternalError());
-                  retval[total_index] = fes[base]->restriction_is_additive(index_in_base);
-                }
-        }
-
-    Assert (total_index == n_shape_functions, ExcInternalError());
-
-    return retval;
-  }
-
-
-
-  /**
-   * Take a @p FiniteElement object
-   * and return an boolean vector including the @p
-   * restriction_is_additive_flags of the mixed element consisting of @p N
-   * elements of the sub-element @p fe.
-   */
-  template <int dim, int spacedim>
-  std::vector<bool>
-  compute_restriction_is_additive_flags (const FiniteElement<dim,spacedim> *fe1,
-                                         const unsigned int        N1,
-                                         const FiniteElement<dim,spacedim> *fe2=NULL,
-                                         const unsigned int        N2=0,
-                                         const FiniteElement<dim,spacedim> *fe3=NULL,
-                                         const unsigned int        N3=0,
-                                         const FiniteElement<dim,spacedim> *fe4=NULL,
-                                         const unsigned int        N4=0,
-                                         const FiniteElement<dim,spacedim> *fe5=NULL,
-                                         const unsigned int        N5=0)
-  {
-    std::vector<const FiniteElement<dim,spacedim>*> fe_list;
-    std::vector<unsigned int>              multiplicities;
-
-    fe_list.push_back (fe1);
-    multiplicities.push_back (N1);
-
-    fe_list.push_back (fe2);
-    multiplicities.push_back (N2);
-
-    fe_list.push_back (fe3);
-    multiplicities.push_back (N3);
-
-    fe_list.push_back (fe4);
-    multiplicities.push_back (N4);
-
-    fe_list.push_back (fe5);
-    multiplicities.push_back (N5);
-    return compute_restriction_is_additive_flags (fe_list, multiplicities);
-  }
-
-
-
-  /**
-   * Compute the nonzero components of a list of finite elements with
-   * multiplicities given in the second argument.
-   */
-  template <int dim, int spacedim>
-  std::vector<ComponentMask>
-  compute_nonzero_components (const std::vector<const FiniteElement<dim,spacedim>*> &fes,
-                              const std::vector<unsigned int>              &multiplicities)
-  {
-    AssertDimension(fes.size(), multiplicities.size());
-
-    // first count the number of dofs and components that will emerge from the
-    // given FEs
-    unsigned int n_shape_functions = 0;
-    for (unsigned int i=0; i<fes.size(); ++i)
-      if (multiplicities[i]>0) //needed because fe might be NULL
-        n_shape_functions += fes[i]->dofs_per_cell * multiplicities[i];
-
-    unsigned int n_components = 0;
-    for (unsigned int i=0; i<fes.size(); ++i)
-      if (multiplicities[i]>0) //needed because fe might be NULL
-        n_components += fes[i]->n_components() * multiplicities[i];
-
-    // generate the array that will hold the output
-    std::vector<std::vector<bool> >
-    retval (n_shape_functions, std::vector<bool> (n_components, false));
-
-    // finally go through all the shape functions of the base elements, and copy
-    // their flags. this somehow copies the code in build_cell_table, which is
-    // not nice as it uses too much implicit knowledge about the layout of the
-    // individual bases in the composed FE, but there seems no way around...
-    //
-    // for each shape function, copy the non-zero flags from the base element to
-    // this one, taking into account multiplicities, multiple components in base
-    // elements, and other complications
-    unsigned int total_index = 0;
-    for (unsigned int vertex_number=0;
-         vertex_number<GeometryInfo<dim>::vertices_per_cell;
-         ++vertex_number)
-      {
-        unsigned int comp_start = 0;
-        for (unsigned int base=0; base<fes.size(); ++base)
-          for (unsigned int m=0; m<multiplicities[base];
-               ++m, comp_start+=fes[base]->n_components())
-            for (unsigned int local_index = 0;
-                 local_index < fes[base]->dofs_per_vertex;
-                 ++local_index, ++total_index)
-              {
-                const unsigned int index_in_base
-                  = (fes[base]->dofs_per_vertex*vertex_number +
-                     local_index);
-
-                Assert (comp_start+fes[base]->n_components() <=
-                        retval[total_index].size(),
-                        ExcInternalError());
-                for (unsigned int c=0; c<fes[base]->n_components(); ++c)
-                  {
-                    Assert (c < fes[base]->get_nonzero_components(index_in_base).size(),
-                            ExcInternalError());
-                    retval[total_index][comp_start+c]
-                      = fes[base]->get_nonzero_components(index_in_base)[c];
-                  }
-              }
-      }
-
-    // 2. Lines
-    if (GeometryInfo<dim>::lines_per_cell > 0)
-      for (unsigned int line_number= 0;
-           line_number != GeometryInfo<dim>::lines_per_cell;
-           ++line_number)
-        {
-          unsigned int comp_start = 0;
-          for (unsigned int base=0; base<fes.size(); ++base)
-            for (unsigned int m=0; m<multiplicities[base];
-                 ++m, comp_start+=fes[base]->n_components())
-              for (unsigned int local_index = 0;
-                   local_index < fes[base]->dofs_per_line;
-                   ++local_index, ++total_index)
-                {
-                  const unsigned int index_in_base
-                    = (fes[base]->dofs_per_line*line_number +
-                       local_index +
-                       fes[base]->first_line_index);
-
-                  Assert (comp_start+fes[base]->n_components() <=
-                          retval[total_index].size(),
-                          ExcInternalError());
-                  for (unsigned int c=0; c<fes[base]->n_components(); ++c)
-                    {
-                      Assert (c < fes[base]->get_nonzero_components(index_in_base).size(),
-                              ExcInternalError());
-                      retval[total_index][comp_start+c]
-                        = fes[base]->get_nonzero_components(index_in_base)[c];
-                    }
-                }
-        }
-
-    // 3. Quads
-    if (GeometryInfo<dim>::quads_per_cell > 0)
-      for (unsigned int quad_number= 0;
-           quad_number != GeometryInfo<dim>::quads_per_cell;
-           ++quad_number)
-        {
-          unsigned int comp_start = 0;
-          for (unsigned int base=0; base<fes.size(); ++base)
-            for (unsigned int m=0; m<multiplicities[base];
-                 ++m, comp_start+=fes[base]->n_components())
-              for (unsigned int local_index = 0;
-                   local_index < fes[base]->dofs_per_quad;
-                   ++local_index, ++total_index)
-                {
-                  const unsigned int index_in_base
-                    = (fes[base]->dofs_per_quad*quad_number +
-                       local_index +
-                       fes[base]->first_quad_index);
-
-                  Assert (comp_start+fes[base]->n_components() <=
-                          retval[total_index].size(),
-                          ExcInternalError());
-                  for (unsigned int c=0; c<fes[base]->n_components(); ++c)
-                    {
-                      Assert (c < fes[base]->get_nonzero_components(index_in_base).size(),
-                              ExcInternalError());
-                      retval[total_index][comp_start+c]
-                        = fes[base]->get_nonzero_components(index_in_base)[c];
-                    }
-                }
-        }
-
-    // 4. Hexes
-    if (GeometryInfo<dim>::hexes_per_cell > 0)
-      for (unsigned int hex_number= 0;
-           hex_number != GeometryInfo<dim>::hexes_per_cell;
-           ++hex_number)
-        {
-          unsigned int comp_start = 0;
-          for (unsigned int base=0; base<fes.size(); ++base)
-            for (unsigned int m=0; m<multiplicities[base];
-                 ++m, comp_start+=fes[base]->n_components())
-              for (unsigned int local_index = 0;
-                   local_index < fes[base]->dofs_per_hex;
-                   ++local_index, ++total_index)
-                {
-                  const unsigned int index_in_base
-                    = (fes[base]->dofs_per_hex*hex_number +
-                       local_index +
-                       fes[base]->first_hex_index);
-
-                  Assert (comp_start+fes[base]->n_components() <=
-                          retval[total_index].size(),
-                          ExcInternalError());
-                  for (unsigned int c=0; c<fes[base]->n_components(); ++c)
-                    {
-                      Assert (c < fes[base]->get_nonzero_components(index_in_base).size(),
-                              ExcInternalError());
-                      retval[total_index][comp_start+c]
-                        = fes[base]->get_nonzero_components(index_in_base)[c];
-                    }
-                }
-        }
-
-    Assert (total_index == n_shape_functions, ExcInternalError());
-
-    // now copy the vector<vector<bool> > into a vector<ComponentMask>.
-    // this appears complicated but we do it this way since it's just
-    // awkward to generate ComponentMasks directly and so we need the
-    // recourse of the inner vector<bool> anyway.
-    std::vector<ComponentMask> xretval (retval.size());
-    for (unsigned int i=0; i<retval.size(); ++i)
-      xretval[i] = ComponentMask(retval[i]);
-    return xretval;
-  }
-
-
-  /**
-   * Compute the non-zero vector components of a composed finite element.
-   */
-  template <int dim, int spacedim>
-  std::vector<ComponentMask>
-  compute_nonzero_components (const FiniteElement<dim,spacedim> *fe1,
-                              const unsigned int        N1,
-                              const FiniteElement<dim,spacedim> *fe2=NULL,
-                              const unsigned int        N2=0,
-                              const FiniteElement<dim,spacedim> *fe3=NULL,
-                              const unsigned int        N3=0,
-                              const FiniteElement<dim,spacedim> *fe4=NULL,
-                              const unsigned int        N4=0,
-                              const FiniteElement<dim,spacedim> *fe5=NULL,
-                              const unsigned int        N5=0)
-  {
-    std::vector<const FiniteElement<dim,spacedim>*> fe_list;
-    std::vector<unsigned int>              multiplicities;
-
-    fe_list.push_back (fe1);
-    multiplicities.push_back (N1);
-
-    fe_list.push_back (fe2);
-    multiplicities.push_back (N2);
-
-    fe_list.push_back (fe3);
-    multiplicities.push_back (N3);
-
-    fe_list.push_back (fe4);
-    multiplicities.push_back (N4);
-
-    fe_list.push_back (fe5);
-    multiplicities.push_back (N5);
-
-    return compute_nonzero_components (fe_list, multiplicities);
-  }
-}
-
-
 
 template <int dim, int spacedim>
 FESystem<dim,spacedim>::FESystem (const FiniteElement<dim,spacedim> &fe,
                                   const unsigned int n_elements) :
-  FiniteElement<dim,spacedim> (multiply_dof_numbers(&fe, n_elements),
-                               compute_restriction_is_additive_flags (&fe, n_elements),
-                               compute_nonzero_components(&fe, n_elements)),
+  FiniteElement<dim,spacedim> (FETools::Compositing::multiply_dof_numbers(&fe, n_elements),
+                               FETools::Compositing::compute_restriction_is_additive_flags (&fe, n_elements),
+                               FETools::Compositing::compute_nonzero_components(&fe, n_elements)),
   base_elements((n_elements>0))
 {
   std::vector<const FiniteElement<dim,spacedim>*> fes;
@@ -625,11 +138,11 @@ FESystem<dim,spacedim>::FESystem (const FiniteElement<dim,spacedim> &fe1,
                                   const unsigned int        n1,
                                   const FiniteElement<dim,spacedim> &fe2,
                                   const unsigned int        n2) :
-  FiniteElement<dim,spacedim> (multiply_dof_numbers(&fe1, n1, &fe2, n2),
-                               compute_restriction_is_additive_flags (&fe1, n1,
+  FiniteElement<dim,spacedim> (FETools::Compositing::multiply_dof_numbers(&fe1, n1, &fe2, n2),
+                               FETools::Compositing::compute_restriction_is_additive_flags (&fe1, n1,
                                    &fe2, n2),
-                               compute_nonzero_components(&fe1, n1,
-                                                          &fe2, n2)),
+                               FETools::Compositing::compute_nonzero_components(&fe1, n1,
+                                   &fe2, n2)),
   base_elements((n1>0)+(n2>0))
 {
   std::vector<const FiniteElement<dim,spacedim>*> fes;
@@ -650,15 +163,15 @@ FESystem<dim,spacedim>::FESystem (const FiniteElement<dim,spacedim> &fe1,
                                   const unsigned int        n2,
                                   const FiniteElement<dim,spacedim> &fe3,
                                   const unsigned int        n3) :
-  FiniteElement<dim,spacedim> (multiply_dof_numbers(&fe1, n1,
-                                                    &fe2, n2,
-                                                    &fe3, n3),
-                               compute_restriction_is_additive_flags (&fe1, n1,
+  FiniteElement<dim,spacedim> (FETools::Compositing::multiply_dof_numbers(&fe1, n1,
+                               &fe2, n2,
+                               &fe3, n3),
+                               FETools::Compositing::compute_restriction_is_additive_flags (&fe1, n1,
                                    &fe2, n2,
                                    &fe3, n3),
-                               compute_nonzero_components(&fe1, n1,
-                                                          &fe2, n2,
-                                                          &fe3, n3)),
+                               FETools::Compositing::compute_nonzero_components(&fe1, n1,
+                                   &fe2, n2,
+                                   &fe3, n3)),
   base_elements((n1>0)+(n2>0)+(n3>0))
 {
   std::vector<const FiniteElement<dim,spacedim>*> fes;
@@ -683,18 +196,18 @@ FESystem<dim,spacedim>::FESystem (const FiniteElement<dim,spacedim> &fe1,
                                   const unsigned int        n3,
                                   const FiniteElement<dim,spacedim> &fe4,
                                   const unsigned int        n4) :
-  FiniteElement<dim,spacedim> (multiply_dof_numbers(&fe1, n1,
-                                                    &fe2, n2,
-                                                    &fe3, n3,
-                                                    &fe4, n4),
-                               compute_restriction_is_additive_flags (&fe1, n1,
+  FiniteElement<dim,spacedim> (FETools::Compositing::multiply_dof_numbers(&fe1, n1,
+                               &fe2, n2,
+                               &fe3, n3,
+                               &fe4, n4),
+                               FETools::Compositing::compute_restriction_is_additive_flags (&fe1, n1,
                                    &fe2, n2,
                                    &fe3, n3,
                                    &fe4, n4),
-                               compute_nonzero_components(&fe1, n1,
-                                                          &fe2, n2,
-                                                          &fe3, n3,
-                                                          &fe4 ,n4)),
+                               FETools::Compositing::compute_nonzero_components(&fe1, n1,
+                                   &fe2, n2,
+                                   &fe3, n3,
+                                   &fe4, n4)),
   base_elements((n1>0)+(n2>0)+(n3>0)+(n4>0))
 {
   std::vector<const FiniteElement<dim,spacedim>*> fes;
@@ -723,21 +236,21 @@ FESystem<dim,spacedim>::FESystem (const FiniteElement<dim,spacedim> &fe1,
                                   const unsigned int        n4,
                                   const FiniteElement<dim,spacedim> &fe5,
                                   const unsigned int        n5) :
-  FiniteElement<dim,spacedim> (multiply_dof_numbers(&fe1, n1,
-                                                    &fe2, n2,
-                                                    &fe3, n3,
-                                                    &fe4, n4,
-                                                    &fe5, n5),
-                               compute_restriction_is_additive_flags (&fe1, n1,
+  FiniteElement<dim,spacedim> (FETools::Compositing::multiply_dof_numbers(&fe1, n1,
+                               &fe2, n2,
+                               &fe3, n3,
+                               &fe4, n4,
+                               &fe5, n5),
+                               FETools::Compositing::compute_restriction_is_additive_flags (&fe1, n1,
                                    &fe2, n2,
                                    &fe3, n3,
                                    &fe4, n4,
                                    &fe5, n5),
-                               compute_nonzero_components(&fe1, n1,
-                                                          &fe2, n2,
-                                                          &fe3, n3,
-                                                          &fe4 ,n4,
-                                                          &fe5, n5)),
+                               FETools::Compositing::compute_nonzero_components(&fe1, n1,
+                                   &fe2, n2,
+                                   &fe3, n3,
+                                   &fe4, n4,
+                                   &fe5, n5)),
   base_elements((n1>0)+(n2>0)+(n3>0)+(n4>0)+(n5>0))
 {
   std::vector<const FiniteElement<dim,spacedim>*> fes;
@@ -762,19 +275,13 @@ FESystem<dim,spacedim>::FESystem (
   const std::vector<const FiniteElement<dim,spacedim>*>  &fes,
   const std::vector<unsigned int>                  &multiplicities)
   :
-  FiniteElement<dim,spacedim> (multiply_dof_numbers(fes, multiplicities),
-                               compute_restriction_is_additive_flags (fes, multiplicities),
-                               compute_nonzero_components(fes, multiplicities)),
-  base_elements(count_nonzeros(multiplicities))
+  FiniteElement<dim,spacedim> (FETools::Compositing::multiply_dof_numbers(fes, multiplicities),
+                               FETools::Compositing::compute_restriction_is_additive_flags (fes, multiplicities),
+                               FETools::Compositing::compute_nonzero_components(fes, multiplicities)),
+  base_elements(internal::FESystem::count_nonzeros(multiplicities))
 {
   initialize(fes, multiplicities);
 }
-
-
-
-template <int dim, int spacedim>
-FESystem<dim,spacedim>::~FESystem ()
-{}
 
 
 
@@ -783,7 +290,7 @@ std::string
 FESystem<dim,spacedim>::get_name () const
 {
   // note that the
-  // FETools::get_fe_from_name
+  // FETools::get_fe_by_name
   // function depends on the
   // particular format of the string
   // this function returns, so they
@@ -810,7 +317,7 @@ FESystem<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FESystem<dim,spacedim>::clone() const
 {
   std::vector< const FiniteElement<dim,spacedim>* >  fes;
@@ -821,7 +328,7 @@ FESystem<dim,spacedim>::clone() const
       fes.push_back( & base_element(i) );
       multiplicities.push_back(this->element_multiplicity(i) );
     }
-  return new FESystem<dim,spacedim>(fes, multiplicities);
+  return std_cxx14::make_unique<FESystem<dim,spacedim>>(fes, multiplicities);
 }
 
 
@@ -1087,7 +594,7 @@ FESystem<dim,spacedim>::get_interpolation_matrix (
   typedef FiniteElement<dim,spacedim> FEL;
   AssertThrow ((x_source_fe.get_name().find ("FESystem<") == 0)
                ||
-               (dynamic_cast<const FESystem<dim,spacedim>*>(&x_source_fe) != 0),
+               (dynamic_cast<const FESystem<dim,spacedim>*>(&x_source_fe) != nullptr),
                typename FEL::
                ExcInterpolationNotImplemented());
 
@@ -1599,7 +1106,7 @@ compute_fill (const Mapping<dim,spacedim>                      &mapping,
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr, ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
   // Either dim_1==dim
@@ -1632,8 +1139,8 @@ compute_fill (const Mapping<dim,spacedim>                      &mapping,
 
         // fill_fe_face_values needs argument Quadrature<dim-1> for both cases
         // dim_1==dim-1 and dim_1=dim. Hence the following workaround
-        const Quadrature<dim>   *cell_quadrature = 0;
-        const Quadrature<dim-1> *face_quadrature = 0;
+        const Quadrature<dim>   *cell_quadrature = nullptr;
+        const Quadrature<dim-1> *face_quadrature = nullptr;
         const unsigned int n_q_points = quadrature.size();
 
         // static cast to the common base class of quadrature being either
@@ -1643,7 +1150,7 @@ compute_fill (const Mapping<dim,spacedim>                      &mapping,
         if (face_no==invalid_face_number)
           {
             Assert(dim_1==dim, ExcDimensionMismatch(dim_1,dim));
-            Assert (dynamic_cast<const Quadrature<dim> *>(quadrature_base_pointer) != 0,
+            Assert (dynamic_cast<const Quadrature<dim> *>(quadrature_base_pointer) != nullptr,
                     ExcInternalError());
 
             cell_quadrature
@@ -1652,7 +1159,7 @@ compute_fill (const Mapping<dim,spacedim>                      &mapping,
         else
           {
             Assert(dim_1==dim-1, ExcDimensionMismatch(dim_1,dim-1));
-            Assert (dynamic_cast<const Quadrature<dim-1> *>(quadrature_base_pointer) != 0,
+            Assert (dynamic_cast<const Quadrature<dim-1> *>(quadrature_base_pointer) != nullptr,
                     ExcInternalError());
 
             face_quadrature
@@ -1697,405 +1204,64 @@ compute_fill (const Mapping<dim,spacedim>                      &mapping,
         //TODO: Introduce the needed table and loop only over base element shape functions. This here is not efficient at all AND very bad style
         const UpdateFlags base_flags = base_fe_data.update_each;
 
-        // if the current cell is just a translation of the previous one,
-        // the underlying data has not changed, and we don't even need to
-        // enter this section
-        if (cell_similarity != CellSimilarity::translation)
-          for (unsigned int system_index=0; system_index<this->dofs_per_cell;
-               ++system_index)
-            if (this->system_to_base_table[system_index].first.first == base_no)
-              {
-                const unsigned int
-                base_index = this->system_to_base_table[system_index].second;
-                Assert (base_index<base_fe.dofs_per_cell, ExcInternalError());
-
-                // now copy. if the shape function is primitive, then there
-                // is only one value to be copied, but for non-primitive
-                // elements, there might be more values to be copied
-                //
-                // so, find out from which index to take this one value, and
-                // to which index to put
-                unsigned int out_index = 0;
-                for (unsigned int i=0; i<system_index; ++i)
-                  out_index += this->n_nonzero_components(i);
-                unsigned int in_index = 0;
-                for (unsigned int i=0; i<base_index; ++i)
-                  in_index += base_fe.n_nonzero_components(i);
-
-                // then loop over the number of components to be copied
-                Assert (this->n_nonzero_components(system_index) ==
-                        base_fe.n_nonzero_components(base_index),
-                        ExcInternalError());
-
-                if (base_flags & update_values)
-                  for (unsigned int s=0; s<this->n_nonzero_components(system_index); ++s)
-                    for (unsigned int q=0; q<n_q_points; ++q)
-                      output_data.shape_values[out_index+s][q] =
-                        base_data.shape_values(in_index+s,q);
-
-                if (base_flags & update_gradients)
-                  for (unsigned int s=0; s<this->n_nonzero_components(system_index); ++s)
-                    for (unsigned int q=0; q<n_q_points; ++q)
-                      output_data.shape_gradients[out_index+s][q] =
-                        base_data.shape_gradients[in_index+s][q];
-
-                if (base_flags & update_hessians)
-                  for (unsigned int s=0; s<this->n_nonzero_components(system_index); ++s)
-                    for (unsigned int q=0; q<n_q_points; ++q)
-                      output_data.shape_hessians[out_index+s][q] =
-                        base_data.shape_hessians[in_index+s][q];
-
-                if (base_flags & update_3rd_derivatives)
-                  for (unsigned int s=0; s<this->n_nonzero_components(system_index); ++s)
-                    for (unsigned int q=0; q<n_q_points; ++q)
-                      output_data.shape_3rd_derivatives[out_index+s][q] =
-                        base_data.shape_3rd_derivatives[in_index+s][q];
-
-              }
-      }
-}
-
-
-
-template <int dim, int spacedim>
-void
-FESystem<dim,spacedim>::build_cell_tables()
-{
-  // If the system is not primitive, these have not been initialized by
-  // FiniteElement
-  this->system_to_component_table.resize(this->dofs_per_cell);
-  this->face_system_to_component_table.resize(this->dofs_per_face);
-
-  unsigned int total_index = 0;
-
-  for (unsigned int base=0; base < this->n_base_elements(); ++base)
-    for (unsigned int m = 0; m < this->element_multiplicity(base); ++m)
-      {
-        for (unsigned int k=0; k<base_element(base).n_components(); ++k)
-          this->component_to_base_table[total_index++]
-            = std::make_pair(std::make_pair(base,k), m);
-      }
-  Assert (total_index == this->component_to_base_table.size(),
-          ExcInternalError());
-
-  // Initialize index tables.  Multi-component base elements have to be
-  // thought of. For non-primitive shape functions, have a special invalid
-  // index.
-  const std::pair<unsigned int, unsigned int>
-  non_primitive_index (numbers::invalid_unsigned_int,
-                       numbers::invalid_unsigned_int);
-
-  // First enumerate vertex indices, where we first enumerate all indices on
-  // the first vertex in the order of the base elements, then of the second
-  // vertex, etc
-  total_index = 0;
-  for (unsigned int vertex_number=0;
-       vertex_number<GeometryInfo<dim>::vertices_per_cell;
-       ++vertex_number)
-    {
-      unsigned int comp_start = 0;
-      for (unsigned int base=0; base<this->n_base_elements(); ++base)
-        for (unsigned int m=0; m<this->element_multiplicity(base);
-             ++m, comp_start+=base_element(base).n_components())
-          for (unsigned int local_index = 0;
-               local_index < base_element(base).dofs_per_vertex;
-               ++local_index, ++total_index)
+        // some base element might involve values that depend on the shape
+        // of the geometry, so we always need to copy the shape values around
+        // also in case we detected a cell similarity (but no heavy work will
+        // be done inside the individual elements in case we have a
+        // translation and simple elements).
+        for (unsigned int system_index=0; system_index<this->dofs_per_cell;
+             ++system_index)
+          if (this->system_to_base_table[system_index].first.first == base_no)
             {
-              const unsigned int index_in_base
-                = (base_element(base).dofs_per_vertex*vertex_number +
-                   local_index);
+              const unsigned int
+              base_index = this->system_to_base_table[system_index].second;
+              Assert (base_index<base_fe.dofs_per_cell, ExcInternalError());
 
-              this->system_to_base_table[total_index]
-                = std::make_pair (std::make_pair(base, m), index_in_base);
+              // now copy. if the shape function is primitive, then there
+              // is only one value to be copied, but for non-primitive
+              // elements, there might be more values to be copied
+              //
+              // so, find out from which index to take this one value, and
+              // to which index to put
+              unsigned int out_index = 0;
+              for (unsigned int i=0; i<system_index; ++i)
+                out_index += this->n_nonzero_components(i);
+              unsigned int in_index = 0;
+              for (unsigned int i=0; i<base_index; ++i)
+                in_index += base_fe.n_nonzero_components(i);
 
-              if (base_element(base).is_primitive(index_in_base))
-                {
-                  const unsigned int comp_in_base
-                    = base_element(base).system_to_component_index(index_in_base).first;
-                  const unsigned int comp
-                    = comp_start + comp_in_base;
-                  const unsigned int index_in_comp
-                    = base_element(base).system_to_component_index(index_in_base).second;
-                  this->system_to_component_table[total_index]
-                    = std::make_pair (comp, index_in_comp);
-                }
-              else
-                this->system_to_component_table[total_index] = non_primitive_index;
+              // then loop over the number of components to be copied
+              Assert (this->n_nonzero_components(system_index) ==
+                      base_fe.n_nonzero_components(base_index),
+                      ExcInternalError());
+
+              if (base_flags & update_values)
+                for (unsigned int s=0; s<this->n_nonzero_components(system_index); ++s)
+                  for (unsigned int q=0; q<n_q_points; ++q)
+                    output_data.shape_values[out_index+s][q] =
+                      base_data.shape_values(in_index+s,q);
+
+              if (base_flags & update_gradients)
+                for (unsigned int s=0; s<this->n_nonzero_components(system_index); ++s)
+                  for (unsigned int q=0; q<n_q_points; ++q)
+                    output_data.shape_gradients[out_index+s][q] =
+                      base_data.shape_gradients[in_index+s][q];
+
+              if (base_flags & update_hessians)
+                for (unsigned int s=0; s<this->n_nonzero_components(system_index); ++s)
+                  for (unsigned int q=0; q<n_q_points; ++q)
+                    output_data.shape_hessians[out_index+s][q] =
+                      base_data.shape_hessians[in_index+s][q];
+
+              if (base_flags & update_3rd_derivatives)
+                for (unsigned int s=0; s<this->n_nonzero_components(system_index); ++s)
+                  for (unsigned int q=0; q<n_q_points; ++q)
+                    output_data.shape_3rd_derivatives[out_index+s][q] =
+                      base_data.shape_3rd_derivatives[in_index+s][q];
+
             }
-    }
-
-  // 2. Lines
-  if (GeometryInfo<dim>::lines_per_cell > 0)
-    for (unsigned int line_number= 0;
-         line_number != GeometryInfo<dim>::lines_per_cell;
-         ++line_number)
-      {
-        unsigned int comp_start = 0;
-        for (unsigned int base=0; base<this->n_base_elements(); ++base)
-          for (unsigned int m=0; m<this->element_multiplicity(base);
-               ++m, comp_start+=base_element(base).n_components())
-            for (unsigned int local_index = 0;
-                 local_index < base_element(base).dofs_per_line;
-                 ++local_index, ++total_index)
-              {
-                const unsigned int index_in_base
-                  = (base_element(base).dofs_per_line*line_number +
-                     local_index +
-                     base_element(base).first_line_index);
-
-                this->system_to_base_table[total_index]
-                  = std::make_pair (std::make_pair(base,m), index_in_base);
-
-                if (base_element(base).is_primitive(index_in_base))
-                  {
-                    const unsigned int comp_in_base
-                      = base_element(base).system_to_component_index(index_in_base).first;
-                    const unsigned int comp
-                      = comp_start + comp_in_base;
-                    const unsigned int index_in_comp
-                      = base_element(base).system_to_component_index(index_in_base).second;
-                    this->system_to_component_table[total_index]
-                      = std::make_pair (comp, index_in_comp);
-                  }
-                else
-                  this->system_to_component_table[total_index] = non_primitive_index;
-              }
-      }
-
-  // 3. Quads
-  if (GeometryInfo<dim>::quads_per_cell > 0)
-    for (unsigned int quad_number= 0;
-         quad_number != GeometryInfo<dim>::quads_per_cell;
-         ++quad_number)
-      {
-        unsigned int comp_start = 0;
-        for (unsigned int base=0; base<this->n_base_elements(); ++base)
-          for (unsigned int m=0; m<this->element_multiplicity(base);
-               ++m, comp_start += base_element(base).n_components())
-            for (unsigned int local_index = 0;
-                 local_index < base_element(base).dofs_per_quad;
-                 ++local_index, ++total_index)
-              {
-                const unsigned int index_in_base
-                  = (base_element(base).dofs_per_quad*quad_number +
-                     local_index +
-                     base_element(base).first_quad_index);
-
-                this->system_to_base_table[total_index]
-                  = std::make_pair (std::make_pair(base,m), index_in_base);
-
-                if (base_element(base).is_primitive(index_in_base))
-                  {
-                    const unsigned int comp_in_base
-                      = base_element(base).system_to_component_index(index_in_base).first;
-                    const unsigned int comp
-                      = comp_start + comp_in_base;
-                    const unsigned int index_in_comp
-                      = base_element(base).system_to_component_index(index_in_base).second;
-                    this->system_to_component_table[total_index]
-                      = std::make_pair (comp, index_in_comp);
-                  }
-                else
-                  this->system_to_component_table[total_index] = non_primitive_index;
-              }
-      }
-
-  // 4. Hexes
-  if (GeometryInfo<dim>::hexes_per_cell > 0)
-    for (unsigned int hex_number= 0;
-         hex_number != GeometryInfo<dim>::hexes_per_cell;
-         ++hex_number)
-      {
-        unsigned int comp_start = 0;
-        for (unsigned int base=0; base<this->n_base_elements(); ++base)
-          for (unsigned int m=0; m<this->element_multiplicity(base);
-               ++m, comp_start+=base_element(base).n_components())
-            for (unsigned int local_index = 0;
-                 local_index < base_element(base).dofs_per_hex;
-                 ++local_index, ++total_index)
-              {
-                const unsigned int index_in_base
-                  = (base_element(base).dofs_per_hex*hex_number +
-                     local_index +
-                     base_element(base).first_hex_index);
-
-                this->system_to_base_table[total_index]
-                  = std::make_pair (std::make_pair(base,m), index_in_base);
-
-                if (base_element(base).is_primitive(index_in_base))
-                  {
-                    const unsigned int comp_in_base
-                      = base_element(base).system_to_component_index(index_in_base).first;
-                    const unsigned int comp
-                      = comp_start + comp_in_base;
-                    const unsigned int index_in_comp
-                      = base_element(base).system_to_component_index(index_in_base).second;
-                    this->system_to_component_table[total_index]
-                      = std::make_pair (comp, index_in_comp);
-                  }
-                else
-                  this->system_to_component_table[total_index] = non_primitive_index;
-              }
       }
 }
-
-
-
-template <int dim, int spacedim>
-void
-FESystem<dim,spacedim>::build_face_tables()
-{
-  // Initialize index tables. do this in the same way as done for the cell
-  // tables, except that we now loop over the objects of faces
-
-  // For non-primitive shape functions, have a special invalid index
-  const std::pair<unsigned int, unsigned int>
-  non_primitive_index (numbers::invalid_unsigned_int,
-                       numbers::invalid_unsigned_int);
-
-  // 1. Vertices
-  unsigned int total_index = 0;
-  for (unsigned int vertex_number=0;
-       vertex_number<GeometryInfo<dim>::vertices_per_face;
-       ++vertex_number)
-    {
-      unsigned int comp_start = 0;
-      for (unsigned int base=0; base<this->n_base_elements(); ++base)
-        for (unsigned int m=0; m<this->element_multiplicity(base);
-             ++m, comp_start += base_element(base).n_components())
-          for (unsigned int local_index = 0;
-               local_index < base_element(base).dofs_per_vertex;
-               ++local_index, ++total_index)
-            {
-              // get (cell) index of this shape function inside the base
-              // element to see whether the shape function is primitive
-              // (assume that all shape functions on vertices share the same
-              // primitivity property; assume likewise for all shape functions
-              // located on lines, quads, etc. this way, we can ask for
-              // primitivity of only _one_ shape function, which is taken as
-              // representative for all others located on the same type of
-              // object):
-              const unsigned int index_in_base
-                = (base_element(base).dofs_per_vertex*vertex_number +
-                   local_index);
-
-              const unsigned int face_index_in_base
-                = (base_element(base).dofs_per_vertex*vertex_number +
-                   local_index);
-
-              this->face_system_to_base_table[total_index]
-                = std::make_pair (std::make_pair(base,m), face_index_in_base);
-
-              if (base_element(base).is_primitive(index_in_base))
-                {
-                  const unsigned int comp_in_base
-                    = base_element(base).face_system_to_component_index(face_index_in_base).first;
-                  const unsigned int comp
-                    = comp_start + comp_in_base;
-                  const unsigned int face_index_in_comp
-                    = base_element(base).face_system_to_component_index(face_index_in_base).second;
-                  this->face_system_to_component_table[total_index]
-                    = std::make_pair (comp, face_index_in_comp);
-                }
-              else
-                this->face_system_to_component_table[total_index] = non_primitive_index;
-            }
-    }
-
-  // 2. Lines
-  if (GeometryInfo<dim>::lines_per_face > 0)
-    for (unsigned int line_number= 0;
-         line_number != GeometryInfo<dim>::lines_per_face;
-         ++line_number)
-      {
-        unsigned int comp_start = 0;
-        for (unsigned int base = 0; base < this->n_base_elements(); ++base)
-          for (unsigned int m=0; m<this->element_multiplicity(base);
-               ++m, comp_start += base_element(base).n_components())
-            for (unsigned int local_index = 0;
-                 local_index < base_element(base).dofs_per_line;
-                 ++local_index, ++total_index)
-              {
-                // do everything alike for this type of object
-                const unsigned int index_in_base
-                  = (base_element(base).dofs_per_line*line_number +
-                     local_index +
-                     base_element(base).first_line_index);
-
-                const unsigned int face_index_in_base
-                  = (base_element(base).first_face_line_index +
-                     base_element(base).dofs_per_line * line_number +
-                     local_index);
-
-                this->face_system_to_base_table[total_index]
-                  = std::make_pair (std::make_pair(base,m), face_index_in_base);
-
-                if (base_element(base).is_primitive(index_in_base))
-                  {
-                    const unsigned int comp_in_base
-                      = base_element(base).face_system_to_component_index(face_index_in_base).first;
-                    const unsigned int comp
-                      = comp_start + comp_in_base;
-                    const unsigned int face_index_in_comp
-                      = base_element(base).face_system_to_component_index(face_index_in_base).second;
-                    this->face_system_to_component_table[total_index]
-                      = std::make_pair (comp, face_index_in_comp);
-                  }
-                else
-                  this->face_system_to_component_table[total_index] = non_primitive_index;
-              }
-      }
-
-  // 3. Quads
-  if (GeometryInfo<dim>::quads_per_face > 0)
-    for (unsigned int quad_number= 0;
-         quad_number != GeometryInfo<dim>::quads_per_face;
-         ++quad_number)
-      {
-        unsigned int comp_start = 0;
-        for (unsigned int base=0; base<this->n_base_elements(); ++base)
-          for (unsigned int m=0; m<this->element_multiplicity(base);
-               ++m, comp_start += base_element(base).n_components())
-            for (unsigned int local_index = 0;
-                 local_index < base_element(base).dofs_per_quad;
-                 ++local_index, ++total_index)
-              {
-                // do everything alike for this type of object
-                const unsigned int index_in_base
-                  = (base_element(base).dofs_per_quad*quad_number +
-                     local_index +
-                     base_element(base).first_quad_index);
-
-                const unsigned int face_index_in_base
-                  = (base_element(base).first_face_quad_index +
-                     base_element(base).dofs_per_quad * quad_number +
-                     local_index);
-
-                this->face_system_to_base_table[total_index]
-                  = std::make_pair (std::make_pair(base,m), face_index_in_base);
-
-                if (base_element(base).is_primitive(index_in_base))
-                  {
-                    const unsigned int comp_in_base
-                      = base_element(base).face_system_to_component_index(face_index_in_base).first;
-                    const unsigned int comp
-                      = comp_start + comp_in_base;
-                    const unsigned int face_index_in_comp
-                      = base_element(base).face_system_to_component_index(face_index_in_base).second;
-                    this->face_system_to_component_table[total_index]
-                      = std::make_pair (comp, face_index_in_comp);
-                  }
-                else
-                  this->face_system_to_component_table[total_index] = non_primitive_index;
-              }
-      }
-  Assert (total_index == this->dofs_per_face, ExcInternalError());
-  Assert (total_index == this->face_system_to_component_table.size(),
-          ExcInternalError());
-  Assert (total_index == this->face_system_to_base_table.size(),
-          ExcInternalError());
-}
-
 
 
 template <int dim, int spacedim>
@@ -2289,7 +1455,7 @@ void FESystem<dim,spacedim>::initialize (const std::vector<const FiniteElement<d
           ExcDimensionMismatch (fes.size(), multiplicities.size()) );
   Assert (fes.size() > 0,
           ExcMessage ("Need to pass at least one finite element."));
-  Assert (count_nonzeros(multiplicities) > 0,
+  Assert (internal::FESystem::count_nonzeros(multiplicities) > 0,
           ExcMessage("You only passed FiniteElements with multiplicity 0."));
 
   // Note that we need to skip every fe with multiplicity 0 in the following block of code
@@ -2300,178 +1466,237 @@ void FESystem<dim,spacedim>::initialize (const std::vector<const FiniteElement<d
     if (multiplicities[i]>0)
       this->base_to_block_indices.push_back( multiplicities[i] );
 
-  std::vector<Threads::Task<FiniteElement<dim,spacedim>*> > clone_base_elements;
+  {
+    Threads::TaskGroup<> clone_base_elements;
 
-  for (unsigned int i=0; i<fes.size(); i++)
-    if (multiplicities[i]>0)
-      clone_base_elements.push_back (Threads::new_task (&FiniteElement<dim,spacedim>::clone,
-                                                        *fes[i]));
-
-  unsigned int ind=0;
-  for (unsigned int i=0; i<fes.size(); i++)
-    {
+    unsigned int ind=0;
+    for (unsigned int i=0; i<fes.size(); i++)
       if (multiplicities[i]>0)
         {
-          base_elements[ind] =
-            std::make_pair (std_cxx11::shared_ptr<const FiniteElement<dim,spacedim> >
-                            (clone_base_elements[ind].return_value()),
-                            multiplicities[i]);
+          clone_base_elements += Threads::new_task ([ &,i,ind] ()
+          {
+            base_elements[ind] = { fes[i]->clone(), multiplicities[i] };
+          });
           ++ind;
         }
-    }
+    Assert(ind>0, ExcInternalError());
 
-  Assert(ind>0, ExcInternalError());
-
-  build_cell_tables();
-  build_face_tables();
-
-  // restriction and prolongation matrices are build on demand
-
-  // now set up the interface constraints.  this is kind'o hairy, so don't try
-  // to do it dimension independent
-  build_interface_constraints ();
-
-  // finally fill in support points on cell and face
-  initialize_unit_support_points ();
-  initialize_unit_face_support_points ();
-
-  initialize_quad_dof_index_permutation ();
-}
+    // wait for all of these clone operations to finish
+    clone_base_elements.join_all();
+  }
 
 
+  {
+    // If the system is not primitive, these have not been initialized by
+    // FiniteElement
+    this->system_to_component_table.resize(this->dofs_per_cell);
+    this->face_system_to_component_table.resize(this->dofs_per_face);
 
+    FETools::Compositing::build_cell_tables(this->system_to_base_table,
+                                            this->system_to_component_table,
+                                            this->component_to_base_table,
+                                            *this);
 
+    FETools::Compositing::build_face_tables(this->face_system_to_base_table,
+                                            this->face_system_to_component_table,
+                                            *this);
 
+  }
 
-template <int dim, int spacedim>
-void
-FESystem<dim,spacedim>::
-initialize_unit_support_points ()
-{
-  // if one of the base elements has no support points, then it makes no sense
-  // to define support points for the composed element, so return an empty
-  // array to demonstrate that fact. Note that we ignore FE_Nothing in this logic.
-  for (unsigned int base_el=0; base_el<this->n_base_elements(); ++base_el)
-    if (!base_element(base_el).has_support_points() && base_element(base_el).dofs_per_cell!=0)
+  // now initialize interface constraints, support points, and other tables.
+  // (restriction and prolongation matrices are only built on demand.) do
+  // this in parallel
+
+  Threads::TaskGroup<> init_tasks;
+
+  init_tasks += Threads::new_task ([&]()
+  {
+    this->build_interface_constraints ();
+  });
+
+  init_tasks += Threads::new_task ([&]()
+  {
+    // if one of the base elements has no support points, then it makes no sense
+    // to define support points for the composed element, so return an empty
+    // array to demonstrate that fact. Note that we ignore FE_Nothing in this logic.
+    for (unsigned int base_el=0; base_el<this->n_base_elements(); ++base_el)
+      if (!base_element(base_el).has_support_points() && base_element(base_el).dofs_per_cell!=0)
+        {
+          this->unit_support_points.resize(0);
+          return;
+        }
+
+    // generate unit support points from unit support points of sub elements
+    this->unit_support_points.resize(this->dofs_per_cell);
+
+    for (unsigned int i=0; i<this->dofs_per_cell; ++i)
       {
-        this->unit_support_points.resize(0);
-        return;
-      };
+        const unsigned int
+        base       = this->system_to_base_table[i].first.first,
+        base_index = this->system_to_base_table[i].second;
+        Assert (base<this->n_base_elements(), ExcInternalError());
+        Assert (base_index<base_element(base).unit_support_points.size(),
+                ExcInternalError());
+        this->unit_support_points[i] = base_element(base).unit_support_points[base_index];
+      }
+  });
 
-  // generate unit support points from unit support points of sub elements
-  this->unit_support_points.resize(this->dofs_per_cell);
-
-  for (unsigned int i=0; i<this->dofs_per_cell; ++i)
+  // initialize face support points (for dim==2,3). same procedure as above
+  if (dim > 1)
+    init_tasks += Threads::new_task ([&]()
     {
-      const unsigned int
-      base       = this->system_to_base_table[i].first.first,
-      base_index = this->system_to_base_table[i].second;
-      Assert (base<this->n_base_elements(), ExcInternalError());
-      Assert (base_index<base_element(base).unit_support_points.size(),
-              ExcInternalError());
-      this->unit_support_points[i] = base_element(base).unit_support_points[base_index];
-    };
-}
+      // if one of the base elements has no support points, then it makes no sense
+      // to define support points for the composed element. In that case, return
+      // an empty array to demonstrate that fact (note that we ask whether the
+      // base element has no support points at all, not only none on the face!)
+      //
+      // on the other hand, if there is an element that simply has no degrees of
+      // freedom on the face at all, then we don't care whether it has support
+      // points or not. this is, for example, the case for the stable Stokes
+      // element Q(p)^dim \times DGP(p-1).
+      for (unsigned int base_el=0; base_el<this->n_base_elements(); ++base_el)
+        if (!base_element(base_el).has_support_points()
+            &&
+            (base_element(base_el).dofs_per_face > 0))
+          {
+            this->unit_face_support_points.resize(0);
+            return;
+          }
 
 
+      // generate unit face support points from unit support points of sub
+      // elements
+      this->unit_face_support_points.resize(this->dofs_per_face);
 
-template <int dim, int spacedim>
-void
-FESystem<dim,spacedim>::
-initialize_unit_face_support_points ()
-{
-  // Nothing to do in 1D
-  if (dim == 1)
-    return;
+      for (unsigned int i=0; i<this->dofs_per_face; ++i)
+        {
+          const unsigned int base_i = this->face_system_to_base_table[i].first.first;
+          const unsigned int index_in_base = this->face_system_to_base_table[i].second;
 
-  // if one of the base elements has no support points, then it makes no sense
-  // to define support points for the composed element. In that case, return
-  // an empty array to demonstrate that fact (note that we ask whether the
-  // base element has no support points at all, not only none on the face!)
-  //
-  // on the other hand, if there is an element that simply has no degrees of
-  // freedom on the face at all, then we don't care whether it has support
-  // points or not. this is, for example, the case for the stable Stokes
-  // element Q(p)^dim \times DGP(p-1).
-  for (unsigned int base_el=0; base_el<this->n_base_elements(); ++base_el)
-    if (!base_element(base_el).has_support_points()
-        &&
-        (base_element(base_el).dofs_per_face > 0))
+          Assert (index_in_base < base_element(base_i).unit_face_support_points.size(),
+                  ExcInternalError());
+
+          this->unit_face_support_points[i]
+            = base_element(base_i).unit_face_support_points[index_in_base];
+        }
+    });
+
+  // Initialize generalized support points and an (internal) index table
+  init_tasks += Threads::new_task ([&]()
+  {
+    // If one of the base elements has no generalized support points, then
+    // it makes no sense to define generalized support points for the
+    // composed element, so return an empty array to demonstrate that fact.
+    // Note that we ignore FE_Nothing in this logic.
+    for (unsigned int base_el=0; base_el < this->n_base_elements(); ++base_el)
+      if (!base_element(base_el).has_generalized_support_points() &&
+          base_element(base_el).dofs_per_cell != 0)
+        {
+          this->generalized_support_points.resize(0);
+          return;
+        }
+
+    // Iterate over all base elements, extract a representative set of
+    // _unique_ generalized support points and store the information how
+    // generalized support points of base elements are mapped to this list
+    // of representatives. Complexity O(n^2), where n is the number of
+    // generalized support points.
+
+    generalized_support_points_index_table.resize(this->n_base_elements());
+
+    for (unsigned int base = 0; base < this->n_base_elements(); ++base)
       {
-        this->unit_face_support_points.resize(0);
-        return;
+        for (const auto &point :
+             base_element(base).get_generalized_support_points())
+          {
+            // Is point already an element of generalized_support_points?
+            const auto p =
+              std::find(std::begin(this->generalized_support_points),
+                        std::end(this->generalized_support_points),
+                        point);
+
+            if (p == std::end(this->generalized_support_points))
+              {
+                // If no, update the table and add the point to the vector
+                const auto n = this->generalized_support_points.size();
+                generalized_support_points_index_table[base].push_back(n);
+                this->generalized_support_points.push_back(point);
+              }
+            else
+              {
+                // If yes, just add the correct index to the table.
+                const auto n = p - std::begin(this->generalized_support_points);
+                generalized_support_points_index_table[base].push_back(n);
+              }
+          }
       }
 
+#ifdef DEBUG
+    // check generalized_support_points_index_table for consistency
+    for (unsigned int i = 0; i < base_elements.size(); ++i)
+      {
+        const auto &points =
+          base_elements[i].first->get_generalized_support_points();
+        for (unsigned int j = 0; j < points.size(); ++j)
+          {
+            const auto n = generalized_support_points_index_table[i][j];
+            Assert(this->generalized_support_points[n] == points[j],
+                   ExcInternalError());
+          }
+      }
+#endif /* DEBUG */
+  });
 
-  // generate unit face support points from unit support points of sub
-  // elements
-  this->unit_face_support_points.resize(this->dofs_per_face);
-
-  for (unsigned int i=0; i<this->dofs_per_face; ++i)
+  // initialize quad dof index permutation in 3d and higher
+  if (dim >= 3)
+    init_tasks += Threads::new_task ([&]()
     {
-      const unsigned int base_i = this->face_system_to_base_table[i].first.first;
-      const unsigned int index_in_base = this->face_system_to_base_table[i].second;
+      // the array into which we want to write should have the correct size
+      // already.
+      Assert (this->adjust_quad_dof_index_for_face_orientation_table.n_elements()==
+              8*this->dofs_per_quad, ExcInternalError());
 
-      Assert (index_in_base < base_element(base_i).unit_face_support_points.size(),
+      // to obtain the shifts for this composed element, copy the shift
+      // information of the base elements
+      unsigned int index = 0;
+      for (unsigned int b=0; b<this->n_base_elements(); ++b)
+        {
+          const Table<2,int> &temp
+            = this->base_element(b).adjust_quad_dof_index_for_face_orientation_table;
+          for (unsigned int c=0; c<this->element_multiplicity(b); ++c)
+            {
+              for (unsigned int i=0; i<temp.size(0); ++i)
+                for (unsigned int j=0; j<8; ++j)
+                  this->adjust_quad_dof_index_for_face_orientation_table(index+i,j)=
+                    temp(i,j);
+              index += temp.size(0);
+            }
+        }
+      Assert (index == this->dofs_per_quad,
               ExcInternalError());
 
-      this->unit_face_support_points[i]
-        = base_element(base_i).unit_face_support_points[index_in_base];
-    }
-}
-
-
-
-template <int dim, int spacedim>
-void
-FESystem<dim,spacedim>::initialize_quad_dof_index_permutation ()
-{
-  // nothing to do in other dimensions than 3
-  if (dim < 3)
-    return;
-
-  // the array into which we want to write should have the correct size
-  // already.
-  Assert (this->adjust_quad_dof_index_for_face_orientation_table.n_elements()==
-          8*this->dofs_per_quad, ExcInternalError());
-
-  // to obtain the shifts for this composed element, copy the shift
-  // information of the base elements
-  unsigned int index = 0;
-  for (unsigned int b=0; b<this->n_base_elements(); ++b)
-    {
-      const Table<2,int> &temp
-        = this->base_element(b).adjust_quad_dof_index_for_face_orientation_table;
-      for (unsigned int c=0; c<this->element_multiplicity(b); ++c)
+      // additionally compose the permutation information for lines
+      Assert (this->adjust_line_dof_index_for_line_orientation_table.size()==
+              this->dofs_per_line, ExcInternalError());
+      index = 0;
+      for (unsigned int b=0; b<this->n_base_elements(); ++b)
         {
-          for (unsigned int i=0; i<temp.size(0); ++i)
-            for (unsigned int j=0; j<8; ++j)
-              this->adjust_quad_dof_index_for_face_orientation_table(index+i,j)=
-                temp(i,j);
-          index += temp.size(0);
+          const std::vector<int> &temp2
+            = this->base_element(b).adjust_line_dof_index_for_line_orientation_table;
+          for (unsigned int c=0; c<this->element_multiplicity(b); ++c)
+            {
+              std::copy(temp2.begin(), temp2.end(),
+                        this->adjust_line_dof_index_for_line_orientation_table.begin()
+                        +index);
+              index += temp2.size();
+            }
         }
-    }
-  Assert (index == this->dofs_per_quad,
-          ExcInternalError());
+      Assert (index == this->dofs_per_line,
+              ExcInternalError());
+    });
 
-  // aditionally compose the permutation information for lines
-  Assert (this->adjust_line_dof_index_for_line_orientation_table.size()==
-          this->dofs_per_line, ExcInternalError());
-  index = 0;
-  for (unsigned int b=0; b<this->n_base_elements(); ++b)
-    {
-      const std::vector<int> &temp2
-        = this->base_element(b).adjust_line_dof_index_for_line_orientation_table;
-      for (unsigned int c=0; c<this->element_multiplicity(b); ++c)
-        {
-          std::copy(temp2.begin(), temp2.end(),
-                    this->adjust_line_dof_index_for_line_orientation_table.begin()
-                    +index);
-          index += temp2.size();
-        }
-    }
-  Assert (index == this->dofs_per_line,
-          ExcInternalError());
+  // wait for all of this to finish
+  init_tasks.join_all();
 }
 
 
@@ -2499,7 +1724,7 @@ get_face_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe,
   typedef FiniteElement<dim,spacedim> FEL;
   AssertThrow ((x_source_fe.get_name().find ("FE_System<") == 0)
                ||
-               (dynamic_cast<const FESystem<dim,spacedim>*>(&x_source_fe) != 0),
+               (dynamic_cast<const FESystem<dim,spacedim>*>(&x_source_fe) != nullptr),
                typename FEL::
                ExcInterpolationNotImplemented());
 
@@ -2610,7 +1835,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe
   typedef FiniteElement<dim,spacedim> FEL;
   AssertThrow ((x_source_fe.get_name().find ("FE_System<") == 0)
                ||
-               (dynamic_cast<const FESystem<dim,spacedim>*>(&x_source_fe) != 0),
+               (dynamic_cast<const FESystem<dim,spacedim>*>(&x_source_fe) != nullptr),
                typename FEL::
                ExcInterpolationNotImplemented());
 
@@ -2774,9 +1999,8 @@ FESystem<dim,spacedim>::hp_object_dof_identities (const FiniteElement<dim,spaced
             }
 
           for (unsigned int i=0; i<base_identities.size(); ++i)
-            identities.push_back
-            (std::make_pair (base_identities[i].first + dof_offset,
-                             base_identities[i].second + dof_offset_other));
+            identities.emplace_back (base_identities[i].first + dof_offset,
+                                     base_identities[i].second + dof_offset_other);
 
           // record the dofs treated above as already taken care of
           dof_offset       += base.template n_dofs_per_object<structdim>();
@@ -2975,7 +2199,7 @@ FESystem<dim,spacedim>::get_constant_modes () const
   std::vector<unsigned int> components;
   for (unsigned int i=0; i<base_elements.size(); ++i)
     {
-      std::pair<Table<2,bool>, std::vector<unsigned int> >
+      const std::pair<Table<2,bool>, std::vector<unsigned int> >
       base_table = base_elements[i].first->get_constant_modes();
       AssertDimension(base_table.first.n_rows(), base_table.second.size());
       const unsigned int element_multiplicity = this->element_multiplicity(i);
@@ -3014,6 +2238,89 @@ FESystem<dim,spacedim>::get_constant_modes () const
   AssertDimension(components.size(), constant_modes.n_rows());
   return std::pair<Table<2,bool>, std::vector<unsigned int> >(constant_modes,
                                                               components);
+}
+
+
+
+template <int dim, int spacedim>
+void
+FESystem<dim,spacedim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &point_values,
+                                                        std::vector<double>                &dof_values) const
+{
+  Assert(this->has_generalized_support_points(),
+         ExcMessage("The FESystem does not have generalized support points"));
+
+  AssertDimension(point_values.size(),
+                  this->get_generalized_support_points().size());
+  AssertDimension(dof_values.size(), this->dofs_per_cell);
+
+  std::vector<double> base_dof_values;
+  std::vector<Vector<double> > base_point_values;
+
+  // loop over all base elements (respecting multiplicity) and let them do
+  // the work on their share of the input argument
+
+  unsigned int current_vector_component = 0;
+  for (unsigned int base = 0; base < base_elements.size(); ++base)
+    {
+      // We need access to the base_element, its multiplicity, the
+      // number of generalized support points (n_base_points) and the
+      // number of components we're dealing with.
+      const auto &base_element = this->base_element(base);
+      const unsigned int multiplicity = this->element_multiplicity(base);
+      const unsigned int n_base_dofs = base_element.dofs_per_cell;
+      const unsigned int n_base_points =
+        base_element.get_generalized_support_points().size();
+      const unsigned int n_base_components = base_element.n_components();
+
+      // If the number of base degrees of freedom is zero, there is nothing
+      // to do, skip the rest of the body in this case and continue with
+      // the next element
+      if (n_base_dofs == 0)
+        {
+          current_vector_component += multiplicity * n_base_components;
+          continue;
+        }
+
+      base_dof_values.resize(n_base_dofs);
+      base_point_values.resize(n_base_points);
+
+      for (unsigned int m = 0; m < multiplicity;
+           ++m, current_vector_component += n_base_components)
+        {
+          // populate base_point_values for a recursive call to
+          // convert_generalized_support_point_values_to_dof_values
+          for (unsigned int j = 0; j < base_point_values.size(); ++j)
+            {
+              base_point_values[j].reinit(n_base_components, false);
+
+              const auto n = generalized_support_points_index_table[base][j];
+
+              // we have to extract the correct slice out of the global
+              // vector of values:
+              const auto begin =
+                std::begin(point_values[n]) + current_vector_component;
+              const auto end = begin + n_base_components;
+              std::copy(begin, end, std::begin(base_point_values[j]));
+            }
+
+          base_element.convert_generalized_support_point_values_to_dof_values(
+            base_point_values, base_dof_values);
+
+          // Finally put these dof values back into global dof values
+          // vector.
+
+          // To do this, we could really use a base_to_system_index()
+          // function, but that doesn't exist -- just do it by using the
+          // reverse table -- the amount of work done here is not worth
+          // trying to optimizing this.
+          for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
+            if (this->system_to_base_index(i).first == std::make_pair(base, m))
+              dof_values[i] =
+                base_dof_values[this->system_to_base_index(i).second];
+        }
+    }
 }
 
 

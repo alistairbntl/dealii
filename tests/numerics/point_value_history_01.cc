@@ -45,7 +45,6 @@
 
 #include <deal.II/numerics/point_value_history.h>
 
-#include <fstream>
 
 using namespace dealii;
 
@@ -267,7 +266,6 @@ int main()
   logfile << std::setprecision(2);
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   TestPointValueHistory<2> test;
   test.run();

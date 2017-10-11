@@ -24,18 +24,13 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/tridiagonal_matrix.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
-#include <cmath>
 
 
 // Symmetric matrix with constant diagonals [-1,2,-1]
-template<typename number>
+template <typename number>
 void
 matrix1(TridiagonalMatrix<number> &M)
 {
@@ -50,7 +45,7 @@ matrix1(TridiagonalMatrix<number> &M)
 
 
 // Nonsymmetric matrix with constant diagonals [-1,2,-3]
-template<typename number>
+template <typename number>
 void
 matrix2(TridiagonalMatrix<number> &M)
 {
@@ -65,7 +60,7 @@ matrix2(TridiagonalMatrix<number> &M)
 
 
 // Matrix with increasing diagonals and symmetric rows
-template<typename number>
+template <typename number>
 void
 matrix3(TridiagonalMatrix<number> &M)
 {
@@ -80,7 +75,7 @@ matrix3(TridiagonalMatrix<number> &M)
 
 
 // Symmetric matrix with increasing diagonals
-template<typename number>
+template <typename number>
 void
 matrix4(TridiagonalMatrix<number> &M)
 {
@@ -95,7 +90,7 @@ matrix4(TridiagonalMatrix<number> &M)
 
 
 // Nonsymmetric matrix with increasing diagonals
-template<typename number>
+template <typename number>
 void
 matrix5(TridiagonalMatrix<number> &M)
 {
@@ -109,7 +104,7 @@ matrix5(TridiagonalMatrix<number> &M)
 }
 
 
-template<typename number>
+template <typename number>
 void
 check_vmult(TridiagonalMatrix<number> &M)
 {
@@ -164,7 +159,7 @@ check_vmult(TridiagonalMatrix<number> &M)
 }
 
 
-template<typename number>
+template <typename number>
 void
 check(unsigned int size)
 {
@@ -199,7 +194,6 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(0);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check<double>(5);
   check<float>(4);

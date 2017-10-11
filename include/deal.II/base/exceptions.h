@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__exceptions_h
-#define dealii__exceptions_h
+#ifndef dealii_exceptions_h
+#define dealii_exceptions_h
 
 #include <deal.II/base/config.h>
 
@@ -55,7 +55,13 @@ public:
   /**
    * Destructor.
    */
-  virtual ~ExceptionBase () throw();
+  virtual ~ExceptionBase () noexcept;
+
+  /**
+   * Copy operator. This operator is deleted since exception objects
+   * are not copyable.
+   */
+  ExceptionBase operator= (const ExceptionBase &) = delete;
 
   /**
    * Set the file name and line of where the exception appeared as well as the
@@ -72,7 +78,7 @@ public:
   /**
    * Override the standard function that returns the description of the error.
    */
-  virtual const char *what() const throw();
+  virtual const char *what() const noexcept;
 
   /**
    * Get exception name.
@@ -180,6 +186,8 @@ namespace deal_II_exceptions
    *
    * Previously set additional output is replaced by the argument given to
    * this function.
+   *
+   * @see Exceptions
    */
   void set_additional_assert_output (const char *const p);
 
@@ -190,6 +198,8 @@ namespace deal_II_exceptions
    * to compare the output of a program across different machines and systems,
    * since the stacktrace shows memory addresses and library names/paths that
    * depend on the exact setup of a machine.
+   *
+   * @see Exceptions
    */
   void suppress_stacktrace_in_exceptions ();
 
@@ -203,6 +213,8 @@ namespace deal_II_exceptions
    * for example in regression tests. Please note that some fatal errors will
    * still call abort(), e.g. when an exception is caught during exception
    * handling.
+   *
+   * @see Exceptions
    */
   void disable_abort_on_exception ();
 
@@ -219,26 +231,33 @@ namespace deal_II_exceptions
     /**
      * Conditionally abort the program.
      *
-     * Depending on whether disable_abort_on_exception was called, this
-     * function either aborts the program flow by printing the error message
-     * provided by @p exc and calling <tt>std::abort()</tt>, or throws @p exc
-     * instead (if @p nothrow is set to <tt>false</tt>).
-     *
-     * If the boolean @p nothrow is set to true and disable_abort_on_exception
-     * was called, the exception type is just printed to deallog and program
-     * flow continues. This is useful if throwing an exception is prohibited
-     * (e.g. in a destructor with <tt>noexcept(true)</tt> or
-     * <tt>throw()</tt>).
+     * Depending on whether deal_II_exceptions::disable_abort_on_exception was
+     * called, this function either aborts the program flow by printing the
+     * error message provided by @p exc and calling <tt>std::abort()</tt>, or
+     * throws @p exc instead.
      */
-    void abort (const ExceptionBase &exc, bool nothrow = false);
+    void abort (const ExceptionBase &exc);
 
     /**
-     * An enum describing how to treat an exception in issue_error
+     * An enum describing how to treat an exception in issue_error.
      */
     enum ExceptionHandling
     {
+      /**
+       * Abort the program by calling <code>std::abort</code> unless
+       * deal_II_exceptions::disable_abort_on_exception has been called: in
+       * that case the program will throw an exception.
+       */
       abort_on_exception,
+      /**
+       * Throw the exception normally.
+       */
       throw_on_exception,
+      /**
+       * Call <code>std::abort</code> as long as
+       * deal_II_exceptions::disable_abort_on_exception has not been called:
+       * if it has, then just print a description of the exception to deallog.
+       */
       abort_nothrow_on_exception
     };
 
@@ -246,16 +265,22 @@ namespace deal_II_exceptions
      * This routine does the main work for the exception generation mechanism
      * used in the <tt>Assert</tt> macro.
      *
+     * The actual exception object (the last argument) is typically an unnamed
+     * object created in place; because we modify it, we can't take it by
+     * const reference, and temporaries don't bind to non-const references.
+     * So take it by value (=copy it) -- the performance implications are
+     * pretty minimal anyway.
+     *
      * @ref ExceptionBase
      */
-    template <class exc>
-    void issue_error (ExceptionHandling handling,
-                      const char *file,
-                      int         line,
-                      const char *function,
-                      const char *cond,
-                      const char *exc_name,
-                      exc         e)
+    template <class ExceptionType>
+    void issue_error (ExceptionHandling  handling,
+                      const char       *file,
+                      int               line,
+                      const char       *function,
+                      const char       *cond,
+                      const char       *exc_name,
+                      ExceptionType     e)
     {
       // Fill the fields of the exception object
       e.set_fields (file, line, function, cond, exc_name);
@@ -266,13 +291,29 @@ namespace deal_II_exceptions
           dealii::deal_II_exceptions::internals::abort(e);
           break;
         case abort_nothrow_on_exception:
-          dealii::deal_II_exceptions::internals::abort(e, /*nothrow =*/ true);
+          // The proper way is to call the function below directly
+          // to preserve the noexcept specifier.
+          // For reasons of backward compatibility
+          // we treat this case here as well.
+          issue_error_nothrow(handling, file, line, function, cond, exc_name, e);
           break;
         case throw_on_exception:
           throw e;
         }
     }
 
+    /**
+     * Exception generation mechanism in case we must not throw.
+     *
+     * @ref ExceptionBase
+     */
+    void issue_error_nothrow (ExceptionHandling,
+                              const char       *file,
+                              int               line,
+                              const char       *function,
+                              const char       *cond,
+                              const char       *exc_name,
+                              ExceptionBase     e) noexcept;
   } /*namespace internals*/
 
 } /*namespace deal_II_exceptions*/
@@ -280,11 +321,13 @@ namespace deal_II_exceptions
 
 
 /**
- * This is the main routine in the exception mechanism for debug mode error
- * checking. It asserts that a certain condition is fulfilled, otherwise
+ * A macro that serves as the main routine in the exception mechanism for debug mode
+ * error checking. It asserts that a certain condition is fulfilled, otherwise
  * issues an error and aborts the program.
  *
- * See the <tt>ExceptionBase</tt> class for more information.
+ * A more detailed description can be found in the @ref Exceptions documentation
+ * module. It is first used in step-5 and step-6.
+ * See also the <tt>ExceptionBase</tt> class for more information.
  *
  * @note Active in DEBUG mode only
  * @ingroup Exceptions
@@ -307,40 +350,45 @@ namespace deal_II_exceptions
 
 /**
  * A variant of the <tt>Assert</tt> macro above that exhibits the same runtime
- * behaviour as long as disable_abort_on_exception was not called.
+ * behavior as long as disable_abort_on_exception was not called.
  *
  * However, if disable_abort_on_exception was called, this macro merely prints
  * the exception that would be thrown to deallog and continues normally
  * without throwing an exception.
  *
- * See the <tt>ExceptionBase</tt> class for more information.
+ * A more detailed description can be found in the @ref Exceptions documentation
+ * module, in the discussion about the corner case at the bottom of the page.
  *
  * @note Active in DEBUG mode only
  * @ingroup Exceptions
  * @author Wolfgang Bangerth, 1997, 1998, Matthias Maier, 2013
  */
 #ifdef DEBUG
-#define AssertNothrow(cond, exc)                                            \
-  {                                                                           \
-    if (!(cond))                                                              \
-      ::dealii::deal_II_exceptions::internals::                               \
-      issue_error(                                                            \
+#define AssertNothrow(cond, exc)                                              \
+  {                                                                             \
+    if (!(cond))                                                                \
+      ::dealii::deal_II_exceptions::internals::                                 \
+      issue_error_nothrow(                                                      \
           ::dealii::deal_II_exceptions::internals::abort_nothrow_on_exception,  \
           __FILE__, __LINE__, __PRETTY_FUNCTION__, #cond, #exc, exc);           \
   }
 #else
-#define AssertNothrow(cond, exc)                                            \
+#define AssertNothrow(cond, exc)                                              \
   {}
 #endif
 
 
 
 /**
- * This is the main routine in the exception mechanism for run-time mode error
- * checking. It assert that a certain condition is fulfilled, otherwise issues
- * an error and aborts the program.
+ * A macro that serves as the main routine in the exception mechanism for dynamic
+ * error checking. It asserts that a certain condition is fulfilled, otherwise
+ * throws an exception via the C++ @p throw mechanism. This exception can
+ * be caught via a @p catch clause, as is shown in step-6 and all following
+ * tutorial programs.
  *
- * See the <tt>ExceptionBase</tt> class for more information.
+ * A more detailed description can be found in the @ref Exceptions documentation
+ * module. It is first used in step-9 and step-13.
+ * See also the <tt>ExceptionBase</tt> class for more information.
  *
  * @note Active in both DEBUG and RELEASE modes
  * @ingroup Exceptions
@@ -391,9 +439,9 @@ namespace deal_II_exceptions
   {                                                                       \
   public:                                                                 \
     Exception (const std::string &msg = defaulttext) : arg (msg) {}       \
-    virtual ~Exception () throw () {}                                     \
+    virtual ~Exception () noexcept {}                                     \
     virtual void print_info (std::ostream &out) const {                   \
-      out << arg << std::endl;                                            \
+      out << "    " << arg << std::endl;                                  \
     }                                                                     \
   private:                                                                \
     const std::string arg;                                                \
@@ -409,9 +457,9 @@ namespace deal_II_exceptions
   class Exception1 : public dealii::ExceptionBase {                       \
   public:                                                                 \
     Exception1 (const type1 a1) : arg1 (a1) {}                            \
-    virtual ~Exception1 () throw () {}                                    \
+    virtual ~Exception1 () noexcept {}                                    \
     virtual void print_info (std::ostream &out) const {                   \
-      out outsequence << std::endl;                                       \
+      out << "    " outsequence << std::endl;                             \
     }                                                                     \
   private:                                                                \
     const type1 arg1;                                                     \
@@ -429,9 +477,9 @@ namespace deal_II_exceptions
   public:                                                                 \
     Exception2 (const type1 a1, const type2 a2) :                         \
       arg1 (a1), arg2(a2) {}                                              \
-    virtual ~Exception2 () throw () {}                                    \
+    virtual ~Exception2 () noexcept {}                                    \
     virtual void print_info (std::ostream &out) const {                   \
-      out outsequence << std::endl;                                       \
+      out << "    " outsequence << std::endl;                             \
     }                                                                     \
   private:                                                                \
     const type1 arg1;                                                     \
@@ -450,9 +498,9 @@ namespace deal_II_exceptions
   public:                                                                 \
     Exception3 (const type1 a1, const type2 a2, const type3 a3) :         \
       arg1 (a1), arg2(a2), arg3(a3) {}                                    \
-    virtual ~Exception3 () throw () {}                                    \
+    virtual ~Exception3 () noexcept {}                                    \
     virtual void print_info (std::ostream &out) const {                   \
-      out outsequence << std::endl;                                       \
+      out << "    " outsequence << std::endl;                             \
     }                                                                     \
   private:                                                                \
     const type1 arg1;                                                     \
@@ -473,9 +521,9 @@ namespace deal_II_exceptions
     Exception4 (const type1 a1, const type2 a2,                           \
                 const type3 a3, const type4 a4) :                         \
       arg1 (a1), arg2(a2), arg3(a3), arg4(a4) {}                          \
-    virtual ~Exception4 () throw () {}                                    \
+    virtual ~Exception4 () noexcept {}                                    \
     virtual void print_info (std::ostream &out) const {                   \
-      out outsequence << std::endl;                                       \
+      out << "    " outsequence << std::endl;                             \
     }                                                                     \
   private:                                                                \
     const type1 arg1;                                                     \
@@ -497,9 +545,9 @@ namespace deal_II_exceptions
     Exception5 (const type1 a1, const type2 a2, const type3 a3,           \
                 const type4 a4, const type5 a5) :                         \
       arg1 (a1), arg2(a2), arg3(a3), arg4(a4), arg5(a5) {}                \
-    virtual ~Exception5 () throw () {}                                    \
+    virtual ~Exception5 () noexcept {}                                    \
     virtual void print_info (std::ostream &out) const {                   \
-      out outsequence << std::endl;                                       \
+      out << "    " outsequence << std::endl;                             \
     }                                                                     \
   private:                                                                \
     const type1 arg1;                                                     \
@@ -520,6 +568,7 @@ namespace deal_II_exceptions
  * @ingroup Exceptions
  */
 #define DeclException0(Exception0)                                        \
+  /** @ingroup Exceptions */ \
   static dealii::ExceptionBase& Exception0 ()
 
 /**
@@ -531,6 +580,8 @@ namespace deal_II_exceptions
  * @ingroup Exceptions
  */
 #define DeclExceptionMsg(Exception, defaulttext)                          \
+  /** @ingroup Exceptions */ \
+  /** @dealiiExceptionMessage{defaulttext} */  \
   static dealii::ExceptionBase& Exception ()
 
 /**
@@ -540,7 +591,9 @@ namespace deal_II_exceptions
  * @ingroup Exceptions
  */
 #define DeclException1(Exception1, type1, outsequence)                    \
-  static dealii::ExceptionBase& Exception1 (type1 arg1) throw (errortext outsequence)
+  /** @ingroup Exceptions */ \
+  /** @dealiiExceptionMessage{outsequence} */              \
+  static dealii::ExceptionBase& Exception1 (type1 arg1)
 
 
 /**
@@ -550,7 +603,9 @@ namespace deal_II_exceptions
  * @ingroup Exceptions
  */
 #define DeclException2(Exception2, type1, type2, outsequence)             \
-  static dealii::ExceptionBase& Exception2 (type1 arg1, type2 arg2) throw (errortext outsequence)
+  /** @ingroup Exceptions */ \
+  /** @dealiiExceptionMessage{outsequence} */              \
+  static dealii::ExceptionBase& Exception2 (type1 arg1, type2 arg2)
 
 
 /**
@@ -560,7 +615,9 @@ namespace deal_II_exceptions
  * @ingroup Exceptions
  */
 #define DeclException3(Exception3, type1, type2, type3, outsequence)      \
-  static dealii::ExceptionBase& Exception3 (type1 arg1, type2 arg2, type3 arg3) throw (errortext outsequence)
+  /** @ingroup Exceptions */ \
+  /** @dealiiExceptionMessage{outsequence} */              \
+  static dealii::ExceptionBase& Exception3 (type1 arg1, type2 arg2, type3 arg3)
 
 
 /**
@@ -570,7 +627,9 @@ namespace deal_II_exceptions
  * @ingroup Exceptions
  */
 #define DeclException4(Exception4, type1, type2, type3, type4, outsequence) \
-  static dealii::ExceptionBase& Exception4 (type1 arg1, type2 arg2, type3 arg3, type4 arg4) throw (errortext outsequence)
+  /** @ingroup Exceptions */ \
+  /** @dealiiExceptionMessage{outsequence} */                \
+  static dealii::ExceptionBase& Exception4 (type1 arg1, type2 arg2, type3 arg3, type4 arg4)
 
 
 /**
@@ -580,7 +639,9 @@ namespace deal_II_exceptions
  * @ingroup Exceptions
  */
 #define DeclException5(Exception5, type1, type2, type3, type4, type5, outsequence) \
-  static dealii::ExceptionBase& Exception5 (type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5) throw (errortext outsequence)
+  /** @ingroup Exceptions */ \
+  /** @dealiiExceptionMessage{outsequence} */                       \
+  static dealii::ExceptionBase& Exception5 (type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)
 
 #endif /*ifndef DOXYGEN*/
 
@@ -626,7 +687,7 @@ namespace StandardExceptions
                   << "value is a finite number (as opposed to plus or minus infinity, or "
                   << "NaN/Not a Number). In the current function, we encountered a number "
                   << "that is not finite (its value is " << arg1 << " and therefore "
-                  << "violates the current assertion.\n\n"
+                  << "violates the current assertion).\n\n"
                   << "This may be due to the fact that some operation in this function "
                   << "created such a value, or because one of the arguments you passed "
                   << "to the function already had this value from some previous "
@@ -669,7 +730,7 @@ namespace StandardExceptions
    */
   DeclException1 (ExcMemoryLeak, int,
                   << "Destroying memory handler while " << arg1
-                  << " objects are still allocated");
+                  << " objects are still allocated.");
 
   /**
    * An error occurred reading or writing a file.
@@ -705,7 +766,7 @@ namespace StandardExceptions
    */
   DeclException1 (ExcFileNotOpen,
                   char *,
-                  << "Could not open file " << arg1);
+                  << "Could not open file " << arg1 << ".");
 
   /**
    * Exception denoting a part of the library or application program that has
@@ -755,7 +816,7 @@ namespace StandardExceptions
                     "example would be that the first part of an algorithm "
                     "sorts elements of an array in ascending order, and "
                     "a second part of the algorithm later encounters an "
-                    "an element that is not larger than the previous one."
+                    "element that is not larger than the previous one."
                     "\n\n"
                     "There is usually not very much you can do if you "
                     "encounter such an exception since it indicates an error "
@@ -805,13 +866,6 @@ namespace StandardExceptions
                     "investigate whether the function being called should indeed have "
                     "been called; if the answer is 'yes', then you need to "
                     "implement the missing override in your class.");
-
-  /**
-   * Used for constructors that are disabled. Examples are copy constructors
-   * and assignment operators of large objects, which are only allowed for
-   * empty objects.
-   */
-  DeclException0 (ExcInvalidConstructorCall);
 
   /**
    * This exception is used if some object is found uninitialized.
@@ -877,7 +931,7 @@ namespace StandardExceptions
    */
   DeclException2 (ExcDimensionMismatch,
                   std::size_t, std::size_t,
-                  << "Dimension " << arg1 << " not equal to " << arg2);
+                  << "Dimension " << arg1 << " not equal to " << arg2 << ".");
 
   /**
    * The first dimension should be either equal to the second or the third,
@@ -886,7 +940,7 @@ namespace StandardExceptions
   DeclException3 (ExcDimensionMismatch2,
                   int, int, int,
                   << "Dimension " << arg1 << " neither equal to " << arg2
-                  << " nor to " << arg3);
+                  << " nor to " << arg3 << ".");
 
   /**
    * This exception indicates that an index is not within the expected range.
@@ -917,7 +971,7 @@ namespace StandardExceptions
    * For example, it may be that you are trying to access an element of a
    * vector which does not exist.
    *
-   * The constructor takes three <tt>int</tt> arguments, namely
+   * The constructor takes three arguments, namely
    * <ol>
    * <li> the violating index
    * <li> the lower bound
@@ -946,7 +1000,7 @@ namespace StandardExceptions
   DeclException2 (ExcLowerRange,
                   int, int,
                   << "Number " << arg1 << " must be larger than or equal "
-                  << arg2 << ").");
+                  << arg2 << ".");
 
   /**
    * A generic exception definition for the ExcLowerRange above.
@@ -964,7 +1018,7 @@ namespace StandardExceptions
   DeclException2 (ExcNotMultiple,
                   int, int,
                   << "Division " << arg1 << " by " << arg2
-                  << " has remainder different from zero");
+                  << " has remainder different from zero.");
 
   /**
    * This exception is thrown if the iterator you access has corrupted data.
@@ -1036,20 +1090,83 @@ namespace StandardExceptions
   /**
    * This function requires support for the LAPACK library.
    */
-  DeclException0 (ExcNeedsLAPACK);
+  DeclExceptionMsg (ExcNeedsLAPACK,
+                    "You are attempting to use functionality that is only available "
+                    "if deal.II was configured to use LAPACK, but cmake did not "
+                    "find a valid LAPACK library.");
 
   /**
    * This function requires support for the NetCDF library.
    */
-  DeclException0 (ExcNeedsNetCDF);
+  DeclExceptionMsg (ExcNeedsNetCDF,
+                    "You are attempting to use functionality that is only available "
+                    "if deal.II was configured to use NetCDF, but cmake did not "
+                    "find a valid NetCDF library.");
 
   /**
    * This function requires support for the FunctionParser library.
    */
-  DeclException0 (ExcNeedsFunctionparser);
+  DeclExceptionMsg (ExcNeedsFunctionparser,
+                    "You are attempting to use functionality that is only available "
+                    "if deal.II was configured to use the function parser which "
+                    "relies on the muparser library, but cmake did not "
+                    "find a valid muparser library on your system and also did "
+                    "not choose the one that comes bundled with deal.II.");
 
+  /**
+   * This function requires support for the Assimp library.
+   */
+  DeclExceptionMsg (ExcNeedsAssimp,
+                    "You are attempting to use functionality that is only available "
+                    "if deal.II was configured to use Assimp, but cmake did not "
+                    "find a valid Assimp library.");
 
+#ifdef DEAL_II_WITH_CUDA
+  /**
+   * This exception is raised if an error happened in a CUDA kernel.
+   *
+   * The constructor takes a single <tt>char*</tt>, the output of
+   * cudaGetErrorString.
+   */
+  DeclException1 (ExcCudaError,
+                  char *,
+                  << arg1);
+#endif
 //@}
+
+#ifdef DEAL_II_WITH_MPI
+  /**
+   * Exception for MPI errors. This exception is only defined if
+   * <code>deal.II</code> is compiled with MPI support. This exception should
+   * be used with <code>AssertThrow</code> to check error codes of MPI
+   * functions. For example:
+   * @code
+   * const int ierr = MPI_Isend(...);
+   * AssertThrow(ierr == MPI_SUCCESS, ExcMPI(ierr));
+   * @endcode
+   * or, using the convenience macro <code>AssertThrowMPI</code>,
+   * @code
+   * const int ierr = MPI_Irecv(...);
+   * AssertThrowMPI(ierr);
+   * @endcode
+   *
+   * If the assertion fails then the error code will be used to print a helpful
+   * message to the screen by utilizing the <code>MPI_Error_string</code>
+   * function.
+   *
+   * @ingroup Exceptions
+   * @author David Wells, 2016
+   */
+  class ExcMPI : public dealii::ExceptionBase
+  {
+  public:
+    ExcMPI (const int error_code);
+
+    virtual void print_info (std::ostream &out) const;
+
+    const int error_code;
+  };
+#endif // DEAL_II_WITH_MPI
 } /*namespace StandardExceptions*/
 
 
@@ -1091,21 +1208,6 @@ namespace StandardExceptions
                                              dealii::ExcIndexRange((index),0,(range)))
 
 /**
- * An assertion that tests that a given index is within the half-open
- * range <code>[0,range)</code>. It throws an exception object
- * <code>ExcIndexRange(index,0,range)</code> if the assertion
- * fails.
- *
- * This variation of the AssertIndexRange assertion is used for indices of type
- * types::global_dof_index for which we need to make special accommodations because
- * they may not fit into the regular 32-bit integer indices used in AssertIndexRange.
- *
- * @ingroup Exceptions
- */
-#define AssertGlobalIndexRange(index,range) Assert((index) < (range), \
-                                                   dealii::ExcIndexRange<types::global_dof_index>((index),0,(range)))
-
-/**
  * An assertion that checks whether a number is finite or not. We explicitly
  * cast the number to std::complex to match the signature of the exception
  * (see there for an explanation of why we use std::complex at all) and to
@@ -1116,6 +1218,37 @@ namespace StandardExceptions
  */
 #define AssertIsFinite(number) Assert(dealii::numbers::is_finite(number), \
                                       dealii::ExcNumberNotFinite(std::complex<double>(number)))
+
+#ifdef DEAL_II_WITH_MPI
+/**
+ * An assertion that checks whether or not an error code returned by an MPI
+ * function is equal to <code>MPI_SUCCESS</code>. If the check fails then an
+ * exception of type ExcMPI is thrown with the given error code as an
+ * argument.
+ *
+ * @note Active only if deal.II is compiled with MPI
+ * @ingroup Exceptions
+ * @author David Wells, 2016
+ */
+#define AssertThrowMPI(error_code) AssertThrow(error_code == MPI_SUCCESS, \
+                                               dealii::ExcMPI(error_code))
+#else
+#define AssertThrowMPI(error_code) {}
+#endif // DEAL_II_WITH_MPI
+
+#ifdef DEAL_II_WITH_CUDA
+/**
+ * An assertion that checks that the error code produced by calling a CUDA
+ * routine is equal to cudaSuccess.
+ *
+ * @ingroup Exceptions
+ * @author Bruno Turcksin, 2016
+ */
+// For now use AssertThrow instead of Assert because macros are not passed
+// correctly to nvcc.
+#define AssertCuda(error_code) AssertThrow(error_code == cudaSuccess, \
+                                           dealii::ExcCudaError(cudaGetErrorString(error_code)))
+#endif
 
 using namespace StandardExceptions;
 

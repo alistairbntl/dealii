@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2016 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -37,19 +37,30 @@ MACRO(DEAL_II_INITIALIZE_CACHED_VARIABLES)
   ENDIF()
 
   #
-  # Set build type according to build type of deal.II
+  # Set build type according to available libraries
   #
-  SET(CMAKE_BUILD_TYPE ${DEAL_II_BUILD_TYPE} CACHE STRING
-    "Choose the type of build, options are: Debug, Release, DebugRelease")
+  IF(DEAL_II_BUILD_TYPE MATCHES "Debug")
+    SET(CMAKE_BUILD_TYPE "Debug" CACHE STRING
+      "Choose the type of build, options are: Debug, Release"
+      )
+  ELSE()
+    SET(CMAKE_BUILD_TYPE "Release" CACHE STRING
+      "Choose the type of build, options are: Debug, Release"
+      )
+  ENDIF()
 
   #
-  # Reset build type if unsupported, i.e. if it is not (case insensitively
-  # equal to Debug or Release or unsupported by the current build type:
+  # Reset build type if unsupported, i.e. if it is not Debug, Release, or
+  # DebugRelease, or if the library doesn't support it
   #
-  STRING(TOLOWER "${CMAKE_BUILD_TYPE}" _cmake_build_type)
+  IF( NOT "${CMAKE_BUILD_TYPE}" MATCHES "^(Debug|Release|DebugRelease)$"
+      OR NOT "${DEAL_II_BUILD_TYPE}" MATCHES "${CMAKE_BUILD_TYPE}" )
 
-  IF(NOT "${_cmake_build_type}" MATCHES "^(debug|release|debugrelease)$")
-
+    IF("${DEAL_II_BUILD_TYPE}" STREQUAL "DebugRelease")
+      SET(_new_build_type "Debug")
+    ELSE()
+      SET(_new_build_type "${DEAL_II_BUILD_TYPE}")
+    ENDIF()
 
     MESSAGE(
 "###
@@ -57,14 +68,14 @@ MACRO(DEAL_II_INITIALIZE_CACHED_VARIABLES)
 #  WARNING:
 #
 #  CMAKE_BUILD_TYPE \"${CMAKE_BUILD_TYPE}\" unsupported by current installation!
-#  deal.II was built with CMAKE_BUILD_TYPE \"${DEAL_II_BUILD_TYPE}\".
+#  deal.II was configured with \"${DEAL_II_BUILD_TYPE}\".
 #
-#  CMAKE_BUILD_TYPE is forced to \"${DEAL_II_BUILD_TYPE}\".
+#  CMAKE_BUILD_TYPE was forced to \"${_new_build_type}\".
 #
 ###"
       )
-    SET(CMAKE_BUILD_TYPE ${DEAL_II_BUILD_TYPE} CACHE STRING
-      "Choose the type of build, options are: Debug, Release, DebugRelease"
+    SET(CMAKE_BUILD_TYPE "${_new_build_type}" CACHE STRING
+      "Choose the type of build, options are: Debug, Release"
       FORCE
       )
 
@@ -73,23 +84,31 @@ MACRO(DEAL_II_INITIALIZE_CACHED_VARIABLES)
 
   SET(CMAKE_CXX_COMPILER ${DEAL_II_CXX_COMPILER} CACHE STRING
     "CXX Compiler.")
-
-  SET(CMAKE_C_COMPILER ${DEAL_II_C_COMPILER} CACHE STRING
-    "C Compiler.")
-
   SET(CMAKE_CXX_FLAGS "" CACHE STRING
     "Flags used by the compiler during all build types."
     )
-
   SET(CMAKE_CXX_FLAGS_DEBUG "" CACHE STRING
     "Flags used by the compiler during debug builds."
     )
-
   SET(CMAKE_CXX_FLAGS_RELEASE "" CACHE STRING
     "Flags used by the compiler during release builds."
     )
 
+
+  IF(DEAL_II_WITH_CUDA)
+    SET(CMAKE_CUDA_COMPILER ${DEAL_II_CUDA_COMPILER} CACHE STRING
+      "CUDA Compiler.")
+    SET(CMAKE_CUDA_FLAGS "" CACHE STRING
+      "Flags used by the compiler during all build types."
+      )
+    SET(CMAKE_CUDA_FLAGS_DEBUG "" CACHE STRING
+      "Flags used by the compiler during debug builds."
+      )
+    SET(CMAKE_CUDA_FLAGS_RELEASE "" CACHE STRING
+      "Flags used by the compiler during release builds."
+      )
+  ENDIF()
+
   MARK_AS_ADVANCED(CMAKE_INSTALL_PREFIX)
 
 ENDMACRO()
-

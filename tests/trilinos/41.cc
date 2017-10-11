@@ -15,18 +15,17 @@
 
 
 
-// check TrilinosWrappers::Vector::sadd(s, Vector)
+// check TrilinosWrappers::MPI::Vector::sadd(s, Vector)
 
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
 
-void test (TrilinosWrappers::Vector &v,
-           TrilinosWrappers::Vector &w)
+void test (TrilinosWrappers::MPI::Vector &v,
+           TrilinosWrappers::MPI::Vector &w)
 {
   for (unsigned int i=0; i<v.size(); ++i)
     {
@@ -53,9 +52,7 @@ void test (TrilinosWrappers::Vector &v,
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 
@@ -63,8 +60,10 @@ int main (int argc,char **argv)
   try
     {
       {
-        TrilinosWrappers::Vector v (100);
-        TrilinosWrappers::Vector w (100);
+        TrilinosWrappers::MPI::Vector v;
+        v.reinit(complete_index_set(100), MPI_COMM_WORLD);
+        TrilinosWrappers::MPI::Vector w;
+        w.reinit(complete_index_set(100), MPI_COMM_WORLD);
         test (v,w);
       }
     }

@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2011 - 2015 by the deal.II authors
+ * Copyright (C) 2011 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -38,7 +38,7 @@
 
 // This includes the data structures for the efficient implementation of
 // matrix-free methods.
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
@@ -83,17 +83,17 @@ namespace Step48
     SineGordonOperation(const MatrixFree<dim,double> &data_in,
                         const double                  time_step);
 
-    void apply (parallel::distributed::Vector<double>                     &dst,
-                const std::vector<parallel::distributed::Vector<double>*> &src) const;
+    void apply (LinearAlgebra::distributed::Vector<double>                     &dst,
+                const std::vector<LinearAlgebra::distributed::Vector<double>*> &src) const;
 
   private:
     const MatrixFree<dim,double>         &data;
     const VectorizedArray<double>         delta_t_sqr;
-    parallel::distributed::Vector<double> inv_mass_matrix;
+    LinearAlgebra::distributed::Vector<double> inv_mass_matrix;
 
     void local_apply (const MatrixFree<dim,double>               &data,
-                      parallel::distributed::Vector<double>      &dst,
-                      const std::vector<parallel::distributed::Vector<double>*> &src,
+                      LinearAlgebra::distributed::Vector<double>      &dst,
+                      const std::vector<LinearAlgebra::distributed::Vector<double>*> &src,
                       const std::pair<unsigned int,unsigned int> &cell_range) const;
   };
 
@@ -169,7 +169,7 @@ namespace Step48
   // one destination vector, even if we happen to use many vectors like the two
   // in this case. Note that the cell loop accepts any valid class for input and
   // output, which does not only include vectors but general data types.
-  // However, only in case it encounters a parallel::distributed::Vector<Number>
+  // However, only in case it encounters a LinearAlgebra::distributed::Vector<Number>
   // or a <tt>std::vector</tt> collecting these vectors, it calls functions that
   // exchange data at the beginning and the end of the loop. In the loop over
   // the cells, we first have to read in the values in the vectors related to
@@ -181,8 +181,8 @@ namespace Step48
   template <int dim, int fe_degree>
   void SineGordonOperation<dim, fe_degree>::
   local_apply (const MatrixFree<dim>                      &data,
-               parallel::distributed::Vector<double>      &dst,
-               const std::vector<parallel::distributed::Vector<double>*> &src,
+               LinearAlgebra::distributed::Vector<double>      &dst,
+               const std::vector<LinearAlgebra::distributed::Vector<double>*> &src,
                const std::pair<unsigned int,unsigned int> &cell_range) const
   {
     AssertDimension (src.size(), 2);
@@ -228,8 +228,8 @@ namespace Step48
   // provide a function with the same signature that is not part of a class.
   template <int dim, int fe_degree>
   void SineGordonOperation<dim, fe_degree>::
-  apply (parallel::distributed::Vector<double>                     &dst,
-         const std::vector<parallel::distributed::Vector<double>*> &src) const
+  apply (LinearAlgebra::distributed::Vector<double>                     &dst,
+         const std::vector<LinearAlgebra::distributed::Vector<double>*> &src) const
   {
     dst = 0;
     data.cell_loop (&SineGordonOperation<dim,fe_degree>::local_apply,
@@ -303,7 +303,7 @@ namespace Step48
 
     MatrixFree<dim,double> matrix_free_data;
 
-    parallel::distributed::Vector<double> solution, old_solution, old_old_solution;
+    LinearAlgebra::distributed::Vector<double> solution, old_solution, old_old_solution;
 
     const unsigned int n_global_refinements;
     double time, time_step;
@@ -338,6 +338,7 @@ namespace Step48
     dof_handler (triangulation),
     n_global_refinements (10-2*dim),
     time (-10),
+    time_step(10.),
     final_time (10),
     cfl_number (.1/fe_degree),
     output_timestep_skip (200)
@@ -415,7 +416,6 @@ namespace Step48
 
     QGaussLobatto<1> quadrature (fe_degree+1);
     typename MatrixFree<dim>::AdditionalData additional_data;
-    additional_data.mpi_communicator = MPI_COMM_WORLD;
     additional_data.tasks_parallel_scheme =
       MatrixFree<dim>::AdditionalData::partition_partition;
 
@@ -433,25 +433,25 @@ namespace Step48
 
   // This function prints the norm of the solution and writes the solution
   // vector to a file. The norm is standard (except for the fact that we need
-  // to be sure to only count norms on locally owned cells), and the second is
-  // similar to what we did in step-40. Note that we can use the same vector
-  // for output as we used for computation: The vectors in the matrix-free
-  // framework always provide full information on all locally owned cells
-  // (this is what is needed in the local evaluations, too), including ghost
-  // vector entries on these cells. This is the only data that is needed in
-  // the integrate_difference function as well as in DataOut. We only need to
-  // make sure that we tell the vector to update its ghost values before we
-  // read them. This is a feature present only in the
-  // parallel::distributed::Vector class. Distributed vectors with PETSc and
-  // Trilinos, on the other hand, need to be copied to special vectors
-  // including ghost values (see the relevant section in step-40). If we
-  // wanted to access all degrees of freedom on ghost cells, too (e.g. when
-  // computing error estimators that use the jump of solution over cell
-  // boundaries), we would need more information and create a vector
-  // initialized with locally relevant dofs just as in step-40. Observe also
-  // that we need to distribute constraints for output - they are not filled
-  // during computations (rather, they are distributed on the fly in the
-  // matrix-free method read_dof_values).
+  // to accumulate the norms over all processors for the parallel grid), and
+  // the second is similar to what we did in step-40 or step-37. Note that we
+  // can use the same vector for output as the one used during computations:
+  // The vectors in the matrix-free framework always provide full information
+  // on all locally owned cells (this is what is needed in the local
+  // evaluations, too), including ghost vector entries on these cells. This is
+  // the only data that is needed in the integrate_difference function as well
+  // as in DataOut. The only action to take at this point is then to make sure
+  // that the vector updates its ghost values before we read from them. This
+  // is a feature present only in the LinearAlgebra::distributed::Vector
+  // class. Distributed vectors with PETSc and Trilinos, on the other hand,
+  // need to be copied to special vectors including ghost values (see the
+  // relevant section in step-40). If we also wanted to access all degrees of
+  // freedom on ghost cells (e.g. when computing error estimators that use the
+  // jump of solution over cell boundaries), we would need more information
+  // and create a vector initialized with locally relevant dofs just as in
+  // step-40. Observe also that we need to distribute constraints for output -
+  // they are not filled during computations (rather, they are interpolated on
+  // the fly in the matrix-free method read_dof_values).
   template <int dim>
   void
   SineGordonProblem<dim>::output_results (const unsigned int timestep_number)
@@ -462,12 +462,14 @@ namespace Step48
     solution.update_ghost_values();
     VectorTools::integrate_difference (dof_handler,
                                        solution,
-                                       ZeroFunction<dim>(),
+                                       Functions::ZeroFunction<dim>(),
                                        norm_per_cell,
                                        QGauss<dim>(fe_degree+1),
                                        VectorTools::L2_norm);
     const double solution_norm =
-      std::sqrt(Utilities::MPI::sum (norm_per_cell.norm_sqr(), MPI_COMM_WORLD));
+      VectorTools::compute_global_error(triangulation,
+                                        norm_per_cell,
+                                        VectorTools::L2_norm);
 
     pcout << "   Time:"
           << std::setw(8) << std::setprecision(3) << time
@@ -554,7 +556,7 @@ namespace Step48
                               old_solution);
     output_results (0);
 
-    std::vector<parallel::distributed::Vector<double>*> previous_solutions;
+    std::vector<LinearAlgebra::distributed::Vector<double>*> previous_solutions;
     previous_solutions.push_back(&old_solution);
     previous_solutions.push_back(&old_old_solution);
 

@@ -17,15 +17,10 @@
 // check that Table<{1,2,3},T>::reinit(TableIndices) work
 
 #include "../tests.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <cstdlib>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/table.h>
 
-template<int dim>
+template <int dim>
 void test()
 {
   dealii::TableIndices<dim> new_size;
@@ -46,7 +41,6 @@ main ()
   deallog << std::fixed;
   deallog << std::setprecision(0);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1>();
   test<2>();

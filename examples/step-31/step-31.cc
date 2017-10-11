@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2007 - 2015 by the deal.II authors
+ * Copyright (C) 2007 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -62,7 +62,7 @@
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/trilinos_block_sparse_matrix.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_precondition.h>
 
 // Finally, here are a few C++ headers that haven't been included yet by one of
@@ -178,6 +178,7 @@ namespace Step31
     TemperatureRightHandSide<dim>::value (const Point<dim>  &p,
                                           const unsigned int component) const
     {
+      (void) component;
       Assert (component == 0,
               ExcMessage ("Invalid operation for a scalar function."));
 
@@ -540,8 +541,8 @@ namespace Step31
     double                              old_time_step;
     unsigned int                        timestep_number;
 
-    std_cxx11::shared_ptr<TrilinosWrappers::PreconditionAMG> Amg_preconditioner;
-    std_cxx11::shared_ptr<TrilinosWrappers::PreconditionIC>  Mp_preconditioner;
+    std::shared_ptr<TrilinosWrappers::PreconditionAMG> Amg_preconditioner;
+    std::shared_ptr<TrilinosWrappers::PreconditionIC>  Mp_preconditioner;
 
     bool                                rebuild_stokes_matrix;
     bool                                rebuild_temperature_matrices;
@@ -567,7 +568,7 @@ namespace Step31
   BoussinesqFlowProblem<dim>::BoussinesqFlowProblem ()
     :
     triangulation (Triangulation<dim>::maximum_smoothing),
-
+    global_Omega_diameter (std::numeric_limits<double>::quiet_NaN()),
     stokes_degree (1),
     stokes_fe (FE_Q<dim>(stokes_degree+1), dim,
                FE_Q<dim>(stokes_degree), 1),
@@ -1184,7 +1185,7 @@ namespace Step31
 
     assemble_stokes_preconditioner ();
 
-    Amg_preconditioner = std_cxx11::shared_ptr<TrilinosWrappers::PreconditionAMG>
+    Amg_preconditioner = std::shared_ptr<TrilinosWrappers::PreconditionAMG>
                          (new TrilinosWrappers::PreconditionAMG());
 
     std::vector<std::vector<bool> > constant_modes;
@@ -1220,7 +1221,7 @@ namespace Step31
     // (IC) factorization preconditioner, which is designed for symmetric
     // matrices. We could have also chosen an SSOR preconditioner with
     // relaxation factor around 1.2, but IC is cheaper for our example. We
-    // wrap the preconditioners into a <code>std_cxx11::shared_ptr</code>
+    // wrap the preconditioners into a <code>std::shared_ptr</code>
     // pointer, which makes it easier to recreate the preconditioner next time
     // around since we do not have to care about destroying the previously
     // used object.
@@ -1231,7 +1232,7 @@ namespace Step31
     Amg_preconditioner->initialize(stokes_preconditioner_matrix.block(0,0),
                                    amg_data);
 
-    Mp_preconditioner = std_cxx11::shared_ptr<TrilinosWrappers::PreconditionIC>
+    Mp_preconditioner = std::shared_ptr<TrilinosWrappers::PreconditionIC>
                         (new TrilinosWrappers::PreconditionIC());
     Mp_preconditioner->initialize(stokes_preconditioner_matrix.block(1,1));
 
@@ -2065,11 +2066,10 @@ namespace Step31
     // another copy of temporary vectors for temperature (now corresponding to
     // the new grid), and let the interpolate function do the job. Then, the
     // resulting array of vectors is written into the respective vector member
-    // variables. For the Stokes vector, everything is just the same &ndash;
-    // except that we do not need another temporary vector since we just
-    // interpolate a single vector. In the end, we have to tell the program
-    // that the matrices and preconditioners need to be regenerated, since the
-    // mesh has changed.
+    // variables.
+    //
+    // Remember that the set of constraints will be updated for the new
+    // triangulation in the setup_dofs() call.
     triangulation.execute_coarsening_and_refinement ();
     setup_dofs ();
 
@@ -2081,7 +2081,18 @@ namespace Step31
     temperature_solution = tmp[0];
     old_temperature_solution = tmp[1];
 
+    // After the solution has been transfered we then enforce the constraints
+    // on the transfered solution.
+    temperature_constraints.distribute(temperature_solution);
+    temperature_constraints.distribute(old_temperature_solution);
+
+    // For the Stokes vector, everything is just the same &ndash; except that
+    // we do not need another temporary vector since we just interpolate a
+    // single vector. In the end, we have to tell the program that the matrices
+    // and preconditioners need to be regenerated, since the mesh has changed.
     stokes_trans.interpolate (x_stokes, stokes_solution);
+
+    stokes_constraints.distribute(stokes_solution);
 
     rebuild_stokes_matrix         = true;
     rebuild_temperature_matrices  = true;

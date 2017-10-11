@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__mg_transfer_component_templates_h
-#define dealii__mg_transfer_component_templates_h
+#ifndef dealii_mg_transfer_component_templates_h
+#define dealii_mg_transfer_component_templates_h
 
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -74,7 +74,7 @@ MGTransferSelect<number>::copy_from_mg (
   dst = 0;
   do_copy_from_mg (mg_dof_handler,
                    dst.block(target_component[selected_component]), src);
-  if (constraints != 0)
+  if (constraints != nullptr)
     constraints->condense(dst);
 }
 
@@ -90,7 +90,7 @@ MGTransferSelect<number>::copy_from_mg (
 {
   dst = 0;
   do_copy_from_mg (mg_dof_handler, dst, src);
-  if (constraints != 0)
+  if (constraints != nullptr)
     {
       //If we were given constraints
       //apply them to the dst that goes
@@ -181,12 +181,6 @@ MGTransferSelect<number>::do_copy_from_mg_add (
   OutVector                            &dst,
   const MGLevelObject<Vector<number> > &src) const
 {
-  const FiniteElement<dim> &fe = mg_dof_handler.get_fe();
-  const unsigned int dofs_per_cell = fe.dofs_per_cell;
-
-  std::vector<types::global_dof_index> global_dof_indices (dofs_per_cell);
-  std::vector<types::global_dof_index> level_dof_indices (dofs_per_cell);
-
   typename DoFHandler<dim,spacedim>::active_cell_iterator
   level_cell = mg_dof_handler.begin_active();
   const typename DoFHandler<dim,spacedim>::active_cell_iterator

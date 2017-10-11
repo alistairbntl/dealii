@@ -29,7 +29,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -44,7 +43,6 @@
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/fe/mapping_cartesian.h>
 
-#include <fstream>
 
 
 bool equal (const FullMatrix<double> &m1,
@@ -61,7 +59,7 @@ bool equal (const FullMatrix<double> &m1,
 }
 
 
-template<int dim>
+template <int dim>
 void test (const Triangulation<dim> &tr)
 {
   FE_DGPNonparametric<dim> fe(2);
@@ -169,7 +167,6 @@ int main()
   deallog << std::setprecision (4);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   test<2>();
   //test<3>();

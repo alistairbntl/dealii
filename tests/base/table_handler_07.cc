@@ -20,19 +20,14 @@
 #include "../tests.h"
 #include <deal.II/base/data_out_base.h>
 #include <deal.II/base/table_handler.h>
-#include <deal.II/base/logstream.h>
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 #include <string>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   /* Like in _06 */
   TableHandler table;

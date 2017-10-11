@@ -19,7 +19,6 @@
 // finite element and vector extractors
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -34,11 +33,10 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_q1.h>
 
-#include <fstream>
 
 
 
-template<int dim>
+template <int dim>
 void test (const Triangulation<dim> &tr,
            const FiniteElement<dim> &fe)
 {
@@ -98,8 +96,9 @@ void test (const Triangulation<dim> &tr,
 
                       AssertThrow (fe_values[vec_components].symmetric_gradient (i,q)
                                    ==
-                                   (fe_values[vec_components].gradient(i,q) +
-                                    transpose(fe_values[vec_components].gradient(i,q)))/2,
+                                   decltype(fe_values[vec_components].symmetric_gradient (i,q))
+                                   ( (fe_values[vec_components].gradient(i,q) +
+                                      transpose(fe_values[vec_components].gradient(i,q)))/2 ),
                                    ExcInternalError());
 
                       AssertThrow (fe_values[vec_components].hessian (i,q)[d]
@@ -114,7 +113,7 @@ void test (const Triangulation<dim> &tr,
 
 
 
-template<int dim>
+template <int dim>
 void test_hyper_sphere()
 {
   Triangulation<dim> tr;
@@ -136,7 +135,6 @@ int main()
   deallog << std::setprecision (2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   test_hyper_sphere<2>();
   test_hyper_sphere<3>();

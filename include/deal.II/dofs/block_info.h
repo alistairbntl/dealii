@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_info_h
-#define dealii__block_info_h
+#ifndef dealii_block_info_h
+#define dealii_block_info_h
 
 #include <deal.II/base/subscriptor.h>
 #include <deal.II/base/memory_consumption.h>
@@ -85,7 +85,7 @@ namespace hp
  * level.
  *
  * @todo Extend the functions local() and renumber() to the concept to
- * hpDoFHandler.
+ * hp::DoFHandler.
  *
  * @ingroup dofs
  * @author Guido Kanschat, 2009

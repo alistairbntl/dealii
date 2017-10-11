@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,9 +14,11 @@
 // ---------------------------------------------------------------------
 
 
+#include <deal.II/base/array_view.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/quadrature.h>
 #include <deal.II/base/qprojector.h>
+#include <deal.II/base/signaling_nan.h>
 #include <deal.II/base/memory_consumption.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/grid/tria.h>
@@ -32,20 +34,22 @@
 DEAL_II_NAMESPACE_OPEN
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 const unsigned int MappingCartesian<dim,spacedim>::invalid_face_number;
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 MappingCartesian<dim, spacedim>::InternalData::InternalData (const Quadrature<dim> &q)
   :
+  cell_extents (numbers::signaling_nan<Tensor<1,dim> >()),
+  volume_element (numbers::signaling_nan<double>()),
   quadrature_points (q.get_points ())
 {}
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 std::size_t
 MappingCartesian<dim, spacedim>::InternalData::memory_consumption () const
 {
@@ -66,7 +70,7 @@ MappingCartesian<dim,spacedim>::preserves_vertex_locations () const
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 UpdateFlags
 MappingCartesian<dim, spacedim>::requires_update_flags (const UpdateFlags in) const
 {
@@ -84,7 +88,7 @@ MappingCartesian<dim, spacedim>::requires_update_flags (const UpdateFlags in) co
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 typename Mapping<dim, spacedim>::InternalDataBase *
 MappingCartesian<dim, spacedim>::get_data (const UpdateFlags      update_flags,
                                            const Quadrature<dim> &q) const
@@ -101,7 +105,7 @@ MappingCartesian<dim, spacedim>::get_data (const UpdateFlags      update_flags,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 typename Mapping<dim, spacedim>::InternalDataBase *
 MappingCartesian<dim, spacedim>::get_face_data (const UpdateFlags update_flags,
                                                 const Quadrature<dim-1>& quadrature) const
@@ -123,7 +127,7 @@ MappingCartesian<dim, spacedim>::get_face_data (const UpdateFlags update_flags,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 typename Mapping<dim, spacedim>::InternalDataBase *
 MappingCartesian<dim, spacedim>::get_subface_data (const UpdateFlags update_flags,
                                                    const Quadrature<dim-1> &quadrature) const
@@ -146,7 +150,7 @@ MappingCartesian<dim, spacedim>::get_subface_data (const UpdateFlags update_flag
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingCartesian<dim, spacedim>::compute_fill (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
                                                const unsigned int        face_no,
@@ -330,7 +334,7 @@ MappingCartesian<dim, spacedim>::compute_fill (const typename Triangulation<dim,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 CellSimilarity::Similarity
 MappingCartesian<dim, spacedim>::
 fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -341,7 +345,7 @@ fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
 {
   // convert data object to internal data for this class. fails with
   // an exception if that is not possible
-  Assert (dynamic_cast<const InternalData *> (&internal_data) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&internal_data) != nullptr, ExcInternalError());
   const InternalData &data = static_cast<const InternalData &> (internal_data);
 
   std::vector<Tensor<1,dim> > dummy;
@@ -424,7 +428,7 @@ fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingCartesian<dim, spacedim>::
 fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -437,7 +441,7 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&internal_data) != 0,
+  Assert (dynamic_cast<const InternalData *> (&internal_data) != nullptr,
           ExcInternalError());
   const InternalData &data = static_cast<const InternalData &> (internal_data);
 
@@ -513,7 +517,7 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingCartesian<dim, spacedim>::
 fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -525,7 +529,7 @@ fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterato
 {
   // convert data object to internal data for this class. fails with
   // an exception if that is not possible
-  Assert (dynamic_cast<const InternalData *> (&internal_data) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&internal_data) != nullptr, ExcInternalError());
   const InternalData &data = static_cast<const InternalData &> (internal_data);
 
   compute_fill (cell, face_no, subface_no, CellSimilarity::none,
@@ -610,7 +614,7 @@ fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterato
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingCartesian<dim,spacedim>::
 transform (const ArrayView<const Tensor<1,dim> >                  &input,
@@ -619,7 +623,7 @@ transform (const ArrayView<const Tensor<1,dim> >                  &input,
            const ArrayView<Tensor<1,spacedim> >                   &output) const
 {
   AssertDimension (input.size(), output.size());
-  Assert (dynamic_cast<const InternalData *>(&mapping_data) != 0,
+  Assert (dynamic_cast<const InternalData *>(&mapping_data) != nullptr,
           ExcInternalError());
   const InternalData &data = static_cast<const InternalData &> (mapping_data);
 
@@ -665,7 +669,7 @@ transform (const ArrayView<const Tensor<1,dim> >                  &input,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingCartesian<dim,spacedim>::
 transform (const ArrayView<const DerivativeForm<1, dim,spacedim> > &input,
@@ -674,7 +678,7 @@ transform (const ArrayView<const DerivativeForm<1, dim,spacedim> > &input,
            const ArrayView<Tensor<2,spacedim> >                    &output) const
 {
   AssertDimension (input.size(), output.size());
-  Assert (dynamic_cast<const InternalData *>(&mapping_data) != 0,
+  Assert (dynamic_cast<const InternalData *>(&mapping_data) != nullptr,
           ExcInternalError());
   const InternalData &data = static_cast<const InternalData &>(mapping_data);
 
@@ -766,7 +770,7 @@ transform (const ArrayView<const DerivativeForm<1, dim,spacedim> > &input,
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingCartesian<dim,spacedim>::
 transform (const ArrayView<const Tensor<2, dim> >                 &input,
@@ -776,7 +780,7 @@ transform (const ArrayView<const Tensor<2, dim> >                 &input,
 {
 
   AssertDimension (input.size(), output.size());
-  Assert (dynamic_cast<const InternalData *>(&mapping_data) != 0,
+  Assert (dynamic_cast<const InternalData *>(&mapping_data) != nullptr,
           ExcInternalError());
   const InternalData &data = static_cast<const InternalData &>(mapping_data);
 
@@ -867,7 +871,7 @@ transform (const ArrayView<const Tensor<2, dim> >                 &input,
 }
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingCartesian<dim,spacedim>::
 transform (const ArrayView<const  DerivativeForm<2, dim, spacedim> > &input,
@@ -877,7 +881,7 @@ transform (const ArrayView<const  DerivativeForm<2, dim, spacedim> > &input,
 {
 
   AssertDimension (input.size(), output.size());
-  Assert (dynamic_cast<const InternalData *>(&mapping_data) != 0,
+  Assert (dynamic_cast<const InternalData *>(&mapping_data) != nullptr,
           ExcInternalError());
   const InternalData &data = static_cast<const InternalData &>(mapping_data);
 
@@ -905,7 +909,7 @@ transform (const ArrayView<const  DerivativeForm<2, dim, spacedim> > &input,
 
 }
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void
 MappingCartesian<dim,spacedim>::
 transform (const ArrayView<const  Tensor<3,dim> >                 &input,
@@ -915,7 +919,7 @@ transform (const ArrayView<const  Tensor<3,dim> >                 &input,
 {
 
   AssertDimension (input.size(), output.size());
-  Assert (dynamic_cast<const InternalData *>(&mapping_data) != 0,
+  Assert (dynamic_cast<const InternalData *>(&mapping_data) != nullptr,
           ExcInternalError());
   const InternalData &data = static_cast<const InternalData &>(mapping_data);
 
@@ -1025,7 +1029,7 @@ MappingCartesian<dim, spacedim>::transform_unit_to_real_cell (
 
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 Point<dim>
 MappingCartesian<dim, spacedim>::transform_real_to_unit_cell (
   const typename Triangulation<dim,spacedim>::cell_iterator &cell,
@@ -1059,7 +1063,7 @@ MappingCartesian<dim, spacedim>::transform_real_to_unit_cell (
 }
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 Mapping<dim, spacedim> *
 MappingCartesian<dim, spacedim>::clone () const
 {

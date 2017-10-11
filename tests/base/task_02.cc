@@ -17,8 +17,6 @@
 // like task_01, but with return value
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 #include <unistd.h>
 
 #include <deal.II/base/thread_management.h>
@@ -35,9 +33,7 @@ int test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Threads::Task<int> t = Threads::new_task (test);
   AssertThrow (t.return_value() == 42, ExcInternalError());

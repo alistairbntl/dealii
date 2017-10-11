@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__q_collection_h
-#define dealii__q_collection_h
+#ifndef dealii_q_collection_h
+#define dealii_q_collection_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/subscriptor.h>
@@ -23,7 +23,7 @@
 #include <deal.II/fe/fe.h>
 
 #include <vector>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -50,7 +50,7 @@ namespace hp
      * Default constructor. Leads to an empty collection that can later be
      * filled using push_back().
      */
-    QCollection ();
+    QCollection () = default;
 
     /**
      * Conversion constructor. This constructor creates a QCollection from a
@@ -66,13 +66,25 @@ namespace hp
     QCollection (const QCollection<dim> &q_collection);
 
     /**
-     * Adds a new quadrature rule to the QCollection.  The quadrature rules
-     * have to be added in the same order as for the FECollection for which
-     * this quadrature rule collection is meant. Thus the reference to the
-     * quadrature rule for active_fe_index 0 has to be added first, followed
-     * by the quadrature rule for active_fe_index 1.
+     * Adds a new quadrature rule to the QCollection. In most cases, you will
+     * want to add quadrature rules in the same order as the elements were
+     * added to the hp::FECollection for which this quadrature rule collection is
+     * meant. If done this way, the hp::FEValues objects with which you will
+     * use both hp::FECollection and hp::QCollection objects will automatically
+     * choose corresponding elements and quadrature formulas. On the other hand,
+     * it is possible to use arbitrary combinations of elements and quadrature
+     * formulas in hp::FECollection and hp::QCollection objects when specifically
+     * specifying appropriate indices in calls to hp::FEValues::reinit()
+     * or hp::FEFaceValues::reinit(). In those cases, there need not be a
+     * correspondence between elements of the hp::FECollection and
+     * hp::QCollection objects; they need not even be of the same size in this
+     * case.
      *
-     * This class creates a copy of the given quadrature object, i.e. you can
+     * The same arguments about the order of elements of collections can, by
+     * the way, also be made about the elements of hp::MappingCollection
+     * objects.
+     *
+     * This class creates a copy of the given quadrature object, i.e., you can
      * do things like <tt>push_back(QGauss<dim>(3));</tt>. The internal copy
      * is later destroyed by this object upon destruction of the entire
      * collection.
@@ -80,7 +92,7 @@ namespace hp
     void push_back (const Quadrature<dim> &new_quadrature);
 
     /**
-     * Returns a reference to the quadrature rule specified by the argument.
+     * Return a reference to the quadrature rule specified by the argument.
      *
      * @pre @p index must be between zero and the number of elements of the
      * collection.
@@ -89,7 +101,7 @@ namespace hp
     operator[] (const unsigned int index) const;
 
     /**
-     * Returns the number of quadrature pointers stored in this object.
+     * Return the number of quadrature pointers stored in this object.
      */
     unsigned int size () const;
 
@@ -117,7 +129,7 @@ namespace hp
      * The real container, which stores pointers to the different quadrature
      * objects.
      */
-    std::vector<std_cxx11::shared_ptr<const Quadrature<dim> > > quadratures;
+    std::vector<std::shared_ptr<const Quadrature<dim> > > quadratures;
   };
 
 
@@ -166,17 +178,10 @@ namespace hp
 
   template <int dim>
   inline
-  QCollection<dim>::QCollection ()
-  {}
-
-
-
-  template <int dim>
-  inline
   QCollection<dim>::QCollection (const Quadrature<dim> &quadrature)
   {
     quadratures
-    .push_back (std_cxx11::shared_ptr<const Quadrature<dim> >(new Quadrature<dim>(quadrature)));
+    .push_back (std::shared_ptr<const Quadrature<dim> >(new Quadrature<dim>(quadrature)));
   }
 
 
@@ -219,7 +224,7 @@ namespace hp
   QCollection<dim>::push_back (const Quadrature<dim> &new_quadrature)
   {
     quadratures
-    .push_back (std_cxx11::shared_ptr<const Quadrature<dim> >(new Quadrature<dim>(new_quadrature)));
+    .push_back (std::shared_ptr<const Quadrature<dim> >(new Quadrature<dim>(new_quadrature)));
   }
 
 } // namespace hp

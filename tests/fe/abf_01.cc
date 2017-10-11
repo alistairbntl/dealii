@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,12 +19,10 @@
 // Plots are gnuplot compatible if lines with desired prefix are selected.
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_raviart_thomas.h>
 
 #define PRECISION 2
 
-#include <fstream>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_in.h>
@@ -72,7 +70,7 @@ void EvaluateDerivative (DoFHandler<2> *dof_handler,
   QGauss<2> quad (3);
   FEValues<2> fe_values (dof_handler->get_fe (), quad,
                          UpdateFlags(update_values    |
-                                     update_q_points  |
+                                     update_quadrature_points  |
                                      update_gradients |
                                      update_JxW_values));
 
@@ -143,11 +141,11 @@ void create_mass_matrix (const Mapping<dim>       &mapping,
                          SparseMatrix<double>     &matrix,
                          const Function<dim>   &rhs_function,
                          Vector<double>        &rhs_vector,
-                         const Function<dim> *const coefficient = 0)
+                         const Function<dim> *const coefficient = nullptr)
 {
-  UpdateFlags update_flags = UpdateFlags(update_values | update_JxW_values | update_q_points);
-  if (coefficient != 0)
-    update_flags = UpdateFlags (update_flags | update_q_points);
+  UpdateFlags update_flags = UpdateFlags(update_values | update_JxW_values | update_quadrature_points);
+  if (coefficient != nullptr)
+    update_flags = UpdateFlags (update_flags | update_quadrature_points);
 
   FEValues<dim> fe_values (mapping, dof.get_fe(), q, update_flags);
 
@@ -156,7 +154,7 @@ void create_mass_matrix (const Mapping<dim>       &mapping,
   const FiniteElement<dim>    &fe  = fe_values.get_fe();
   const unsigned int n_components  = fe.n_components();
 
-  Assert(coefficient == 0 ||
+  Assert(coefficient == nullptr ||
          coefficient->n_components==1 ||
          coefficient->n_components==n_components, ExcInternalError());
 
@@ -183,7 +181,7 @@ void create_mass_matrix (const Mapping<dim>       &mapping,
       rhs_function.vector_value_list (fe_values.get_quadrature_points(), rhs_values);
       cell_vector = 0;
 
-      if (coefficient != 0)
+      if (coefficient != nullptr)
         {
           if (coefficient->n_components==1)
             {
@@ -344,7 +342,7 @@ void create_right_hand_side (const Mapping<dim>    &mapping,
   rhs_vector = 0;
 
   UpdateFlags update_flags = UpdateFlags(update_values   |
-                                         update_q_points |
+                                         update_quadrature_points |
                                          update_JxW_values);
   FEValues<dim> fe_values (mapping, fe, quadrature, update_flags);
 
@@ -591,7 +589,6 @@ int main (int /*argc*/, char **/*argv*/)
   logfile << std::setprecision(PRECISION);
   logfile << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
 
   Triangulation<2> tria_test;
@@ -631,7 +628,7 @@ int main (int /*argc*/, char **/*argv*/)
   hn_constraints.close ();
   MappingQGeneric<2> map_default(1);
   project (map_default, *dof_handler, hn_constraints,
-           QGauss<2> (6), ConstantFunction<2>(1., 2),
+           QGauss<2> (6), Functions::ConstantFunction<2>(1., 2),
            solution);
 
   EvaluateDerivative (dof_handler, solution);

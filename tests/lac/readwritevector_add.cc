@@ -17,10 +17,8 @@
 
 #include "../tests.h"
 #include <deal.II/base/index_set.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/read_write_vector.h>
 
-#include <fstream>
 #include <vector>
 
 void test()
@@ -75,8 +73,7 @@ void test()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   test();
 
   return 0;

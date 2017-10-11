@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2001 - 2015 by the deal.II authors
+ * Copyright (C) 2001 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -33,7 +33,7 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
 
-// This is the only new one: in it, we declare the <code>MappingQ</code> class
+// This is the only new one: in it, we declare the MappingQ class
 // which we will use for polynomial mappings of arbitrary order:
 #include <deal.II/fe/mapping_q.h>
 
@@ -48,13 +48,13 @@ namespace Step10
   using namespace dealii;
 
   // Now, as we want to compute the value of $\pi$, we have to compare to
-  // somewhat. These are the first few digits of $\pi$, which we define
+  // something. These are the first few digits of $\pi$, which we define
   // beforehand for later use. Since we would like to compute the difference
   // between two numbers which are quite accurate, with the accuracy of the
   // computed approximation to $\pi$ being in the range of the number of
   // digits which a double variable can hold, we rather declare the reference
   // value as a <code>long double</code> and give it a number of extra digits:
-  const long double pi = 3.141592653589793238462643;
+  const long double pi = 3.141592653589793238462643L;
 
 
 
@@ -95,17 +95,9 @@ namespace Step10
         std::cout << "Refinement level: " << refinement << std::endl;
 
         // Then have a string which denotes the base part of the names of the
-        // files into which we write the output. Note that in the parentheses
-        // in the initializer we do arithmetic on characters, which assumes
-        // that first the characters denoting numbers are placed consecutively
-        // (which is probably true for all reasonable character sets
-        // nowadays), but also assumes that the increment
-        // <code>refinement</code> is less than ten. This is therefore more a
-        // quick hack if we know exactly the values which the increment can
-        // assume. A better implementation would use the
-        // <code>std::istringstream</code> class to generate a name.
-        std::string filename_base = "ball";
-        filename_base += '0'+refinement;
+        // files into which we write the output (ending with the refinement
+        // level).
+        std::string filename_base = "ball_" + Utilities::to_string(refinement);
 
         // Then output the present grid for $Q_1$, $Q_2$, and $Q_3$ mappings:
         for (unsigned int degree=1; degree<4; ++degree)
@@ -113,20 +105,19 @@ namespace Step10
             std::cout << "Degree = " << degree << std::endl;
 
             // For this, first set up an object describing the mapping. This
-            // is done using the <code>MappingQ</code> class, which takes as
+            // is done using the MappingQ class, which takes as
             // argument to the constructor the polynomial degree which it
             // shall use.
             const MappingQ<dim> mapping (degree);
-            // We note one interesting fact: if you want a piecewise linear
-            // mapping, then you could give a value of <code>1</code> to the
-            // constructor. However, for linear mappings, so many things can
-            // be generated simpler that there is another class, called
-            // <code>MappingQ1</code> which does exactly the same is if you
-            // gave an degree of <code>1</code> to the <code>MappingQ</code>
-            // class, but does so significantly faster. <code>MappingQ1</code>
-            // is also the class that is implicitly used throughout the
-            // library in many functions and classes if you do not specify
-            // another mapping explicitly.
+            // As a side note, for a piecewise linear mapping, you
+            // could give a value of <code>1</code> to the constructor
+            // of MappingQ, but there is also a class MappingQ1 that
+            // achieves the same effect. Historically, it did a lot of
+            // things in a simpler way than MappingQ but is today just
+            // a wrapper around the latter. It is, however, still the
+            // class that is used implicitly in many places of the
+            // library if you do not specify another mapping
+            // explicitly.
 
 
             // In degree to actually write out the present grid with this
@@ -146,17 +137,17 @@ namespace Step10
             GridOutFlags::Gnuplot gnuplot_flags(false, 30);
             grid_out.set_flags(gnuplot_flags);
 
-            // Finally, generate a filename and a file for output using the
-            // same evil hack as above:
-            std::string filename = filename_base+"_mapping_q";
-            filename += ('0'+degree);
-            filename += ".dat";
+            // Finally, generate a filename and a file for output:
+            std::string filename = filename_base
+                                   + "_mapping_q_"
+                                   + Utilities::to_string(degree)
+                                   + ".dat";
             std::ofstream gnuplot_file (filename.c_str());
 
             // Then write out the triangulation to this file. The last
             // argument of the function is a pointer to a mapping object. This
             // argument has a default value, and if no value is given a simple
-            // <code>MappingQ1</code> object is taken, which we briefly
+            // MappingQ1 object is taken, which we briefly
             // described above. This would then result in a piecewise linear
             // approximation of the true boundary in the output.
             grid_out.write_gnuplot (triangulation, gnuplot_file, &mapping);
@@ -178,8 +169,8 @@ namespace Step10
   // $x_i$. The integrals on each cell are approximated by numerical
   // quadrature, hence the only additional ingredient we need is to set up a
   // FEValues object that provides the corresponding `JxW' values of each
-  // cell. (Note that `JxW' is meant to abbreviate <code>Jacobian determinant
-  // times weight</code>; since in numerical quadrature the two factors always
+  // cell. (Note that `JxW' is meant to abbreviate <i>Jacobian determinant
+  // times weight</i>; since in numerical quadrature the two factors always
   // occur at the same places, we only offer the combined quantity, rather
   // than two separate ones.) We note that here we won't use the FEValues
   // object in its original purpose, i.e. for the computation of values of
@@ -292,7 +283,7 @@ namespace Step10
               {
                 fe_values.reinit (cell);
                 for (unsigned int i=0; i<fe_values.n_quadrature_points; ++i)
-                  area += fe_values.JxW (i);
+                  area += static_cast<long double>(fe_values.JxW (i));
               }
 
             // ...and store the resulting area values and the errors in the
@@ -391,11 +382,11 @@ namespace Step10
                     // iterator and the number of the face.
                     fe_face_values.reinit (cell, face_no);
                     for (unsigned int i=0; i<fe_face_values.n_quadrature_points; ++i)
-                      perimeter += fe_face_values.JxW (i);
+                      perimeter += static_cast<long double>(fe_face_values.JxW (i));
                   }
             // Then store the evaluated values in the table...
-            table.add_value("eval.pi", static_cast<double> (perimeter/2.));
-            table.add_value("error",   static_cast<double> (std::fabs(perimeter/2.-pi)));
+            table.add_value("eval.pi", static_cast<double> (perimeter/2.0L));
+            table.add_value("error",   static_cast<double> (std::fabs(perimeter/2.0L-pi)));
           }
 
         // ...and end this function as we did in the previous one:

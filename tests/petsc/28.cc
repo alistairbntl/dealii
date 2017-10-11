@@ -15,17 +15,16 @@
 
 
 
-// check PETScWrappers::Vector::operator = (Vector), except that we don't
+// check PETScWrappers::MPI::Vector::operator = (Vector), except that we don't
 // resize the vector to be copied to beforehand
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
 
-void test (PETScWrappers::Vector &v)
+void test (PETScWrappers::MPI::Vector &v)
 {
   // set some entries of the vector
   for (unsigned int i=0; i<v.size(); ++i)
@@ -35,7 +34,7 @@ void test (PETScWrappers::Vector &v)
 
   // then copy it to a vector of different
   // size
-  PETScWrappers::Vector w (1);
+  PETScWrappers::MPI::Vector w (MPI_COMM_WORLD, 1, 1);
   w = v;
 
   // make sure they're equal
@@ -52,16 +51,16 @@ void test (PETScWrappers::Vector &v)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, 1);
       {
-        PETScWrappers::Vector v (100);
-        test (v);
+        IndexSet indices(100);
+        indices.add_range(0, 100);
+        PETScWrappers::MPI::Vector v(indices, MPI_COMM_WORLD);
+        test(v);
       }
 
     }

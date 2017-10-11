@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2014 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -46,8 +46,18 @@ namespace Polynomials
                                       std::vector<number> &values) const
   {
     Assert (values.size() > 0, ExcZero());
-    const unsigned int values_size=values.size();
 
+    value(x,values.size()-1,&values[0]);
+  }
+
+
+
+  template <typename number>
+  void
+  PiecewisePolynomial<number>::value (const number         x,
+                                      const unsigned int n_derivatives,
+                                      number *values) const
+  {
     // shift polynomial if necessary
     number y = x;
     double derivative_change_sign = 1.;
@@ -60,7 +70,7 @@ namespace Polynomials
             const double offset = step * interval;
             if (x<offset || x>offset+step+step)
               {
-                for (unsigned int k=0; k<values.size(); ++k)
+                for (unsigned int k=0; k<=n_derivatives; ++k)
                   values[k] = 0;
                 return;
               }
@@ -77,7 +87,7 @@ namespace Polynomials
             const double offset = step * interval;
             if (x<offset || x>offset+step)
               {
-                for (unsigned int k=0; k<values.size(); ++k)
+                for (unsigned int k=0; k<=n_derivatives; ++k)
                   values[k] = 0;
                 return;
               }
@@ -94,16 +104,16 @@ namespace Polynomials
              (interval < n_intervals-1 || derivative_change_sign == -1.)))
           {
             values[0] = value(x);
-            for (unsigned int d=1; d<values_size; ++d)
+            for (unsigned int d=1; d<=n_derivatives; ++d)
               values[d] = 0;
             return;
           }
       }
 
-    polynomial.value(y, values);
+    polynomial.value(y, n_derivatives, values);
 
     // change sign if necessary
-    for (unsigned int j=1; j<values_size; j+=2)
+    for (unsigned int j=1; j<=n_derivatives; j+=2)
       values[j] *= derivative_change_sign;
   }
 
@@ -121,14 +131,14 @@ namespace Polynomials
     std::vector<PiecewisePolynomial<double> > p;
     p.reserve (n_subdivisions * base_degree + 1);
 
-    p.push_back (PiecewisePolynomial<double> (p_base[0], n_subdivisions, 0,
-                                              false));
+    p.emplace_back(p_base[0], n_subdivisions, 0,
+                   false);
     for (unsigned int s=0; s<n_subdivisions; ++s)
       for (unsigned int i=0; i<base_degree; ++i)
-        p.push_back (PiecewisePolynomial<double> (p_base[i+1], n_subdivisions,
-                                                  s,
-                                                  i==(base_degree-1) &&
-                                                  s<n_subdivisions-1));
+        p.emplace_back(p_base[i+1], n_subdivisions,
+                       s,
+                       i==(base_degree-1) &&
+                       s<n_subdivisions-1);
     return p;
   }
 

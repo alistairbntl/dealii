@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2014 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,10 +20,6 @@
 # include <unistd.h>
 #endif
 
-#ifdef DEAM_II_MSVC
-#  include <WinSock2.h>
-#endif
-
 DEAL_II_NAMESPACE_OPEN
 
 
@@ -32,7 +28,7 @@ JobIdentifier dealjobid;
 
 JobIdentifier::JobIdentifier()
 {
-  time_t t = std::time(0);
+  time_t t = std::time(nullptr);
   id = std::string("JobId ");
 
 #if defined(DEAL_II_HAVE_UNISTD_H) && defined(DEAL_II_HAVE_GETHOSTNAME)
@@ -58,9 +54,9 @@ std::string
 JobIdentifier::base_name(const char *filename)
 {
   std::string name(filename);
-  std::string::size_type pos = name.find(".");
+  std::string::size_type pos = name.find('.');
   name.erase(pos, name.size());
-  pos = name.rfind("/");
+  pos = name.rfind('/');
   if (pos < name.size())
     name.erase(0,pos);
   return name;

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2016 by the deal.II authors
+// Copyright (C) 2001 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,15 +13,17 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__grid_tools_H
-#define dealii__grid_tools_H
+#ifndef dealii_grid_tools_h
+#define dealii_grid_tools_h
 
 
 #include <deal.II/base/config.h>
+#include <deal.II/base/bounding_box.h>
 #include <deal.II/base/geometry_info.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/mapping.h>
 #include <deal.II/fe/mapping_q1.h>
+#include <deal.II/grid/manifold.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -50,14 +52,14 @@ class SparsityPattern;
 
 namespace internal
 {
-  template<int dim, int spacedim, class MeshType>
+  template <int dim, int spacedim, class MeshType>
   class ActiveCellIterator
   {
   public:
     typedef typename MeshType::active_cell_iterator type;
   };
 
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   class ActiveCellIterator<dim, spacedim, dealii::DoFHandler<dim, spacedim> >
   {
   public:
@@ -68,7 +70,7 @@ namespace internal
 #endif
   };
 
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   class ActiveCellIterator<dim, spacedim, dealii::hp::DoFHandler<dim, spacedim> >
   {
   public:
@@ -161,6 +163,54 @@ namespace GridTools
   template <int dim>
   double cell_measure (const std::vector<Point<dim> > &all_vertices,
                        const unsigned int (&vertex_indices)[GeometryInfo<dim>::vertices_per_cell]);
+
+  /**
+   * A version of the last function that can accept input for nonzero
+   * codimension cases. This function only exists to aid generic programming
+   * and calling it will just raise an exception.
+   */
+  template <int dim, typename T>
+  double cell_measure (const T &, ...);
+
+  /**
+   * Compute the smallest box containing the entire triangulation.
+   *
+   * If the input triangulation is a `parallel::distributed::Triangulation`,
+   * then each processor will compute a bounding box enclosing all locally
+   * owned, ghost, and artificial cells. In the case of a domain without curved
+   * boundaries, these bounding boxes will all agree between processors because
+   * the union of the areas occupied by artificial and ghost cells equals the
+   * union of the areas occupied by the cells that other processors own.
+   * However, if the domain has curved boundaries, this is no longer the case.
+   * The bounding box returned may be appropriate for the current processor,
+   * but different from the bounding boxes computed on other processors.
+   */
+  template <int dim, int spacedim>
+  BoundingBox<spacedim> compute_bounding_box(const Triangulation<dim, spacedim> &triangulation);
+
+  /**
+   * Return the point on the geometrical object @object closest to the given
+   * point @p trial_point. For example, if @p object is a one-dimensional line
+   * or edge, then the the returned point will be a point on the geodesic that
+   * connects the vertices as the manifold associated with the object sees it
+   * (i.e., the geometric line may be curved if it lives in a higher
+   * dimensional space). If the iterator points to a quadrilateral in a higher
+   * dimensional space, then the returned point lies within the convex hull of
+   * the vertices of the quad as seen by the associated manifold.
+   *
+   * @note This projection is usually not well-posed since there may be
+   * multiple points on the object that minimize the distance. The algorithm
+   * used in this function is robust (and the output is guaranteed to be on
+   * the given @p object) but may only provide a few correct digits if the
+   * object has high curvature. If your manifold supports it then the
+   * specialized function Manifold::project_to_manifold() may perform better.
+   *
+   * @author Luca Heltai, David Wells, 2017.
+   */
+  template <typename Iterator>
+  Point<Iterator::AccessorType::space_dimension>
+  project_to_object(const Iterator &object,
+                    const Point<Iterator::AccessorType::space_dimension> &trial_point);
 
   /*@}*/
   /**
@@ -276,7 +326,7 @@ namespace GridTools
    *
    * @note Implemented for dim=1, 2, and 3.
    */
-  template<int dim>
+  template <int dim>
   void
   rotate (const double          angle,
           const unsigned int    axis,
@@ -287,12 +337,27 @@ namespace GridTools
    * typically, each of the vertices at the boundary of the triangulation is
    * mapped to the corresponding points in the @p new_points map.
    *
-   * The way this function works is that it solves a Laplace equation for each
+   * The unknown displacement field $u_d(\mathbf x)$ in direction $d$ is obtained from
+   * the minimization problem
+   * \f[
+   *   \min\, \int
+   *   \frac{1}{2}
+   *   c(\mathbf x)
+   *   \mathbf \nabla u_d(\mathbf x) \cdot
+   *   \mathbf \nabla u_d(\mathbf x)
+   *   \,\rm d x
+   * \f]
+   * subject to prescribed constraints. The minimizer is obtained by solving the Laplace equation
    * of the dim components of a displacement field that maps the current
-   * domain into one described by @p new_points . The @p new_points array
-   * therefore represents the boundary values of this displacement field. The
-   * function then evaluates this displacement field at each vertex in the
-   * interior and uses it to place the mapped vertex where the displacement
+   * domain into one described by @p new_points . Linear finite elements with
+   * four Gaussian quadrature points in each direction are used. The difference
+   * between the vertex positions specified in @p new_points and their current
+   * value in @p tria therefore represents the prescribed values of this
+   * displacement field at the boundary of the domain, or more precisely at all
+   * of those locations for which @p new_points provides values (which may be
+   * at part of the boundary, or even in the interior of the domain). The
+   * function then evaluates this displacement field at each unconstrained
+   * vertex and uses it to place the mapped vertex where the displacement
    * field locates it. Because the solution of the Laplace equation is smooth,
    * this guarantees a smooth mapping from the old domain to the new one.
    *
@@ -315,15 +380,24 @@ namespace GridTools
    * Should this function be provided, sensible results can only be expected
    * if all coefficients are positive.
    *
+   * @param[in] solve_for_absolute_positions If set to <code>true</code>, the
+   * minimization problem is formulated with respect to the final vertex positions
+   * as opposed to their displacement. The two formulations are equivalent for
+   * the homogeneous problem (default value of @p coefficient), but they
+   * result in very different mesh motion otherwise. Since in most cases one will
+   * be using a non-constant coefficient in displacement formulation, the default
+   * value of this parameter is <code>false</code>.
+   *
    * @note This function is not currently implemented for the 1d case.
    */
   template <int dim>
   void laplace_transform (const std::map<unsigned int,Point<dim> > &new_points,
                           Triangulation<dim> &tria,
-                          const Function<dim,double> *coefficient = 0);
+                          const Function<dim,double> *coefficient = nullptr,
+                          const bool solve_for_absolute_positions = false);
 
   /**
-   * Returns a std::map with all vertices of faces located in the boundary
+   * Return a std::map with all vertices of faces located in the boundary
    *
    * @param[in] tria The Triangulation object.
    */
@@ -382,8 +456,8 @@ namespace GridTools
    * (default value) refine the cell in the direction that removes hanging node.
    *
    * @param[in] max_iterations At each step only closest cells to hanging nodes
-   * are refined. The code may require a lot of iterations to to remove all
-   * hangind nodes. @p max_iterations is the maximum number of iteration
+   * are refined. The code may require a lot of iterations to remove all
+   * hanging nodes. @p max_iterations is the maximum number of iteration
    * allowed. If @p max_iterations == numbers::invalid_unsigned_int this
    * function continues refining until there are no hanging nodes.
    *
@@ -392,7 +466,7 @@ namespace GridTools
    *
    * @author Mauro Bardelloni, Luca Heltai, Andrea Mola, 2016
    */
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   void
   remove_hanging_nodes( Triangulation<dim,spacedim> &tria,
                         const bool isotropic = false,
@@ -423,11 +497,104 @@ namespace GridTools
    *
    * @author Mauro Bardelloni, Luca Heltai, Andrea Mola, 2016
    */
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   void
   remove_anisotropy(  Triangulation<dim,spacedim> &tria,
                       const double max_ratio = 1.6180339887,
                       const unsigned int max_iterations = 5);
+
+  /**
+   * Analyze the boundary cells of a mesh, and if one cell is found at
+   * a corner position (with dim adjacent faces on the boundary), and its
+   * dim-dimensional angle fraction exceeds @p limit_angle_fraction,
+   * refine globally once, and replace the children of such cell
+   * with children where the corner is no longer offending the given angle
+   * fraction.
+   *
+   * If no boundary cells exist with two adjacent faces on the boundary, then
+   * the triangulation is left untouched. If instead we do have cells with dim
+   * adjacent faces on the boundary, then the fraction between the dim-dimensional
+   * solid angle and dim*pi/2 is checked against the parameter @p limit_angle_fraction.
+   * If it is higher, the grid is refined once, and the children of the
+   * offending cell are replaced with some cells that instead respect the limit. After
+   * this process the triangulation is flattened, and all Manifold objects are restored
+   * as they were in the original triangulation.
+   *
+   * An example is given by the following mesh, obtained by attaching a SphericalManifold
+   * to a mesh generated using GridGenerator::hyper_cube:
+   *
+   * @code
+   * const SphericalManifold<dim> m0;
+   * Triangulation<dim> tria;
+   * GridGenerator::hyper_cube(tria,-1,1);
+   * tria.set_all_manifold_ids_on_boundary(0);
+   * tria.set_manifold(0, m0);
+   * tria.refine_global(4);
+   * @endcode
+   *
+   * <p ALIGN="center">
+   * @image html regularize_mesh_01.png
+   * </p>
+   *
+   * The four cells that were originally the corners of a square will give you some troubles
+   * during computations, as the jacobian of the transformation from the reference cell to
+   * those cells will go to zero, affecting the error constants of the finite element estimates.
+   *
+   * Those cells have a corner with an angle that is very close to 180 degrees, i.e., an angle
+   * fraction very close to one.
+   *
+   * The same code, adding a call to regularize_corner_cells:
+   * @code
+   * const SphericalManifold<dim> m0;
+   * Triangulation<dim> tria;
+   * GridGenerator::hyper_cube(tria,-1,1);
+   * tria.set_all_manifold_ids_on_boundary(0);
+   * tria.set_manifold(0, m0);
+   * GridTools::regularize_corner_cells(tria);
+   * tria.refine_global(2);
+   * @endcode
+   * generates a mesh that has a much better behaviour w.r.t. the jacobian of the Mapping:
+   *
+   * <p ALIGN="center">
+   * @image html regularize_mesh_02.png
+   * </p>
+   *
+   * This mesh is very similar to the one obtained by GridGenerator::hyper_ball. However, using
+   * GridTools::regularize_corner_cells one has the freedom to choose when to apply the
+   * regularization, i.e., one could in principle first refine a few times, and then call the
+   * regularize_corner_cells function:
+   *
+   * @code
+   * const SphericalManifold<dim> m0;
+   * Triangulation<dim> tria;
+   * GridGenerator::hyper_cube(tria,-1,1);
+   * tria.set_all_manifold_ids_on_boundary(0);
+   * tria.set_manifold(0, m0);
+   * tria.refine_global(2);
+   * GridTools::regularize_corner_cells(tria);
+   * tria.refine_global(1);
+   * @endcode
+   *
+   * This generates the following mesh:
+   *
+   * <p ALIGN="center">
+   * @image html regularize_mesh_03.png
+   * </p>
+   *
+   * The function is currently implemented only for dim = 2 and
+   * will throw an exception if called with dim = 3.
+   *
+   * @param[in,out] tria Triangulation to regularize.
+   *
+   * @param[in] limit_angle_fraction Maximum ratio of angle or solid
+   * angle that is allowed for a corner element in the mesh.
+   *
+   * @author Luca Heltai, Martin Kronbichler, 2017
+   */
+  template <int dim, int spacedim>
+  void
+  regularize_corner_cells(Triangulation<dim,spacedim> &tria,
+                          const double limit_angle_fraction=.75);
 
   /*@}*/
   /**
@@ -436,20 +603,118 @@ namespace GridTools
   /*@{*/
 
   /**
-   * Find and return the number of the used vertex in a given mesh that is
-   * located closest to a given point.
+   * Return a map of index:Point<spacedim>, containing the used vertices of the
+   * given `container`. The key of the returned map is the global index in the
+   * triangulation. The used vertices are obtained by looping over all cells,
+   * and querying for each cell where its vertices are through the (optional)
+   * `mapping` argument.
+   *
+   * The size of the returned map equals Triangulation::n_used_vertices(),
+   * (not Triangulation::n_vertices()). If you use the default `mapping`, the
+   * returned map satisfies the following equality:
+   *
+   * @code
+   * used_vertices = extract_used_vertices(tria);
+   * all_vertices = tria.get_vertices();
+   *
+   * for(auto &id_and_v : used_vertices)
+   *    all_vertices[id_and_v.first] == id_and_v.second; // true
+   * @endcode
+   *
+   * Notice that the above is not satisfied for mappings that change the
+   * location of vertices, like MappingQEulerian.
+   *
+   * @ref ConceptMeshType "MeshType concept".
+   * @param container The container to extract vertices from.
+   * @param mapping The mapping to use to compute the points locations.
+   *
+   * @author Luca Heltai, 2017.
+   */
+  template <int dim, int spacedim>
+  std::map<unsigned int,Point<spacedim>> extract_used_vertices (
+                                        const Triangulation<dim,spacedim> &container,
+                                        const Mapping<dim,spacedim> &mapping = StaticMappingQ1<dim,spacedim>::mapping);
+
+  /**
+   * Find and return the index of the closest vertex to a given point in the
+   * map of vertices passed as the first argument.
+   *
+   * @param vertices A map of index->vertex, as returned by
+   *        GridTools::extract_used_vertices().
+   * @param p The target point.
+   * @return The index of the vertex that is closest to the target point `p`.
+   *
+   * @author Luca Heltai, 2017.
+   */
+  template<int spacedim>
+  unsigned int
+  find_closest_vertex (const std::map<unsigned int,Point<spacedim>> &vertices,
+                       const Point<spacedim>         &p);
+
+  /**
+   * Find and return the index of the used vertex (or marked vertex) in a
+   * given mesh that is located closest to a given point.
+   *
+   * This function uses the locations of vertices as stored in the
+   * triangulation. This is usually sufficient, unless you are using a Mapping
+   * that moves the vertices around (for example, MappingQEulerian). In this
+   * case, you should call the function with the same name and with an
+   * additional Mapping argument.
    *
    * @param mesh A variable of a type that satisfies the requirements of the
    * @ref ConceptMeshType "MeshType concept".
    * @param p The point for which we want to find the closest vertex.
+   * @param marked_vertices An array of bools indicating which
+   * vertices of @p mesh will be considered within the search
+   * as the potentially closest vertex. On receiving a non-empty
+   * @p marked_vertices, the function will
+   * only search among @p marked_vertices for the closest vertex.
+   * The size of this array should be equal to the value returned by
+   * Triangulation::n_vertices() for the triangulation underlying the given mesh
+   * (as opposed to the value returned by Triangulation::n_used_vertices()).
    * @return The index of the closest vertex found.
+   *
    *
    * @author Ralf B. Schulz, 2006
    */
   template <int dim, template <int, int> class MeshType, int spacedim>
   unsigned int
   find_closest_vertex (const MeshType<dim, spacedim> &mesh,
-                       const Point<spacedim>         &p);
+                       const Point<spacedim>         &p,
+                       const std::vector<bool>       &marked_vertices = std::vector<bool>());
+
+  /**
+   * Find and return the index of the used vertex (or marked vertex) in a
+   * given mesh that is located closest to a given point. Use the given
+   * mapping to compute the actual location of the vertices.
+   *
+   * If the Mapping does not modify the position of the mesh vertices (like,
+   * for example, MappingQEulerian does), then this function is equivalent to
+   * the one with the same name, and without the `mapping` argument.
+   *
+   * @param mapping A mapping used to compute the vertex locations
+   * @param mesh A variable of a type that satisfies the requirements of the
+   * @ref ConceptMeshType "MeshType concept".
+   * @param p The point for which we want to find the closest vertex.
+   * @param marked_vertices An array of bools indicating which
+   * vertices of @p mesh will be considered within the search
+   * as the potentially closest vertex. On receiving a non-empty
+   * @p marked_vertices, the function will
+   * only search among @p marked_vertices for the closest vertex.
+   * The size of this array should be equal to the value returned by
+   * Triangulation::n_vertices() for the triangulation underlying the given mesh
+   * (as opposed to the value returned by Triangulation::n_used_vertices()).
+   * @return The index of the closest vertex found.
+   *
+   * @author Luca Heltai, 2017
+   */
+  template <int dim, template <int, int> class MeshType, int spacedim>
+  unsigned int
+  find_closest_vertex (const Mapping<dim,spacedim>   &mapping,
+                       const MeshType<dim, spacedim> &mesh,
+                       const Point<spacedim>         &p,
+                       const std::vector<bool>       &marked_vertices = std::vector<bool>());
+
 
   /**
    * Find and return a vector of iterators to active cells that surround a
@@ -475,7 +740,7 @@ namespace GridTools
    * right thing with anisotropically refined meshes. It needs to be checked
    * for this case.
    */
-  template<int dim, template <int, int> class MeshType, int spacedim>
+  template <int dim, template <int, int> class MeshType, int spacedim>
 #ifndef _MSC_VER
   std::vector<typename MeshType<dim, spacedim>::active_cell_iterator>
 #else
@@ -500,6 +765,14 @@ namespace GridTools
    * @param mesh A variable of a type that satisfies the requirements of the
    * @ref ConceptMeshType "MeshType concept".
    * @param p The point for which we want to find the surrounding cell.
+   * @param marked_vertices An array of bools indicating whether an
+   * entry in the vertex array should be considered
+   * (and the others must be ignored) as the potentially
+   * closest vertex to the specified point. On specifying a non-default
+   * @p marked_vertices, find_closest_vertex() would
+   * only search among @p marked_vertices for the closest vertex.
+   * The size of this array should be equal to n_vertices() of the
+   * triangulation (as opposed to n_used_vertices() ).
    * @return An iterator into the mesh that points to the surrounding cell.
    *
    * @note If the point requested does not lie in any of the cells of the mesh
@@ -524,7 +797,8 @@ namespace GridTools
   typename dealii::internal::ActiveCellIterator<dim, spacedim, MeshType<dim, spacedim> >::type
 #endif
   find_active_cell_around_point (const MeshType<dim,spacedim> &mesh,
-                                 const Point<spacedim>        &p);
+                                 const Point<spacedim>        &p,
+                                 const std::vector<bool>      &marked_vertices = std::vector<bool>());
 
   /**
    * Find and return an iterator to the active cell that surrounds a given
@@ -548,6 +822,14 @@ namespace GridTools
    * @param mesh A variable of a type that satisfies the requirements of the
    * @ref ConceptMeshType "MeshType concept".
    * @param p The point for which we want to find the surrounding cell.
+   * @param marked_vertices An array of bools indicating whether an
+   * entry in the vertex array should be considered
+   * (and the others must be ignored) as the potentially
+   * closest vertex to the specified point. On specifying a non-default
+   * @p marked_vertices, find_closest_vertex() would
+   * only search among @p marked_vertices for the closest vertex.
+   * The size of this array should be equal to n_vertices() of the
+   * triangulation (as opposed to n_used_vertices() ).
    * @return An pair of an iterators into the mesh that points to the
    * surrounding cell, and of the coordinates of that point inside the cell in
    * the reference coordinates of that cell. This local position might be
@@ -555,6 +837,19 @@ namespace GridTools
    * Therefore, the point returned by this function should be projected onto
    * the unit cell, using GeometryInfo::project_to_unit_cell().  This is not
    * automatically performed by the algorithm.
+   *
+   * @note When @p marked_vertices is specified the function should always be
+   * called inside a try block to catch the exception that the function might
+   * throw in the case it couldn't find an active cell surrounding the point.
+   * The motivation of using @p marked_vertices is to cut down the search space
+   * of vertices if one has a priori knowledge of a collection of vertices that
+   * the point of interest may be close to. For instance, in the case when a
+   * parallel::shared::Triangulation is employed and we are looking for a point
+   * that we know is inside the locally owned part of the mesh, then it would
+   * make sense to pass an array for @p marked_vertices that flags only the
+   * vertices of all locally owned active cells. If, however, the function
+   * throws an exception, then that would imply that the point lies outside
+   * locally owned active cells.
    *
    * @note If the point requested does not lie in any of the cells of the mesh
    * given, then this function throws an exception of type
@@ -571,7 +866,7 @@ namespace GridTools
    * evaluating the solution) may not be possible and you will have to decide
    * what to do in that case.
    */
-  template <int dim, template<int, int> class MeshType, int spacedim>
+  template <int dim, template <int, int> class MeshType, int spacedim>
 #ifndef _MSC_VER
   std::pair<typename MeshType<dim, spacedim>::active_cell_iterator, Point<dim> >
 #else
@@ -579,7 +874,30 @@ namespace GridTools
 #endif
   find_active_cell_around_point (const Mapping<dim,spacedim>  &mapping,
                                  const MeshType<dim,spacedim> &mesh,
-                                 const Point<spacedim>        &p);
+                                 const Point<spacedim>        &p,
+                                 const std::vector<bool>      &marked_vertices = std::vector<bool>());
+
+  /**
+   * A version of the previous function that exploits an already existing
+   * map between vertices and cells, constructed using the function
+   * GridTools::vertex_to_cell_map, a map of vertex_to_cell_centers, obtained
+   * through GridTools::vertex_to_cells_center_directions, and a guess `cell_hint`.
+   *
+   * @author Luca Heltai, Rene Gassmoeller, 2017
+   */
+  template <int dim, template <int, int> class MeshType, int spacedim>
+#ifndef _MSC_VER
+  std::pair<typename MeshType<dim, spacedim>::active_cell_iterator, Point<dim> >
+#else
+  std::pair<typename dealii::internal::ActiveCellIterator<dim, spacedim, MeshType<dim, spacedim> >::type, Point<dim> >
+#endif
+  find_active_cell_around_point (const Mapping<dim,spacedim>                                                          &mapping,
+                                 const MeshType<dim,spacedim>                                                         &mesh,
+                                 const Point<spacedim>                                                                &p,
+                                 const std::vector<std::set<typename MeshType<dim,spacedim>::active_cell_iterator > > &vertex_to_cell_map,
+                                 const std::vector<std::vector<Tensor<1,spacedim> > >                                 &vertex_to_cell_centers,
+                                 const typename MeshType<dim, spacedim>::active_cell_iterator                         &cell_hint=typename MeshType<dim, spacedim>::active_cell_iterator(),
+                                 const std::vector<bool>                                                              &marked_vertices = std::vector<bool>());
 
   /**
    * A version of the previous function where we use that mapping on a given
@@ -658,7 +976,7 @@ namespace GridTools
    * An example of a custom predicate is one that checks for a given material
    * id
    * @code
-   * template<int dim>
+   * template <int dim>
    * bool
    * pred_mat_id(const typename Triangulation<dim>::active_cell_iterator & cell)
    * {
@@ -672,13 +990,13 @@ namespace GridTools
    * @endcode
    *
    * Predicates that are frequently useful can be found in namespace
-   * IteratorFilters. For example, it is possible to extracting a layer based
-   * on material id
+   * IteratorFilters. For example, it is possible to extract a layer
+   * of cells around all of those cells with a given material id,
    * @code
    * GridTools::compute_active_cell_halo_layer(tria,
    *                                           IteratorFilters::MaterialIdEqualTo(1, true));
    * @endcode
-   * or based on a set of active FE indices for an hp::DoFHandler
+   * or around all cells with one of a set of active FE indices for an hp::DoFHandler
    * @code
    * GridTools::compute_active_cell_halo_layer(hp_dof_handler,
    *                                           IteratorFilters::ActiveFEIndexEqualTo({1,2}, true));
@@ -703,7 +1021,23 @@ namespace GridTools
   std::vector<typename MeshType::active_cell_iterator>
   compute_active_cell_halo_layer
   (const MeshType                                                                    &mesh,
-   const std_cxx11::function<bool (const typename MeshType::active_cell_iterator &)> &predicate);
+   const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate);
+
+
+  /**
+   * Extract and return the cell layer around a subdomain (set of
+   * cells) on a specified level of the @p mesh (i.e. those cells on
+   * that level that share a common set of vertices with the subdomain
+   * but are not a part of it). Here, the "subdomain" consists of exactly
+   * all of those cells for which the @p predicate returns @p true.
+   */
+  template <class MeshType>
+  std::vector<typename MeshType::cell_iterator>
+  compute_cell_halo_layer_on_level
+  (const MeshType                                                       &mesh,
+   const std::function<bool (const typename MeshType::cell_iterator &)> &predicate,
+   const unsigned int                                                    level);
+
 
   /**
    * Extract and return ghost cells which are the active cell layer around all
@@ -724,6 +1058,116 @@ namespace GridTools
   std::vector<typename MeshType::active_cell_iterator>
   compute_ghost_cell_halo_layer (const MeshType &mesh);
 
+  /**
+   * Extract and return the set of active cells within a geometric distance of
+   * @p layer_thickness around a subdomain (set of active cells) in the @p mesh.
+   * Here, the "subdomain" consists of exactly all of
+   * those cells for which the @p predicate returns @p true.
+   *
+   * The function first computes the cells that form the 'surface' of the
+   * subdomain that consists of all of the active cells for which the predicate
+   * is true. Using compute_bounding_box(), a bounding box is
+   * computed for this subdomain and extended by @p layer_thickness. These
+   * cells are called interior subdomain boundary cells.
+   * The active cells with all of their vertices outside the extended
+   * bounding box are ignored.
+   * The cells that are inside the extended bounding box are then checked for
+   * their proximity to the interior subdomain boundary cells. This implies
+   * checking the distance between a pair of arbitrarily oriented cells,
+   * which is not trivial in general. To simplify this, the algorithm checks
+   * the distance between the two enclosing spheres of the cells.
+   * This will definitely result in slightly more cells being marked but
+   * also greatly simplifies the arithmetic complexity of the algorithm.
+   *
+   * @image html active_cell_layer_within_distance.png
+   * The image shows a mesh generated by subdivided_hyper_rectangle(). The cells
+   * are marked using three different colors. If the grey colored cells in the
+   * image are the cells for which the predicate is true, then the function
+   * compute_active_cell_layer_within_distance() will return a set of cell
+   * iterators corresponding to the cells colored in red.
+   * The red colored cells are the active cells that are within a given
+   * distance to the grey colored cells.
+   *
+   * @tparam MeshType A type that satisfies the requirements of the
+   * @ref ConceptMeshType "MeshType concept".
+   * @param mesh A mesh (i.e. objects of type Triangulation, DoFHandler,
+   * or hp::DoFHandler).
+   * @param predicate A function  (or object of a type with an operator())
+   * defining the subdomain around which the halo layer is to be extracted. It
+   * is a function that takes in an active cell and returns a boolean.
+   * @param layer_thickness specifies the geometric distance within
+   * which the function searches for active cells from the predicate domain.
+   * If the minimal distance between the enclosing sphere of the an
+   * active cell and the enclosing sphere of any of the cells for which
+   * the @p predicate returns @p true is less than @p layer_thickness,
+   * then the active cell is an \a active_cell_wthin_distance.
+   * @return A list of active cells within a given geometric distance
+   * @p layer_thickness from the set of active cells for which the @p predicate
+   * returns @p true.
+   *
+   * See compute_active_cell_halo_layer().
+   *
+   * @author Vishal Boddu, Denis Davydov, 2017
+   */
+  template <class MeshType>
+  std::vector<typename MeshType::active_cell_iterator>
+  compute_active_cell_layer_within_distance
+  (const MeshType                                                                    &mesh,
+   const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate,
+   const double                                                                       layer_thickness);
+
+  /**
+   * Extract and return a set of ghost cells which are within a
+   * @p layer_thickness around all locally owned cells.
+   * This is most relevant for parallel::shared::Triangulation
+   * where it will return a subset of all ghost cells on a process, but for
+   * parallel::distributed::Triangulation this will return all the ghost cells.
+   * All the cells for the parallel::shared::Triangulation class that
+   * are not owned by the current processor can be considered as ghost cells;
+   * in particular, they do not only form a single layer of cells around the
+   * locally owned ones.
+   *
+   * @tparam MeshType A type that satisfies the requirements of the
+   * @ref ConceptMeshType "MeshType concept".
+   * @param mesh A mesh (i.e. objects of type Triangulation, DoFHandler,
+   * or hp::DoFHandler).
+   * @param layer_thickness specifies the geometric distance within
+   * which the function searches for active cells from the locally owned cells.
+   * @return A subset of ghost cells within a given geometric distance of @p
+   * layer_thickness from the locally owned cells of a current process.
+   *
+   * Also see compute_ghost_cell_halo_layer() and
+   * compute_active_cell_layer_within_distance().
+   *
+   * @author Vishal Boddu, Denis Davydov, 2017
+   */
+  template <class MeshType>
+  std::vector<typename MeshType::active_cell_iterator>
+  compute_ghost_cell_layer_within_distance ( const MeshType &mesh,
+                                             const double layer_thickness);
+
+
+  /**
+   * Compute and return a bounding box, defined through a pair of points
+   * bottom left and top right, that surrounds a subdomain of the @p mesh.
+   * Here, the "subdomain" consists of exactly all of those
+   * active cells for which the @p predicate returns @p true.
+   *
+   * For a description of how @p predicate works,
+   * see compute_active_cell_halo_layer().
+   *
+   * @note This function was written before the BoundingBox class was invented.
+   *   Consequently, it returns a pair of points, rather than a BoundingBox object
+   *   as one may expect. However, BoundingBox has a conversion constructor from
+   *   pairs of points, so the result of this function can still be assigned to
+   *   a BoundingBox object.
+   */
+  template <class MeshType>
+  std::pair< Point<MeshType::space_dimension>, Point<MeshType::space_dimension> >
+  compute_bounding_box
+  ( const MeshType                                                                    &mesh,
+    const std::function<bool (const typename MeshType::active_cell_iterator &)> &predicate );
+
 
   /**
    * Return the adjacent cells of all the vertices. If a vertex is also a
@@ -736,6 +1180,37 @@ namespace GridTools
   template <int dim, int spacedim>
   std::vector<std::set<typename Triangulation<dim,spacedim>::active_cell_iterator> >
   vertex_to_cell_map(const Triangulation<dim,spacedim> &triangulation);
+
+  /**
+   * Returns a vector of normalized tensors for each vertex-cell combination of
+   * the output of GridTools::vertex_to_cell_map() (which is expected as input
+   * parameter for this function). Each tensor represents a geometric vector
+   * from the vertex to the respective cell center.
+   *
+   * An assertion will be thrown if the size of the input vector is not equal to
+   * the number of vertices of the triangulation.
+   *
+   * result[v][c] is a unit Tensor for vertex index v, indicating the direction of
+   * the center of the c-th cell with respect to the vertex v.
+   *
+   * @author Rene Gassmoeller, Luca Heltai, 2017.
+   */
+  template <int dim, int spacedim>
+  std::vector<std::vector<Tensor<1,spacedim> > >
+  vertex_to_cell_centers_directions(const Triangulation<dim,spacedim> &mesh,
+                                    const std::vector<std::set<typename Triangulation<dim,spacedim>::active_cell_iterator> > &vertex_to_cells);
+
+
+  /**
+   * Returns the local vertex index of cell @p cell that is closest to
+   * the given location @p position.
+   *
+   * @author Rene Gassmoeller, Luca Heltai, 2017.
+   */
+  template <int dim, int spacedim>
+  unsigned int
+  find_closest_vertex_of_cell(const typename Triangulation<dim,spacedim>::active_cell_iterator &cell,
+                              const Point<spacedim> &position);
 
   /**
    * Compute a globally unique index for each vertex and hanging node
@@ -766,7 +1241,7 @@ namespace GridTools
    *
    * @author Mauro Bardelloni, Luca Heltai, Andrea Mola, 2016
    */
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   std::pair<unsigned int, double>
   get_longest_direction(typename Triangulation<dim, spacedim>::active_cell_iterator cell);
 
@@ -790,16 +1265,6 @@ namespace GridTools
                                   DynamicSparsityPattern             &connectivity);
 
   /**
-   * As above, but filling a SparsityPattern object instead.
-   *
-   * @deprecated
-   */
-  template <int dim, int spacedim>
-  void
-  get_face_connectivity_of_cells (const Triangulation<dim, spacedim> &triangulation,
-                                  SparsityPattern                    &connectivity) DEAL_II_DEPRECATED;
-
-  /**
    * Produce a sparsity pattern in which nonzero entries indicate that two
    * cells are connected via a common vertex. The diagonal entries of the
    * sparsity pattern are also set.
@@ -811,6 +1276,20 @@ namespace GridTools
   void
   get_vertex_connectivity_of_cells (const Triangulation<dim, spacedim> &triangulation,
                                     DynamicSparsityPattern             &connectivity);
+
+  /**
+   * Produce a sparsity pattern for a given level mesh in which nonzero entries
+   * indicate that two cells are connected via a common vertex. The diagonal
+   * entries of the sparsity pattern are also set.
+   *
+   * The rows and columns refer to the cells as they are traversed in their
+   * natural order using cell iterators.
+   */
+  template <int dim, int spacedim>
+  void
+  get_vertex_connectivity_of_cells_on_level (const Triangulation<dim, spacedim> &triangulation,
+                                             const unsigned int                 level,
+                                             DynamicSparsityPattern             &connectivity);
 
   /**
    * Use the METIS partitioner to generate a partitioning of the active cells
@@ -876,6 +1355,31 @@ namespace GridTools
   partition_triangulation (const unsigned int     n_partitions,
                            const SparsityPattern &cell_connection_graph,
                            Triangulation<dim,spacedim>    &triangulation);
+
+  /**
+   * Generates a partitioning of the active cells making up the entire domain
+   * using the same partitioning scheme as in the p4est library. After calling
+   * this function, the subdomain ids of all active cells will have values
+   * between zero and @p n_partitions-1. You can access the subdomain id of a
+   * cell by using <tt>cell-@>subdomain_id()</tt>.
+   */
+  template <int dim, int spacedim>
+  void
+  partition_triangulation_zorder (const unsigned int          n_partitions,
+                                  Triangulation<dim,spacedim> &triangulation);
+
+  /**
+   * Partitions the cells of a multigrid hierarchy by assigning level subdomain ids
+   * using the "youngest child" rule, that is, each cell in the hierarchy is owned by
+   * the processor who owns its left most child in the forest, and active cells
+   * have the same subdomain id and level subdomain id. You can access the level subdomain
+   * id of a cell by using <tt>cell-@>level_subdomain_id()</tt>.
+   *
+   * Note: This function assumes that the active cells have already been partitioned.
+   */
+  template <int dim, int spacedim>
+  void
+  partition_multigrid_levels (Triangulation<dim,spacedim> &triangulation);
 
   /**
    * For each active cell, return in the output array to which subdomain (as
@@ -1239,30 +1743,7 @@ namespace GridTools
 
 
   /*@}*/
-  /**
-   * @name Lower-dimensional meshes for parts of higher-dimensional meshes
-   */
-  /*@{*/
 
-
-#ifdef _MSC_VER
-  // Microsoft's VC++ has a bug where it doesn't want to recognize that
-  // an implementation (definition) of the extract_boundary_mesh function
-  // matches a declaration. This can apparently only be avoided by
-  // doing some contortion with the return type using the following
-  // intermediate type. This is only used when using MS VC++ and uses
-  // the direct way of doing it otherwise
-  template <template <int,int> class MeshType, int dim, int spacedim>
-  struct ExtractBoundaryMesh
-  {
-    typedef
-    std::map<typename MeshType<dim-1,spacedim>::cell_iterator,
-        typename MeshType<dim,spacedim>::face_iterator>
-        return_type;
-  };
-#endif
-
-  /*@}*/
   /**
    * @name Dealing with periodic domains
    */
@@ -1273,7 +1754,7 @@ namespace GridTools
    * constraints and a periodic p4est forest with respect to two 'periodic'
    * cell faces.
    */
-  template<typename CellIterator>
+  template <typename CellIterator>
   struct PeriodicFacePair
   {
     /**
@@ -1375,7 +1856,7 @@ namespace GridTools
    *
    * @author Matthias Maier, 2012
    */
-  template<typename FaceIterator>
+  template <typename FaceIterator>
   bool
   orthogonal_equality (std::bitset<3>     &orientation,
                        const FaceIterator &face1,
@@ -1389,7 +1870,7 @@ namespace GridTools
   /**
    * Same function as above, but doesn't return the actual orientation
    */
-  template<typename FaceIterator>
+  template <typename FaceIterator>
   bool
   orthogonal_equality (const FaceIterator &face1,
                        const FaceIterator &face2,
@@ -1449,6 +1930,12 @@ namespace GridTools
    * times with different boundary ids to generate a vector with all periodic
    * pairs.
    *
+   * @note Since the periodic face pairs are found on the coarsest mesh level,
+   * it is necessary to ensure that the coarsest level faces have the correct
+   * boundary indicators set. In general, this means that one must first set
+   * all boundary indicators on the coarse grid before performing any global
+   * or local grid refinement.
+   *
    * @author Daniel Arndt, Matthias Maier, 2013 - 2015
    */
   template <typename MeshType>
@@ -1464,7 +1951,7 @@ namespace GridTools
 
 
   /**
-   * This compatibility version of collect_periodic_face_pairs() only works on
+   * This compatibility version of collect_periodic_faces() only works on
    * grids with cells in
    * @ref GlossFaceOrientation "standard orientation".
    *
@@ -1479,7 +1966,7 @@ namespace GridTools
    *
    * See above function for further details.
    *
-   * @note This version of collect_periodic_face_pairs() will not work on
+   * @note This version of collect_periodic_faces() will not work on
    * meshes with cells not in
    * @ref GlossFaceOrientation "standard orientation".
    *
@@ -1594,7 +2081,7 @@ namespace GridTools
    */
   DeclException1 (ExcScalingFactorNotPositive,
                   double,
-                  << "The scaling factor must be positive, but is " << arg1);
+                  << "The scaling factor must be positive, but it is " << arg1 << ".");
   /**
    * Exception
    */
@@ -1619,8 +2106,8 @@ namespace GridTools
    */
   DeclException1 (ExcVertexNotUsed,
                   unsigned int,
-                  << "The given vertex " << arg1
-                  << " is not used in the given triangulation");
+                  << "The given vertex with index " << arg1
+                  << " is not used in the given triangulation.");
 
 
   /*@}*/
@@ -1635,6 +2122,12 @@ namespace GridTools
 
 namespace GridTools
 {
+  template <int dim, typename T>
+  double cell_measure (const T &, ...)
+  {
+    Assert(false, ExcNotImplemented());
+    return std::numeric_limits<double>::quiet_NaN();
+  }
 
   template <int dim, typename Predicate, int spacedim>
   void transform (const Predicate    &predicate,
@@ -1706,6 +2199,9 @@ namespace GridTools
                      + cell->face(face)->vertex(2) + cell->face(face)->vertex(3)) / 4.0;
               }
       }
+
+    // Make sure FEValues notices that the mesh has changed
+    triangulation.signals.mesh_movement();
   }
 
 
@@ -1783,17 +2279,511 @@ namespace GridTools
         }
   }
 
-// declaration of explicit specializations
 
-  template <>
-  double
-  cell_measure<3>(const std::vector<Point<3> > &all_vertices,
-                  const unsigned int (&vertex_indices) [GeometryInfo<3>::vertices_per_cell]);
 
-  template <>
-  double
-  cell_measure<2>(const std::vector<Point<2> > &all_vertices,
-                  const unsigned int (&vertex_indices) [GeometryInfo<2>::vertices_per_cell]);
+  namespace internal
+  {
+    namespace ProjectToObject
+    {
+      /**
+       * The method GridTools::project_to_object requires taking derivatives
+       * along the surface of a simplex. In general these cannot be
+       * approximated with finite differences but special differences of the
+       * form
+       *
+       *     df/dx_i - df/dx_j
+       *
+       * <em>can</em> be approximated. This <code>struct</code> just stores
+       * the two derivatives approximated by the stencil (in the case of the
+       * example above <code>i</code> and <code>j</code>).
+       */
+      struct CrossDerivative
+      {
+        const unsigned int direction_0;
+        const unsigned int direction_1;
+
+        CrossDerivative(const unsigned int d0, const unsigned int d1);
+      };
+
+      inline
+      CrossDerivative::CrossDerivative(const unsigned int d0, const unsigned int d1)
+        :
+        direction_0 (d0),
+        direction_1 (d1)
+      {}
+
+
+
+      /**
+       * Standard second-order approximation to the first derivative with a
+       * two-point centered scheme. This is used below in a 1D Newton method.
+       */
+      template <typename F>
+      inline
+      auto
+      centered_first_difference(const double  center,
+                                const double  step,
+                                const F      &f)
+      -> decltype(f(center) - f(center))
+      {
+        return (f(center + step) - f(center - step))/(2.0*step);
+      }
+
+
+
+      /**
+       * Standard second-order approximation to the second derivative with a
+       * three-point centered scheme. This is used below in a 1D Newton method.
+       */
+      template <typename F>
+      inline
+      auto
+      centered_second_difference(const double  center,
+                                 const double  step,
+                                 const F      &f)
+      -> decltype(f(center) - f(center))
+      {
+        return (f(center + step) - 2.0*f(center) + f(center - step))/(step*step);
+      }
+
+
+
+      /**
+       * Fourth order approximation of the derivative
+       *
+       *     df/dx_i - df/dx_j
+       *
+       * where <code>i</code> and <code>j</code> are specified by @p
+       * cross_derivative. The derivative approximation is at @p center with a
+       * step size of @p step and function @p f.
+       */
+      template <int structdim, typename F>
+      inline
+      auto
+      cross_stencil
+      (const CrossDerivative                                        cross_derivative,
+       const Tensor<1, GeometryInfo<structdim>::vertices_per_cell> &center,
+       const double                                                 step,
+       const F                                                     &f)
+      -> decltype(f(center) - f(center))
+      {
+        Tensor<1, GeometryInfo<structdim>::vertices_per_cell> simplex_vector;
+        simplex_vector[cross_derivative.direction_0] = 0.5*step;
+        simplex_vector[cross_derivative.direction_1] = -0.5*step;
+        return (- 4.0     *f(center)
+                - 1.0     *f(center + simplex_vector)
+                - 1.0/3.0 *f(center - simplex_vector)
+                + 16.0/3.0*f(center + 0.5*simplex_vector)
+               )/step;
+      }
+
+
+
+      /**
+       * The optimization algorithm used in GridTools::project_to_object is
+       * essentially a gradient descent method. This function computes entries
+       * in the gradient of the objective function; see the description in the
+       * comments inside GridTools::project_to_object for more information.
+       */
+      template <int spacedim, int structdim, typename F>
+      inline
+      double
+      gradient_entry
+      (const unsigned int                                           row_n,
+       const unsigned int                                           dependent_direction,
+       const Point<spacedim>                                       &p0,
+       const Tensor<1, GeometryInfo<structdim>::vertices_per_cell> &center,
+       const double                                                 step,
+       const F                                                     &f)
+      {
+        Assert(row_n < GeometryInfo<structdim>::vertices_per_cell &&
+               dependent_direction < GeometryInfo<structdim>::vertices_per_cell,
+               ExcMessage("This function assumes that the last weight is a "
+                          "dependent variable (and hence we cannot take its "
+                          "derivative directly)."));
+        Assert(row_n != dependent_direction,
+               ExcMessage("We cannot differentiate with respect to the variable "
+                          "that is assumed to be dependent."));
+
+        const Point<spacedim> manifold_point = f(center);
+        const Tensor<1, spacedim> stencil_value = cross_stencil<structdim>
+                                                  ({row_n, dependent_direction},
+                                                   center,
+                                                   step,
+                                                   f);
+        double entry = 0.0;
+        for (unsigned int dim_n = 0; dim_n < spacedim; ++dim_n)
+          entry += -2.0*(p0[dim_n] - manifold_point[dim_n])*stencil_value[dim_n];
+        return entry;
+      }
+
+      /**
+       * Project onto a d-linear object. This is more accurate than the
+       * general algorithm in project_to_object but only works for geometries
+       * described by linear, bilinear, or trilinear mappings.
+       */
+      template <typename Iterator, int spacedim, int structdim>
+      Point<spacedim>
+      project_to_d_linear_object (const Iterator        &object,
+                                  const Point<spacedim> &trial_point)
+      {
+        // let's look at this for simplicity for a quad (structdim==2) in a space with
+        // spacedim>2 (notate trial_point by y): all points on the surface are
+        // given by
+        //   x(\xi) = sum_i v_i phi_x(\xi)
+        // where v_i are the vertices of the quad, and \xi=(\xi_1,\xi_2) are the
+        // reference coordinates of the quad. so what we are trying to do is find
+        // a point x on the surface that is closest to the point y. there are
+        // different ways to solve this problem, but in the end it's a nonlinear
+        // problem and we have to find reference coordinates \xi so that J(\xi) =
+        // 1/2 || x(\xi)-y ||^2 is minimal. x(\xi) is a function that is
+        // structdim-linear in \xi, so J(\xi) is a polynomial of degree 2*structdim that we'd
+        // like to minimize. unless structdim==1, we'll have to use a Newton method to
+        // find the answer. This leads to the following formulation of Newton
+        // steps:
+        //
+        // Given \xi_k, find \delta\xi_k so that
+        //   H_k \delta\xi_k = - F_k
+        // where H_k is an approximation to the second derivatives of J at \xi_k,
+        // and F_k is the first derivative of J.  We'll iterate this a number of
+        // times until the right hand side is small enough. As a stopping
+        // criterion, we terminate if ||\delta\xi||<eps.
+        //
+        // As for the Hessian, the best choice would be
+        //   H_k = J''(\xi_k)
+        // but we'll opt for the simpler Gauss-Newton form
+        //   H_k = A^T A
+        // i.e.
+        //   (H_k)_{nm} = \sum_{i,j} v_i*v_j *
+        //                   \partial_n phi_i *
+        //                   \partial_m phi_j
+        // we start at xi=(0.5, 0.5).
+        Point<structdim> xi;
+        for (unsigned int d=0; d<structdim; ++d)
+          xi[d] = 0.5;
+
+        Point<spacedim> x_k;
+        for (unsigned int i=0; i<GeometryInfo<structdim>::vertices_per_cell; ++i)
+          x_k += object->vertex(i) *
+                 GeometryInfo<structdim>::d_linear_shape_function (xi, i);
+
+        do
+          {
+            Tensor<1,structdim> F_k;
+            for (unsigned int i=0; i<GeometryInfo<structdim>::vertices_per_cell; ++i)
+              F_k += (x_k-trial_point)*object->vertex(i) *
+                     GeometryInfo<structdim>::d_linear_shape_function_gradient (xi, i);
+
+            Tensor<2,structdim> H_k;
+            for (unsigned int i=0; i<GeometryInfo<structdim>::vertices_per_cell; ++i)
+              for (unsigned int j=0; j<GeometryInfo<structdim>::vertices_per_cell; ++j)
+                {
+                  Tensor<2, structdim> tmp = outer_product(
+                                               GeometryInfo<structdim>::d_linear_shape_function_gradient(xi, i),
+                                               GeometryInfo<structdim>::d_linear_shape_function_gradient(xi, j));
+                  H_k += (object->vertex(i) * object->vertex(j)) * tmp;
+                }
+
+            const Tensor<1,structdim> delta_xi = - invert(H_k) * F_k;
+            xi += delta_xi;
+
+            x_k = Point<spacedim>();
+            for (unsigned int i=0; i<GeometryInfo<structdim>::vertices_per_cell; ++i)
+              x_k += object->vertex(i) *
+                     GeometryInfo<structdim>::d_linear_shape_function (xi, i);
+
+            if (delta_xi.norm() < 1e-7)
+              break;
+          }
+        while (true);
+
+        return x_k;
+      }
+    }
+  }
+
+
+
+  template <typename Iterator>
+  Point<Iterator::AccessorType::space_dimension>
+  project_to_object(const Iterator &object,
+                    const Point<Iterator::AccessorType::space_dimension> &trial_point)
+  {
+    const int spacedim = Iterator::AccessorType::space_dimension;
+    const int structdim = Iterator::AccessorType::structure_dimension;
+
+    Point<spacedim> projected_point = trial_point;
+
+    if (structdim >= spacedim)
+      return projected_point;
+    else if (structdim == 1 || structdim == 2)
+      {
+        using namespace internal::ProjectToObject;
+        // Try to use the special flat algorithm for quads (this is better
+        // than the general algorithm in 3D). This does not take into account
+        // whether projected_point is outside the quad, but we optimize along
+        // lines below anyway:
+        const int dim = Iterator::AccessorType::dimension;
+        const Manifold<dim, spacedim> &manifold = object->get_manifold();
+        if (structdim == 2 &&
+            dynamic_cast<const FlatManifold<dim,spacedim> *>(&manifold)
+            != nullptr)
+          {
+            projected_point = project_to_d_linear_object<Iterator, spacedim, structdim>(object, trial_point);
+          }
+        else
+          {
+            // We want to find a point on the convex hull (defined by the
+            // vertices of the object and the manifold description) that is
+            // relatively close to the trial point. This has a few issues:
+            //
+            // 1. For a general convex hull we are not guaranteed that a unique
+            //    minimum exists.
+            // 2. The independent variables in the optimization process are the
+            //    weights given to Manifold::get_new_point, which must sum to 1,
+            //    so we cannot use standard finite differences to approximate a
+            //    gradient.
+            //
+            // There is not much we can do about 1., but for 2. we can derive
+            // finite difference stencils that work on a structdim-dimensional
+            // simplex and rewrite the optimization problem to use those
+            // instead. Consider the structdim 2 case and let
+            //
+            // F(c0, c1, c2, c3) = Manifold::get_new_point(vertices, {c0, c1, c2, c3})
+            //
+            // where {c0, c1, c2, c3} are the weights for the four vertices on
+            // the quadrilateral. We seek to minimize the Euclidean distance
+            // between F(...) and trial_point. We can solve for c3 in terms of
+            // the other weights and get, for one coordinate direction
+            //
+            // d/dc0 ((x0 - F(c0, c1, c2, 1 - c0 - c1 - c2))^2)
+            //      = -2(x0 - F(...)) (d/dc0 F(...) - d/dc3 F(...))
+            //
+            // where we substitute back in for c3 after taking the
+            // derivative. We can compute a stencil for the cross derivative
+            // d/dc0 - d/dc3: this is exactly what cross_stencil approximates
+            // (and gradient_entry computes the sum over the independent
+            // variables). Below, we somewhat arbitrarily pick the last
+            // component as the dependent one.
+            //
+            // Since we can now calculate derivatives of the objective
+            // function we can use gradient descent to minimize it.
+            //
+            // Of course, this is much simpler in the structdim = 1 case (we
+            // could rewrite the projection as a 1D optimization problem), but
+            // to reduce the potential for bugs we use the same code in both
+            // cases.
+            auto weights_are_ok = [](const Tensor<1, GeometryInfo<structdim>::vertices_per_cell> &v)
+                                  -> bool
+            {
+              // clang has trouble figuring out structdim here, so define it
+              // again:
+              static const std::size_t n_vertices_per_cell
+              = Tensor<1, GeometryInfo<structdim>::vertices_per_cell>::n_independent_components;
+              std::array<double, n_vertices_per_cell> copied_weights;
+              for (unsigned int i = 0; i < n_vertices_per_cell; ++i)
+                {
+                  copied_weights[i] = v[i];
+                  if (v[i] < 0.0 || v[i] > 1.0)
+                    return false;
+                }
+
+              // check the sum: try to avoid some roundoff errors by summing in order
+              std::sort(copied_weights.begin(), copied_weights.end());
+              const double sum = std::accumulate(copied_weights.begin(), copied_weights.end(), 0.0);
+              return std::abs(sum - 1.0) < 1e-10; // same tolerance used in manifold.cc
+            };
+            const double step_size = object->diameter()/64.0;
+
+
+            std::array<Point<spacedim>, GeometryInfo<structdim>::vertices_per_cell> vertices;
+            for (unsigned int vertex_n = 0; vertex_n < GeometryInfo<structdim>::vertices_per_cell;
+                 ++vertex_n)
+              vertices[vertex_n] = object->vertex(vertex_n);
+
+            auto get_point_from_weights =
+              [&](const Tensor<1, GeometryInfo<structdim>::vertices_per_cell> &weights)
+              -> Point<spacedim>
+            {
+              return object->get_manifold().get_new_point
+              (make_array_view(vertices.begin(), vertices.end()),
+              make_array_view(&weights[0],
+              &weights[GeometryInfo<structdim>::vertices_per_cell - 1] + 1));
+            };
+
+            // pick the initial weights as (normalized) inverse distances from
+            // the trial point:
+            Tensor<1, GeometryInfo<structdim>::vertices_per_cell> guess_weights;
+            double guess_weights_sum = 0.0;
+            for (unsigned int vertex_n = 0; vertex_n < GeometryInfo<structdim>::vertices_per_cell;
+                 ++vertex_n)
+              {
+                const double distance = vertices[vertex_n].distance(trial_point);
+                if (distance == 0.0)
+                  {
+                    guess_weights = 0.0;
+                    guess_weights[vertex_n] = 1.0;
+                    guess_weights_sum = 1.0;
+                    break;
+                  }
+                else
+                  {
+                    guess_weights[vertex_n] = 1.0/distance;
+                    guess_weights_sum += guess_weights[vertex_n];
+                  }
+              }
+            guess_weights /= guess_weights_sum;
+            Assert(weights_are_ok(guess_weights), ExcInternalError());
+
+            // The optimization algorithm consists of two parts:
+            //
+            // 1. An outer loop where we apply the gradient descent algorithm.
+            // 2. An inner loop where we do a line search to find the optimal
+            //    length of the step one should take in the gradient direction.
+            //
+            for (unsigned int outer_n = 0; outer_n < 40; ++outer_n)
+              {
+                const unsigned int dependent_direction = GeometryInfo<structdim>::vertices_per_cell - 1;
+                Tensor<1, GeometryInfo<structdim>::vertices_per_cell> current_gradient;
+                for (unsigned int row_n = 0;
+                     row_n < GeometryInfo<structdim>::vertices_per_cell;
+                     ++row_n)
+                  {
+                    if (row_n != dependent_direction)
+                      {
+                        current_gradient[row_n] = gradient_entry<spacedim, structdim>
+                                                  (row_n,
+                                                   dependent_direction,
+                                                   trial_point,
+                                                   guess_weights,
+                                                   step_size,
+                                                   get_point_from_weights);
+
+                        current_gradient[dependent_direction] -= current_gradient[row_n];
+                      }
+                  }
+
+                // We need to travel in the -gradient direction, as noted
+                // above, but we may not want to take a full step in that
+                // direction; instead, guess that we will go -0.5*gradient and
+                // do quasi-Newton iteration to pick the best multiplier. The
+                // goal is to find a scalar alpha such that
+                //
+                // F(x - alpha g)
+                //
+                // is minimized, where g is the gradient and F is the
+                // objective function. To find the optimal value we find roots
+                // of the derivative of the objective function with respect to
+                // alpha by Newton iteration, where we approximate the first
+                // and second derivatives of F(x - alpha g) with centered
+                // finite differences.
+                double gradient_weight = -0.5;
+                auto gradient_weight_objective_function = [&](const double gradient_weight_guess)
+                                                          -> double
+                {
+                  return (trial_point -
+                  get_point_from_weights(guess_weights +
+                  gradient_weight_guess*current_gradient)).norm_square();
+                };
+
+                for (unsigned int inner_n = 0; inner_n < 10; ++inner_n)
+                  {
+                    const double update_numerator = centered_first_difference
+                                                    (gradient_weight, step_size, gradient_weight_objective_function);
+                    const double update_denominator = centered_second_difference
+                                                      (gradient_weight, step_size, gradient_weight_objective_function);
+
+                    // avoid division by zero. Note that we limit the gradient weight below
+                    if (std::abs(update_denominator) == 0.0)
+                      break;
+                    gradient_weight = gradient_weight - update_numerator/update_denominator;
+
+                    // Put a fairly lenient bound on the largest possible
+                    // gradient (things tend to be locally flat, so the gradient
+                    // itself is usually small)
+                    if (std::abs(gradient_weight) > 10)
+                      {
+                        gradient_weight = -10.0;
+                        break;
+                      }
+                  }
+
+                // It only makes sense to take convex combinations with weights
+                // between zero and one. If the update takes us outside of this
+                // region then rescale the update to stay within the region and
+                // try again
+                Tensor<1, GeometryInfo<structdim>::vertices_per_cell> tentative_weights =
+                  guess_weights + gradient_weight*current_gradient;
+
+                double new_gradient_weight = gradient_weight;
+                for (unsigned int iteration_count = 0; iteration_count < 40; ++iteration_count)
+                  {
+                    if (weights_are_ok(tentative_weights))
+                      break;
+
+                    for (unsigned int i = 0; i < GeometryInfo<structdim>::vertices_per_cell; ++i)
+                      {
+                        if (tentative_weights[i] < 0.0)
+                          {
+                            tentative_weights -= (tentative_weights[i]/current_gradient[i])
+                                                 *current_gradient;
+                          }
+                        if (tentative_weights[i] < 0.0 || 1.0 < tentative_weights[i])
+                          {
+                            new_gradient_weight /= 2.0;
+                            tentative_weights = guess_weights + new_gradient_weight*current_gradient;
+                          }
+                      }
+                  }
+
+                // the update might still send us outside the valid region, so
+                // check again and quit if the update is still not valid
+                if (!weights_are_ok(tentative_weights))
+                  break;
+
+                // if we cannot get closer by traveling in the gradient direction then quit
+                if (get_point_from_weights(tentative_weights).distance(trial_point) <
+                    get_point_from_weights(guess_weights).distance(trial_point))
+                  guess_weights = tentative_weights;
+                else
+                  break;
+                Assert(weights_are_ok(guess_weights), ExcInternalError());
+              }
+            Assert(weights_are_ok(guess_weights), ExcInternalError());
+            projected_point =  get_point_from_weights(guess_weights);
+          }
+
+        // if structdim == 2 and the optimal point is not on the interior then
+        // we may be able to get a more accurate result by projecting onto the
+        // lines.
+        if (structdim == 2)
+          {
+            std::array<Point<spacedim>, GeometryInfo<structdim>::lines_per_cell>
+            line_projections;
+            for (unsigned int line_n = 0; line_n < GeometryInfo<structdim>::lines_per_cell;
+                 ++line_n)
+              {
+                line_projections[line_n] = project_to_object(object->line(line_n),
+                                                             trial_point);
+              }
+            std::sort(line_projections.begin(), line_projections.end(),
+                      [&](const Point<spacedim> &a, const Point<spacedim> &b)
+            {
+              return a.distance(trial_point) < b.distance(trial_point);
+            });
+            if (line_projections[0].distance(trial_point)
+                < projected_point.distance(trial_point))
+              projected_point = line_projections[0];
+          }
+      }
+    else
+      {
+        Assert(false, ExcNotImplemented());
+        return projected_point;
+      }
+
+    return projected_point;
+  }
 }
 
 #endif
@@ -1801,6 +2791,6 @@ namespace GridTools
 DEAL_II_NAMESPACE_CLOSE
 
 /*----------------------------   grid_tools.h     ---------------------------*/
-/* end of #ifndef dealii__grid_tools_H */
+/* end of #ifndef dealii_grid_tools_h */
 #endif
 /*----------------------------   grid_tools.h     ---------------------------*/

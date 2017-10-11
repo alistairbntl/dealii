@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -37,8 +37,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/fe/fe_values.h>
-#include <fstream>
-#include <iomanip>
 
 
 template <int dim>
@@ -69,7 +67,7 @@ void test ()
 
   Quadrature<2> quadrature_formula(fe.get_unit_support_points());
   FEValues<2> fe_values (fe, quadrature_formula,
-                         update_values | update_gradients | update_JxW_values|update_q_points);
+                         update_values | update_gradients | update_JxW_values|update_quadrature_points);
 
   const unsigned int   dofs_per_cell = fe.dofs_per_cell;
   std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);

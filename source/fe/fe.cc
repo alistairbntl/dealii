@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -42,12 +42,6 @@ FiniteElement<dim, spacedim>::InternalDataBase::InternalDataBase ():
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim>::InternalDataBase::~InternalDataBase ()
-{}
-
-
-
-template <int dim, int spacedim>
 std::size_t
 FiniteElement<dim, spacedim>::InternalDataBase::memory_consumption () const
 {
@@ -64,7 +58,7 @@ FiniteElement (const FiniteElementData<dim> &fe_data,
   :
   FiniteElementData<dim> (fe_data),
   adjust_quad_dof_index_for_face_orientation_table (dim == 3 ?
-                                                    this->dofs_per_quad : 0 ,
+                                                    this->dofs_per_quad : 0,
                                                     dim==3 ? 8 : 0),
   adjust_line_dof_index_for_line_orientation_table (dim == 3 ?
                                                     this->dofs_per_line : 0),
@@ -85,15 +79,14 @@ FiniteElement (const FiniteElementData<dim> &fe_data,
                       std::vector<ComponentMask> (fe_data.dofs_per_cell, nonzero_c[0])
                       :
                       nonzero_c),
-  n_nonzero_components_table (compute_n_nonzero_components(nonzero_components))
+  n_nonzero_components_table (compute_n_nonzero_components(nonzero_components)),
+  cached_primitivity (std::find_if (n_nonzero_components_table.begin(),
+                                    n_nonzero_components_table.end(),
+                                    std::bind (std::not_equal_to<unsigned int>(),
+                                               std::placeholders::_1,
+                                               1U))
+                      == n_nonzero_components_table.end())
 {
-  this->set_primitivity(std::find_if (n_nonzero_components_table.begin(),
-                                      n_nonzero_components_table.end(),
-                                      std::bind2nd(std::not_equal_to<unsigned int>(),
-                                                   1U))
-                        == n_nonzero_components_table.end());
-
-
   Assert (restriction_is_additive_flags.size() == this->dofs_per_cell,
           ExcDimensionMismatch(restriction_is_additive_flags.size(),
                                this->dofs_per_cell));
@@ -153,9 +146,11 @@ FiniteElement (const FiniteElementData<dim> &fe_data,
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim>::~FiniteElement ()
-{}
-
+std::pair<std::unique_ptr<FiniteElement<dim, spacedim> >, unsigned int>
+FiniteElement<dim, spacedim>::operator^ (const unsigned int multiplicity) const
+{
+  return {this->clone(), multiplicity};
+}
 
 
 
@@ -980,10 +975,8 @@ template <int dim, int spacedim>
 const std::vector<Point<dim> > &
 FiniteElement<dim,spacedim>::get_generalized_support_points () const
 {
-  // a finite element may define
-  // support points, but only if
-  // there are as many as there are
-  // degrees of freedom
+  // If the finite element implements generalized support points, return
+  // those. Otherwise fall back to unit support points.
   return ((generalized_support_points.size() == 0)
           ? unit_support_points
           : generalized_support_points);
@@ -1100,70 +1093,17 @@ FiniteElement<dim,spacedim>::get_constant_modes () const
 
 template <int dim, int spacedim>
 void
-FiniteElement<dim,spacedim>::interpolate(
-  std::vector<double>       &local_dofs,
-  const std::vector<double> &values) const
+FiniteElement<dim,spacedim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &,
+                                                        std::vector<double> &) const
 {
-  Assert (has_support_points(), ExcFEHasNoSupportPoints());
-  Assert (values.size() == unit_support_points.size(),
-          ExcDimensionMismatch(values.size(), unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (this->n_components() == 1,
-          ExcDimensionMismatch(this->n_components(), 1));
-
-  std::copy(values.begin(), values.end(), local_dofs.begin());
-}
-
-
-
-
-template <int dim, int spacedim>
-void
-FiniteElement<dim,spacedim>::interpolate(
-  std::vector<double>    &local_dofs,
-  const std::vector<Vector<double> > &values,
-  unsigned int offset) const
-{
-  Assert (has_support_points(), ExcFEHasNoSupportPoints());
-  Assert (values.size() == unit_support_points.size(),
-          ExcDimensionMismatch(values.size(), unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values[0].size() >= offset+this->n_components(),
-          ExcDimensionMismatch(values[0].size(),offset+this->n_components()));
-
-  for (unsigned int i=0; i<this->dofs_per_cell; ++i)
-    {
-      const std::pair<unsigned int, unsigned int> index
-        = this->system_to_component_index(i);
-      local_dofs[i] = values[i](offset+index.first);
-    }
-}
-
-
-
-
-template <int dim, int spacedim>
-void
-FiniteElement<dim,spacedim>::interpolate(
-  std::vector<double> &local_dofs,
-  const VectorSlice<const std::vector<std::vector<double> > > &values) const
-{
-  Assert (has_support_points(), ExcFEHasNoSupportPoints());
-  Assert (values[0].size() == unit_support_points.size(),
-          ExcDimensionMismatch(values.size(), unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values.size() == this->n_components(),
-          ExcDimensionMismatch(values.size(), this->n_components()));
-
-  for (unsigned int i=0; i<this->dofs_per_cell; ++i)
-    {
-      const std::pair<unsigned int, unsigned int> index
-        = this->system_to_component_index(i);
-      local_dofs[i] = values[index.first][i];
-    }
+  Assert (has_generalized_support_points(),
+          ExcMessage ("The element for which you are calling the current "
+                      "function does not have generalized support points (see "
+                      "the glossary for a definition of generalized support "
+                      "points). Consequently, the current function can not "
+                      "be defined and is not implemented by the element."));
+  Assert (false, ExcNotImplemented());
 }
 
 

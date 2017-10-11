@@ -25,7 +25,6 @@
 #include "../tests.h"
 #include "mesh_3d.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
@@ -34,7 +33,6 @@
 #include <deal.II/grid/grid_reordering.h>
 #include <deal.II/grid/grid_generator.h>
 
-#include <fstream>
 
 
 void check_this (Triangulation<3> &tria)
@@ -108,9 +106,7 @@ void check (Triangulation<3> &tria)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   {
     Triangulation<3> coarse_grid;

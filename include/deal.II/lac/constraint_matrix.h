@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,28 +14,28 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__constraint_matrix_h
-#define dealii__constraint_matrix_h
+#ifndef dealii_constraint_matrix_h
+#define dealii_constraint_matrix_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/index_set.h>
 #include <deal.II/base/subscriptor.h>
 #include <deal.II/base/template_constraints.h>
-#include <deal.II/base/thread_local_storage.h>
 
 #include <deal.II/lac/vector.h>
+#include <deal.II/lac/vector_element_access.h>
+
+#include <boost/range/iterator_range.hpp>
 
 #include <vector>
-#include <map>
 #include <set>
 #include <utility>
-#include <complex>
 
 
 DEAL_II_NAMESPACE_OPEN
 
-template<int dim, class T> class Table;
+template <int dim, class T> class Table;
 template <typename> class FullMatrix;
 class SparsityPattern;
 class DynamicSparsityPattern;
@@ -195,6 +195,35 @@ public:
   explicit ConstraintMatrix (const ConstraintMatrix &constraint_matrix);
 
   /**
+   * Move constructor
+   */
+  ConstraintMatrix (ConstraintMatrix &&constraint_matrix) = default;
+
+  /**
+   * Copy operator. Like for many other large objects, this operator
+   * is deleted to avoid its inadvertent use in places such as
+   * accidentally declaring a @p ConstraintMatrix object as a
+   * function argument by value, rather than by reference.
+   *
+   * However, you can use the copy_from() function to explicitly
+   * copy ConstraintMatrix objects.
+   */
+  ConstraintMatrix &operator= (const ConstraintMatrix &) = delete;
+
+  /**
+   * Move assignment operator
+   */
+  ConstraintMatrix &operator= (ConstraintMatrix &&constraint_matrix) = default;
+
+  /**
+   * Copy the given object to the current one.
+   *
+   * This function exists because @p operator=() is explicitly
+   * disabled.
+   */
+  void copy_from (const ConstraintMatrix &other);
+
+  /**
    * clear() the ConstraintMatrix object and supply an IndexSet with lines
    * that may be constrained. This function is only relevant in the
    * distributed case to supply a different IndexSet. Otherwise this routine
@@ -211,7 +240,7 @@ public:
   bool can_store_line (const size_type line_index) const;
 
   /**
-   * Returns the index set describing locally relevant lines if any are
+   * Return the index set describing locally relevant lines if any are
    * present. Note that if no local lines were given, this represents an empty
    * IndexSet, whereas otherwise it contains the global problem size and the
    * local range.
@@ -362,13 +391,23 @@ public:
    * second. If this is nevertheless the case, an exception is thrown.
    * However, this behavior can be changed by providing a different value for
    * the second argument.
+   *
+   * By default, merging two ConstraintMatrix objects that are initialized
+   * with different IndexSet objects is not allowed.
+   * This behavior can be altered by setting @p allow_different_local_lines
+   * appropriately.
+   *
+   * Merging a ConstraintMatrix that is initialized with an IndexSet
+   * and one that is not initialized with an IndexSet is not yet implemented.
    */
   void merge (const ConstraintMatrix &other_constraints,
-              const MergeConflictBehavior merge_conflict_behavior = no_conflicts_allowed);
+              const MergeConflictBehavior merge_conflict_behavior = no_conflicts_allowed,
+              const bool allow_different_local_lines = false);
 
   /**
    * Shift all entries of this matrix down @p offset rows and over @p offset
-   * columns.
+   * columns. If this object is initialized with an IndexSet, local_lines are
+   * shifted as well.
    *
    * This function is useful if you are building block matrices, where all
    * blocks are built by the same DoFHandler object, i.e. the matrix size is
@@ -449,40 +488,52 @@ public:
   size_type max_constraint_indirections () const;
 
   /**
-   * Returns <tt>true</tt> in case the dof is constrained and there is a non-
+   * Return <tt>true</tt> in case the dof is constrained and there is a non-
    * trivial inhomogeneous values set to the dof.
    */
   bool is_inhomogeneously_constrained (const size_type index) const;
 
   /**
-   * Returns <tt>false</tt> if all constraints in the ConstraintMatrix are
+   * Return <tt>false</tt> if all constraints in the ConstraintMatrix are
    * homogeneous ones, and <tt>true</tt> if there is at least one
    * inhomogeneity.
    */
   bool has_inhomogeneities () const;
 
   /**
-   * Returns a pointer to the the vector of entries if a line is constrained,
+   * Return a pointer to the vector of entries if a line is constrained,
    * and a zero pointer in case the dof is not constrained.
    */
   const std::vector<std::pair<size_type,double> > *
   get_constraint_entries (const size_type line) const;
 
   /**
-   * Returns the value of the inhomogeneity stored in the constrained dof @p
+   * Return the value of the inhomogeneity stored in the constrained dof @p
    * line. Unconstrained dofs also return a zero value.
    */
   double get_inhomogeneity (const size_type line) const;
 
   /**
-   * Print the constraint lines. Mainly for debugging purposes.
+   * Print the constraints represented by the current object to the
+   * given stream.
    *
-   * This function writes out all entries in the constraint matrix lines with
-   * their value in the form <tt>row col : value</tt>. Unconstrained lines
-   * containing only one identity entry are not stored in this object and are
-   * not printed.
+   * For each constraint of the form
+   * @f[
+   *  x_{42} = 0.5 x_2 + 0.25 x_{14} + 2.75
+   * @f]
+   * this function will write a sequence of lines that look like this:
+   * @code
+   *   42 2 : 0.5
+   *   42 14 : 0.25
+   *   42 : 2.75
+   * @endcode
+   * The last line is only shown if the inhomogeneity (here: 2.75) is
+   * nonzero.
+   *
+   * A block of lines such as the one above is repeated for each
+   * constrained degree of freedom.
    */
-  void print (std::ostream &) const;
+  void print (std::ostream &out) const;
 
   /**
    * Write the graph of constraints in 'dot' format. 'dot' is a program that
@@ -565,7 +616,7 @@ public:
    * See the general documentation of this class for more detailed
    * information.
    */
-  template<typename number>
+  template <typename number>
   void condense (SparseMatrix<number> &matrix) const;
 
   /**
@@ -610,7 +661,7 @@ public:
    * See the general documentation of this class for more detailed
    * information.
    */
-  template<typename number, class VectorType>
+  template <typename number, class VectorType>
   void condense (SparseMatrix<number> &matrix,
                  VectorType           &vector) const;
 
@@ -623,7 +674,7 @@ public:
                  BlockVectorType           &vector) const;
 
   /**
-   * Sets the values of all constrained DoFs in a vector to zero.  The @p
+   * Set the values of all constrained DoFs in a vector to zero.  The @p
    * VectorType may be a Vector<float>, Vector<double>,
    * BlockVector<tt><...></tt>, a PETSc or Trilinos vector wrapper class, or
    * any other type having the same interface.
@@ -897,6 +948,30 @@ public:
                               MatrixType                   &global_matrix) const;
 
   /**
+   * Does almost the same as the function above for general rectangular
+   * matrices but uses different ConstraintMatrix objects on the row and
+   * column indices. The convention is that row indices are constrained
+   * according to the calling ConstraintMatrix <code>*this</code>, whereas
+   * column indices are constrained according to the given ConstraintMatrix
+   * <code>column_constraint_matrix</code>. This function allows to handle the
+   * case where rows and columns of a matrix are represented by different
+   * function spaces with their own enumeration of indices, as e.g. in mixed
+   * finite element problems with separate DoFHandler objects or for flux
+   * matrices between different levels in multigrid methods.
+   *
+   * Like the other method with separate slots for row and column indices,
+   * this method does not add diagonal entries to eliminated degrees of
+   * freedom. See there for a more elaborate description.
+   */
+  template <typename MatrixType>
+  void
+  distribute_local_to_global (const FullMatrix<typename MatrixType::value_type> &local_matrix,
+                              const std::vector<size_type> &row_indices,
+                              const ConstraintMatrix       &column_constraint_matrix,
+                              const std::vector<size_type> &column_indices,
+                              MatrixType                   &global_matrix) const;
+
+  /**
    * This function simultaneously writes elements into matrix and vector,
    * according to the constraints specified by the calling ConstraintMatrix.
    * This function can correctly handle inhomogeneous constraints as well. For
@@ -1047,6 +1122,87 @@ public:
    * @}
    */
 
+
+
+  /**
+   * This class represents one line of a constraint matrix.
+   */
+  struct ConstraintLine
+  {
+    /**
+     * A data type in which we store the list of entries that make up the
+     * homogenous part of a constraint.
+     */
+    typedef std::vector<std::pair<size_type,double> > Entries;
+
+    /**
+     * Global DoF index of this line. Since only very few lines are stored,
+     * we can not assume a specific order and have to store the index
+     * explicitly.
+     */
+    size_type index;
+
+    /**
+     * Row numbers and values of the entries in this line.
+     *
+     * For the reason why we use a vector instead of a map and the
+     * consequences thereof, the same applies as what is said for
+     * ConstraintMatrix::lines.
+     */
+    Entries entries;
+
+    /**
+     * Value of the inhomogeneity.
+     */
+    double inhomogeneity;
+
+    /**
+     * This operator is a bit weird and unintuitive: it compares the line
+     * numbers of two lines. We need this to sort the lines; in fact we could
+     * do this using a comparison predicate.  However, this way, it is easier,
+     * albeit unintuitive since two lines really have no god-given order
+     * relation.
+     */
+    bool operator < (const ConstraintLine &) const;
+
+    /**
+     * This operator is likewise weird: it checks whether the line indices of
+     * the two operands are equal, irrespective of the fact that the contents
+     * of the line may be different.
+     */
+    bool operator == (const ConstraintLine &) const;
+
+    /**
+     * Determine an estimate for the memory consumption (in bytes) of this
+     * object.
+     */
+    std::size_t memory_consumption () const;
+  };
+
+
+  /**
+   * Typedef for the iterator type that is used in the LineRange container.
+   */
+  typedef std::vector<ConstraintLine>::const_iterator const_iterator;
+
+
+  /**
+   * Typedef for the return type used by get_lines().
+   */
+  typedef boost::iterator_range<const_iterator> LineRange;
+
+
+  /**
+   * Return a range object containing (const) iterators to all line entries
+   * stored in the ConstraintMatrix. Such a range is useful to initialize
+   * range-based for loops as supported by C++11.
+   *
+   * @return A range object for the half open range <code>[this->begin(),
+   * this->end())</code> of line entries.
+   */
+  const LineRange get_lines() const;
+
+
   /**
    * Exception
    *
@@ -1155,60 +1311,6 @@ public:
 private:
 
   /**
-   * This class represents one line of a constraint matrix.
-   */
-  struct ConstraintLine
-  {
-    /**
-     * A data type in which we store the list of entries that make up the
-     * homogenous part of a constraint.
-     */
-    typedef std::vector<std::pair<size_type,double> > Entries;
-
-    /**
-     * Number of this line. Since only very few lines are stored, we can not
-     * assume a specific order and have to store the line number explicitly.
-     */
-    size_type line;
-
-    /**
-     * Row numbers and values of the entries in this line.
-     *
-     * For the reason why we use a vector instead of a map and the
-     * consequences thereof, the same applies as what is said for
-     * ConstraintMatrix::lines.
-     */
-    Entries entries;
-
-    /**
-     * Value of the inhomogeneity.
-     */
-    double inhomogeneity;
-
-    /**
-     * This operator is a bit weird and unintuitive: it compares the line
-     * numbers of two lines. We need this to sort the lines; in fact we could
-     * do this using a comparison predicate.  However, this way, it is easier,
-     * albeit unintuitive since two lines really have no god-given order
-     * relation.
-     */
-    bool operator < (const ConstraintLine &) const;
-
-    /**
-     * This operator is likewise weird: it checks whether the line indices of
-     * the two operands are equal, irrespective of the fact that the contents
-     * of the line may be different.
-     */
-    bool operator == (const ConstraintLine &) const;
-
-    /**
-     * Determine an estimate for the memory consumption (in bytes) of this
-     * object.
-     */
-    std::size_t memory_consumption () const;
-  };
-
-  /**
    * Store the lines of the matrix.  Entries are usually appended in an
    * arbitrary order and insertion into a vector is done best at the end, so
    * the order is unspecified after all entries are inserted. Sorting of the
@@ -1297,7 +1399,7 @@ private:
                               MatrixType                   &global_matrix,
                               VectorType                   &global_vector,
                               bool                          use_inhomogeneities_for_rhs,
-                              internal::bool2type<false>) const;
+                              std::integral_constant<bool, false>) const;
 
   /**
    * This function actually implements the local_to_global function for block
@@ -1311,7 +1413,7 @@ private:
                               MatrixType                   &global_matrix,
                               VectorType                   &global_vector,
                               bool                          use_inhomogeneities_for_rhs,
-                              internal::bool2type<true>) const;
+                              std::integral_constant<bool, true>) const;
 
   /**
    * This function actually implements the local_to_global function for
@@ -1323,7 +1425,7 @@ private:
                                SparsityPatternType          &sparsity_pattern,
                                const bool                    keep_constrained_entries,
                                const Table<2,bool>          &dof_mask,
-                               internal::bool2type<false>) const;
+                               std::integral_constant<bool, false>) const;
 
   /**
    * This function actually implements the local_to_global function for block
@@ -1335,7 +1437,7 @@ private:
                                SparsityPatternType          &sparsity_pattern,
                                const bool                    keep_constrained_entries,
                                const Table<2,bool>          &dof_mask,
-                               internal::bool2type<true>) const;
+                               std::integral_constant<bool, true>) const;
 
   /**
    * Internal helper function for distribute_local_to_global function.
@@ -1369,12 +1471,6 @@ private:
                         const Vector<LocalType>              &local_vector,
                         const std::vector<size_type>         &local_dof_indices,
                         const FullMatrix<LocalType>          &local_matrix) const;
-
-  /**
-   * The assignment operator is not implemented for performance reasons. You
-   * can clear() or reinit() and merge() manually if needed.
-   */
-  ConstraintMatrix &operator= (const ConstraintMatrix &other);
 };
 
 
@@ -1432,8 +1528,8 @@ ConstraintMatrix::add_line (const size_type line)
                         numbers::invalid_size_type);
 
   // push a new line to the end of the list
-  lines.push_back (ConstraintLine());
-  lines.back().line = line;
+  lines.emplace_back ();
+  lines.back().index = line;
   lines.back().inhomogeneity = 0.;
   lines_cache[line_index] = lines.size()-1;
 }
@@ -1450,17 +1546,24 @@ ConstraintMatrix::add_entry (const size_type line,
   Assert (line != column,
           ExcMessage ("Can't constrain a degree of freedom to itself"));
 
+  // Ensure that the current line is present in the cache:
+  const size_type line_index = calculate_line_index(line);
+  Assert (line_index < lines_cache.size(),
+          ExcMessage("The current ConstraintMatrix does not contain the line "
+                     "for the current entry. Call ConstraintMatrix::add_line "
+                     "before calling this function."));
+
   // if in debug mode, check whether an entry for this column already exists
   // and if it's the same as the one entered at present
   //
   // in any case: exit the function if an entry for this column already
   // exists, since we don't want to enter it twice
-  Assert (lines_cache[calculate_line_index(line)] != numbers::invalid_size_type,
+  Assert (lines_cache[line_index] != numbers::invalid_size_type,
           ExcInternalError());
   Assert (!local_lines.size() || local_lines.is_element(column),
           ExcColumnNotStoredHere(line, column));
-  ConstraintLine *line_ptr = &lines[lines_cache[calculate_line_index(line)]];
-  Assert (line_ptr->line == line, ExcInternalError());
+  ConstraintLine *line_ptr = &lines[lines_cache[line_index]];
+  Assert (line_ptr->index == line, ExcInternalError());
   for (ConstraintLine::Entries::const_iterator
        p=line_ptr->entries.begin();
        p != line_ptr->entries.end(); ++p)
@@ -1471,7 +1574,7 @@ ConstraintMatrix::add_entry (const size_type line,
         return;
       }
 
-  line_ptr->entries.push_back (std::make_pair(column,value));
+  line_ptr->entries.emplace_back (column, value);
 }
 
 
@@ -1541,7 +1644,7 @@ ConstraintMatrix::get_constraint_entries (const size_type line) const
   const size_type line_index = calculate_line_index(line);
   if (line_index >= lines_cache.size() ||
       lines_cache[line_index] == numbers::invalid_size_type)
-    return 0;
+    return nullptr;
   else
     return &lines[lines_cache[line_index]].entries;
 }
@@ -1632,14 +1735,16 @@ void ConstraintMatrix::distribute_local_to_global (
         ++local_vector_begin, ++local_indices_begin)
     {
       if (is_constrained(*local_indices_begin) == false)
-        global_vector(*local_indices_begin) += *local_vector_begin;
+        internal::ElementAccess<VectorType>::add(*local_vector_begin,
+                                                 *local_indices_begin, global_vector);
       else
         {
           const ConstraintLine &position =
             lines[lines_cache[calculate_line_index(*local_indices_begin)]];
           for (size_type j=0; j<position.entries.size(); ++j)
-            global_vector(position.entries[j].first)
-            += *local_vector_begin * position.entries[j].second;
+            internal::ElementAccess<VectorType>::add(*local_vector_begin *
+                                                     position.entries[j].second, position.entries[j].first,
+                                                     global_vector);
         }
     }
 }
@@ -1759,7 +1864,7 @@ public:
    * derived from BlockMatrixBase<T>).
    */
   static const bool value = (sizeof(check_for_block_matrix
-                                    ((MatrixType *)0))
+                                    ((MatrixType *)nullptr))
                              ==
                              sizeof(yes_type));
 };
@@ -1783,7 +1888,7 @@ distribute_local_to_global (const FullMatrix<typename MatrixType::value_type>   
   Vector<typename MatrixType::value_type> dummy(0);
   distribute_local_to_global (local_matrix, dummy, local_dof_indices,
                               global_matrix, dummy, false,
-                              dealii::internal::bool2type<IsBlockMatrix<MatrixType>::value>());
+                              std::integral_constant<bool, IsBlockMatrix<MatrixType>::value>());
 }
 
 
@@ -1804,7 +1909,7 @@ distribute_local_to_global (const FullMatrix<typename MatrixType::value_type>   
   // the actual implementation follows in the cm.templates.h file.
   distribute_local_to_global (local_matrix, local_vector, local_dof_indices,
                               global_matrix, global_vector, use_inhomogeneities_for_rhs,
-                              dealii::internal::bool2type<IsBlockMatrix<MatrixType>::value>());
+                              std::integral_constant<bool, IsBlockMatrix<MatrixType>::value>());
 }
 
 
@@ -1823,7 +1928,7 @@ add_entries_local_to_global (const std::vector<size_type> &local_dof_indices,
   // the actual implementation follows in the cm.templates.h file.
   add_entries_local_to_global (local_dof_indices, sparsity_pattern,
                                keep_constrained_entries, dof_mask,
-                               internal::bool2type<IsBlockMatrix<SparsityPatternType>::value>());
+                               std::integral_constant<bool, IsBlockMatrix<SparsityPatternType>::value>());
 }
 
 

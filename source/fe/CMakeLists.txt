@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2017 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -15,7 +15,7 @@
 
 INCLUDE_DIRECTORIES(BEFORE ${CMAKE_CURRENT_BINARY_DIR})
 
-SET(_src
+SET(_unity_include_src
   block_mask.cc
   component_mask.cc
   fe_abf.cc
@@ -33,6 +33,7 @@ SET(_src
   fe_nothing.cc
   fe_poly.cc
   fe_poly_tensor.cc
+  fe_p1nc.cc
   fe_q_base.cc
   fe_q.cc
   fe_q_bubbles.cc
@@ -42,22 +43,38 @@ SET(_src
   fe_rannacher_turek.cc
   fe_raviart_thomas.cc
   fe_raviart_thomas_nodal.cc
+  fe_series.cc
   fe_system.cc
+  fe_enriched.cc
   fe_tools.cc
-  fe_tools_interpolate.cc
   fe_trace.cc
-  fe_values.cc
-  fe_values_inst2.cc
   mapping_c1.cc
   mapping_cartesian.cc
   mapping.cc
-  mapping_fe_field.cc
   mapping_q_generic.cc
   mapping_q1.cc
   mapping_q1_eulerian.cc
   mapping_q.cc
   mapping_q_eulerian.cc
   mapping_manifold.cc
+  )
+
+SET(_separate_src
+  fe_values.cc
+  fe_values_inst2.cc
+  mapping_fe_field.cc
+  mapping_fe_field_inst2.cc
+  fe_tools_interpolate.cc
+  fe_tools_extrapolate.cc
+  )
+
+# determined by profiling
+SET(_n_includes_per_unity_file 15)
+
+SETUP_SOURCE_LIST("${_unity_include_src}"
+  "${_separate_src}"
+  ${_n_includes_per_unity_file}
+  _src
   )
 
 SET(_inst
@@ -85,8 +102,10 @@ SET(_inst
   fe_raviart_thomas.inst.in
   fe_raviart_thomas_nodal.inst.in
   fe_system.inst.in
+  fe_enriched.inst.in
   fe_tools.inst.in
   fe_tools_interpolate.inst.in
+  fe_tools_extrapolate.inst.in
   fe_trace.inst.in
   fe_values.decl.1.inst.in
   fe_values.decl.2.inst.in

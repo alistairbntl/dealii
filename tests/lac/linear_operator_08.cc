@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 - 2016 by the deal.II authors
+// Copyright (C) 2015 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -42,7 +42,6 @@
 #include <deal.II/lac/solver_relaxation.h>
 #include <deal.II/lac/solver_richardson.h>
 #include <deal.II/lac/solver_selector.h>
-#include <deal.II/lac/iterative_inverse.h>
 #ifdef DEAL_II_WITH_UMFPACK
 #include <deal.II/lac/sparse_direct.h>
 #endif
@@ -50,12 +49,12 @@
 using namespace dealii;
 
 
-template<class PRECONDITIONER, typename MatrixType, typename VectorType,
-         class ADDITIONAL_DATA = typename PRECONDITIONER::AdditionalData>
+template <class PRECONDITIONER, typename MatrixType, typename VectorType,
+          class ADDITIONAL_DATA = typename PRECONDITIONER::AdditionalData>
 void
-test_preconditioner (const MatrixType &A,
-                     const VectorType &b,
-                     const ADDITIONAL_DATA &data = ADDITIONAL_DATA())
+test_preconditioner_block (const MatrixType &A,
+                           const VectorType &b,
+                           const ADDITIONAL_DATA &data = ADDITIONAL_DATA())
 {
   const auto lo_A = linear_operator<VectorType>(A);
 
@@ -88,7 +87,7 @@ test_preconditioner (const MatrixType &A,
 // For Vector <double>
 // Cannot use more generic function as Vector <double>
 // does not define vector_type
-template<class PRECONDITIONER>
+template <class PRECONDITIONER>
 void
 test_preconditioner (const SparseMatrix<double> &A,
                      const Vector<double> &b,
@@ -130,7 +129,7 @@ test_preconditioner (const SparseMatrix<double> &A,
   }
 }
 
-template<typename SolverType>
+template <typename SolverType>
 void
 test_solver (const SparseMatrix<double> &A,
              const Vector<double> &b)
@@ -194,14 +193,14 @@ public:
                               matrix.n_block_cols());
   }
 
-  template<typename VectorType>
+  template <typename VectorType>
   void
   vmult(VectorType &dst, const VectorType &src) const
   {
     dst = src;
   }
 
-  template<typename VectorType>
+  template <typename VectorType>
   void
   Tvmult(VectorType &dst, const VectorType &src) const
   {
@@ -398,21 +397,6 @@ int main()
       const Vector<double> x = lo_A_inv*b;
     }
 #endif
-//    { // See #1673 and #1784
-//      deallog << "IterativeInverse" << std::endl;
-//
-//      PreconditionJacobi< SparseMatrix<double> > preconditioner;
-//      preconditioner.initialize(A);
-//
-//      ReductionControl solver_control (10, 1.e-30, 1.e-2);
-//      IterativeInverse< Vector<double> > A_inv;
-//      A_inv.initialize(A,preconditioner);
-//      A_inv.solver.select("cg");
-//      A_inv.solver.set_control(solver_control);
-//
-//      const auto lo_A_inv = linear_operator(A_inv);
-//      const Vector<double> x = lo_A_inv*b;
-//    }
     deallog.pop();
 
 
@@ -425,7 +409,7 @@ int main()
     const unsigned int rc=10;
     BlockSparsityPattern sparsity_pattern;
     {
-      BlockCompressedSimpleSparsityPattern csp(blks, blks);
+      BlockDynamicSparsityPattern csp(blks, blks);
       for (unsigned int bi=0; bi<blks; ++bi)
         for (unsigned int bj=0; bj<blks; ++bj)
           csp.block(bi,bj).reinit(rc,rc);
@@ -447,7 +431,7 @@ int main()
     {
       deallog << "PreconditionBlockIdentity" << std::endl;
       typedef PreconditionBlockIdentity< SparseMatrix<double> > PREC;
-      test_preconditioner<PREC>(A, b);
+      test_preconditioner_block<PREC>(A, b);
     }
 
     deallog << "BlockSparseMatrix OK" << std::endl;

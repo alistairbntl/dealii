@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,14 +20,13 @@
 // have support points
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/fe/fe_face.h>
+#include <deal.II/fe/fe_trace.h>
 #include <deal.II/fe/fe_nedelec.h>
-#include <fstream>
 
 
 template <int dim>
@@ -110,6 +109,8 @@ void face_check()
 {
   check1 (FE_FaceQ<dim>(2));
   check2 (FE_FaceQ<dim>(2), 0);
+  check1 (FE_TraceQ<dim>(2));
+  check2 (FE_TraceQ<dim>(2), 0);
 }
 
 
@@ -144,9 +145,7 @@ void check ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   check<1> ();
   check<2> ();

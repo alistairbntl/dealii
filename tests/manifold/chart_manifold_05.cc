@@ -14,8 +14,6 @@
 // pull-back and push-forward
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/manifold.h>
 
 
@@ -75,9 +73,7 @@ void test()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<1,1>();
   test<1,2>();

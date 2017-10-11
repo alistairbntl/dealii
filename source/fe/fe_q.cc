@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,28 +15,35 @@
 
 
 #include <deal.II/base/quadrature_lib.h>
+#include <deal.II/lac/vector.h>
 #include <deal.II/fe/fe_q.h>
 
 #include <vector>
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 DEAL_II_NAMESPACE_OPEN
 
 
-namespace
+namespace internal
 {
-  std::vector<Point<1> >
-  get_QGaussLobatto_points (const unsigned int degree)
+  namespace FE_Q
   {
-    if (degree > 0)
-      return QGaussLobatto<1>(degree+1).get_points();
-    else
-      AssertThrow(false,
-                  ExcMessage ("FE_Q can only be used for polynomial degrees "
-                              "greater than zero. If you want an element of polynomial "
-                              "degree zero, then it cannot be continuous and you "
-                              "will want to use FE_DGQ<dim>(0)."));
-    return std::vector<Point<1> >();
+    namespace
+    {
+      std::vector<Point<1> >
+      get_QGaussLobatto_points (const unsigned int degree)
+      {
+        if (degree > 0)
+          return QGaussLobatto<1>(degree+1).get_points();
+        else
+          {
+            typedef dealii::FE_Q_Base<TensorProductPolynomials<1>, 1, 1> FEQ;
+            AssertThrow(false, FEQ::ExcFEQCannotHaveDegree0());
+          }
+        return std::vector<Point<1> >();
+      }
+    }
   }
 }
 
@@ -46,13 +53,13 @@ template <int dim, int spacedim>
 FE_Q<dim,spacedim>::FE_Q (const unsigned int degree)
   :
   FE_Q_Base<TensorProductPolynomials<dim>, dim, spacedim>
-  (TensorProductPolynomials<dim>(Polynomials::generate_complete_Lagrange_basis(get_QGaussLobatto_points(degree))),
+  (TensorProductPolynomials<dim>(Polynomials::generate_complete_Lagrange_basis(internal::FE_Q::get_QGaussLobatto_points(degree))),
    FiniteElementData<dim>(this->get_dpo_vector(degree),
                           1, degree,
                           FiniteElementData<dim>::H1),
    std::vector<bool> (1, false))
 {
-  this->initialize(get_QGaussLobatto_points(degree));
+  this->initialize(internal::FE_Q::get_QGaussLobatto_points(degree));
 }
 
 
@@ -67,12 +74,6 @@ FE_Q<dim,spacedim>::FE_Q (const Quadrature<1> &points)
                            FiniteElementData<dim>::H1),
     std::vector<bool> (1, false))
 {
-  const unsigned int degree = points.size()-1;
-  (void)degree;
-  Assert (degree > 0,
-          ExcMessage ("This element can only be used for polynomial degrees "
-                      "at least zero"));
-
   this->initialize(points.get_points());
 }
 
@@ -82,7 +83,7 @@ template <int dim, int spacedim>
 std::string
 FE_Q<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
 
@@ -140,10 +141,33 @@ FE_Q<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+void
+FE_Q<dim,spacedim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                        std::vector<double>                &nodal_values) const
+{
+  AssertDimension (support_point_values.size(),
+                   this->get_unit_support_points().size());
+  AssertDimension (support_point_values.size(),
+                   nodal_values.size());
+  AssertDimension (this->dofs_per_cell,
+                   nodal_values.size());
+
+  for (unsigned int i=0; i<this->dofs_per_cell; ++i)
+    {
+      AssertDimension (support_point_values[i].size(), 1);
+
+      nodal_values[i] = support_point_values[i](0);
+    }
+}
+
+
+
+template <int dim, int spacedim>
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_Q<dim,spacedim>::clone() const
 {
-  return new FE_Q<dim,spacedim>(*this);
+  return std_cxx14::make_unique<FE_Q<dim,spacedim>>(*this);
 }
 
 

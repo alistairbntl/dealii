@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,9 +16,6 @@
 
 
 // check that VectorTools::project works for DGQ elements correctly
-
-char logname[] = "output";
-
 
 #include "project_common.h"
 

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -49,7 +49,6 @@
 
 #include <deal.II/numerics/point_value_history.h>
 
-#include <fstream>
 
 using namespace dealii;
 
@@ -58,23 +57,12 @@ template <int dim>
 class Postprocess : public DataPostprocessor<dim>
 {
 public:
-
-  void compute_derived_quantities_scalar (
-    const std::vector< double > &,
-    const std::vector< Tensor< 1, dim > > &,
-    const std::vector< Tensor< 2, dim > > &,
-    const std::vector< Point< dim > > &,
-    const std::vector< Point< dim > > &,
-    std::vector< Vector< double > > &
-  ) const;
+  void evaluate_scalar_field (const DataPostprocessorInputs::Scalar<dim> &inputs,
+                              std::vector<Vector<double> >               &computed_quantities) const;
 
   std::vector<std::string> get_names () const;
   UpdateFlags              get_needed_update_flags () const;
   unsigned int             n_output_variables () const;
-  // The following function is not required
-  // by the point_value_history class.
-  //std::vector<DataComponentInterpretation::DataComponentInterpretation>
-  //                  get_data_component_interpretation () const;
 };
 
 template <int dim>
@@ -104,25 +92,19 @@ Postprocess<dim>::n_output_variables () const
 
 template <int dim>
 void
-Postprocess<dim>::compute_derived_quantities_scalar (
-  const std::vector< double >                  &uh,
-  const std::vector< Tensor< 1, dim > >   &duh,
-  const std::vector< Tensor< 2, dim > >   &dduh,
-  const std::vector< Point< dim > >                     & /* normals */,
-  const std::vector< Point< dim > >                     & /* locations */,
-  std::vector< Vector< double > >                        &computed_quantities
-) const
+Postprocess<dim>::evaluate_scalar_field (const DataPostprocessorInputs::Scalar<dim> &inputs,
+                                         std::vector<Vector<double> >               &computed_quantities) const
 {
-  Assert(computed_quantities.size() == uh.size(),
-         ExcDimensionMismatch (computed_quantities.size(), uh.size()));
+  Assert(computed_quantities.size() == inputs.solution_values.size(),
+         ExcDimensionMismatch (computed_quantities.size(), inputs.solution_values.size()));
 
   for (unsigned int i=0; i<computed_quantities.size(); i++)
     {
       Assert(computed_quantities[i].size() == 2,
              ExcDimensionMismatch (computed_quantities[i].size(), 2));
 
-      computed_quantities[i](0) = duh[i][0]; // norm of x gradient
-      computed_quantities[i](1) = dduh[i][0].norm(); // norm of x hessian
+      computed_quantities[i](0) = inputs.solution_gradients[i][0]; // norm of x gradient
+      computed_quantities[i](1) = inputs.solution_hessians[i][0].norm(); // norm of x hessian
     }
 }
 
@@ -387,7 +369,6 @@ int main()
   logfile << std::setprecision(2);
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   TestPointValueHistory<2> test;
   test.run();

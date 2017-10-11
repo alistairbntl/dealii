@@ -22,14 +22,13 @@
 #include <deal.II/fe/fe_raviart_thomas.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
 #define PRECISION 8
 
 
 
-template<int dim>
+template <int dim>
 void test ()
 {
   for (unsigned int degree=0; degree<9-2*dim; ++degree)
@@ -53,7 +52,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<2>();
   test<3>();

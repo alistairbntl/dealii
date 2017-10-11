@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,11 +20,9 @@
 // like _01, but with an inhomogeneity
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/lac/constraint_matrix.h>
 
-#include <fstream>
 #include <sstream>
 
 
@@ -147,9 +145,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       test();
     }

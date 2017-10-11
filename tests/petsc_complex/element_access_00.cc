@@ -16,9 +16,8 @@
 
 // deal.II includes
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
 
-#include <fstream>
 #include <iostream>
 #include <cassert>
 
@@ -29,7 +28,7 @@
 // on vector
 
 // vector elements
-void test_vector (PETScWrappers::Vector &v)
+void test_vector (PETScWrappers::MPI::Vector &v)
 {
   deallog << "Check vector access" << std::endl;
 
@@ -61,13 +60,12 @@ int main (int argc, char **argv)
   std::ofstream logfile ("output");
   dealii::deallog.attach (logfile);
   dealii::deallog.depth_console (0);
-  deallog.threshold_double(1.e-10);
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        PETScWrappers::Vector v (5);
+        PETScWrappers::MPI::Vector v (MPI_COMM_WORLD, 5, 5);
         test_vector (v);
 
         deallog << "vector:" << std::endl;
@@ -105,5 +103,3 @@ int main (int argc, char **argv)
 
   return 0;
 }
-
-

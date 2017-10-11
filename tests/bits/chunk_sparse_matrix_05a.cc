@@ -20,7 +20,6 @@
 
 #include "../tests.h"
 #include <deal.II/lac/chunk_sparse_matrix.h>
-#include <fstream>
 
 
 void test (const unsigned int chunk_size)
@@ -67,9 +66,7 @@ void test (const unsigned int chunk_size)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

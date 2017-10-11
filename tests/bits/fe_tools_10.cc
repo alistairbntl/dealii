@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,13 +19,12 @@
 #include <deal.II/lac/sparsity_pattern.h>
 
 // check
-//   FETools::get_fe_from_name
+//   FETools::get_fe_by_name
 // like fe_tools_09, but with the difference that we use the generic
 // "<dim>" marker in the finite element name, instead of the one with
 // the concrete dimension (see the documentation)
 
 
-std::string output_file_name = "output";
 
 template <int dim>
 std::string modify_name (const std::string &name)
@@ -59,7 +58,7 @@ check_this (const FiniteElement<dim> &fe1,
   // pretty good indication that the
   // two FEs are actually the same
   deallog << modify_name<dim> (fe1.get_name());
-  p1 = FETools::get_fe_from_name<dim> (modify_name<dim> (fe1.get_name()));
+  p1 = FETools::get_fe_by_name<dim, dim> (modify_name<dim> (fe1.get_name()));
   AssertThrow (fe1.get_name() == p1->get_name(),
                ExcInternalError());
   deallog << " ok" << std::endl;
@@ -67,7 +66,7 @@ check_this (const FiniteElement<dim> &fe1,
 
   // same for fe2
   deallog << modify_name<dim> (fe2.get_name());
-  p2 = FETools::get_fe_from_name<dim> (modify_name<dim> (fe2.get_name()));
+  p2 = FETools::get_fe_by_name<dim, dim> (modify_name<dim> (fe2.get_name()));
   AssertThrow (fe2.get_name() == p2->get_name(),
                ExcInternalError());
   deallog << " ok" << std::endl;

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,11 +15,13 @@
 
 
 #include <deal.II/base/quadrature_lib.h>
+#include <deal.II/lac/vector.h>
 #include <deal.II/fe/fe_q_iso_q1.h>
 #include <deal.II/fe/fe_nothing.h>
 
 #include <vector>
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -54,7 +56,7 @@ template <int dim, int spacedim>
 std::string
 FE_Q_iso_Q1<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in sync
 
@@ -68,10 +70,33 @@ FE_Q_iso_Q1<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+void
+FE_Q_iso_Q1<dim,spacedim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                        std::vector<double>                &nodal_values) const
+{
+  AssertDimension (support_point_values.size(),
+                   this->get_unit_support_points().size());
+  AssertDimension (support_point_values.size(),
+                   nodal_values.size());
+  AssertDimension (this->dofs_per_cell,
+                   nodal_values.size());
+
+  for (unsigned int i=0; i<this->dofs_per_cell; ++i)
+    {
+      AssertDimension (support_point_values[i].size(), 1);
+
+      nodal_values[i] = support_point_values[i](0);
+    }
+}
+
+
+
+template <int dim, int spacedim>
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_Q_iso_Q1<dim,spacedim>::clone() const
 {
-  return new FE_Q_iso_Q1<dim,spacedim>(*this);
+  return std_cxx14::make_unique<FE_Q_iso_Q1<dim,spacedim>>(*this);
 }
 
 

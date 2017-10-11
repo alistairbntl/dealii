@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -25,13 +25,12 @@ char logname[] = "output";
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/grid/tria.h>
@@ -47,7 +46,6 @@ char logname[] = "output";
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <fstream>
 #include <iostream>
 
 #include <deal.II/fe/fe_q.h>
@@ -179,8 +177,8 @@ void LaplaceProblem<dim>::setup_system ()
     }
   else
     {
-      CompressedSparsityPattern csp (dof_handler.n_dofs(),
-                                     dof_handler.n_dofs());
+      DynamicSparsityPattern csp (dof_handler.n_dofs(),
+                                  dof_handler.n_dofs());
       DoFTools::make_sparsity_pattern (dof_handler, csp);
 
       condense.reset();
@@ -200,7 +198,7 @@ void LaplaceProblem<dim>::assemble_system ()
   hp::FEValues<dim> hp_fe_values (fe_collection,
                                   quadrature_collection,
                                   update_values    |  update_gradients |
-                                  update_q_points  |  update_JxW_values);
+                                  update_quadrature_points  |  update_JxW_values);
 
   const RightHandSide<dim> rhs_function;
 
@@ -258,7 +256,7 @@ void LaplaceProblem<dim>::assemble_system ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim>(),
+                                            Functions::ZeroFunction<dim>(),
                                             boundary_values);
   MatrixTools::apply_boundary_values (boundary_values,
                                       system_matrix,
@@ -873,7 +871,6 @@ int main ()
   logfile.precision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
   try
     {
       LaplaceProblem<3> laplace_problem;

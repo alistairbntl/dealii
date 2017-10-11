@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -339,12 +339,11 @@ void test_with_2d_deformed_refined_mesh (const FiniteElement<dim> &fe,
 
 int main ()
 {
-  std::ofstream logfile(logname);
+  std::ofstream logfile("output");
   deallog << std::setprecision (3);
 
   deallog.attach(logfile);
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   test<1>();
   test<2>();

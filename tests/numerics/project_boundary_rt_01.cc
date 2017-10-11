@@ -15,7 +15,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -27,13 +26,12 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <fstream>
 
 
 /**
  * A vector-valued polynomial for testing RT elements.
  */
-template<int dim>
+template <int dim>
 class TestFunction : public Function<dim>
 {
 public:
@@ -48,14 +46,14 @@ private:
 };
 
 
-template<int dim>
+template <int dim>
 TestFunction<dim>::TestFunction (unsigned int p)
   :
   Function<dim>(dim), degree(p)
 {}
 
 
-template<int dim>
+template <int dim>
 void
 TestFunction<dim>::vector_value_list (const std::vector<Point<dim> > &points,
                                       std::vector<Vector<double> >   &values) const
@@ -87,7 +85,7 @@ TestFunction<dim>::vector_value_list (const std::vector<Point<dim> > &points,
 
 
 
-template<int dim>
+template <int dim>
 double integrate_error(const DoFHandler<dim> &dof,
                        FEFaceValues<dim> &fe,
                        const Vector<double> &u,
@@ -120,7 +118,7 @@ double integrate_error(const DoFHandler<dim> &dof,
 }
 
 
-template<int dim>
+template <int dim>
 void test_projection (const Triangulation<dim> &tr,
                       const FiniteElement<dim> &fe)
 {
@@ -162,7 +160,7 @@ void test_projection (const Triangulation<dim> &tr,
 }
 
 
-template<int dim>
+template <int dim>
 void test_hyper_cube(const FiniteElement<dim> &fe)
 {
   Triangulation<dim> tr;
@@ -178,7 +176,6 @@ int main()
   deallog << std::setprecision (2);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-12);
 
   FE_RaviartThomasNodal<2> rt21(1);
   test_hyper_cube(rt21);

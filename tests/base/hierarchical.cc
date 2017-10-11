@@ -19,11 +19,7 @@
 // in time, so why not make it a testcase -- WB)
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/polynomial.h>
 
 
@@ -35,7 +31,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   const std::vector<Polynomial<double> >
   p = Hierarchical::generate_complete_basis (10);

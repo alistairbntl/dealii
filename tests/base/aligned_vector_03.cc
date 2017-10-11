@@ -17,9 +17,6 @@
 // test for AlignedVector<bool>
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
 #include <deal.II/base/aligned_vector.h>
 
@@ -83,9 +80,6 @@ void test ()
   for (unsigned int i=200000; i<400000; ++i)
     AssertDimension (a[i], true);
   deallog << "OK" << std::endl;
-
-  deallog << "Memory consumption: " << a.memory_consumption()
-          << " for a.size()=" << a.size() << std::endl;
 }
 
 
@@ -93,9 +87,7 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test ();
 }

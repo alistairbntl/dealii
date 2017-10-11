@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,14 +19,11 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -54,7 +51,6 @@ std::ofstream logfile("output");
 #include <deal.II/hp/fe_values.h>
 
 #include <typeinfo>
-#include <fstream>
 #include <iostream>
 
 
@@ -283,10 +279,10 @@ void HelmholtzProblem<dim>::assemble_system ()
 
   hp::FEValues<dim>  x_fe_values (*fe, quadrature_formula,
                                   update_values   | update_gradients |
-                                  update_q_points | update_JxW_values);
+                                  update_quadrature_points | update_JxW_values);
 
   hp::FEFaceValues<dim> x_fe_face_values (*fe, face_quadrature_formula,
-                                          update_values         | update_q_points  |
+                                          update_values         | update_quadrature_points  |
                                           update_normal_vectors | update_JxW_values);
 
   const RightHandSide<dim> right_hand_side;
@@ -666,7 +662,6 @@ int main ()
   deallog << std::setprecision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   const unsigned int dim = 2;
 

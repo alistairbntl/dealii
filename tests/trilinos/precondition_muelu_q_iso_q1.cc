@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -26,7 +26,7 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/constraint_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -35,8 +35,6 @@
 #include <deal.II/base/function.h>
 #include <deal.II/grid/tria.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 template <int dim>
@@ -150,7 +148,7 @@ void Step4<dim>::setup_system ()
                                             constraints);
   constraints.close();
 
-  CompressedSparsityPattern c_sparsity(dof_handler.n_dofs());
+  DynamicSparsityPattern c_sparsity(dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern (dof_handler, c_sparsity, constraints, false);
   system_matrix.reinit (c_sparsity);
   preconditioner_matrix.reinit(c_sparsity);
@@ -276,7 +274,7 @@ void Step4<dim>::solve ()
     check_solver_within_range(
       solver.solve (system_matrix, solution, system_rhs,
                     preconditioner),
-      solver_control.last_step(), 25, 34);
+      solver_control.last_step(), 20, 34);
   }
   deallog.pop();
 
@@ -290,7 +288,7 @@ void Step4<dim>::solve ()
     check_solver_within_range(
       solver.solve (system_matrix, solution, system_rhs,
                     preconditioner),
-      solver_control.last_step(), 24, 40);
+      solver_control.last_step(), 20, 40);
   }
   deallog.pop();
   deallog << std::endl;
@@ -319,9 +317,7 @@ void Step4<dim>::run()
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 

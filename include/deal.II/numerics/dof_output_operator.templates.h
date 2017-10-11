@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,6 +13,9 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_dof_output_operator_templates_h
+#define dealii_dof_output_operator_templates_h
+
 
 #include <deal.II/numerics/dof_output_operator.h>
 
@@ -22,7 +25,7 @@ namespace Algorithms
 {
   template <typename VectorType, int dim, int spacedim>
   DoFOutputOperator<VectorType, dim, spacedim>::DoFOutputOperator (
-    const std::string filename_base,
+    const std::string &filename_base,
     const unsigned int digits)
     :
     filename_base(filename_base),
@@ -44,12 +47,12 @@ namespace Algorithms
   DoFOutputOperator<VectorType, dim, spacedim>::operator<<(
     const AnyData &data)
   {
-    Assert ((dof!=0), ExcNotInitialized());
+    Assert ((dof!=nullptr), ExcNotInitialized());
     out.attach_dof_handler (*dof);
     for (unsigned int i=0; i<data.size(); ++i)
       {
         const VectorType *p = data.try_read_ptr<VectorType>(i);
-        if (p!=0)
+        if (p!=nullptr)
           {
             out.add_data_vector (*p, data.name(i));
           }
@@ -67,3 +70,5 @@ namespace Algorithms
 }
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

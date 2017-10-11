@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,7 +16,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -31,7 +30,6 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
 #define PRECISION 2
@@ -154,15 +152,15 @@ void test ()
     new FE_Q<dim>(1),
     new FE_Q<dim>(2),
     new FE_Q<dim>(3),
-    (dim<2 ? new FE_Q<dim>(4) : 0),
-    (dim<2 ? new FE_Q<dim>(5) : 0),
+    (dim<2 ? new FE_Q<dim>(4) : nullptr),
+    (dim<2 ? new FE_Q<dim>(5) : nullptr),
 
     // FE_DGQ
     new FE_DGQ<dim>(0),
     new FE_DGQ<dim>(1),
     new FE_DGQ<dim>(2),
-    (dim<3 ? new FE_DGQ<dim>(3) : 0),
-    (dim<3 ? new FE_DGQ<dim>(4) : 0),
+    (dim<3 ? new FE_DGQ<dim>(3) : nullptr),
+    (dim<3 ? new FE_DGQ<dim>(4) : nullptr),
 
     // FE_DGP does not
     // presently have the
@@ -176,8 +174,8 @@ void test ()
 //           new FE_DGP<dim>(3),
 
     // a non-primitive FE
-    (dim != 1 ? new FE_Nedelec<dim>(0) : 0),
-    (dim != 1 ? new FE_Nedelec<dim>(1) : 0),
+    (dim != 1 ? new FE_Nedelec<dim>(0) : nullptr),
+    (dim != 1 ? new FE_Nedelec<dim>(1) : nullptr),
 
     // some composed elements
     // of increasing
@@ -217,25 +215,30 @@ void test ()
     // really difficult
     (dim != 1 ?
     new FESystem<dim>(FE_Nedelec<dim>(0), 2)
-    : 0),
+    : nullptr),
     (dim != 1 ?
     new FESystem<dim>(FE_Nedelec<dim>(0), 2,
     FE_Q<dim> (2), 2)
-    : 0),
+    : nullptr),
     (dim != 1 ?
     new FESystem<dim>(FE_Nedelec<dim>(0), 2,
     FE_DGQ<dim> (2), 2,
     FESystem<dim>(FE_Nedelec<dim>(0), 2,
     FE_Q<dim> (2), 2), 2)
-    : 0),
+    : nullptr),
   };
 
   for (unsigned int i=0; i<sizeof(fe_list)/sizeof(fe_list[0]); ++i)
-    if (fe_list[i] != 0)
+    if (fe_list[i] != nullptr)
       {
         deallog << dim << "d, uniform grid, fe #" << i;
         check_element (tr, *fe_list[i]);
       }
+
+
+  for (unsigned int i=0; i<sizeof(fe_list)/sizeof(fe_list[0]); ++i)
+    if (fe_list[i] != nullptr)
+      delete fe_list[i];
 }
 
 
@@ -247,7 +250,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1>();
   test<2>();

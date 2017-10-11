@@ -24,7 +24,6 @@ char logname[] = "output";
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 
@@ -43,7 +42,6 @@ char logname[] = "output";
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
 #include <vector>
 
 
@@ -136,7 +134,6 @@ int main ()
   logfile.precision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<3> ();
 }

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,10 +18,8 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector_base.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 
 #include <deal.II/grid/grid_refinement.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -37,191 +35,101 @@
 DEAL_II_NAMESPACE_OPEN
 
 
-namespace
+namespace internal
 {
-  namespace internal
+  namespace GridRefinement
   {
-    template <typename number>
-    inline
-    number
-    max_element (const Vector<number> &criteria)
+    namespace
     {
-      return *std::max_element(criteria.begin(), criteria.end());
-    }
+      template <typename number>
+      inline
+      number
+      max_element (const dealii::Vector<number> &criteria)
+      {
+        return *std::max_element(criteria.begin(), criteria.end());
+      }
 
 
-    template <typename number>
-    inline
-    number
-    min_element (const Vector<number> &criteria)
-    {
-      return *std::min_element(criteria.begin(), criteria.end());
-    }
+      template <typename number>
+      inline
+      number
+      min_element (const dealii::Vector<number> &criteria)
+      {
+        return *std::min_element(criteria.begin(), criteria.end());
+      }
 
-    // Silence a (bogus) warning in clang-3.6 about the following four
-    // functions being unused:
-    DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
-
-#ifdef DEAL_II_WITH_PETSC
-    inline
-    PetscScalar
-    max_element (const PETScWrappers::Vector &criteria)
-    {
-      // this is horribly slow (since we have
-      // to get the array of values from PETSc
-      // in every iteration), but works
-      PetscScalar m = 0;
-#ifndef PETSC_USE_COMPLEX
-      for (unsigned int i=0; i<criteria.size(); ++i)
-        m = std::max (m, criteria(i));
-#else
-      Assert(false, ExcMessage("The GridRefinement functions should only get real-valued vectors of refinement indicators."
-                               " Using these functions with complex-valued PETSc vectors does not make sense."))
-#endif
-      return m;
-    }
-
-
-    inline
-    PetscScalar
-    min_element (const PETScWrappers::Vector &criteria)
-    {
-      // this is horribly slow (since we have
-      // to get the array of values from PETSc
-      // in every iteration), but works
-      PetscScalar m = criteria(0);
-#ifndef PETSC_USE_COMPLEX
-      for (unsigned int i=1; i<criteria.size(); ++i)
-        m = std::min (m, criteria(i));
-#else
-      Assert(false, ExcMessage("The GridRefinement functions should only get real-valued vectors of refinement indicators."
-                               " Using these functions with complex-valued PETSc vectors does not make sense."))
-#endif
-      return m;
-    }
-#endif
-
+      // Silence a (bogus) warning in clang-3.6 about the following four
+      // functions being unused:
+      DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 
 #ifdef DEAL_II_WITH_TRILINOS
-    inline
-    TrilinosScalar
-    max_element (const TrilinosWrappers::Vector &criteria)
-    {
-      TrilinosScalar m = 0;
-      criteria.trilinos_vector().MaxValue(&m);
-      return m;
-    }
+      inline
+      TrilinosScalar
+      max_element (const dealii::TrilinosWrappers::MPI::Vector &criteria)
+      {
+        TrilinosScalar m = 0;
+        criteria.trilinos_vector().MaxValue(&m);
+        return m;
+      }
 
 
-    inline
-    TrilinosScalar
-    min_element (const TrilinosWrappers::Vector &criteria)
-    {
-      TrilinosScalar m = 0;
-      criteria.trilinos_vector().MinValue(&m);
-      return m;
-    }
+      inline
+      TrilinosScalar
+      min_element (const dealii::TrilinosWrappers::MPI::Vector &criteria)
+      {
+        TrilinosScalar m = 0;
+        criteria.trilinos_vector().MinValue(&m);
+        return m;
+      }
 #endif
 
-    DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
+      DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
-  } /* namespace internal */
-
-
-  template <typename VectorType>
-  typename constraint_and_return_value<!IsBlockVector<VectorType>::value,
-           typename VectorType::value_type>::type
-           min_element (const VectorType &criteria)
-  {
-    return internal::min_element (criteria);
-  }
-
-
-  template <typename VectorType>
-  typename constraint_and_return_value<!IsBlockVector<VectorType>::value,
-           typename VectorType::value_type>::type
-           max_element (const VectorType &criteria)
-  {
-    return internal::max_element (criteria);
-  }
-
-
-  template <typename VectorType>
-  typename constraint_and_return_value<IsBlockVector<VectorType>::value,
-           typename VectorType::value_type>::type
-           min_element (const VectorType &criteria)
-  {
-    typename VectorType::value_type t = internal::min_element(criteria.block(0));
-    for (unsigned int b=1; b<criteria.n_blocks(); ++b)
-      t = std::min (t, internal::min_element(criteria.block(b)));
-
-    return t;
-  }
-
-
-  template <typename VectorType>
-  typename constraint_and_return_value<IsBlockVector<VectorType>::value,
-           typename VectorType::value_type>::type
-           max_element (const VectorType &criteria)
-  {
-    typename VectorType::value_type t = internal::max_element(criteria.block(0));
-    for (unsigned int b=1; b<criteria.n_blocks(); ++b)
-      t = std::max (t, internal::max_element(criteria.block(b)));
-
-    return t;
-  }
-
-}
-
-
-namespace
-{
-  /**
-   * Sorts the vector @p ind as an index vector of @p a in increasing order.
-   * This implementation of quicksort seems to be faster than the standard
-   * library version and is needed in @p refine_and_coarsen_optimize.
-   */
-
-  template <class VectorType>
-  void qsort_index (const VectorType          &a,
-                    std::vector<unsigned int> &ind,
-                    int                        l,
-                    int                        r)
-  {
-    int i,j;
-    typename VectorType::value_type v;
-
-    if (r<=l)
-      return;
-
-    v = a(ind[r]);
-    i = l-1;
-    j = r;
-    do
+      template <typename VectorType>
+      typename std::enable_if<!IsBlockVector<VectorType>::value,
+               typename VectorType::value_type>::type
+               min_element (const VectorType &criteria)
       {
-        do
-          {
-            ++i;
-          }
-        while ((a(ind[i])>v) && (i<r));
-        do
-          {
-            --j;
-          }
-        while ((a(ind[j])<v) && (j>0));
-
-        if (i<j)
-          std::swap (ind[i], ind[j]);
-        else
-          std::swap (ind[i], ind[r]);
+        return min_element (criteria);
       }
-    while (i<j);
-    qsort_index(a,ind,l,i-1);
-    qsort_index(a,ind,i+1,r);
-  }
-}
 
 
+      template <typename VectorType>
+      typename std::enable_if<!IsBlockVector<VectorType>::value,
+               typename VectorType::value_type>::type
+               max_element (const VectorType &criteria)
+      {
+        return max_element (criteria);
+      }
+
+
+      template <typename VectorType>
+      typename std::enable_if<IsBlockVector<VectorType>::value,
+               typename VectorType::value_type>::type
+               min_element (const VectorType &criteria)
+      {
+        typename VectorType::value_type t = min_element(criteria.block(0));
+        for (unsigned int b=1; b<criteria.n_blocks(); ++b)
+          t = std::min (t, min_element(criteria.block(b)));
+
+        return t;
+      }
+
+
+      template <typename VectorType>
+      typename std::enable_if<IsBlockVector<VectorType>::value,
+               typename VectorType::value_type>::type
+               max_element (const VectorType &criteria)
+      {
+        typename VectorType::value_type t = max_element(criteria.block(0));
+        for (unsigned int b=1; b<criteria.n_blocks(); ++b)
+          t = std::max (t, max_element(criteria.block(b)));
+
+        return t;
+      }
+    }
+  } /* namespace GridRefinement */
+} /* namespace internal */
 
 
 template <int dim, class VectorType, int spacedim>
@@ -530,7 +438,7 @@ GridRefinement::refine_and_coarsen_fixed_fraction (Triangulation<dim,spacedim> &
   // threshold if it equals the
   // largest indicator and the
   // top_fraction!=1
-  if ((top_threshold == max_element(criteria)) &&
+  if ((top_threshold == internal::GridRefinement::max_element(criteria)) &&
       (top_fraction != 1))
     top_threshold *= 0.999;
 
@@ -538,10 +446,10 @@ GridRefinement::refine_and_coarsen_fixed_fraction (Triangulation<dim,spacedim> &
     bottom_threshold = 0.999*top_threshold;
 
   // actually flag cells
-  if (top_threshold < max_element(criteria))
+  if (top_threshold < internal::GridRefinement::max_element(criteria))
     refine (tria, criteria, top_threshold, pp - tmp.begin());
 
-  if (bottom_threshold > min_element(criteria))
+  if (bottom_threshold > internal::GridRefinement::min_element(criteria))
     coarsen (tria, criteria, bottom_threshold);
 }
 
@@ -557,26 +465,29 @@ GridRefinement::refine_and_coarsen_optimize (Triangulation<dim,spacedim> &tria,
           ExcDimensionMismatch(criteria.size(), tria.n_active_cells()));
   Assert (criteria.is_non_negative (), ExcNegativeCriteria());
 
-  // get an increasing order on
-  // the error indicator
-  std::vector<unsigned int> tmp(criteria.size());
-  for (unsigned int i=0; i<criteria.size(); ++i)
-    tmp[i] = i;
+  // get a decreasing order on the error indicator
+  std::vector<unsigned int> cell_indices(criteria.size());
+  std::iota(cell_indices.begin(), cell_indices.end(), 0u);
 
-  qsort_index (criteria, tmp, 0, criteria.size()-1);
+  std::sort(cell_indices.begin(), cell_indices.end(),
+            [&criteria](const unsigned int left,
+                        const unsigned int right)
+  {
+    return criteria[left] > criteria[right];
+  });
 
   double expected_error_reduction = 0;
   const double original_error     = criteria.l1_norm();
 
-  const unsigned int N = criteria.size();
+  const std::size_t N = criteria.size();
 
   // minimize the cost functional discussed in the documentation
   double min_cost = std::numeric_limits<double>::max();
-  unsigned int min_arg = 0;
+  std::size_t min_arg = 0;
 
-  for (unsigned int M = 0; M<criteria.size(); ++M)
+  for (std::size_t M = 0; M<criteria.size(); ++M)
     {
-      expected_error_reduction += (1-std::pow(2.,-1.*order)) * criteria(tmp[M]);
+      expected_error_reduction += (1-std::pow(2.,-1.*order)) * criteria(cell_indices[M]);
 
       const double cost = std::pow(((std::pow(2.,dim)-1)*(1+M)+N),
                                    (double)order/dim) *
@@ -588,7 +499,7 @@ GridRefinement::refine_and_coarsen_optimize (Triangulation<dim,spacedim> &tria,
         }
     }
 
-  refine (tria, criteria, criteria(tmp[min_arg]));
+  refine (tria, criteria, criteria(cell_indices[min_arg]));
 }
 
 

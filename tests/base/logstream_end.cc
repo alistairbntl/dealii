@@ -23,9 +23,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <iomanip>
 #include <limits>
 
 
@@ -33,13 +30,11 @@ int main()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   {
     LogStream log;
 
     log.attach(logfile);
-    log.threshold_double(1.e-10);
     log.log_thread_id (false);
 
     log << "This should be printed!";

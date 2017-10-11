@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2016 by the deal.II authors
+// Copyright (C) 2013 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -28,8 +28,10 @@
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/vector.h>
+
 #include <sstream>
 #include <iostream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 //TODO: implement the adjust_quad_dof_index_for_face_orientation_table and
 //adjust_line_dof_index_for_line_orientation_table fields, and write tests
@@ -42,31 +44,35 @@ DEAL_II_NAMESPACE_OPEN
 
 namespace internal
 {
-  namespace
+  namespace FE_Nedelec
   {
-    double
-    get_embedding_computation_tolerance(const unsigned int p)
+    namespace
     {
-      // This heuristic was computed by monitoring the worst residual
-      // resulting from the least squares computation when computing
-      // the face embedding matrices in the FE_Nedelec constructor.
-      // The residual growth is exponential, but is bounded by this
-      // function up to degree 12.
-      return 1.e-15*std::exp(std::pow(p,1.075));
+      double
+      get_embedding_computation_tolerance(const unsigned int p)
+      {
+        // This heuristic was computed by monitoring the worst residual
+        // resulting from the least squares computation when computing
+        // the face embedding matrices in the FE_Nedelec constructor.
+        // The residual growth is exponential, but is bounded by this
+        // function up to degree 12.
+        return 1.e-15*std::exp(std::pow(p,1.075));
+      }
     }
   }
 }
 
 
 template <int dim>
-FE_Nedelec<dim>::FE_Nedelec (const unsigned int p) :
+FE_Nedelec<dim>::FE_Nedelec (const unsigned int order)
+  :
   FE_PolyTensor<PolynomialsNedelec<dim>, dim>
-  (p,
-   FiniteElementData<dim> (get_dpo_vector (p), dim, p + 1,
+  (order,
+   FiniteElementData<dim> (get_dpo_vector (order), dim, order + 1,
                            FiniteElementData<dim>::Hcurl),
-   std::vector<bool> (PolynomialsNedelec<dim>::compute_n_pols (p), true),
+   std::vector<bool> (PolynomialsNedelec<dim>::compute_n_pols (order), true),
    std::vector<ComponentMask>
-   (PolynomialsNedelec<dim>::compute_n_pols (p),
+   (PolynomialsNedelec<dim>::compute_n_pols (order),
     std::vector<bool> (dim, true)))
 {
 #ifdef DEBUG_NEDELEC
@@ -82,7 +88,7 @@ FE_Nedelec<dim>::FE_Nedelec (const unsigned int p) :
   // generalized support points and
   // quadrature weights, since they
   // are required for interpolation.
-  initialize_support_points (p);
+  initialize_support_points (order);
   this->inverse_node_matrix.reinit (n_dofs, n_dofs);
   this->inverse_node_matrix.fill
   (FullMatrix<double> (IdentityMatrix (n_dofs)));
@@ -104,7 +110,7 @@ FE_Nedelec<dim>::FE_Nedelec (const unsigned int p) :
 
   FETools::compute_face_embedding_matrices<dim,double>
   (*this, face_embeddings, 0, 0,
-   internal::get_embedding_computation_tolerance(p));
+   internal::FE_Nedelec::get_embedding_computation_tolerance(order));
 
   switch (dim)
     {
@@ -192,7 +198,7 @@ std::string
 FE_Nedelec<dim>::get_name () const
 {
   // note that the
-  // FETools::get_fe_from_name
+  // FETools::get_fe_by_name
   // function depends on the
   // particular format of the string
   // this function returns, so they
@@ -206,10 +212,10 @@ FE_Nedelec<dim>::get_name () const
 
 
 template <int dim>
-FiniteElement<dim>
-*FE_Nedelec<dim>::clone () const
+std::unique_ptr<FiniteElement<dim,dim> >
+FE_Nedelec<dim>::clone () const
 {
-  return new FE_Nedelec<dim> (*this);
+  return std_cxx14::make_unique<FE_Nedelec<dim> >(*this);
 }
 
 //---------------------------------------------------------------------------
@@ -235,22 +241,22 @@ FE_Nedelec<1>::initialize_support_points (const unsigned int)
 
 template <>
 void
-FE_Nedelec<2>::initialize_support_points (const unsigned int degree)
+FE_Nedelec<2>::initialize_support_points (const unsigned int order)
 {
   const int dim = 2;
 
   // Create polynomial basis.
   const std::vector<Polynomials::Polynomial<double> > &lobatto_polynomials
-    = Polynomials::Lobatto::generate_complete_basis (degree + 1);
+    = Polynomials::Lobatto::generate_complete_basis (order + 1);
   std::vector<Polynomials::Polynomial<double> >
-  lobatto_polynomials_grad (degree + 1);
+  lobatto_polynomials_grad (order + 1);
 
   for (unsigned int i = 0; i < lobatto_polynomials_grad.size (); ++i)
     lobatto_polynomials_grad[i] = lobatto_polynomials[i + 1].derivative ();
 
   // Initialize quadratures to obtain
   // quadrature points later on.
-  const QGauss<dim - 1> reference_edge_quadrature (degree + 1);
+  const QGauss<dim - 1> reference_edge_quadrature (order + 1);
   const unsigned int n_edge_points = reference_edge_quadrature.size ();
   const unsigned int n_boundary_points
     = GeometryInfo<dim>::lines_per_cell * n_edge_points;
@@ -264,17 +270,17 @@ FE_Nedelec<2>::initialize_support_points (const unsigned int degree)
     this->generalized_face_support_points[q_point]
       = reference_edge_quadrature.point (q_point);
 
-  if (degree > 0)
+  if (order > 0)
     {
       // If the polynomial degree is positive
       // we have support points on the faces
       // and in the interior of a cell.
-      const QGauss<dim> quadrature (degree + 1);
+      const QGauss<dim> quadrature (order + 1);
       const unsigned int &n_interior_points = quadrature.size ();
 
       this->generalized_support_points.resize
       (n_boundary_points + n_interior_points);
-      boundary_weights.reinit (n_edge_points, degree);
+      boundary_weights.reinit (n_edge_points, order);
 
       for (unsigned int q_point = 0; q_point < n_edge_points;
            ++q_point)
@@ -287,7 +293,7 @@ FE_Nedelec<2>::initialize_support_points (const unsigned int degree)
                 (QProjector<dim>::DataSetDescriptor::face
                  (line, true, false, false, n_edge_points) + q_point);
 
-          for (unsigned int i = 0; i < degree; ++i)
+          for (unsigned int i = 0; i < order; ++i)
             boundary_weights (q_point, i)
               = reference_edge_quadrature.weight (q_point)
                 * lobatto_polynomials_grad[i + 1].value
@@ -322,43 +328,43 @@ FE_Nedelec<2>::initialize_support_points (const unsigned int degree)
 
 template <>
 void
-FE_Nedelec<3>::initialize_support_points (const unsigned int degree)
+FE_Nedelec<3>::initialize_support_points (const unsigned int order)
 {
   const int dim = 3;
 
   // Create polynomial basis.
   const std::vector<Polynomials::Polynomial<double> > &lobatto_polynomials
-    = Polynomials::Lobatto::generate_complete_basis (degree + 1);
+    = Polynomials::Lobatto::generate_complete_basis (order + 1);
   std::vector<Polynomials::Polynomial<double> >
-  lobatto_polynomials_grad (degree + 1);
+  lobatto_polynomials_grad (order + 1);
 
   for (unsigned int i = 0; i < lobatto_polynomials_grad.size (); ++i)
     lobatto_polynomials_grad[i] = lobatto_polynomials[i + 1].derivative ();
 
   // Initialize quadratures to obtain
   // quadrature points later on.
-  const QGauss<1> reference_edge_quadrature (degree + 1);
+  const QGauss<1> reference_edge_quadrature (order + 1);
   const unsigned int &n_edge_points = reference_edge_quadrature.size ();
   const Quadrature<dim - 1>& edge_quadrature
     = QProjector<dim - 1>::project_to_all_faces
       (reference_edge_quadrature);
 
-  if (degree > 0)
+  if (order > 0)
     {
-      // If the polynomial degree is positive
+      // If the polynomial order is positive
       // we have support points on the edges,
       // faces and in the interior of a cell.
-      const QGauss<dim - 1> reference_face_quadrature (degree + 1);
+      const QGauss<dim - 1> reference_face_quadrature (order + 1);
       const unsigned int &n_face_points
         = reference_face_quadrature.size ();
       const unsigned int n_boundary_points
         = GeometryInfo<dim>::lines_per_cell * n_edge_points
           + GeometryInfo<dim>::faces_per_cell * n_face_points;
-      const QGauss<dim> quadrature (degree + 1);
+      const QGauss<dim> quadrature (order + 1);
       const unsigned int &n_interior_points = quadrature.size ();
 
       boundary_weights.reinit (n_edge_points + n_face_points,
-                               2 * (degree + 1) * degree);
+                               2 * (order + 1) * order);
       this->generalized_face_support_points.resize
       (4 * n_edge_points + n_face_points);
       this->generalized_support_points.resize
@@ -395,7 +401,7 @@ FE_Nedelec<3>::initialize_support_points (const unsigned int degree)
                      reference_edge_quadrature.point (q_point) (0));
               }
 
-          for (unsigned int i = 0; i < degree; ++i)
+          for (unsigned int i = 0; i < order; ++i)
             boundary_weights (q_point, i)
               = reference_edge_quadrature.weight (q_point)
                 * lobatto_polynomials_grad[i + 1].value
@@ -410,11 +416,11 @@ FE_Nedelec<3>::initialize_support_points (const unsigned int degree)
                                                 + 4 * n_edge_points]
             = reference_face_quadrature.point (q_point);
 
-          for (unsigned int i = 0; i <= degree; ++i)
-            for (unsigned int j = 0; j < degree; ++j)
+          for (unsigned int i = 0; i <= order; ++i)
+            for (unsigned int j = 0; j < order; ++j)
               {
                 boundary_weights (q_point + n_edge_points,
-                                  2 * (i * degree + j))
+                                  2 * (i * order + j))
                   = reference_face_quadrature.weight (q_point)
                     * lobatto_polynomials_grad[i].value
                     (this->generalized_face_support_points
@@ -423,7 +429,7 @@ FE_Nedelec<3>::initialize_support_points (const unsigned int degree)
                     (this->generalized_face_support_points
                      [q_point + 4 * n_edge_points] (1));
                 boundary_weights (q_point + n_edge_points,
-                                  2 * (i * degree + j) + 1)
+                                  2 * (i * order + j) + 1)
                   = reference_face_quadrature.weight (q_point)
                     * lobatto_polynomials_grad[i].value
                     (this->generalized_face_support_points
@@ -2381,12 +2387,12 @@ const
 
       for (unsigned int i = 0;
            i < std::min (fe_nedelec_other->degree, this->degree); ++i)
-        identities.push_back (std::make_pair (i, i));
+        identities.emplace_back (i, i);
 
       return identities;
     }
 
-  else if (dynamic_cast<const FE_Nothing<dim>*> (&fe_other) != 0)
+  else if (dynamic_cast<const FE_Nothing<dim>*> (&fe_other) != nullptr)
     {
       // the FE_Nothing has no
       // degrees of freedom, so there
@@ -2426,16 +2432,14 @@ const
       for (unsigned int i = 0; i < p_min; ++i)
         for (unsigned int j = 0; j < p_min - 1; ++j)
           {
-            identities.push_back (std::make_pair (i * (q - 1) + j,
-                                                  i * (p - 1) + j));
-            identities.push_back (std::make_pair (i + (j + q - 1) * q,
-                                                  i + (j + p - 1) * p));
+            identities.emplace_back (i * (q - 1) + j, i * (p - 1) + j);
+            identities.emplace_back (i + (j + q - 1) * q, i + (j + p - 1) * p);
           }
 
       return identities;
     }
 
-  else if (dynamic_cast<const FE_Nothing<dim>*> (&fe_other) != 0)
+  else if (dynamic_cast<const FE_Nothing<dim>*> (&fe_other) != nullptr)
     {
       // the FE_Nothing has no
       // degrees of freedom, so there
@@ -2471,7 +2475,7 @@ const
   typedef FiniteElement<dim> FEL;
 
   AssertThrow ((source.get_name ().find ("FE_Nedelec<") == 0) ||
-               (dynamic_cast<const FEN *> (&source) != 0),
+               (dynamic_cast<const FEN *> (&source) != nullptr),
                typename FEL::ExcInterpolationNotImplemented());
   Assert (interpolation_matrix.m () == source.dofs_per_face,
           ExcDimensionMismatch (interpolation_matrix.m (),
@@ -2579,7 +2583,7 @@ FE_Nedelec<dim>::get_subface_interpolation_matrix(
   typedef FiniteElement<dim> FEL;
 
   AssertThrow ((source.get_name ().find ("FE_Nedelec<") == 0) ||
-               (dynamic_cast<const FEN *> (&source) != 0),
+               (dynamic_cast<const FEN *> (&source) != nullptr),
                typename FEL::ExcInterpolationNotImplemented ());
   Assert (interpolation_matrix.m () == source.dofs_per_face,
           ExcDimensionMismatch (interpolation_matrix.m (),
@@ -3021,7 +3025,7 @@ FE_Nedelec<dim>
       this_nonconst.reinit_restriction_and_prolongation_matrices ();
       // Fill prolongation matrices with embedding operators
       FETools::compute_embedding_matrices (this_nonconst, this_nonconst.prolongation, true,
-                                           internal::get_embedding_computation_tolerance(this->degree));
+                                           internal::FE_Nedelec::get_embedding_computation_tolerance(this->degree));
 #ifdef DEBUG_NEDELEC
       deallog << "Restriction" << std::endl;
 #endif
@@ -3072,7 +3076,7 @@ FE_Nedelec<dim>
       this_nonconst.reinit_restriction_and_prolongation_matrices ();
       // Fill prolongation matrices with embedding operators
       FETools::compute_embedding_matrices (this_nonconst, this_nonconst.prolongation, true,
-                                           internal::get_embedding_computation_tolerance(this->degree));
+                                           internal::FE_Nedelec::get_embedding_computation_tolerance(this->degree));
 #ifdef DEBUG_NEDELEC
       deallog << "Restriction" << std::endl;
 #endif
@@ -3085,14 +3089,6 @@ FE_Nedelec<dim>
   return this->restriction[refinement_case-1][child];
 }
 
-// Since this is a vector valued element,
-// we cannot interpolate a scalar function.
-template <int dim>
-void FE_Nedelec<dim>::interpolate (std::vector<double> &, const std::vector<double> &) const
-{
-  Assert(false, ExcNotImplemented ());
-}
-
 
 // Interpolate a function, which is given by
 // its values at the generalized support
@@ -3102,1580 +3098,19 @@ void FE_Nedelec<dim>::interpolate (std::vector<double> &, const std::vector<doub
 // interpolation.
 template <int dim>
 void
-FE_Nedelec<dim>::interpolate (std::vector<double> &local_dofs,
-                              const std::vector<Vector<double> > &values,
-                              unsigned int offset) const
+FE_Nedelec<dim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                        std::vector<double> &nodal_values) const
 {
   const unsigned int deg = this->degree-1;
-
-  Assert (values.size () == this->generalized_support_points.size (),
-          ExcDimensionMismatch (values.size (),
+  Assert (support_point_values.size () == this->generalized_support_points.size (),
+          ExcDimensionMismatch (support_point_values.size (),
                                 this->generalized_support_points.size ()));
-  Assert (local_dofs.size () == this->dofs_per_cell,
-          ExcDimensionMismatch (local_dofs.size (),this->dofs_per_cell));
-  Assert (values[0].size () >= offset + this->n_components (),
-          ExcDimensionMismatch (values[0].size (),
-                                offset + this->n_components ()));
-  std::fill (local_dofs.begin (), local_dofs.end (), 0.);
-
-  if (offset < dim)
-    switch (dim)
-      {
-      case 2:
-      {
-        const QGauss<1> reference_edge_quadrature (this->degree);
-        const unsigned int &n_edge_points
-          = reference_edge_quadrature.size ();
-
-        // Let us begin with the
-        // interpolation part.
-        for (unsigned int i = 0; i < 2; ++i)
-          {
-            for (unsigned int q_point = 0; q_point < n_edge_points;
-                 ++q_point)
-              local_dofs[i * this->degree]
-              += reference_edge_quadrature.weight (q_point)
-                 * values[q_point + i * n_edge_points] (1);
-
-            // Add the computed values
-            // to the resulting vector
-            // only, if they are not
-            // too small.
-            if (std::abs (local_dofs[i * this->degree]) < 1e-14)
-              local_dofs[i * this->degree] = 0.0;
-          }
-
-        if (offset == 0)
-          for (unsigned int i = 0; i < 2; ++i)
-            {
-              for (unsigned int q_point = 0; q_point < n_edge_points;
-                   ++q_point)
-                local_dofs[(i + 2) * this->degree]
-                += reference_edge_quadrature.weight (q_point)
-                   * values[q_point + (i + 2) * n_edge_points] (0);
-
-              if (std::abs (local_dofs[(i + 2) * this->degree]) < 1e-14)
-                local_dofs[(i + 2) * this->degree] = 0.0;
-            }
-
-        // If the degree is greater
-        // than 0, then we have still
-        // some higher order edge
-        // shape functions to
-        // consider.
-        // Here the projection part
-        // starts. The dof values
-        // are obtained by solving
-        // a linear system of
-        // equations.
-        if (this->degree > 1)
-          {
-            // We start with projection
-            // on the higher order edge
-            // shape function.
-            const std::vector<Polynomials::Polynomial<double> > &
-            lobatto_polynomials
-              = Polynomials::Lobatto::generate_complete_basis
-                (this->degree);
-            const unsigned int
-            line_coordinate[GeometryInfo<2>::lines_per_cell]
-              = {1, 1, 0, 0};
-            std::vector<Polynomials::Polynomial<double> >
-            lobatto_polynomials_grad (this->degree);
-
-            for (unsigned int i = 0; i < lobatto_polynomials_grad.size ();
-                 ++i)
-              lobatto_polynomials_grad[i]
-                = lobatto_polynomials[i + 1].derivative ();
-
-            // Set up the system matrix.
-            // This can be used for all
-            // edges.
-            FullMatrix<double> system_matrix (this->degree-1, this->degree-1);
-
-            for (unsigned int i = 0; i < system_matrix.m (); ++i)
-              for (unsigned int j = 0; j < system_matrix.n (); ++j)
-                for (unsigned int q_point = 0; q_point < n_edge_points;
-                     ++q_point)
-                  system_matrix (i, j)
-                  += boundary_weights (q_point, j)
-                     * lobatto_polynomials_grad[i + 1].value
-                     (this->generalized_face_support_points[q_point]
-                      (1));
-
-            FullMatrix<double> system_matrix_inv (this->degree-1, this->degree-1);
-
-            system_matrix_inv.invert (system_matrix);
-
-            Vector<double> system_rhs (system_matrix.m ());
-            Vector<double> solution (system_rhs.size ());
-
-            for (unsigned int line = 0;
-                 line < GeometryInfo<dim>::lines_per_cell; ++line)
-              if ((line < 2) || (offset == 0))
-                {
-                  // Set up the right hand side.
-                  system_rhs = 0;
-
-                  for (unsigned int q_point = 0; q_point < n_edge_points;
-                       ++q_point)
-                    {
-                      const double tmp
-                        = values[line * n_edge_points + q_point]
-                          (line_coordinate[line])
-                          - local_dofs[line * this->degree]
-                          * this->shape_value_component
-                          (line * this->degree,
-                           this->generalized_support_points[line
-                                                            * n_edge_points
-                                                            + q_point],
-                           line_coordinate[line]);
-
-                      for (unsigned int i = 0; i < system_rhs.size ();
-                           ++i)
-                        system_rhs (i) += boundary_weights (q_point, i)
-                                          * tmp;
-                    }
-
-                  system_matrix_inv.vmult (solution, system_rhs);
-
-                  // Add the computed values
-                  // to the resulting vector
-                  // only, if they are not
-                  // too small.
-                  for (unsigned int i = 0; i < solution.size (); ++i)
-                    if (std::abs (solution (i)) > 1e-14)
-                      local_dofs[line * this->degree + i + 1]
-                        = solution (i);
-                }
-
-            // Then we go on to the
-            // interior shape
-            // functions. Again we
-            // set up the system
-            // matrix and use it
-            // for both, the
-            // horizontal and the
-            // vertical, interior
-            // shape functions.
-            const QGauss<dim> reference_quadrature (this->degree);
-            const std::vector<Polynomials::Polynomial<double> > &
-            legendre_polynomials
-              = Polynomials::Legendre::generate_complete_basis (this->degree-1);
-            const unsigned int &n_interior_points
-              = reference_quadrature.size ();
-
-            system_matrix.reinit ((this->degree-1) * this->degree,
-                                  (this->degree-1) * this->degree);
-            system_matrix = 0;
-
-            for (unsigned int i = 0; i < this->degree; ++i)
-              for (unsigned int j = 0; j < this->degree-1; ++j)
-                for (unsigned int k = 0; k < this->degree; ++k)
-                  for (unsigned int l = 0; l < this->degree-1; ++l)
-                    for (unsigned int q_point = 0;
-                         q_point < n_interior_points; ++q_point)
-                      system_matrix (i * (this->degree-1) + j, k * (this->degree-1) + l)
-                      += reference_quadrature.weight (q_point)
-                         * legendre_polynomials[i].value
-                         (this->generalized_support_points[q_point
-                                                           + GeometryInfo<dim>::lines_per_cell
-                                                           * n_edge_points]
-                          (0))
-                         * lobatto_polynomials[j + 2].value
-                         (this->generalized_support_points[q_point
-                                                           + GeometryInfo<dim>::lines_per_cell
-                                                           * n_edge_points]
-                          (1))
-                         * lobatto_polynomials_grad[k].value
-                         (this->generalized_support_points[q_point
-                                                           + GeometryInfo<dim>::lines_per_cell
-                                                           * n_edge_points]
-                          (0))
-                         * lobatto_polynomials[l + 2].value
-                         (this->generalized_support_points[q_point
-                                                           + GeometryInfo<dim>::lines_per_cell
-                                                           * n_edge_points]
-                          (1));
-
-            system_matrix_inv.reinit (system_matrix.m (),
-                                      system_matrix.m ());
-            system_matrix_inv.invert (system_matrix);
-            solution.reinit (system_matrix_inv.m ());
-            system_rhs.reinit (system_matrix.m ());
-
-            if (offset == 0)
-              {
-                // Set up the right hand side
-                // for the horizontal shape
-                // functions.
-                system_rhs = 0;
-
-                for (unsigned int q_point = 0;
-                     q_point < n_interior_points; ++q_point)
-                  {
-                    double tmp
-                      = values[q_point + GeometryInfo<dim>::lines_per_cell
-                               * n_edge_points] (0);
-
-                    for (unsigned int i = 0; i < 2; ++i)
-                      for (unsigned int j = 0; j < this->degree; ++j)
-                        tmp -= local_dofs[(i + 2) * this->degree + j]
-                               * this->shape_value_component
-                               ((i + 2) * this->degree + j,
-                                this->generalized_support_points[q_point
-                                                                 + GeometryInfo<dim>::lines_per_cell
-                                                                 * n_edge_points],
-                                0);
-
-                    for (unsigned int i = 0; i < this->degree; ++i)
-                      for (unsigned int j = 0; j < this->degree-1; ++j)
-                        system_rhs (i * (this->degree-1) + j)
-                        += reference_quadrature.weight (q_point) * tmp
-                           * lobatto_polynomials_grad[i].value
-                           (this->generalized_support_points[q_point
-                                                             + GeometryInfo<dim>::lines_per_cell
-                                                             * n_edge_points]
-                            (0))
-                           * lobatto_polynomials[j + 2].value
-                           (this->generalized_support_points[q_point
-                                                             + GeometryInfo<dim>::lines_per_cell
-                                                             * n_edge_points]
-                            (1));
-                  }
-
-                system_matrix_inv.vmult (solution, system_rhs);
-
-                // Add the computed values
-                // to the resulting vector
-                // only, if they are not
-                // too small.
-                for (unsigned int i = 0; i < this->degree; ++i)
-                  for (unsigned int j = 0; j < this->degree-1; ++j)
-                    if (std::abs (solution (i * (this->degree-1) + j)) > 1e-14)
-                      local_dofs[(i + GeometryInfo<dim>::lines_per_cell)
-                                 * (this->degree-1) + j
-                                 + GeometryInfo<dim>::lines_per_cell]
-                        = solution (i * (this->degree-1) + j);
-              }
-
-            // Set up the right hand side
-            // for the vertical shape
-            // functions.
-            system_rhs = 0;
-
-            for (unsigned int q_point = 0; q_point < n_interior_points;
-                 ++q_point)
-              {
-                double tmp
-                  = values[q_point + GeometryInfo<dim>::lines_per_cell
-                           * n_edge_points] (1);
-
-                for (unsigned int i = 0; i < 2; ++i)
-                  for (unsigned int j = 0; j < this->degree; ++j)
-                    tmp -= local_dofs[i * this->degree + j]
-                           * this->shape_value_component
-                           (i * this->degree + j,
-                            this->generalized_support_points[q_point
-                                                             + GeometryInfo<dim>::lines_per_cell
-                                                             * n_edge_points],
-                            1);
-
-                for (unsigned int i = 0; i < this->degree; ++i)
-                  for (unsigned int j = 0; j < this->degree-1; ++j)
-                    system_rhs (i * (this->degree-1) + j)
-                    += reference_quadrature.weight (q_point) * tmp
-                       * lobatto_polynomials_grad[i].value
-                       (this->generalized_support_points[q_point
-                                                         + GeometryInfo<dim>::lines_per_cell
-                                                         * n_edge_points]
-                        (1))
-                       * lobatto_polynomials[j + 2].value
-                       (this->generalized_support_points[q_point
-                                                         + GeometryInfo<dim>::lines_per_cell
-                                                         * n_edge_points]
-                        (0));
-              }
-
-            system_matrix_inv.vmult (solution, system_rhs);
-
-            // Add the computed values
-            // to the resulting vector
-            // only, if they are not
-            // too small.
-            for (unsigned int i = 0; i < this->degree; ++i)
-              for (unsigned int j = 0; j < this->degree-1; ++j)
-                if (std::abs (solution (i * (this->degree-1) + j)) > 1e-14)
-                  local_dofs[i + (j + GeometryInfo<dim>::lines_per_cell
-                                  + this->degree-1) * this->degree]
-                    = solution (i * (this->degree-1) + j);
-          }
-
-        break;
-      }
-
-      case 3:
-      {
-        const QGauss<1>
-        reference_edge_quadrature (this->degree);
-        const unsigned int &
-        n_edge_points = reference_edge_quadrature.size ();
-
-        // Let us begin with the
-        // interpolation part.
-        for (unsigned int i = 0; i < 4; ++i)
-          {
-            for (unsigned int q_point = 0; q_point < n_edge_points;
-                 ++q_point)
-              local_dofs[(i + 8) * this->degree]
-              += reference_edge_quadrature.weight (q_point)
-                 * values[q_point + (i + 8) * n_edge_points] (2);
-
-            // Add the computed values
-            // to the resulting vector
-            // only, if they are not
-            // too small.
-            if (std::abs (local_dofs[(i + 8) * this->degree]) < 1e-14)
-              local_dofs[(i + 8) * this->degree] = 0.0;
-          }
-
-        if (offset + 1 < dim)
-          {
-            for (unsigned int i = 0; i < 2; ++i)
-              for (unsigned int j = 0; j < 2; ++j)
-                {
-                  for (unsigned int q_point = 0; q_point < n_edge_points;
-                       ++q_point)
-                    local_dofs[(i + 4 * j) * this->degree]
-                    += reference_edge_quadrature.weight (q_point)
-                       * values[q_point + (i + 4 * j) * n_edge_points]
-                       (1);
-
-                  // Add the computed values
-                  // to the resulting vector
-                  // only, if they are not
-                  // too small.
-                  if (std::abs (local_dofs[(i + 4 * j) * this->degree])
-                      < 1e-14)
-                    local_dofs[(i + 4 * j) * this->degree] = 0.0;
-                }
-
-            if (offset == 0)
-              for (unsigned int i = 0; i < 2; ++i)
-                for (unsigned int j = 0; j < 2; ++j)
-                  {
-                    for (unsigned int q_point = 0;
-                         q_point < n_edge_points; ++q_point)
-                      local_dofs[(i + 4 * j + 2) * this->degree]
-                      += reference_edge_quadrature.weight (q_point)
-                         * values[q_point + (i + 4 * j + 2)
-                                  * n_edge_points] (0);
-
-                    // Add the computed values
-                    // to the resulting vector
-                    // only, if they are not
-                    // too small.
-                    if (std::abs (local_dofs[(i + 4 * j + 2)
-                                             * this->degree]) < 1e-14)
-                      local_dofs[(i + 4 * j + 2) * this->degree] = 0.0;
-                  }
-          }
-
-        // If the degree is greater
-        // than 0, then we have still
-        // some higher order shape
-        // functions to consider.
-        // Here the projection part
-        // starts. The dof values
-        // are obtained by solving
-        // a linear system of
-        // equations.
-        if (this->degree > 1)
-          {
-            // We start with projection
-            // on the higher order edge
-            // shape function.
-            const std::vector<Polynomials::Polynomial<double> > &
-            lobatto_polynomials
-              = Polynomials::Lobatto::generate_complete_basis
-                (this->degree);
-            const unsigned int
-            line_coordinate[GeometryInfo<3>::lines_per_cell]
-              = {1, 1, 0, 0, 1, 1, 0, 0, 2, 2, 2, 2};
-            FullMatrix<double> system_matrix (this->degree-1, this->degree-1);
-            FullMatrix<double> system_matrix_inv (this->degree-1, this->degree-1);
-            std::vector<Polynomials::Polynomial<double> >
-            lobatto_polynomials_grad (this->degree);
-
-            for (unsigned int i = 0; i < lobatto_polynomials_grad.size ();
-                 ++i)
-              lobatto_polynomials_grad[i]
-                = lobatto_polynomials[i + 1].derivative ();
-
-            Vector<double> system_rhs (system_matrix.m ());
-            Vector<double> solution (system_rhs.size ());
-
-            // Set up the system matrix.
-            // This can be used for all
-            // edges.
-            for (unsigned int i = 0; i < system_matrix.m (); ++i)
-              for (unsigned int j = 0; j < system_matrix.n (); ++j)
-                for (unsigned int q_point = 0; q_point < n_edge_points;
-                     ++q_point)
-                  system_matrix (i, j)
-                  += boundary_weights (q_point, j)
-                     * lobatto_polynomials_grad[i + 1].value
-                     (this->generalized_face_support_points[q_point]
-                      (1));
-
-            system_matrix_inv.invert (system_matrix);
-
-            for (unsigned int line = 0;
-                 line < GeometryInfo<dim>::lines_per_cell; ++line)
-              {
-                // Set up the right hand side.
-                system_rhs = 0;
-
-                if ((((line == 0) || (line == 1) || (line == 4) ||
-                      (line == 5)) && (offset + 1 < dim)) ||
-                    (((line == 2) || (line == 3) || (line == 6) ||
-                      (line == 7)) && (offset == 0)) || (line > 7))
-                  {
-                    for (unsigned int q_point = 0; q_point < n_edge_points;
-                         ++q_point)
-                      {
-                        double tmp
-                          = values[line * n_edge_points + q_point]
-                            (line_coordinate[line])
-                            - local_dofs[line * this->degree]
-                            * this->shape_value_component
-                            (line * this->degree,
-                             this->generalized_support_points[line
-                                                              * this->degree
-                                                              + q_point],
-                             line_coordinate[line]);
-
-                        for (unsigned int i = 0; i < system_rhs.size ();
-                             ++i)
-                          system_rhs (i)
-                          += boundary_weights (q_point, i) * tmp;
-                      }
-
-                    system_matrix_inv.vmult (solution, system_rhs);
-
-                    // Add the computed values
-                    // to the resulting vector
-                    // only, if they are not
-                    // too small.
-                    for (unsigned int i = 0; i < solution.size (); ++i)
-                      if (std::abs (solution (i)) > 1e-14)
-                        local_dofs[line * this->degree + i + 1]
-                          = solution (i);
-                  }
-              }
-
-            // Then we go on to the
-            // face shape functions.
-            // Again we set up the
-            // system matrix and
-            // use it for both, the
-            // horizontal and the
-            // vertical, shape
-            // functions.
-            const std::vector<Polynomials::Polynomial<double> > &
-            legendre_polynomials
-              = Polynomials::Legendre::generate_complete_basis (this->degree-1);
-            const unsigned int
-            n_face_points = n_edge_points * n_edge_points;
-
-            system_matrix.reinit ((this->degree-1) * this->degree,
-                                  (this->degree-1) * this->degree);
-            system_matrix = 0;
-
-            for (unsigned int i = 0; i < this->degree; ++i)
-              for (unsigned int j = 0; j < this->degree-1; ++j)
-                for (unsigned int k = 0; k < this->degree; ++k)
-                  for (unsigned int l = 0; l < this->degree-1; ++l)
-                    for (unsigned int q_point = 0; q_point < n_face_points;
-                         ++q_point)
-                      system_matrix (i * (this->degree-1) + j, k * (this->degree-1) + l)
-                      += boundary_weights (q_point + n_edge_points,
-                                           2 * (k * (this->degree-1) + l))
-                         * legendre_polynomials[i].value
-                         (this->generalized_face_support_points[q_point
-                                                                + 4
-                                                                * n_edge_points]
-                          (0))
-                         * lobatto_polynomials[j + 2].value
-                         (this->generalized_face_support_points[q_point
-                                                                + 4
-                                                                * n_edge_points]
-                          (1));
-
-            system_matrix_inv.reinit (system_matrix.m (),
-                                      system_matrix.n ());
-            system_matrix_inv.invert (system_matrix);
-            solution.reinit (system_matrix.m ());
-            system_rhs.reinit (system_matrix.m ());
-
-            for (unsigned int face = 0;
-                 face < GeometryInfo<dim>::faces_per_cell; ++face)
-              {
-                switch (face)
-                  {
-                  case 0:
-                  {
-                    if (offset + 1 < dim)
-                      {
-                        // Set up the right hand side
-                        // for the horizontal shape
-                        // functions.
-                        system_rhs = 0;
-
-                        for (unsigned int q_point = 0;
-                             q_point < n_face_points; ++q_point)
-                          {
-                            double tmp
-                              = values[q_point
-                                       + GeometryInfo<dim>::lines_per_cell
-                                       * n_edge_points] (1);
-
-                            for (unsigned int i = 0; i < 2; ++i)
-                              for (unsigned int j = 0; j < this->degree; ++j)
-                                tmp
-                                -= local_dofs[4 * i * this->degree
-                                              + j]
-                                   * this->shape_value_component
-                                   (4 * i * this->degree + j,
-                                    this->generalized_support_points[q_point
-                                                                     + GeometryInfo<dim>::lines_per_cell
-                                                                     * n_edge_points],
-                                    1);
-
-                            for (unsigned int i = 0; i < this->degree; ++i)
-                              for (unsigned int j = 0; j < this->degree-1; ++j)
-                                system_rhs (i * (this->degree-1) + j)
-                                += boundary_weights
-                                   (q_point + n_edge_points,
-                                    2 * (i * (this->degree-1) + j)) * tmp;
-                          }
-
-                        system_matrix_inv.vmult (solution, system_rhs);
-
-                        // Add the computed values
-                        // to the resulting vector
-                        // only, if they are not
-                        // too small.
-                        for (unsigned int i = 0; i < this->degree; ++i)
-                          for (unsigned int j = 0; j < this->degree-1; ++j)
-                            if (std::abs (solution (i * (this->degree-1) + j))
-                                > 1e-14)
-                              local_dofs[(i
-                                          + GeometryInfo<dim>::lines_per_cell)
-                                         * (this->degree-1) + j
-                                         + GeometryInfo<dim>::lines_per_cell]
-                                = solution (i * (this->degree-1) + j);
-                      }
-
-                    // Set up the right hand side
-                    // for the vertical shape
-                    // functions.
-                    system_rhs = 0;
-
-                    for (unsigned int q_point = 0;
-                         q_point < n_face_points; ++q_point)
-                      {
-                        double tmp
-                          = values[q_point
-                                   + GeometryInfo<dim>::lines_per_cell
-                                   * n_edge_points] (2);
-
-                        for (unsigned int i = 0; i < 2; ++i)
-                          for (unsigned int j = 0; j < this->degree; ++j)
-                            tmp -= local_dofs[2 * (i + 4)
-                                              * this->degree + j]
-                                   * this->shape_value_component
-                                   (2 * (i + 4) * this->degree + j,
-                                    this->generalized_support_points[q_point
-                                                                     + GeometryInfo<dim>::lines_per_cell
-                                                                     * n_edge_points],
-                                    2);
-
-                        for (unsigned int i = 0; i < this->degree; ++i)
-                          for (unsigned int j = 0; j < this->degree-1; ++j)
-                            system_rhs (i * (this->degree-1) + j)
-                            += boundary_weights
-                               (q_point + n_edge_points,
-                                2 * (i * (this->degree-1) + j) + 1)
-                               * tmp;
-                      }
-
-                    system_matrix_inv.vmult (solution, system_rhs);
-
-                    // Add the computed values
-                    // to the resulting vector
-                    // only, if they are not
-                    // too small.
-                    for (unsigned int i = 0; i < this->degree; ++i)
-                      for (unsigned int j = 0; j < this->degree-1; ++j)
-                        if (std::abs (solution (i * (this->degree-1) + j)) > 1e-14)
-                          local_dofs[i + (j + GeometryInfo<dim>::lines_per_cell
-                                          + this->degree-1)
-                                     * this->degree]
-                            = solution (i * (this->degree-1) + j);
-
-                    break;
-                  }
-
-                  case 1:
-                  {
-                    if (offset + 1 < dim)
-                      {
-                        // Set up the right hand side
-                        // for the horizontal shape
-                        // functions.
-                        system_rhs = 0;
-
-                        for (unsigned int q_point = 0;
-                             q_point < n_face_points; ++q_point)
-                          {
-                            double tmp
-                              = values[q_point
-                                       + GeometryInfo<dim>::lines_per_cell
-                                       * n_edge_points
-                                       + n_face_points] (1);
-
-                            for (unsigned int i = 0; i < 2; ++i)
-                              for (unsigned int j = 0; j <= deg; ++j)
-                                tmp -= local_dofs[(4 * i + 1)
-                                                  * this->degree + j]
-                                       * this->shape_value_component
-                                       ((4 * i + 1) * this->degree
-                                        + j,
-                                        this->generalized_support_points[q_point
-                                                                         + GeometryInfo<dim>::lines_per_cell
-                                                                         * n_edge_points
-                                                                         + n_face_points],
-                                        1);
-
-                            for (unsigned int i = 0; i <= deg; ++i)
-                              for (unsigned int j = 0; j < deg; ++j)
-                                system_rhs (i * deg + j)
-                                += boundary_weights
-                                   (q_point + n_edge_points,
-                                    2 * (i * deg + j)) * tmp;
-                          }
-
-                        system_matrix_inv.vmult (solution, system_rhs);
-
-                        // Add the computed values
-                        // to the resulting vector
-                        // only, if they are not
-                        // too small.
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            if (std::abs (solution (i * deg + j))
-                                > 1e-14)
-                              local_dofs[(i + GeometryInfo<dim>::lines_per_cell
-                                          + 2 * this->degree) * deg + j
-                                         + GeometryInfo<dim>::lines_per_cell]
-                                = solution (i * deg + j);
-                      }
-
-                    // Set up the right hand side
-                    // for the vertical shape
-                    // functions.
-                    system_rhs = 0;
-
-                    for (unsigned int q_point = 0;
-                         q_point < n_face_points; ++q_point)
-                      {
-                        double tmp
-                          = values[q_point
-                                   + GeometryInfo<dim>::lines_per_cell
-                                   * n_edge_points + n_face_points]
-                            (2);
-
-                        for (unsigned int i = 0; i < 2; ++i)
-                          for (unsigned int j = 0; j <= deg; ++j)
-                            tmp -= local_dofs[(2 * (i + 4) + 1)
-                                              * this->degree + j]
-                                   * this->shape_value_component
-                                   ((2 * (i + 4) + 1) * this->degree
-                                    + j,
-                                    this->generalized_support_points[q_point
-                                                                     + GeometryInfo<dim>::lines_per_cell
-                                                                     * n_edge_points
-                                                                     + n_face_points],
-                                    2);
-
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            system_rhs (i * deg + j)
-                            += boundary_weights
-                               (q_point + n_edge_points,
-                                2 * (i * deg + j) + 1) * tmp;
-                      }
-
-                    system_matrix_inv.vmult (solution, system_rhs);
-
-                    // Add the computed values
-                    // to the resulting vector
-                    // only, if they are not
-                    // too small.
-                    for (unsigned int i = 0; i <= deg; ++i)
-                      for (unsigned int j = 0; j < deg; ++j)
-                        if (std::abs (solution (i * deg + j)) > 1e-14)
-                          local_dofs[i + (j + GeometryInfo<dim>::lines_per_cell
-                                          + 3 * deg)
-                                     * this->degree]
-                            = solution (i * deg + j);
-
-                    break;
-                  }
-
-                  case 2:
-                  {
-                    if (offset == 0)
-                      {
-                        // Set up the right hand side
-                        // for the horizontal shape
-                        // functions.
-                        system_rhs = 0;
-
-                        for (unsigned int q_point = 0;
-                             q_point < n_face_points; ++q_point)
-                          {
-                            double tmp
-                              = values[q_point
-                                       + GeometryInfo<dim>::lines_per_cell
-                                       * n_edge_points + 2 * n_face_points]
-                                (2);
-
-                            for (unsigned int i = 0; i < 2; ++i)
-                              for (unsigned int j = 0; j <= deg; ++j)
-                                tmp -= local_dofs[(i + 8) * this->degree
-                                                  + j]
-                                       * this->shape_value_component
-                                       ((i + 8) * this->degree + j,
-                                        this->generalized_support_points[q_point
-                                                                         + GeometryInfo<dim>::lines_per_cell
-                                                                         * n_edge_points
-                                                                         + 2
-                                                                         * n_face_points],
-                                        2);
-
-                            for (unsigned int i = 0; i <= deg; ++i)
-                              for (unsigned int j = 0; j < deg; ++j)
-                                system_rhs (i * deg + j)
-                                += boundary_weights
-                                   (q_point + n_edge_points,
-                                    2 * (i * deg + j)) * tmp;
-                          }
-
-                        system_matrix_inv.vmult (solution, system_rhs);
-
-                        // Add the computed values
-                        // to the resulting vector
-                        // only, if they are not
-                        // too small.
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            if (std::abs (solution (i * deg + j))
-                                > 1e-14)
-                              local_dofs[(i + GeometryInfo<dim>::lines_per_cell
-                                          + 4 * this->degree) * deg
-                                         + j
-                                         + GeometryInfo<dim>::lines_per_cell]
-                                = solution (i * deg + j);
-                      }
-
-                    // Set up the right hand side
-                    // for the vertical shape
-                    // functions.
-                    system_rhs = 0;
-
-                    for (unsigned int q_point = 0;
-                         q_point < n_face_points; ++q_point)
-                      {
-                        double tmp
-                          = values[q_point
-                                   + GeometryInfo<dim>::lines_per_cell
-                                   * n_edge_points
-                                   + 2 * n_face_points] (0);
-
-                        for (unsigned int i = 0; i < 2; ++i)
-                          for (unsigned int j = 0; j <= deg; ++j)
-                            tmp -= local_dofs[(4 * i + 2)
-                                              * this->degree + j]
-                                   * this->shape_value_component
-                                   ((4 * i + 2) * this->degree
-                                    + j,
-                                    this->generalized_support_points[q_point
-                                                                     + GeometryInfo<dim>::lines_per_cell
-                                                                     * n_edge_points
-                                                                     + 2
-                                                                     * n_face_points],
-                                    0);
-
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            system_rhs (i * deg + j)
-                            += boundary_weights
-                               (q_point + n_edge_points,
-                                2 * (i * deg + j) + 1) * tmp;
-                      }
-
-                    system_matrix_inv.vmult (solution, system_rhs);
-
-                    // Add the computed values
-                    // to the resulting vector
-                    // only, if they are not
-                    // too small.
-                    for (unsigned int i = 0; i <= deg; ++i)
-                      for (unsigned int j = 0; j < deg; ++j)
-                        if (std::abs (solution (i * deg + j)) > 1e-14)
-                          local_dofs[i + (j + GeometryInfo<dim>::lines_per_cell
-                                          + 5 * deg) * this->degree]
-                            = solution (i * deg + j);
-
-                    break;
-                  }
-
-                  case 3:
-                  {
-                    if (offset == 0)
-                      {
-                        // Set up the right hand side
-                        // for the horizontal shape
-                        // functions.
-                        system_rhs = 0;
-
-                        for (unsigned int q_point = 0;
-                             q_point < n_face_points; ++q_point)
-                          {
-                            double tmp
-                              = values[q_point
-                                       + GeometryInfo<dim>::lines_per_cell
-                                       * n_edge_points + 3 * n_face_points]
-                                (2);
-
-                            for (unsigned int i = 0; i < 2; ++i)
-                              for (unsigned int j = 0; j <= deg; ++j)
-                                tmp -= local_dofs[(i + 10) * this->degree
-                                                  + j]
-                                       * this->shape_value_component
-                                       ((i + 10) * this->degree + j,
-                                        this->generalized_support_points[q_point
-                                                                         + GeometryInfo<dim>::lines_per_cell
-                                                                         * n_edge_points
-                                                                         + 3
-                                                                         * n_face_points],
-                                        2);
-
-                            for (unsigned int i = 0; i <= deg; ++i)
-                              for (unsigned int j = 0; j < deg; ++j)
-                                system_rhs (i * deg + j)
-                                += boundary_weights
-                                   (q_point + n_edge_points,
-                                    2 * (i * deg + j)) * tmp;
-                          }
-
-                        system_matrix_inv.vmult (solution, system_rhs);
-
-                        // Add the computed values
-                        // to the resulting vector
-                        // only, if they are not
-                        // too small.
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            if (std::abs (solution (i * deg + j))
-                                > 1e-14)
-                              local_dofs[(i + GeometryInfo<dim>::lines_per_cell
-                                          + 6 * this->degree) * deg + j
-                                         + GeometryInfo<dim>::lines_per_cell]
-                                = solution (i * deg + j);
-                      }
-
-                    // Set up the right hand side
-                    // for the vertical shape
-                    // functions.
-                    system_rhs = 0;
-
-                    for (unsigned int q_point = 0;
-                         q_point < n_face_points; ++q_point)
-                      {
-                        double tmp
-                          = values[q_point
-                                   + GeometryInfo<dim>::lines_per_cell
-                                   * n_edge_points + 3
-                                   * n_face_points] (0);
-
-                        for (unsigned int i = 0; i < 2; ++i)
-                          for (unsigned int j = 0; j <= deg; ++j)
-                            tmp -= local_dofs[(4 * i + 3)
-                                              * this->degree + j]
-                                   * this->shape_value_component
-                                   ((4 * i + 3) * this->degree
-                                    + j,
-                                    this->generalized_support_points[q_point
-                                                                     + GeometryInfo<dim>::lines_per_cell
-                                                                     * n_edge_points
-                                                                     + 3
-                                                                     * n_face_points],
-                                    0);
-
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            system_rhs (i * deg + j)
-                            += boundary_weights
-                               (q_point + n_edge_points,
-                                2 * (i * deg + j) + 1) * tmp;
-                      }
-
-                    system_matrix_inv.vmult (solution, system_rhs);
-
-                    // Add the computed values
-                    // to the resulting vector
-                    // only, if they are not
-                    // too small.
-                    for (unsigned int i = 0; i <= deg; ++i)
-                      for (unsigned int j = 0; j < deg; ++j)
-                        if (std::abs (solution (i * deg + j)) > 1e-14)
-                          local_dofs[i + (j + GeometryInfo<dim>::lines_per_cell
-                                          + 7 * deg) * this->degree]
-                            = solution (i * deg + j);
-
-                    break;
-                  }
-
-                  case 4:
-                  {
-                    if (offset + 1 < dim)
-                      {
-                        // Set up the right hand side
-                        // for the horizontal shape
-                        // functions.
-                        if (offset == 0)
-                          {
-                            system_rhs = 0;
-
-                            for (unsigned int q_point = 0;
-                                 q_point < n_face_points; ++q_point)
-                              {
-                                double tmp
-                                  = values[q_point
-                                           + GeometryInfo<dim>::lines_per_cell
-                                           * n_edge_points + 4
-                                           * n_face_points] (0);
-
-                                for (unsigned int i = 0; i < 2; ++i)
-                                  for (unsigned int j = 0; j <= deg; ++j)
-                                    tmp -= local_dofs[(i + 2)
-                                                      * this->degree
-                                                      + j]
-                                           * this->shape_value_component
-                                           ((i + 2) * this->degree
-                                            + j,
-                                            this->generalized_support_points[q_point
-                                                                             + GeometryInfo<dim>::lines_per_cell
-                                                                             * n_edge_points
-                                                                             + 4
-                                                                             * n_face_points],
-                                            0);
-
-                                for (unsigned int i = 0; i <= deg; ++i)
-                                  for (unsigned int j = 0; j < deg; ++j)
-                                    system_rhs (i * deg + j)
-                                    += boundary_weights
-                                       (q_point + n_edge_points,
-                                        2 * (i * deg + j)) * tmp;
-                              }
-
-                            system_matrix_inv.vmult
-                            (solution, system_rhs);
-
-                            // Add the computed values
-                            // to the resulting vector
-                            // only, if they are not
-                            // too small.
-                            for (unsigned int i = 0; i <= deg; ++i)
-                              for (unsigned int j = 0; j < deg; ++j)
-                                if (std::abs (solution (i * deg + j))
-                                    > 1e-14)
-                                  local_dofs[(i + GeometryInfo<dim>::lines_per_cell
-                                              + 8 * this->degree) * deg
-                                             + j
-                                             + GeometryInfo<dim>::lines_per_cell]
-                                    = solution (i * deg + j);
-                          }
-
-                        // Set up the right hand side
-                        // for the vertical shape
-                        // functions.
-                        system_rhs = 0;
-
-                        for (unsigned int q_point = 0;
-                             q_point < n_face_points; ++q_point)
-                          {
-                            double tmp
-                              = values[q_point
-                                       + GeometryInfo<dim>::lines_per_cell
-                                       * n_edge_points + 4
-                                       * n_face_points] (1);
-
-                            for (unsigned int i = 0; i < 2; ++i)
-                              for (unsigned int j = 0; j <= deg; ++j)
-                                tmp -= local_dofs[i * this->degree + j]
-                                       * this->shape_value_component
-                                       (i * this->degree + j,
-                                        this->generalized_support_points[q_point
-                                                                         + GeometryInfo<dim>::lines_per_cell
-                                                                         * n_edge_points
-                                                                         + 4
-                                                                         * n_face_points],
-                                        1);
-
-                            for (unsigned int i = 0; i <= deg; ++i)
-                              for (unsigned int j = 0; j < deg; ++j)
-                                system_rhs (i * deg + j)
-                                += boundary_weights
-                                   (q_point + n_edge_points,
-                                    2 * (i * deg + j) + 1) * tmp;
-                          }
-
-                        system_matrix_inv.vmult (solution, system_rhs);
-
-                        // Add the computed values
-                        // to the resulting vector
-                        // only, if they are not
-                        // too small.
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            if (std::abs (solution (i * deg + j))
-                                > 1e-14)
-                              local_dofs[i + (j + GeometryInfo<dim>::lines_per_cell
-                                              + 9 * deg)
-                                         * this->degree]
-                                = solution (i * deg + j);
-                      }
-
-                    break;
-                  }
-
-                  default:
-                    if (offset + 1 < dim)
-                      {
-                        // Set up the right hand side
-                        // for the horizontal shape
-                        // functions.
-                        if (offset == 0)
-                          {
-                            system_rhs = 0;
-
-                            for (unsigned int q_point = 0;
-                                 q_point < n_face_points; ++q_point)
-                              {
-                                double tmp
-                                  = values[q_point
-                                           + GeometryInfo<dim>::lines_per_cell
-                                           * n_edge_points
-                                           + 5 * n_face_points] (0);
-
-                                for (unsigned int i = 0; i < 2; ++i)
-                                  for (unsigned int j = 0; j <= deg; ++j)
-                                    tmp -= local_dofs[(i + 6)
-                                                      * this->degree + j]
-                                           * this->shape_value_component
-                                           ((i + 6) * this->degree + j,
-                                            this->generalized_support_points[q_point
-                                                                             + GeometryInfo<dim>::lines_per_cell
-                                                                             * n_edge_points
-                                                                             + 5
-                                                                             * n_face_points],
-                                            0);
-
-                                for (unsigned int i = 0; i <= deg; ++i)
-                                  for (unsigned int j = 0; j < deg; ++j)
-                                    system_rhs (i * deg + j)
-                                    += boundary_weights
-                                       (q_point + n_edge_points,
-                                        2 * (i * deg + j)) * tmp;
-                              }
-
-                            system_matrix_inv.vmult
-                            (solution, system_rhs);
-
-                            // Add the computed values
-                            // to the resulting vector
-                            // only, if they are not
-                            // too small.
-                            for (unsigned int i = 0; i <= deg; ++i)
-                              for (unsigned int j = 0; j < deg; ++j)
-                                if (std::abs (solution (i * deg + j))
-                                    > 1e-14)
-                                  local_dofs[(i + GeometryInfo<dim>::lines_per_cell
-                                              + 10 * this->degree)
-                                             * deg + j
-                                             + GeometryInfo<dim>::lines_per_cell]
-                                    = solution (i * deg + j);
-                          }
-
-                        // Set up the right hand side
-                        // for the vertical shape
-                        // functions.
-                        system_rhs = 0;
-
-                        for (unsigned int q_point = 0;
-                             q_point < n_face_points; ++q_point)
-                          {
-                            double tmp
-                              = values[q_point
-                                       + GeometryInfo<dim>::lines_per_cell
-                                       * n_edge_points + 5
-                                       * n_face_points] (1);
-
-                            for (unsigned int i = 0; i < 2; ++i)
-                              for (unsigned int j = 0; j <= deg; ++j)
-                                tmp -= local_dofs[(i + 4)
-                                                  * this->degree + j]
-                                       * this->shape_value_component
-                                       ((i + 4) * this->degree + j,
-                                        this->generalized_support_points[q_point
-                                                                         + GeometryInfo<dim>::lines_per_cell
-                                                                         * n_edge_points
-                                                                         + 5
-                                                                         * n_face_points],
-                                        1);
-
-                            for (unsigned int i = 0; i <= deg; ++i)
-                              for (unsigned int j = 0; j < deg; ++j)
-                                system_rhs (i * deg + j)
-                                += boundary_weights
-                                   (q_point + n_edge_points,
-                                    2 * (i * deg + j) + 1) * tmp;
-                          }
-
-                        system_matrix_inv.vmult (solution, system_rhs);
-
-                        // Add the computed values
-                        // to the resulting vector
-                        // only, if they are not
-                        // too small.
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            if (std::abs (solution (i * deg + j))
-                                > 1e-14)
-                              local_dofs[i + (j + GeometryInfo<dim>::lines_per_cell
-                                              + 11 * deg) * this->degree]
-                                = solution (i * deg + j);
-                      }
-                  }
-              }
-
-            // Finally we project
-            // the remaining parts
-            // of the function on
-            // the interior shape
-            // functions.
-            const QGauss<dim> reference_quadrature (this->degree);
-            const unsigned int &
-            n_interior_points = reference_quadrature.size ();
-
-            // We create the
-            // system matrix.
-            system_matrix.reinit (this->degree * deg * deg,
-                                  this->degree * deg * deg);
-            system_matrix = 0;
-
-            for (unsigned int i = 0; i <= deg; ++i)
-              for (unsigned int j = 0; j < deg; ++j)
-                for (unsigned int k = 0; k < deg; ++k)
-                  for (unsigned int l = 0; l <= deg; ++l)
-                    for (unsigned int m = 0; m < deg; ++m)
-                      for (unsigned int n = 0; n < deg; ++n)
-                        for (unsigned int q_point = 0;
-                             q_point < n_interior_points; ++q_point)
-                          system_matrix ((i * deg + j) * deg + k,
-                                         (l * deg + m) * deg + n)
-                          += reference_quadrature.weight (q_point)
-                             * legendre_polynomials[i].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (0)) * lobatto_polynomials[j + 2].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (1))
-                             * lobatto_polynomials[k + 2].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (2))
-                             * lobatto_polynomials_grad[l].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (0))
-                             * lobatto_polynomials[m + 2].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (1))
-                             * lobatto_polynomials[n + 2].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (2));
-
-            system_matrix_inv.reinit (system_matrix.m (),
-                                      system_matrix.m ());
-            system_matrix_inv.invert (system_matrix);
-            system_rhs.reinit (system_matrix_inv.m ());
-            solution.reinit (system_matrix.m ());
-
-            if (offset + 1 < dim)
-              {
-                if (offset == 0)
-                  {
-                    // Set up the right hand side.
-                    system_rhs = 0;
-
-                    for (unsigned int q_point = 0;
-                         q_point < n_interior_points; ++q_point)
-                      {
-                        double tmp
-                          = values[q_point
-                                   + GeometryInfo<dim>::lines_per_cell
-                                   * n_edge_points
-                                   + GeometryInfo<dim>::faces_per_cell
-                                   * n_face_points] (0);
-
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          {
-                            for (unsigned int j = 0; j < 2; ++j)
-                              for (unsigned int k = 0; k < 2; ++k)
-                                tmp -= local_dofs[i + (j + 4 * k + 2)
-                                                  * this->degree]
-                                       * this->shape_value_component
-                                       (i + (j + 4 * k + 2)
-                                        * this->degree,
-                                        this->generalized_support_points[q_point
-                                                                         + GeometryInfo<dim>::lines_per_cell
-                                                                         * n_edge_points
-                                                                         + GeometryInfo<dim>::faces_per_cell
-                                                                         * n_face_points],
-                                        0);
-
-                            for (unsigned int j = 0; j < deg; ++j)
-                              for (unsigned int k = 0; k < 4; ++k)
-                                tmp -= local_dofs[(i + 2 * (k + 2)
-                                                   * this->degree
-                                                   + GeometryInfo<dim>::lines_per_cell)
-                                                  * deg + j
-                                                  + GeometryInfo<dim>::lines_per_cell]
-                                       * this->shape_value_component
-                                       ((i + 2 * (k + 2) * this->degree
-                                         + GeometryInfo<dim>::lines_per_cell)
-                                        * deg + j
-                                        + GeometryInfo<dim>::lines_per_cell,
-                                        this->generalized_support_points[q_point
-                                                                         + GeometryInfo<dim>::lines_per_cell
-                                                                         * n_edge_points
-                                                                         + GeometryInfo<dim>::faces_per_cell
-                                                                         * n_face_points],
-                                        0);
-                          }
-
-                        for (unsigned int i = 0; i <= deg; ++i)
-                          for (unsigned int j = 0; j < deg; ++j)
-                            for (unsigned int k = 0; k < deg; ++k)
-                              system_rhs ((i * deg + j) * deg + k)
-                              += reference_quadrature.weight (q_point)
-                                 * tmp
-                                 * lobatto_polynomials_grad[i].value
-                                 (this->generalized_support_points[q_point
-                                                                   + GeometryInfo<dim>::lines_per_cell
-                                                                   * n_edge_points
-                                                                   + GeometryInfo<dim>::faces_per_cell
-                                                                   * n_face_points]
-                                  (0))
-                                 * lobatto_polynomials[j + 2].value
-                                 (this->generalized_support_points[q_point
-                                                                   + GeometryInfo<dim>::lines_per_cell
-                                                                   * n_edge_points
-                                                                   + GeometryInfo<dim>::faces_per_cell
-                                                                   * n_face_points]
-                                  (1))
-                                 * lobatto_polynomials[k + 2].value
-                                 (this->generalized_support_points[q_point
-                                                                   + GeometryInfo<dim>::lines_per_cell
-                                                                   * n_edge_points
-                                                                   + GeometryInfo<dim>::faces_per_cell
-                                                                   * n_face_points]
-                                  (2));
-                      }
-
-                    system_matrix_inv.vmult (solution, system_rhs);
-
-                    // Add the computed values
-                    // to the resulting vector
-                    // only, if they are not
-                    // too small.
-                    for (unsigned int i = 0; i <= deg; ++i)
-                      for (unsigned int j = 0; j < deg; ++j)
-                        for (unsigned int k = 0; k < deg; ++k)
-                          if (std::abs (solution ((i * deg + j) * deg + k))
-                              > 1e-14)
-                            local_dofs[((i + 2
-                                         * GeometryInfo<dim>::faces_per_cell)
-                                        * deg + j
-                                        + GeometryInfo<dim>::lines_per_cell
-                                        + 2
-                                        * GeometryInfo<dim>::faces_per_cell)
-                                       * deg + k
-                                       + GeometryInfo<dim>::lines_per_cell]
-                              = solution ((i * deg + j) * deg + k);
-                  }
-
-                // Set up the right hand side.
-                system_rhs = 0;
-
-                for (unsigned int q_point = 0; q_point < n_interior_points;
-                     ++q_point)
-                  {
-                    double tmp
-                      = values[q_point + GeometryInfo<dim>::lines_per_cell
-                               * n_edge_points
-                               + GeometryInfo<dim>::faces_per_cell
-                               * n_face_points] (1);
-
-                    for (unsigned int i = 0; i <= deg; ++i)
-                      for (unsigned int j = 0; j < 2; ++j)
-                        {
-                          for (unsigned int k = 0; k < 2; ++k)
-                            tmp -= local_dofs[i + (4 * j + k)
-                                              * this->degree]
-                                   * this->shape_value_component
-                                   (i + (4 * j + k) * this->degree,
-                                    this->generalized_support_points[q_point
-                                                                     + GeometryInfo<dim>::lines_per_cell
-                                                                     * n_edge_points
-                                                                     + GeometryInfo<dim>::faces_per_cell
-                                                                     * n_face_points],
-                                    1);
-
-                          for (unsigned int k = 0; k < deg; ++k)
-                            tmp -= local_dofs[(i + 2 * j * this->degree
-                                               + GeometryInfo<dim>::lines_per_cell)
-                                              * deg + k
-                                              + GeometryInfo<dim>::lines_per_cell]
-                                   * this->shape_value_component
-                                   ((i + 2 * j * this->degree
-                                     + GeometryInfo<dim>::lines_per_cell)
-                                    * deg + k
-                                    + GeometryInfo<dim>::lines_per_cell,
-                                    this->generalized_support_points[q_point
-                                                                     + GeometryInfo<dim>::lines_per_cell
-                                                                     * n_edge_points
-                                                                     + GeometryInfo<dim>::faces_per_cell
-                                                                     * n_face_points],
-                                    1)
-                                   + local_dofs[i + ((2 * j + 9) * deg + k
-                                                     + GeometryInfo<dim>::lines_per_cell)
-                                                * this->degree]
-                                   * this->shape_value_component
-                                   (i + ((2 * j + 9) * deg + k
-                                         + GeometryInfo<dim>::lines_per_cell)
-                                    * this->degree,
-                                    this->generalized_support_points[q_point
-                                                                     + GeometryInfo<dim>::lines_per_cell
-                                                                     * n_edge_points
-                                                                     + GeometryInfo<dim>::faces_per_cell
-                                                                     * n_face_points],
-                                    1);
-                        }
-
-                    for (unsigned int i = 0; i <= deg; ++i)
-                      for (unsigned int j = 0; j < deg; ++j)
-                        for (unsigned int k = 0; k < deg; ++k)
-                          system_rhs ((i * deg + j) * deg + k)
-                          += reference_quadrature.weight (q_point) * tmp
-                             * lobatto_polynomials_grad[i].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (1))
-                             * lobatto_polynomials[j + 2].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (0))
-                             * lobatto_polynomials[k + 2].value
-                             (this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points]
-                              (2));
-                  }
-
-                system_matrix_inv.vmult (solution, system_rhs);
-
-                // Add the computed values
-                // to the resulting vector
-                // only, if they are not
-                // too small.
-                for (unsigned int i = 0; i <= deg; ++i)
-                  for (unsigned int j = 0; j < deg; ++j)
-                    for (unsigned int k = 0; k < deg; ++k)
-                      if (std::abs (solution ((i * deg + j) * deg + k))
-                          > 1e-14)
-                        local_dofs[((i + this->degree + 2
-                                     * GeometryInfo<dim>::faces_per_cell)
-                                    * deg + j
-                                    + GeometryInfo<dim>::lines_per_cell + 2
-                                    * GeometryInfo<dim>::faces_per_cell)
-                                   * deg + k
-                                   + GeometryInfo<dim>::lines_per_cell]
-                          = solution ((i * deg + j) * deg + k);
-              }
-
-            // Set up the right hand side.
-            system_rhs = 0;
-
-            for (unsigned int q_point = 0; q_point < n_interior_points;
-                 ++q_point)
-              {
-                double tmp
-                  = values[q_point + GeometryInfo<dim>::lines_per_cell
-                           * n_edge_points
-                           + GeometryInfo<dim>::faces_per_cell
-                           * n_face_points] (2);
-
-                for (unsigned int i = 0; i <= deg; ++i)
-                  for (unsigned int j = 0; j < 4; ++j)
-                    {
-                      tmp -= local_dofs[i + (j + 8) * this->degree]
-                             * this->shape_value_component
-                             (i + (j + 8) * this->degree,
-                              this->generalized_support_points[q_point
-                                                               + GeometryInfo<dim>::lines_per_cell
-                                                               * n_edge_points
-                                                               + GeometryInfo<dim>::faces_per_cell
-                                                               * n_face_points],
-                              2);
-
-                      for (unsigned int k = 0; k < deg; ++k)
-                        tmp -= local_dofs[i + ((2 * j + 1) * deg + k
-                                               + GeometryInfo<dim>::lines_per_cell)
-                                          * this->degree]
-                               * this->shape_value_component
-                               (i + ((2 * j + 1) * deg + k
-                                     + GeometryInfo<dim>::lines_per_cell)
-                                * this->degree,
-                                this->generalized_support_points[q_point
-                                                                 + GeometryInfo<dim>::lines_per_cell
-                                                                 * n_edge_points
-                                                                 + GeometryInfo<dim>::faces_per_cell
-                                                                 * n_face_points],
-                                2);
-                    }
-
-                for (unsigned int i = 0; i <= deg; ++i)
-                  for (unsigned int j = 0; j < deg; ++j)
-                    for (unsigned int k = 0; k < deg; ++k)
-                      system_rhs ((i * deg + j) * deg + k)
-                      += reference_quadrature.weight (q_point) * tmp
-                         * lobatto_polynomials_grad[i].value
-                         (this->generalized_support_points[q_point
-                                                           + GeometryInfo<dim>::lines_per_cell
-                                                           * n_edge_points
-                                                           + GeometryInfo<dim>::faces_per_cell
-                                                           * n_face_points]
-                          (2))
-                         * lobatto_polynomials[j + 2].value
-                         (this->generalized_support_points[q_point
-                                                           + GeometryInfo<dim>::lines_per_cell
-                                                           * n_edge_points
-                                                           + GeometryInfo<dim>::faces_per_cell
-                                                           * n_face_points]
-                          (0))
-                         * lobatto_polynomials[k + 2].value
-                         (this->generalized_support_points[q_point
-                                                           + GeometryInfo<dim>::lines_per_cell
-                                                           * n_edge_points
-                                                           + GeometryInfo<dim>::faces_per_cell
-                                                           * n_face_points]
-                          (1));
-              }
-
-            system_matrix_inv.vmult (solution, system_rhs);
-
-            // Add the computed values
-            // to the resulting vector
-            // only, if they are not
-            // too small.
-            for (unsigned int i = 0; i <= deg; ++i)
-              for (unsigned int j = 0; j < deg; ++j)
-                for (unsigned int k = 0; k < deg; ++k)
-                  if (std::abs (solution ((i * deg + j) * deg + k))
-                      > 1e-14)
-                    local_dofs[i + ((j + 2
-                                     * (deg + GeometryInfo<dim>::faces_per_cell))
-                                    * deg + k
-                                    + GeometryInfo<dim>::lines_per_cell)
-                               * this->degree]
-                      = solution ((i * deg + j) * deg + k);
-          }
-
-        break;
-      }
-
-      default:
-        Assert (false, ExcNotImplemented ());
-      }
-}
-
-
-// Interpolate a function, which is given by
-// its values at the generalized support
-// points in the finite element space on the
-// reference cell.
-// This is done as usual by projection-based
-// interpolation.
-template <int dim>
-void
-FE_Nedelec<dim>::interpolate (std::vector<double> &local_dofs,
-                              const VectorSlice<const std::vector<std::vector<double> > > &values)
-const
-{
-  const unsigned int deg = this->degree-1;
-  Assert (values.size () == this->n_components (),
-          ExcDimensionMismatch (values.size (), this->n_components ()));
-  Assert (values[0].size () == this->generalized_support_points.size (),
-          ExcDimensionMismatch (values[0].size (),
-                                this->generalized_support_points.size ()));
-  Assert (local_dofs.size () == this->dofs_per_cell,
-          ExcDimensionMismatch (local_dofs.size (), this->dofs_per_cell));
-  std::fill (local_dofs.begin (), local_dofs.end (), 0.0);
+  Assert (support_point_values[0].size () == this->n_components (),
+          ExcDimensionMismatch (support_point_values[0].size (), this->n_components ()));
+  Assert (nodal_values.size () == this->dofs_per_cell,
+          ExcDimensionMismatch (nodal_values.size (), this->dofs_per_cell));
+  std::fill (nodal_values.begin (), nodal_values.end (), 0.0);
 
   switch (dim)
     {
@@ -4692,16 +3127,15 @@ const
           {
             for (unsigned int q_point = 0; q_point < n_edge_points;
                  ++q_point)
-              local_dofs[(i + 2 * j) * this->degree]
+              nodal_values[(i + 2 * j) * this->degree]
               += reference_edge_quadrature.weight (q_point)
-                 * values[1 - j][q_point + (i + 2 * j) * n_edge_points];
+                 * support_point_values[q_point + (i + 2 * j) * n_edge_points][1 - j];
 
-            // Add the computed values
-            // to the resulting vector
+            // Add the computed support_point_values to the resulting vector
             // only, if they are not
             // too small.
-            if (std::abs (local_dofs[(i + 2 * j) * this->degree]) < 1e-14)
-              local_dofs[(i + 2 * j) * this->degree] = 0.0;
+            if (std::abs (nodal_values[(i + 2 * j) * this->degree]) < 1e-14)
+              nodal_values[(i + 2 * j) * this->degree] = 0.0;
           }
 
       // If the degree is greater
@@ -4710,7 +3144,7 @@ const
       // shape functions to
       // consider.
       // Here the projection part
-      // starts. The dof values
+      // starts. The dof support_point_values
       // are obtained by solving
       // a linear system of
       // equations.
@@ -4743,7 +3177,7 @@ const
                 += boundary_weights (q_point, j)
                    * lobatto_polynomials_grad[i + 1].value
                    (this->generalized_face_support_points[q_point]
-                    (1));
+                    (0));
 
           FullMatrix<double> system_matrix_inv (this->degree-1, this->degree-1);
 
@@ -4765,9 +3199,8 @@ const
                    ++q_point)
                 {
                   const double tmp
-                    = values[line_coordinate[line]][line * n_edge_points
-                                                    + q_point]
-                      - local_dofs[line * this->degree]
+                    = support_point_values[line * n_edge_points + q_point][line_coordinate[line]]
+                      - nodal_values[line * this->degree]
                       * this->shape_value_component
                       (line * this->degree,
                        this->generalized_support_points[line
@@ -4781,13 +3214,13 @@ const
 
               system_matrix_inv.vmult (solution, system_rhs);
 
-              // Add the computed values
+              // Add the computed support_point_values
               // to the resulting vector
               // only, if they are not
               // too small.
               for (unsigned int i = 0; i < solution.size (); ++i)
                 if (std::abs (solution (i)) > 1e-14)
-                  local_dofs[line * this->degree + i + 1] = solution (i);
+                  nodal_values[line * this->degree + i + 1] = solution (i);
             }
 
           // Then we go on to the
@@ -4852,12 +3285,12 @@ const
                ++q_point)
             {
               double tmp
-                = values[0][q_point + GeometryInfo<dim>::lines_per_cell
-                            * n_edge_points];
+                = support_point_values[q_point + GeometryInfo<dim>::lines_per_cell
+                                       * n_edge_points][0];
 
               for (unsigned int i = 0; i < 2; ++i)
                 for (unsigned int j = 0; j <= deg; ++j)
-                  tmp -= local_dofs[(i + 2) * this->degree + j]
+                  tmp -= nodal_values[(i + 2) * this->degree + j]
                          * this->shape_value_component
                          ((i + 2) * this->degree + j,
                           this->generalized_support_points[q_point
@@ -4884,15 +3317,15 @@ const
           solution.reinit (system_matrix.m ());
           system_matrix_inv.vmult (solution, system_rhs);
 
-          // Add the computed values
+          // Add the computed support_point_values
           // to the resulting vector
           // only, if they are not
           // too small.
           for (unsigned int i = 0; i <= deg; ++i)
             for (unsigned int j = 0; j < deg; ++j)
               if (std::abs (solution (i * deg + j)) > 1e-14)
-                local_dofs[(i + GeometryInfo<dim>::lines_per_cell) * deg
-                           + j + GeometryInfo<dim>::lines_per_cell]
+                nodal_values[(i + GeometryInfo<dim>::lines_per_cell) * deg
+                             + j + GeometryInfo<dim>::lines_per_cell]
                   = solution (i * deg + j);
 
           system_rhs = 0;
@@ -4904,12 +3337,12 @@ const
                ++q_point)
             {
               double tmp
-                = values[1][q_point + GeometryInfo<dim>::lines_per_cell
-                            * n_edge_points];
+                = support_point_values[q_point + GeometryInfo<dim>::lines_per_cell
+                                       * n_edge_points][1];
 
               for (unsigned int i = 0; i < 2; ++i)
                 for (unsigned int j = 0; j <= deg; ++j)
-                  tmp -= local_dofs[i * this->degree + j]
+                  tmp -= nodal_values[i * this->degree + j]
                          * this->shape_value_component
                          (i * this->degree + j,
                           this->generalized_support_points[q_point
@@ -4935,15 +3368,15 @@ const
 
           system_matrix_inv.vmult (solution, system_rhs);
 
-          // Add the computed values
+          // Add the computed support_point_values
           // to the resulting vector
           // only, if they are not
           // too small.
           for (unsigned int i = 0; i <= deg; ++i)
             for (unsigned int j = 0; j < deg; ++j)
               if (std::abs (solution (i * deg + j)) > 1e-14)
-                local_dofs[i + (j + GeometryInfo<dim>::lines_per_cell
-                                + deg) * this->degree]
+                nodal_values[i + (j + GeometryInfo<dim>::lines_per_cell
+                                  + deg) * this->degree]
                   = solution (i * deg + j);
         }
 
@@ -4961,40 +3394,40 @@ const
       for (unsigned int q_point = 0; q_point < n_edge_points; ++q_point)
         {
           for (unsigned int i = 0; i < 4; ++i)
-            local_dofs[(i + 8) * this->degree]
+            nodal_values[(i + 8) * this->degree]
             += reference_edge_quadrature.weight (q_point)
-               * values[2][q_point + (i + 8) * n_edge_points];
+               * support_point_values[q_point + (i + 8) * n_edge_points][2];
 
           for (unsigned int i = 0; i < 2; ++i)
             for (unsigned int j = 0; j < 2; ++j)
               for (unsigned int k = 0; k < 2; ++k)
-                local_dofs[(i + 2 * (2 * j + k)) * this->degree]
+                nodal_values[(i + 2 * (2 * j + k)) * this->degree]
                 += reference_edge_quadrature.weight (q_point)
-                   * values[1 - k][q_point + (i + 2 * (2 * j + k))
-                                   * n_edge_points];
+                   * support_point_values[q_point + (i + 2 * (2 * j + k))
+                                          * n_edge_points][1 - k];
         }
 
-      // Add the computed values
+      // Add the computed support_point_values
       // to the resulting vector
       // only, if they are not
       // too small.
       for (unsigned int i = 0; i < 4; ++i)
-        if (std::abs (local_dofs[(i + 8) * this->degree]) < 1e-14)
-          local_dofs[(i + 8) * this->degree] = 0.0;
+        if (std::abs (nodal_values[(i + 8) * this->degree]) < 1e-14)
+          nodal_values[(i + 8) * this->degree] = 0.0;
 
       for (unsigned int i = 0; i < 2; ++i)
         for (unsigned int j = 0; j < 2; ++j)
           for (unsigned int k = 0; k < 2; ++k)
-            if (std::abs (local_dofs[(i + 2 * (2 * j + k)) * this->degree])
+            if (std::abs (nodal_values[(i + 2 * (2 * j + k)) * this->degree])
                 < 1e-14)
-              local_dofs[(i + 2 * (2 * j + k)) * this->degree] = 0.0;
+              nodal_values[(i + 2 * (2 * j + k)) * this->degree] = 0.0;
 
       // If the degree is greater
       // than 0, then we have still
       // some higher order shape
       // functions to consider.
       // Here the projection part
-      // starts. The dof values
+      // starts. The dof support_point_values
       // are obtained by solving
       // a linear system of
       // equations.
@@ -5048,9 +3481,9 @@ const
               for (unsigned int q_point = 0; q_point < this->degree; ++q_point)
                 {
                   const double tmp
-                    = values[line_coordinate[line]][line * this->degree
-                                                    + q_point]
-                      - local_dofs[line * this->degree]
+                    = support_point_values[line * this->degree
+                                           + q_point][line_coordinate[line]]
+                      - nodal_values[line * this->degree]
                       * this->shape_value_component
                       (line * this->degree,
                        this->generalized_support_points[line
@@ -5071,7 +3504,7 @@ const
               // too small.
               for (unsigned int i = 0; i < solution.size (); ++i)
                 if (std::abs (solution (i)) > 1e-14)
-                  local_dofs[line * this->degree + i + 1] = solution (i);
+                  nodal_values[line * this->degree + i + 1] = solution (i);
             }
 
           // Then we go on to the
@@ -5138,14 +3571,14 @@ const
                    ++q_point)
                 {
                   double tmp
-                    = values[face_coordinates[face][0]][q_point
-                                                        + GeometryInfo<dim>::lines_per_cell
-                                                        * n_edge_points];
+                    = support_point_values[q_point
+                                           + GeometryInfo<dim>::lines_per_cell
+                                           * n_edge_points][face_coordinates[face][0]];
 
                   for (unsigned int i = 0; i < 2; ++i)
                     for (unsigned int j = 0; j <= deg; ++j)
-                      tmp -= local_dofs[edge_indices[face][i]
-                                        * this->degree + j]
+                      tmp -= nodal_values[edge_indices[face][i]
+                                          * this->degree + j]
                              * this->shape_value_component
                              (edge_indices[face][i] * this->degree + j,
                               this->generalized_support_points[q_point
@@ -5162,16 +3595,16 @@ const
 
               system_matrix_inv.vmult (solution, system_rhs);
 
-              // Add the computed values
+              // Add the computed support_point_values
               // to the resulting vector
               // only, if they are not
               // too small.
               for (unsigned int i = 0; i <= deg; ++i)
                 for (unsigned int j = 0; j < deg; ++j)
                   if (std::abs (solution (i * deg + j)) > 1e-14)
-                    local_dofs[(2 * face * this->degree + i
-                                + GeometryInfo<dim>::lines_per_cell) * deg
-                               + j + GeometryInfo<dim>::lines_per_cell]
+                    nodal_values[(2 * face * this->degree + i
+                                  + GeometryInfo<dim>::lines_per_cell) * deg
+                                 + j + GeometryInfo<dim>::lines_per_cell]
                       = solution (i * deg + j);
 
               // Set up the right hand side
@@ -5183,14 +3616,14 @@ const
                    ++q_point)
                 {
                   double tmp
-                    = values[face_coordinates[face][1]][q_point
-                                                        + GeometryInfo<dim>::lines_per_cell
-                                                        * n_edge_points];
+                    = support_point_values[q_point
+                                           + GeometryInfo<dim>::lines_per_cell
+                                           * n_edge_points][face_coordinates[face][1]];
 
                   for (int i = 2; i < (int) GeometryInfo<dim>::lines_per_face; ++i)
                     for (unsigned int j = 0; j <= deg; ++j)
-                      tmp -= local_dofs[edge_indices[face][i]
-                                        * this->degree + j]
+                      tmp -= nodal_values[edge_indices[face][i]
+                                          * this->degree + j]
                              * this->shape_value_component
                              (edge_indices[face][i] * this->degree + j,
                               this->generalized_support_points[q_point
@@ -5208,15 +3641,15 @@ const
 
               system_matrix_inv.vmult (solution, system_rhs);
 
-              // Add the computed values
+              // Add the computed support_point_values
               // to the resulting vector
               // only, if they are not
               // too small.
               for (unsigned int i = 0; i <= deg; ++i)
                 for (unsigned int j = 0; j < deg; ++j)
                   if (std::abs (solution (i * deg + j)) > 1e-14)
-                    local_dofs[((2 * face + 1) * deg + j + GeometryInfo<dim>::lines_per_cell)
-                               * this->degree + i]
+                    nodal_values[((2 * face + 1) * deg + j + GeometryInfo<dim>::lines_per_cell)
+                                 * this->degree + i]
                       = solution (i * deg + j);
             }
 
@@ -5300,16 +3733,16 @@ const
                ++q_point)
             {
               double tmp
-                = values[0][q_point + GeometryInfo<dim>::lines_per_cell
-                            * n_edge_points
-                            + GeometryInfo<dim>::faces_per_cell
-                            * n_face_points];
+                = support_point_values[q_point + GeometryInfo<dim>::lines_per_cell
+                                       * n_edge_points
+                                       + GeometryInfo<dim>::faces_per_cell
+                                       * n_face_points][0];
 
               for (unsigned int i = 0; i <= deg; ++i)
                 {
                   for (unsigned int j = 0; j < 2; ++j)
                     for (unsigned int k = 0; k < 2; ++k)
-                      tmp -= local_dofs[i + (j + 4 * k + 2) * this->degree]
+                      tmp -= nodal_values[i + (j + 4 * k + 2) * this->degree]
                              * this->shape_value_component
                              (i + (j + 4 * k + 2) * this->degree,
                               this->generalized_support_points[q_point
@@ -5321,10 +3754,10 @@ const
 
                   for (unsigned int j = 0; j < deg; ++j)
                     for (unsigned int k = 0; k < 4; ++k)
-                      tmp -= local_dofs[(i + 2 * (k + 2) * this->degree
-                                         + GeometryInfo<dim>::lines_per_cell)
-                                        * deg + j
-                                        + GeometryInfo<dim>::lines_per_cell]
+                      tmp -= nodal_values[(i + 2 * (k + 2) * this->degree
+                                           + GeometryInfo<dim>::lines_per_cell)
+                                          * deg + j
+                                          + GeometryInfo<dim>::lines_per_cell]
                              * this->shape_value_component
                              ((i + 2 * (k + 2) * this->degree
                                + GeometryInfo<dim>::lines_per_cell)
@@ -5377,10 +3810,10 @@ const
             for (unsigned int j = 0; j < deg; ++j)
               for (unsigned int k = 0; k < deg; ++k)
                 if (std::abs (solution ((i * deg + j) * deg + k)) > 1e-14)
-                  local_dofs[((i + 2 * GeometryInfo<dim>::faces_per_cell)
-                              * deg + j + GeometryInfo<dim>::lines_per_cell
-                              + 2 * GeometryInfo<dim>::faces_per_cell)
-                             * deg + k + GeometryInfo<dim>::lines_per_cell]
+                  nodal_values[((i + 2 * GeometryInfo<dim>::faces_per_cell)
+                                * deg + j + GeometryInfo<dim>::lines_per_cell
+                                + 2 * GeometryInfo<dim>::faces_per_cell)
+                               * deg + k + GeometryInfo<dim>::lines_per_cell]
                     = solution ((i * deg + j) * deg + k);
 
           // Set up the right hand side.
@@ -5390,16 +3823,16 @@ const
                ++q_point)
             {
               double tmp
-                = values[1][q_point + GeometryInfo<dim>::lines_per_cell
-                            * n_edge_points
-                            + GeometryInfo<dim>::faces_per_cell
-                            * n_face_points];
+                = support_point_values[q_point + GeometryInfo<dim>::lines_per_cell
+                                       * n_edge_points
+                                       + GeometryInfo<dim>::faces_per_cell
+                                       * n_face_points][1];
 
               for (unsigned int i = 0; i <= deg; ++i)
                 for (unsigned int j = 0; j < 2; ++j)
                   {
                     for (unsigned int k = 0; k < 2; ++k)
-                      tmp -= local_dofs[i + (4 * j + k) * this->degree]
+                      tmp -= nodal_values[i + (4 * j + k) * this->degree]
                              * this->shape_value_component
                              (i + (4 * j + k) * this->degree,
                               this->generalized_support_points[q_point
@@ -5410,10 +3843,10 @@ const
                               1);
 
                     for (unsigned int k = 0; k < deg; ++k)
-                      tmp -= local_dofs[(i + 2 * j * this->degree
-                                         + GeometryInfo<dim>::lines_per_cell)
-                                        * deg + k
-                                        + GeometryInfo<dim>::lines_per_cell]
+                      tmp -= nodal_values[(i + 2 * j * this->degree
+                                           + GeometryInfo<dim>::lines_per_cell)
+                                          * deg + k
+                                          + GeometryInfo<dim>::lines_per_cell]
                              * this->shape_value_component
                              ((i + 2 * j * this->degree
                                + GeometryInfo<dim>::lines_per_cell)
@@ -5425,9 +3858,9 @@ const
                                                                + GeometryInfo<dim>::faces_per_cell
                                                                * n_face_points],
                               1)
-                             + local_dofs[i + ((2 * j + 9) * deg + k
-                                               + GeometryInfo<dim>::lines_per_cell)
-                                          * this->degree]
+                             + nodal_values[i + ((2 * j + 9) * deg + k
+                                                 + GeometryInfo<dim>::lines_per_cell)
+                                            * this->degree]
                              * this->shape_value_component
                              (i + ((2 * j + 9) * deg + k
                                    + GeometryInfo<dim>::lines_per_cell)
@@ -5470,7 +3903,7 @@ const
 
           system_matrix_inv.vmult (solution, system_rhs);
 
-          // Add the computed values
+          // Add the computed support_point_values
           // to the resulting vector
           // only, if they are not
           // too small.
@@ -5478,11 +3911,11 @@ const
             for (unsigned int j = 0; j < deg; ++j)
               for (unsigned int k = 0; k < deg; ++k)
                 if (std::abs (solution ((i * deg + j) * deg + k)) > 1e-14)
-                  local_dofs[((i + this->degree + 2
-                               * GeometryInfo<dim>::faces_per_cell) * deg
-                              + j + GeometryInfo<dim>::lines_per_cell + 2
-                              * GeometryInfo<dim>::faces_per_cell) * deg
-                             + k + GeometryInfo<dim>::lines_per_cell]
+                  nodal_values[((i + this->degree + 2
+                                 * GeometryInfo<dim>::faces_per_cell) * deg
+                                + j + GeometryInfo<dim>::lines_per_cell + 2
+                                * GeometryInfo<dim>::faces_per_cell) * deg
+                               + k + GeometryInfo<dim>::lines_per_cell]
                     = solution ((i * deg + j) * deg + k);
 
           // Set up the right hand side.
@@ -5492,15 +3925,15 @@ const
                ++q_point)
             {
               double tmp
-                = values[2][q_point + GeometryInfo<dim>::lines_per_cell
-                            * n_edge_points
-                            + GeometryInfo<dim>::faces_per_cell
-                            * n_face_points];
+                = support_point_values[q_point + GeometryInfo<dim>::lines_per_cell
+                                       * n_edge_points
+                                       + GeometryInfo<dim>::faces_per_cell
+                                       * n_face_points][2];
 
               for (unsigned int i = 0; i <= deg; ++i)
                 for (unsigned int j = 0; j < 4; ++j)
                   {
-                    tmp -= local_dofs[i + (j + 8) * this->degree]
+                    tmp -= nodal_values[i + (j + 8) * this->degree]
                            * this->shape_value_component
                            (i + (j + 8) * this->degree,
                             this->generalized_support_points[q_point
@@ -5511,9 +3944,9 @@ const
                             2);
 
                     for (unsigned int k = 0; k < deg; ++k)
-                      tmp -= local_dofs[i + ((2 * j + 1) * deg + k
-                                             + GeometryInfo<dim>::lines_per_cell)
-                                        * this->degree]
+                      tmp -= nodal_values[i + ((2 * j + 1) * deg + k
+                                               + GeometryInfo<dim>::lines_per_cell)
+                                          * this->degree]
                              * this->shape_value_component
                              (i + ((2 * j + 1) * deg + k
                                    + GeometryInfo<dim>::lines_per_cell)
@@ -5556,7 +3989,7 @@ const
 
           system_matrix_inv.vmult (solution, system_rhs);
 
-          // Add the computed values
+          // Add the computed support_point_values
           // to the resulting vector
           // only, if they are not
           // too small.
@@ -5564,11 +3997,11 @@ const
             for (unsigned int j = 0; j < deg; ++j)
               for (unsigned int k = 0; k < deg; ++k)
                 if (std::abs (solution ((i * deg + j) * deg + k)) > 1e-14)
-                  local_dofs[i + ((j + 2 * (deg
-                                            + GeometryInfo<dim>::faces_per_cell))
-                                  * deg + k
-                                  + GeometryInfo<dim>::lines_per_cell)
-                             * this->degree]
+                  nodal_values[i + ((j + 2 * (deg
+                                              + GeometryInfo<dim>::faces_per_cell))
+                                    * deg + k
+                                    + GeometryInfo<dim>::lines_per_cell)
+                               * this->degree]
                     = solution ((i * deg + j) * deg + k);
         }
 

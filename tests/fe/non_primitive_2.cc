@@ -22,7 +22,6 @@
 // with a Nedelec element, but this is just to test the library, no?
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/grid/tria.h>
@@ -38,7 +37,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 
 
 // note: create_stokes_matrix_1 from non_primitive_1 does not work here,
@@ -258,9 +256,7 @@ test (const unsigned int p)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
   deallog << "Degree 0: " << std::endl;
   test<2> (0);
   test<3> (0);

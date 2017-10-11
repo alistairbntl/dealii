@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 // Test has_hanging_nodes() in sequential and parallel triangulations
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -39,7 +38,7 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/constraint_matrix.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/trilinos_vector.h>
 
 #include <deal.II/lac/petsc_parallel_vector.h>
@@ -61,14 +60,13 @@
 #include <deal.II/lac/sparsity_tools.h>
 
 
-#include <fstream>
 #include <iostream>
 
 using namespace dealii;
 
 //#define DISTRIBUTED
 
-template<int dim>
+template <int dim>
 void test_int(const unsigned int n_global = 0,
               const unsigned int n_local = 0)
 {
@@ -139,9 +137,7 @@ void test_int(const unsigned int n_global = 0,
 
 int main (int argc, char *argv[])
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
   test_int<2>(0,0);

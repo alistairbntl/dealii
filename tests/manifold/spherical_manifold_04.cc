@@ -1,70 +1,99 @@
-//----------------------------  spherical_manifold_01.cc  ---------------------------
-//    Copyright (C) 2011 - 2015 by the mathLab team.
+// ---------------------------------------------------------------------
 //
-//    This file is subject to LGPL and may not be  distributed
-//    without copyright and license information. Please refer
-//    to the file deal.II/doc/license.html for the  text  and
-//    further information on this license.
+// Copyright (C) 2016 by the deal.II authors
 //
-//----------------------------  spherical_manifold_04.cc  ---------------------------
+// This file is part of the deal.II library.
+//
+// The deal.II library is free software; you can use it, redistribute
+// it, and/or modify it under the terms of the GNU Lesser General
+// Public License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+// The full text of the license can be found in the file LICENSE at
+// the top level of the deal.II distribution.
+//
+// ---------------------------------------------------------------------
 
-
-// Test that the flat manifold does what it should on a sphere surface.
+// test Volume of a Ball
 
 #include "../tests.h"
 
-#include <fstream>
-#include <deal.II/base/logstream.h>
-
-
-// all include files you need here
-#include <deal.II/grid/tria.h>
-#include <deal.II/grid/tria_accessor.h>
-#include <deal.II/grid/tria_iterator.h>
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_tools.h>
+#include <deal.II/fe/mapping_q.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria_boundary_lib.h>
-#include <deal.II/grid/manifold_lib.h>
+
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/numerics/data_out.h>
+
 #include <deal.II/grid/grid_out.h>
+#include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_tools.h>
+#include <deal.II/grid/manifold_lib.h>
 
-// Helper function
-template <int dim, int spacedim>
-void test(unsigned int ref=1)
+#include <deal.II/matrix_free/matrix_free.h>
+#include <deal.II/matrix_free/fe_evaluation.h>
+
+#include <iostream>
+#include <sstream>
+
+using namespace dealii;
+
+void test (const double R)
 {
-  SphericalManifold<dim,spacedim> manifold;
+  const unsigned int dim = 3;
+  const unsigned int global_mesh_refinement_steps = 4;
+  const unsigned int fe_degree = 2;
+  const unsigned int n_q_points_1d = 3;
 
-  Triangulation<spacedim, spacedim> volume_tria;
-  Triangulation<dim, spacedim> tria;
-  GridGenerator::hyper_ball (volume_tria);
-  GridGenerator::extract_boundary_mesh(volume_tria, tria);
+  // derived
+  Point<dim> center;
+  for (unsigned int d=0; d < dim; d++)
+    center[d] = d;
 
-  typename Triangulation<dim,spacedim>::active_cell_iterator cell;
+  Triangulation<dim> triangulation;
+  DoFHandler<dim> dof_handler(triangulation);
+  FE_Q<dim> fe(fe_degree);
+  QGauss<dim> quadrature_formula(n_q_points_1d);
 
-  for (cell = tria.begin_active(); cell != tria.end(); ++cell)
-    cell->set_all_manifold_ids(1);
+  GridGenerator::hyper_ball (triangulation,
+                             center,
+                             R);
+  triangulation.set_all_manifold_ids_on_boundary(0);
+  static SphericalManifold<dim> surface_description(center);
+  triangulation.set_manifold (0, surface_description);
+  triangulation.refine_global(global_mesh_refinement_steps);
+  dof_handler.distribute_dofs (fe);
+  MappingQ<dim> mapping(fe_degree);
 
-  for (cell = tria.begin_active(); cell != tria.end(); ++cell)
+  FEValues<dim> fe_values (mapping, fe, quadrature_formula,
+                           update_JxW_values);
+
+  DoFHandler<dim>::active_cell_iterator
+  cell = dof_handler.begin_active (),
+  endc = dof_handler.end ();
+  const unsigned int n_q_points = quadrature_formula.size();
+
+  double volume = 0.;
+  for (; cell!=endc; ++cell)
     {
-      if (cell->center().distance(Point<spacedim>()) < 1e-10)
-        cell->set_all_manifold_ids(0);
+      fe_values.reinit (cell);
+      for (unsigned int q=0; q<n_q_points; ++q)
+        volume += fe_values.JxW (q);
     }
 
-  tria.set_manifold(1, manifold);
-  tria.refine_global(2);
+  deallog << "Volume:       " << volume  << std::endl
+          << "Exact volume: " << 4.0*numbers::PI *std::pow(R,3.0)/3. << std::endl;
 
-  GridOut gridout;
-  gridout.write_msh(tria, deallog.get_file_stream());
+  dof_handler.clear ();
 }
 
-int main ()
+
+using namespace dealii;
+
+int main (int argc, char *argv[])
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
-
-  test<1,2>();
-  test<2,3>();
-
+  initlog();
+  test(15);
   return 0;
 }
-

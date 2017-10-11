@@ -13,15 +13,14 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__array_view_h
-#define dealii__array_view_h
+#ifndef dealii_array_view_h
+#define dealii_array_view_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/table.h>
 
-#include <boost/type_traits/remove_cv.hpp>
-
+#include <type_traits>
 #include <vector>
 
 DEAL_II_NAMESPACE_OPEN
@@ -65,7 +64,7 @@ DEAL_II_NAMESPACE_OPEN
  * std::vector::operator[] is non-@p const.
  *
  * @ingroup data
- * @author Wolfgang Bangerth, 2015
+ * @author Wolfgang Bangerth, 2015, David Wells, 2017
  */
 template <typename ElementType>
 class ArrayView
@@ -76,6 +75,22 @@ public:
    * i.e., the type of the element it "stores" or points to.
    */
   typedef ElementType value_type;
+
+  /**
+   * A typedef for iterators pointing into the array.
+   */
+  typedef value_type *iterator;
+
+  /**
+   * A typedef for const iterators pointing into the array.
+   */
+  typedef const ElementType *const_iterator;
+
+  /**
+   * Default constructor. Creates an invalid view that does not point to
+   * anything at all.
+   */
+  ArrayView ();
 
   /**
    * Constructor.
@@ -108,13 +123,95 @@ public:
    * non-@p const view to a @p const view, akin to converting a non-@p const
    * pointer to a @p const pointer.
    */
-  ArrayView (const ArrayView<typename boost::remove_cv<value_type>::type> &view);
+  ArrayView (const ArrayView<typename std::remove_cv<value_type>::type> &view);
+
+  /**
+   * A constructor that automatically creates a view from a std::vector object.
+   * The view encompasses all elements of the given vector.
+   *
+   * This implicit conversion constructor is particularly useful when calling
+   * a function that takes an ArrayView object as argument, and passing in
+   * a std::vector.
+   *
+   * @note This constructor takes a reference to a @p const vector as argument.
+   *   It can only be used to initialize ArrayView objects that point to
+   *   @p const memory locations, such as <code>ArrayView@<const double@></code>.
+   *   You cannot initialize ArrayView objects to non-@p const memory with
+   *   such arguments, such as <code>ArrayView@<double@></code>.
+   */
+  ArrayView (const std::vector<typename std::remove_cv<value_type>::type> &vector);
+
+  /**
+   * A constructor that automatically creates a view from a std::vector object.
+   * The view encompasses all elements of the given vector.
+   *
+   * This implicit conversion constructor is particularly useful when calling
+   * a function that takes an ArrayView object as argument, and passing in
+   * a std::vector.
+   *
+   * @note This constructor takes a reference to a non-@p const vector as
+   *   argument. It can be used to initialize ArrayView objects that point to
+   *   either @p const memory locations, such as
+   *   <code>ArrayView@<const double@></code>, or to non-@p const memory,
+   *   such as <code>ArrayView@<double@></code>.
+   */
+  ArrayView (std::vector<typename std::remove_cv<value_type>::type> &vector);
+
+  /**
+   * Compare two ArrayView objects of the same type. Two objects are considered
+   * equal if they have the same size and the same starting pointer.
+   * This version always compares with the const value_type.
+   */
+  bool operator == (const ArrayView<const value_type> &other_view) const;
+
+  /**
+   * Compare two ArrayView objects of the same type. Two objects are considered
+   * equal if they have the same size and the same starting pointer.
+   * This version always compares with the non-const value_type.
+   */
+  bool operator ==
+  (const ArrayView<typename std::remove_cv<value_type>::type> &other_view) const;
+
+  /**
+   * Compare two ArrayView objects of the same type. Two objects are considered
+   * equal if they have the same size and the same starting pointer.
+   * This version always compares with the const value_type.
+   */
+  bool operator != (const ArrayView<const value_type> &other_view) const;
+
+  /**
+   * Compare two ArrayView objects of the same type. Two objects are considered
+   * equal if they have the same size and the same starting pointer.
+   * This version always comapres with the non-const value_type.
+   */
+  bool operator !=
+  (const ArrayView<typename std::remove_cv<value_type>::type> &other_view) const;
 
   /**
    * Return the size (in elements) of the view of memory this object
    * represents.
    */
   std::size_t size() const;
+
+  /**
+   * Return an iterator pointing to the beginning of the array view.
+   */
+  iterator begin() const;
+
+  /**
+   * Return an iterator pointing to one past the end of the array view.
+   */
+  iterator end() const;
+
+  /**
+   * Return a constant iterator pointing to the beginning of the array view.
+   */
+  const_iterator cbegin() const;
+
+  /**
+   * Return a constant iterator pointing to one past the end of the array view.
+   */
+  const_iterator cend() const;
 
   /**
    * Return a reference to the $i$th element of the range represented by the
@@ -132,12 +229,14 @@ private:
    * A pointer to the first element of the range of locations in memory that
    * this object represents.
    */
-  value_type  *const starting_element;
+  value_type *const starting_element;
 
   /**
    * The length of the array this object represents.
    */
-  const std::size_t  n_elements;
+  const std::size_t n_elements;
+
+  friend class ArrayView<const ElementType>;
 };
 
 
@@ -147,8 +246,19 @@ private:
 
 template <typename ElementType>
 inline
-ArrayView<ElementType>::ArrayView(value_type        *starting_element,
-                                  const std::size_t  n_elements)
+ArrayView<ElementType>::ArrayView()
+  :
+  starting_element (nullptr),
+  n_elements(0)
+{}
+
+
+
+template <typename ElementType>
+inline
+ArrayView<ElementType>::
+ArrayView(value_type        *starting_element,
+          const std::size_t  n_elements)
   :
   starting_element (starting_element),
   n_elements(n_elements)
@@ -158,11 +268,93 @@ ArrayView<ElementType>::ArrayView(value_type        *starting_element,
 
 template <typename ElementType>
 inline
-ArrayView<ElementType>::ArrayView(const ArrayView<typename boost::remove_cv<value_type>::type> &view)
+ArrayView<ElementType>::
+ArrayView(const ArrayView<typename std::remove_cv<value_type>::type> &view)
   :
-  starting_element (&view[0]),
-  n_elements(view.size())
+  starting_element (view.starting_element),
+  n_elements(view.n_elements)
 {}
+
+
+
+template <typename ElementType>
+inline
+ArrayView<ElementType>::
+ArrayView (const std::vector<typename std::remove_cv<value_type>::type> &vector)
+  :
+  // use delegating constructor
+  ArrayView (vector.data(), vector.size())
+{
+  // the following static_assert is not strictly necessary because,
+  // if we got a const std::vector reference argument but ElementType
+  // is not itself const, then the call to the forwarding constructor
+  // above will already have failed: vector.data() will have returned
+  // a const pointer, but we need a non-const pointer.
+  //
+  // nevertheless, leave the static_assert in since it provides a
+  // more descriptive error message that will simply come after the first
+  // error produced above
+  static_assert (std::is_const<value_type>::value == true,
+                 "This constructor may only be called if the ArrayView "
+                 "object has a const value_type. In other words, you can "
+                 "only create an ArrayView to const values from a const "
+                 "std::vector.");
+}
+
+
+
+template <typename ElementType>
+inline
+ArrayView<ElementType>::
+ArrayView (std::vector<typename std::remove_cv<value_type>::type> &vector)
+  :
+  // use delegating constructor
+  ArrayView (vector.data(), vector.size())
+{}
+
+
+
+template <typename ElementType>
+inline
+bool
+ArrayView<ElementType>::operator == (const ArrayView<const value_type> &other_view) const
+{
+  return (other_view.begin() == starting_element)
+         && (other_view.size() == n_elements);
+}
+
+
+
+template <typename ElementType>
+inline
+bool
+ArrayView<ElementType>::operator ==
+(const ArrayView<typename std::remove_cv<value_type>::type> &other_view) const
+{
+  return (other_view.begin() == starting_element)
+         && (other_view.size() == n_elements);
+}
+
+
+
+template <typename ElementType>
+inline
+bool
+ArrayView<ElementType>::operator != (const ArrayView<const value_type> &other_view) const
+{
+  return !(*this == other_view);
+}
+
+
+
+template <typename ElementType>
+inline
+bool
+ArrayView<ElementType>::operator !=
+(const ArrayView<typename std::remove_cv<value_type>::type> &other_view) const
+{
+  return !(*this == other_view);
+}
 
 
 
@@ -172,6 +364,40 @@ std::size_t
 ArrayView<ElementType>::size() const
 {
   return n_elements;
+}
+
+template <typename ElementType>
+inline
+typename ArrayView<ElementType>::iterator
+ArrayView<ElementType>::begin() const
+{
+  return starting_element;
+}
+
+
+template <typename ElementType>
+inline
+typename ArrayView<ElementType>::iterator
+ArrayView<ElementType>::end() const
+{
+  return starting_element + n_elements;
+}
+
+template <typename ElementType>
+inline
+typename ArrayView<ElementType>::const_iterator
+ArrayView<ElementType>::cbegin() const
+{
+  return starting_element;
+}
+
+
+template <typename ElementType>
+inline
+typename ArrayView<ElementType>::const_iterator
+ArrayView<ElementType>::cend() const
+{
+  return starting_element + n_elements;
 }
 
 
@@ -265,6 +491,54 @@ make_array_view (std::vector<ElementType> &vector,
                       "create would lead to a view that extends beyond the end "
                       "of the given vector."));
   return ArrayView<ElementType> (&vector[starting_index], size_of_view);
+}
+
+
+/**
+ * Create an ArrayView that takes a pair of iterators as arguments. The type
+ * of the ArrayView is inferred from the value type of the iterator (e.g., the
+ * view created from two const iterators will have a const type).
+ *
+ * @warning The iterators @p begin and @p end must bound (in the usual half-open
+ * way) a contiguous in memory range of values. This function is intended for
+ * use with iterators into containers like
+ * <code>boost::container::small_vector</code> or <code>std::vector</code> and
+ * will not work correctly with, e.g.,
+ * <code>boost::container::stable_vector</code> or <code>std::deque</code>.
+ *
+ * @relates ArrayView
+ */
+template <typename Iterator>
+ArrayView<typename std::remove_reference<typename std::iterator_traits<Iterator>::reference>::type>
+make_array_view (const Iterator begin, const Iterator end)
+{
+  static_assert(std::is_same<typename std::iterator_traits<Iterator>::iterator_category,
+                typename std::random_access_iterator_tag>::value,
+                "The provided iterator should be a random access iterator.");
+  Assert(begin <= end,
+         ExcMessage("The beginning of the array view should be before the end."));
+  // the reference type, not the value type, knows the constness of the iterator
+  return ArrayView<typename std::remove_reference
+         <typename std::iterator_traits<Iterator>::reference>::type>
+         (&*begin, end - begin);
+}
+
+/**
+ * Create a view from a pair of pointers. <code>ElementType</code> may be
+ * const-qualified.
+ *
+ * @warning The pointers @p begin and @p end must bound (in the usual
+ * half-open way) a contiguous in memory range of values.
+ *
+ * @relates ArrayView
+ */
+template <typename ElementType>
+ArrayView<ElementType>
+make_array_view (ElementType *const begin, ElementType *const end)
+{
+  Assert(begin <= end,
+         ExcMessage("The beginning of the array view should be before the end."));
+  return ArrayView<ElementType>(begin, end - begin);
 }
 
 

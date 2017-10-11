@@ -22,7 +22,6 @@
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/index_set.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -61,7 +60,7 @@ void test ()
     {
       norm = v_tmp.linfty_norm();
     }
-  catch (TrilinosWrappers::VectorBase::ExcTrilinosError e)
+  catch (TrilinosWrappers::MPI::Vector::ExcTrilinosError e)
     {
       deallog << e.get_exc_name() << std::endl;
       exc = true;
@@ -90,10 +89,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       test();
     }

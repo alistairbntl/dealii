@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,9 +22,7 @@
 #include "../tests.h"
 #include <deal.II/lac/generic_linear_algebra.h>
 #include <deal.II/base/index_set.h>
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 #include <vector>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -94,7 +92,7 @@ void test ()
   ConstraintMatrix constraints(locally_relevant_dofs);
   constraints.close();
 
-  BlockCompressedSimpleSparsityPattern bcsp (locally_relevant_partitioning);
+  BlockDynamicSparsityPattern bcsp (locally_relevant_partitioning);
   DoFTools::make_sparsity_pattern (dof_handler, bcsp, constraints, false);
   SparsityTools::distribute_sparsity_pattern (bcsp, dof_handler.locally_owned_dofs_per_processor (), MPI_COMM_WORLD, locally_relevant_dofs);
 

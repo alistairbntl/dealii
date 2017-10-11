@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2007 - 2015 by the deal.II authors
+// Copyright (C) 2007 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_function_h
-#define dealii__fe_function_h
+#ifndef dealii_fe_function_h
+#define dealii_fe_function_h
 
 #include <deal.II/base/function.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -414,11 +414,6 @@ namespace Functions
      std::vector<std::vector<Point<dim> > >                      &qpoints,
      std::vector<std::vector<unsigned int> >                     &maps) const;
 
-    /**
-     * @deprecated Use VectorTools::ExcPointNotAvailableHere instead.
-     */
-    typedef VectorTools::ExcPointNotAvailableHere ExcPointNotAvailableHere DEAL_II_DEPRECATED;
-
   private:
     /**
      * Typedef holding the local cell_hint.
@@ -446,11 +441,6 @@ namespace Functions
      * The latest cell hint.
      */
     mutable cell_hint_t cell_hint;
-
-    /**
-     * Store the number of components of this function.
-     */
-    const unsigned int n_components;
 
     /**
      * Given a cell, return the reference coordinates of the given point

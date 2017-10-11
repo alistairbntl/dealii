@@ -15,13 +15,20 @@
 
 
 #include <deal.II/fe/fe_nothing.h>
+#include <deal.II/base/std_cxx14/memory.h>
 
 DEAL_II_NAMESPACE_OPEN
 
-namespace
+namespace internal
 {
-  const char *
-  zero_dof_message = "This element has no shape functions.";
+  namespace FE_Nothing
+  {
+    namespace
+    {
+      const char *
+      zero_dof_message = "This element has no shape functions.";
+    }
+  }
 }
 
 
@@ -48,10 +55,10 @@ FE_Nothing<dim,spacedim>::FE_Nothing (const unsigned int n_components,
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_Nothing<dim,spacedim>::clone() const
 {
-  return new FE_Nothing<dim,spacedim>(*this);
+  return std_cxx14::make_unique<FE_Nothing<dim,spacedim>>(*this);
 }
 
 
@@ -84,8 +91,8 @@ double
 FE_Nothing<dim,spacedim>::shape_value (const unsigned int /*i*/,
                                        const Point<dim> & /*p*/) const
 {
-  (void)zero_dof_message;
-  Assert(false,ExcMessage(zero_dof_message));
+  (void)internal::FE_Nothing::zero_dof_message;
+  Assert(false,ExcMessage(internal::FE_Nothing::zero_dof_message));
   return 0;
 }
 
@@ -112,7 +119,7 @@ template <int dim, int spacedim>
 void
 FE_Nothing<dim,spacedim>::
 fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
-                const CellSimilarity::Similarity                                     ,
+                const CellSimilarity::Similarity,
                 const Quadrature<dim> &,
                 const Mapping<dim,spacedim> &,
                 const typename Mapping<dim,spacedim>::InternalDataBase &,
@@ -129,7 +136,7 @@ template <int dim, int spacedim>
 void
 FE_Nothing<dim,spacedim>::
 fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
-                     const unsigned int                                                   ,
+                     const unsigned int,
                      const Quadrature<dim-1>                                             &,
                      const Mapping<dim,spacedim> &,
                      const typename Mapping<dim,spacedim>::InternalDataBase &,
@@ -146,8 +153,8 @@ template <int dim, int spacedim>
 void
 FE_Nothing<dim,spacedim>::
 fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
-                        const unsigned int                                                   ,
-                        const unsigned int                                                   ,
+                        const unsigned int,
+                        const unsigned int,
                         const Quadrature<dim-1>                                             &,
                         const Mapping<dim,spacedim> &,
                         const typename Mapping<dim,spacedim>::InternalDataBase &,
@@ -179,7 +186,7 @@ compare_for_face_domination (const FiniteElement<dim,spacedim> &fe) const
       return FiniteElementDomination::no_requirements;
     }
   // if it does and the other is FE_Nothing, either can dominate
-  else if (dynamic_cast<const FE_Nothing<dim>*>(&fe) != 0)
+  else if (dynamic_cast<const FE_Nothing<dim>*>(&fe) != nullptr)
     {
       return FiniteElementDomination::either_element_can_dominate;
     }
@@ -239,6 +246,27 @@ hp_constraints_are_implemented () const
 }
 
 
+
+template <int dim, int spacedim>
+void
+FE_Nothing<dim,spacedim>::
+get_interpolation_matrix (const FiniteElement<dim,spacedim> &/*source_fe*/,
+                          FullMatrix<double>       &interpolation_matrix) const
+{
+  // Since this element has no dofs,
+  // the interpolation matrix is necessarily empty.
+  (void)interpolation_matrix;
+
+  Assert (interpolation_matrix.m() == 0,
+          ExcDimensionMismatch (interpolation_matrix.m(),
+                                0));
+  Assert (interpolation_matrix.n() == 0,
+          ExcDimensionMismatch (interpolation_matrix.n(),
+                                0));
+}
+
+
+
 template <int dim, int spacedim>
 void
 FE_Nothing<dim,spacedim>::
@@ -284,4 +312,3 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> & /*source_f
 
 
 DEAL_II_NAMESPACE_CLOSE
-

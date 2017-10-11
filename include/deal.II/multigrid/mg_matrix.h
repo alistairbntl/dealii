@@ -13,15 +13,16 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mg_matrix_h
-#define dealii__mg_matrix_h
+#ifndef dealii_mg_matrix_h
+#define dealii_mg_matrix_h
 
-#include <deal.II/lac/vector.h>
-#include <deal.II/lac/pointer_matrix.h>
-#include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/multigrid/mg_base.h>
 #include <deal.II/base/mg_level_object.h>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
+#include <deal.II/lac/linear_operator.h>
+#include <deal.II/lac/sparse_matrix.h>
+#include <deal.II/lac/vector.h>
+#include <deal.II/multigrid/mg_base.h>
+
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -32,8 +33,8 @@ namespace mg
 {
   /**
    * Multilevel matrix. This matrix stores an MGLevelObject of
-   * PointerMatrixBase objects. It implements the interface defined in
-   * MGMatrixBase, so that it can be used as a matrix in Multigrid.
+   * LinearOpetors. It implements the interface defined in MGMatrixBase, so
+   * that it can be used as a matrix in Multigrid.
    *
    * @author Guido Kanschat
    * @date 2002, 2010
@@ -46,7 +47,7 @@ namespace mg
     /**
      * Default constructor for an empty object.
      */
-    Matrix();
+    Matrix() = default;
 
     /**
      * Constructor setting up pointers to the matrices in <tt>M</tt> by
@@ -64,21 +65,28 @@ namespace mg
     initialize(const MGLevelObject<MatrixType> &M);
 
     /**
+     * Reset the object.
+     */
+    void reset();
+
+    /**
      * Access matrix on a level.
      */
-    const PointerMatrixBase<VectorType> &operator[] (unsigned int level) const;
+    const LinearOperator<VectorType> &operator[] (unsigned int level) const;
 
     virtual void vmult (const unsigned int level, VectorType &dst, const VectorType &src) const;
     virtual void vmult_add (const unsigned int level, VectorType &dst, const VectorType &src) const;
     virtual void Tvmult (const unsigned int level, VectorType &dst, const VectorType &src) const;
     virtual void Tvmult_add (const unsigned int level, VectorType &dst, const VectorType &src) const;
+    virtual unsigned int get_minlevel() const;
+    virtual unsigned int get_maxlevel() const;
 
     /**
      * Memory used by this object.
      */
     std::size_t memory_consumption () const;
   private:
-    MGLevelObject<std_cxx11::shared_ptr<PointerMatrixBase<VectorType> > > matrices;
+    MGLevelObject<LinearOperator<VectorType> > matrices;
   };
 
 }
@@ -108,7 +116,7 @@ public:
 
   /**
    * Set the matrix object to be used. The matrix object must exist longer as
-   * the @p MGMatrix object, since only a pointer is stored.
+   * the @p MGMatrixSelect object, since only a pointer is stored.
    */
   void set_matrix (MGLevelObject<MatrixType> *M);
 
@@ -175,10 +183,26 @@ namespace mg
   Matrix<VectorType>::initialize (const MGLevelObject<MatrixType> &p)
   {
     matrices.resize(p.min_level(), p.max_level());
-    for (unsigned int level=p.min_level(); level <= p.max_level(); ++level)
-      matrices[level] = std_cxx11::shared_ptr<PointerMatrixBase<VectorType> >
-                        (new_pointer_matrix_base(p[level], VectorType()));
+    for (unsigned int level = p.min_level(); level <= p.max_level(); ++level)
+      {
+        // Workaround: Unfortunately, not every "p[level]" object has a
+        // rich enough interface to populate reinit_(domain|range)_vector.
+        // Thus, apply an empty LinearOperator exemplar.
+        matrices[level] =
+          linear_operator<VectorType>(LinearOperator<VectorType>(), p[level]);
+      }
   }
+
+
+
+  template <typename VectorType>
+  inline
+  void
+  Matrix<VectorType>::reset ()
+  {
+    matrices.resize(0,0);
+  }
+
 
 
   template <typename VectorType>
@@ -190,19 +214,15 @@ namespace mg
   }
 
 
-  template <typename VectorType>
-  inline
-  Matrix<VectorType>::Matrix ()
-  {}
-
 
   template <typename VectorType>
   inline
-  const PointerMatrixBase<VectorType> &
+  const LinearOperator<VectorType> &
   Matrix<VectorType>::operator[] (unsigned int level) const
   {
-    return *matrices[level];
+    return matrices[level];
   }
+
 
 
   template <typename VectorType>
@@ -211,8 +231,9 @@ namespace mg
                              VectorType         &dst,
                              const VectorType   &src) const
   {
-    matrices[level]->vmult(dst, src);
+    matrices[level].vmult(dst, src);
   }
+
 
 
   template <typename VectorType>
@@ -221,8 +242,9 @@ namespace mg
                                  VectorType         &dst,
                                  const VectorType   &src) const
   {
-    matrices[level]->vmult_add(dst, src);
+    matrices[level].vmult_add(dst, src);
   }
+
 
 
   template <typename VectorType>
@@ -231,8 +253,9 @@ namespace mg
                               VectorType         &dst,
                               const VectorType   &src) const
   {
-    matrices[level]->Tvmult(dst, src);
+    matrices[level].Tvmult(dst, src);
   }
+
 
 
   template <typename VectorType>
@@ -241,8 +264,27 @@ namespace mg
                                   VectorType         &dst,
                                   const VectorType   &src) const
   {
-    matrices[level]->Tvmult_add(dst, src);
+    matrices[level].Tvmult_add(dst, src);
   }
+
+
+
+  template <typename VectorType>
+  unsigned int
+  Matrix<VectorType>::get_minlevel() const
+  {
+    return matrices.min_level();
+  }
+
+
+
+  template <typename VectorType>
+  unsigned int
+  Matrix<VectorType>::get_maxlevel() const
+  {
+    return matrices.max_level();
+  }
+
 
 
   template <typename VectorType>
@@ -278,6 +320,7 @@ MGMatrixSelect<MatrixType, number>::set_matrix (MGLevelObject<MatrixType> *p)
 }
 
 
+
 template <typename MatrixType, typename number>
 void
 MGMatrixSelect<MatrixType, number>::
@@ -287,6 +330,7 @@ select_block (const unsigned int brow,
   row = brow;
   col = bcol;
 }
+
 
 
 template <typename MatrixType, typename number>
@@ -303,6 +347,7 @@ vmult  (const unsigned int    level,
 }
 
 
+
 template <typename MatrixType, typename number>
 void
 MGMatrixSelect<MatrixType, number>::
@@ -317,6 +362,7 @@ vmult_add  (const unsigned int    level,
 }
 
 
+
 template <typename MatrixType, typename number>
 void
 MGMatrixSelect<MatrixType, number>::
@@ -329,6 +375,7 @@ Tvmult  (const unsigned int    level,
   const MGLevelObject<MatrixType> &m = *matrix;
   m[level].block(row, col).Tvmult(dst, src);
 }
+
 
 
 template <typename MatrixType, typename number>

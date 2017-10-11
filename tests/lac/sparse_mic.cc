@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,13 +19,7 @@
 // generates the exact inverse matrix
 
 #include "../tests.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
-#include <cstdlib>
-#include "testmatrix.h"
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/sparse_mic.h>
 #include <deal.II/lac/vector.h>
@@ -38,7 +32,6 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
 
   for (unsigned int size=4; size <= 16; size *= 2)

@@ -30,7 +30,6 @@
 #include <deal.II/hp/fe_collection.h>
 
 #include <iostream>
-#include <cmath>
 
 using namespace dealii;
 
@@ -95,8 +94,7 @@ void test (unsigned p1, unsigned p2)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   test<3>(0, 1);
   test<3>(1, 2);

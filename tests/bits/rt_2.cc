@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -26,7 +26,6 @@
 
 
 #include "../tests.h"
-#include <fstream>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
@@ -59,14 +58,14 @@ void evaluate_normal (DoFHandler<2>  &dof_handler,
   QGauss<1> quad (6);
   FEFaceValues<2> fe_v_face (dof_handler.get_fe (), quad,
                              UpdateFlags(update_values    |
-                                         update_q_points  |
+                                         update_quadrature_points  |
                                          update_gradients |
                                          update_normal_vectors |
                                          update_JxW_values));
 
   FEFaceValues<2> fe_v_face_n (dof_handler.get_fe (), quad,
                                UpdateFlags(update_values    |
-                                           update_q_points  |
+                                           update_quadrature_points  |
                                            update_gradients |
                                            update_normal_vectors |
                                            update_JxW_values));
@@ -134,9 +133,7 @@ void evaluate_normal (DoFHandler<2>  &dof_handler,
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<2> tria_test;
   Point<2> p1 (0,0),

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -28,7 +28,6 @@ std::ofstream logfile("output");
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/grid/tria.h>
@@ -45,7 +44,6 @@ std::ofstream logfile("output");
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -151,7 +149,7 @@ void test ()
 
   const unsigned int dofs_per_block = dof_handler_sca.n_dofs();
   {
-    BlockCompressedSimpleSparsityPattern csp (dim,dim);
+    BlockDynamicSparsityPattern csp (dim,dim);
     for (unsigned int d=0; d<dim; ++d)
       for (unsigned int e=0; e<dim; ++e)
         csp.block(d,e).reinit (dofs_per_block, dofs_per_block);
@@ -254,8 +252,7 @@ void test ()
     QGauss<1> quad(fe_degree+1);
     mf_data.reinit (dof_handler_sca, constraints, quad,
                     typename MatrixFree<dim>::AdditionalData
-                    (MPI_COMM_WORLD,
-                     MatrixFree<dim>::AdditionalData::none));
+                    (MatrixFree<dim>::AdditionalData::none));
   }
 
   system_matrix.vmult (solution, system_rhs);
@@ -284,7 +281,6 @@ int main ()
 
   {
     deallog << std::endl << "Test with doubles" << std::endl << std::endl;
-    deallog.threshold_double(1.e-12);
     deallog.push("2d");
     test<2,1>();
     test<2,2>();
@@ -295,4 +291,3 @@ int main ()
     deallog.pop();
   }
 }
-

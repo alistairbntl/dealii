@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__persistent_tria_h
-#define dealii__persistent_tria_h
+#ifndef dealii_persistent_tria_h
+#define dealii_persistent_tria_h
 
 
 #include <deal.II/base/config.h>
@@ -133,7 +133,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~PersistentTriangulation ();
+  virtual ~PersistentTriangulation () = default;
 
   /**
    * Overloaded version of the same function in the base class which stores
@@ -168,7 +168,7 @@ public:
   void restore (const unsigned int step_no);
 
   /**
-   * Returns the number of refinement and coarsening steps. This is given by
+   * Return the number of refinement and coarsening steps. This is given by
    * the size of the @p refine_flags vector.
    */
   unsigned int n_refinement_steps () const;
@@ -204,7 +204,7 @@ public:
     const SubCellData                 &subcelldata);
 
   /**
-   * Writes all refine and coarsen flags to the ostream @p out.
+   * Write all refine and coarsen flags to the ostream @p out.
    */
   virtual void write_flags(std::ostream &out) const;
 
@@ -216,7 +216,7 @@ public:
   virtual void read_flags(std::istream &in);
 
   /**
-   * Clears all flags. Retains the same coarse grid.
+   * Clear all flags. Retains the same coarse grid.
    */
   virtual void clear_flags();
 

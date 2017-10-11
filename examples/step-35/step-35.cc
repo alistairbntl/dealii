@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2009 - 2015 by the deal.II authors
+ * Copyright (C) 2009 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -98,7 +98,7 @@ namespace Step35
     {
     public:
       Data_Storage();
-      ~Data_Storage();
+
       void read_data (const char *filename);
       MethodFormulation form;
       double initial_time,
@@ -122,7 +122,22 @@ namespace Step35
     // In the constructor of this class we declare all the parameters. The
     // details of how this works have been discussed elsewhere, for example in
     // step-19 and step-29.
-    Data_Storage::Data_Storage()
+    Data_Storage::Data_Storage() :
+      form (METHOD_ROTATIONAL),
+      initial_time (0.),
+      final_time (1.),
+      Reynolds (1.),
+      dt (5e-4),
+      n_global_refines (0),
+      pressure_degree (1),
+      vel_max_iterations (1000),
+      vel_Krylov_size (30),
+      vel_off_diagonals (60),
+      vel_update_prec (15),
+      vel_eps (1e-12),
+      vel_diag_strength (0.01),
+      verbose (true),
+      output_interval (15)
     {
       prm.declare_entry ("Method_Form", "rotational",
                          Patterns::Selection ("rotational|standard"),
@@ -199,17 +214,12 @@ namespace Step35
 
 
 
-    Data_Storage::~Data_Storage()
-    {}
-
-
-
     void Data_Storage::read_data (const char *filename)
     {
       std::ifstream file (filename);
       AssertThrow (file, ExcFileNotOpen (filename));
 
-      prm.read_input (file);
+      prm.parse_input (file);
 
       if (prm.get ("Method_Form") == std::string ("rotational"))
         form = METHOD_ROTATIONAL;
@@ -511,7 +521,7 @@ namespace Step35
     // the iterators stored internally is moved up one step as well, thereby
     // always staying in sync. As it so happens, there is a deal.II class that
     // facilitates this sort of thing.
-    typedef std_cxx11::tuple< typename DoFHandler<dim>::active_cell_iterator,
+    typedef std::tuple< typename DoFHandler<dim>::active_cell_iterator,
             typename DoFHandler<dim>::active_cell_iterator
             > IteratorTuple;
 
@@ -766,9 +776,9 @@ namespace Step35
       {
         vel_exact.set_time (t_0);
         vel_exact.set_component(d);
-        VectorTools::interpolate (dof_handler_velocity, ZeroFunction<dim>(), u_n_minus_1[d]);
+        VectorTools::interpolate (dof_handler_velocity, Functions::ZeroFunction<dim>(), u_n_minus_1[d]);
         vel_exact.advance_time (dt);
-        VectorTools::interpolate (dof_handler_velocity, ZeroFunction<dim>(), u_n[d]);
+        VectorTools::interpolate (dof_handler_velocity, Functions::ZeroFunction<dim>(), u_n[d]);
       }
   }
 
@@ -888,11 +898,11 @@ namespace Step35
                                  InitGradScratchData &scratch,
                                  InitGradPerTaskData &data)
   {
-    scratch.fe_val_vel.reinit (std_cxx11::get<0> (SI.iterators));
-    scratch.fe_val_pres.reinit (std_cxx11::get<1> (SI.iterators));
+    scratch.fe_val_vel.reinit (std::get<0> (*SI));
+    scratch.fe_val_pres.reinit (std::get<1> (*SI));
 
-    std_cxx11::get<0> (SI.iterators)->get_dof_indices (data.vel_local_dof_indices);
-    std_cxx11::get<1> (SI.iterators)->get_dof_indices (data.pres_local_dof_indices);
+    std::get<0> (*SI)->get_dof_indices (data.vel_local_dof_indices);
+    std::get<1> (*SI)->get_dof_indices (data.pres_local_dof_indices);
 
     data.local_grad = 0.;
     for (unsigned int q=0; q<scratch.nqp; ++q)
@@ -1037,7 +1047,7 @@ namespace Step35
                 VectorTools::
                 interpolate_boundary_values (dof_handler_velocity,
                                              *boundaries,
-                                             ZeroFunction<dim>(),
+                                             Functions::ZeroFunction<dim>(),
                                              boundary_values);
                 break;
               case 2:
@@ -1052,14 +1062,14 @@ namespace Step35
                   VectorTools::
                   interpolate_boundary_values (dof_handler_velocity,
                                                *boundaries,
-                                               ZeroFunction<dim>(),
+                                               Functions::ZeroFunction<dim>(),
                                                boundary_values);
                 break;
               case 4:
                 VectorTools::
                 interpolate_boundary_values (dof_handler_velocity,
                                              *boundaries,
-                                             ZeroFunction<dim>(),
+                                             Functions::ZeroFunction<dim>(),
                                              boundary_values);
                 break;
               default:
@@ -1205,7 +1215,7 @@ namespace Step35
     static std::map<types::global_dof_index, double> bval;
     if (reinit_prec)
       VectorTools::interpolate_boundary_values (dof_handler_pressure, 3,
-                                                ZeroFunction<dim>(), bval);
+                                                Functions::ZeroFunction<dim>(), bval);
 
     MatrixTools::apply_boundary_values (bval, pres_iterative, phi_n, pres_tmp);
 

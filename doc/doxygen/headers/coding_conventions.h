@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -32,22 +32,31 @@ code is written, without having to look up the exact definition of something.
 
 <h3>Notes on deal.II indentation</h3>
 
-<p>deal.II uses <code>astyle</code> to normalize indentation. A
+<p>deal.II uses <code>astyle</code> 2.04 to normalize indentation. A
 style file is provided at
 <code>
 <pre>
-  ./contrib/utilities/astyle.rc
+  ./contrib/styles/astyle.rc
 </pre>
 </code>
 
 <p>Before a commit, you should run
 <code>
 <pre>
-  astyle --options=&lt;SOURCE DIRECTORY&gt;/contrib/utilities/astyle.rc &lt;file&gt;
+  astyle --options=&lt;SOURCE DIRECTORY&gt;/contrib/styles/astyle.rc &lt;file&gt;
 </pre>
 </code>
 on each of your files. This will make sure indentation is conforming to the
-style guidelines outlined in this page.</p>
+style guidelines outlined in this page. Alternatively, if you are using a recent
+version of the library, you can run
+<code>
+<pre>
+  make indent
+</pre>
+</code>
+in whatever directory you set up the library to be compiled in to indent all
+source files.
+</p>
 
 <h3>Style issues</h3>
 
@@ -121,6 +130,26 @@ style guidelines outlined in this page.</p>
   handle run time errors (like I/O failures) which must be on
   in any case, not only in debug mode.</li>
 
+<li> Sometimes it makes sense to implement a class by using several
+  non-member functions that are not part of the public interface and are only
+  meant to be called in the current source file. Such free functions should be
+  put in an anonymous namespace structured in the following way:
+  <code>
+  <pre>
+  namespace internal
+  {
+    namespace ClassName
+    {
+      namespace
+      {
+        // free functions go here
+      }
+    }
+  }
+  </pre>
+  </code>
+  where <code>ClassName</code> is the name of the calling class.
+
 <li> Classes and types generally are named using uppercase letters to denote
   word beginnings (e.g. TriaIterator) &mdash; sometimes called
   <a href="http://en.wikipedia.org/wiki/Camel_case"><i>camel
@@ -150,6 +179,49 @@ style guidelines outlined in this page.</p>
 <li> Each class has to have at least 200 pages of documentation ;-)</li>
 
 </ol>
+
+
+<h3>Instantiation of templated functions/classes</h3>
+
+<p>The majority of classes and functions in deal.II are templated. This brings a
+question of how and where such objects are instantiated, if at all. Throughout
+deal.II we adopt the following convention:</p>
+
+<ol>
+
+<li> If we can enumerate all possible template arguments (e.g., the dimension
+can only be 1, 2, or 3), then a function template goes into the <code>.cc</code> file and
+we explicitly instantiate all possibilities. Users will not have any need to
+ever see these function templates because they will not want to instantiate
+these functions for any other template arguments anyway. </li>
+
+<li> If we can not enumerate all possible template arguments (e.g., vector
+types -- because users might want to define their own vector kinds) but at
+least know a few common usage cases, then the function is put into a
+<code>.templates.h</code> file. We #include it into the <code>.cc</code> file and instantiate the
+functions for all of the common arguments. For almost all users, this will be
+just fine -- they only use the (vector, matrix, ...) types we already
+instantiate, and for them the <code>.templates.h</code> file will not be of any interest.
+It will also not slow down their compilations because nothing they see will
+#include the <code>.templates.h</code> file. But users who define their own
+(vector, matrix, ...) types can instantiate the template functions with their
+own user-defined types by including the <code>.templates.h</code> files.
+
+<li> Finally, if we can not assume in advance which values template arguments
+will take (e.g., any class derived from Subscriptor can be used as an argument),
+the definitions of functions are provided at the bottom of the header
+file with declarations. The definitions should be guarded with <code>#ifndef DOXYGEN ...
+#endif</code> to prevent Doxygen from picking them up.</li>
+
+</ol>
+
+<p> For the first two cases, instantiation instructions are defined in <code>.inst.in</code>
+files. They are processed by a binary called expand_instantiations (built from
+<code>cmake/scripts/expand_instantiations.cc</code>) and the parameters are
+defined dynamically through cmake depending on your configuration (see
+<code>share/deal.II/template-arguments</code> in your build directory).
+It is those <code>.inst</code> files that are eventually included from the
+corresponding <code>.cc</code> files. </p>
 
 
 <h3>Defensive programming</h3>

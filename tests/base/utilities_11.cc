@@ -18,9 +18,6 @@
 // Note that the floating point number output might be depend on the system.
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
 #include <deal.II/base/utilities.h>
 
@@ -66,10 +63,8 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   test ();
 }

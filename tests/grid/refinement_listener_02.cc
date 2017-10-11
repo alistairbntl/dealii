@@ -22,11 +22,7 @@
 #include "../tests.h"
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
-#include <iomanip>
-#include <cstdio>
 
 std::ofstream logfile("output");
 
@@ -82,41 +78,41 @@ void test ()
 
   boost::signals2::connection connections_1[4]
     = {tria_1.signals.pre_refinement
-       .connect (std_cxx11::bind (&pre_refinement_notification<dim,dim>,
-                                  "tria_1",
-                                  std_cxx11::cref(tria_1))),
+       .connect (std::bind (&pre_refinement_notification<dim,dim>,
+                            "tria_1",
+                            std::cref(tria_1))),
        tria_1.signals.post_refinement
-       .connect (std_cxx11::bind (&post_refinement_notification<dim,dim>,
-                                  "tria_1",
-                                  std_cxx11::cref(tria_1))),
+       .connect (std::bind (&post_refinement_notification<dim,dim>,
+                            "tria_1",
+                            std::cref(tria_1))),
        tria_1.signals.create
-       .connect (std_cxx11::bind (&create_notification<dim,dim>,
-                                  "tria_1",
-                                  std_cxx11::cref(tria_1))),
+       .connect (std::bind (&create_notification<dim,dim>,
+                            "tria_1",
+                            std::cref(tria_1))),
        tria_1.signals.copy
-       .connect (std_cxx11::bind (&copy_notification<dim,dim>,
-                                  "tria_1",
-                                  std_cxx11::_1,
-                                  std_cxx11::cref(tria_1)))
+       .connect (std::bind (&copy_notification<dim,dim>,
+                            "tria_1",
+                            std::placeholders::_1,
+                            std::cref(tria_1)))
       };
   boost::signals2::connection connections_2[4]
     = {tria_2.signals.pre_refinement
-       .connect (std_cxx11::bind (&pre_refinement_notification<dim,dim>,
-                                  "tria_2",
-                                  std_cxx11::cref(tria_2))),
+       .connect (std::bind (&pre_refinement_notification<dim,dim>,
+                            "tria_2",
+                            std::cref(tria_2))),
        tria_2.signals.post_refinement
-       .connect (std_cxx11::bind (&post_refinement_notification<dim,dim>,
-                                  "tria_2",
-                                  std_cxx11::cref(tria_2))),
+       .connect (std::bind (&post_refinement_notification<dim,dim>,
+                            "tria_2",
+                            std::cref(tria_2))),
        tria_2.signals.create
-       .connect (std_cxx11::bind (&create_notification<dim,dim>,
-                                  "tria_2",
-                                  std_cxx11::cref(tria_2))),
+       .connect (std::bind (&create_notification<dim,dim>,
+                            "tria_2",
+                            std::cref(tria_2))),
        tria_2.signals.copy
-       .connect (std_cxx11::bind (&copy_notification<dim,dim>,
-                                  "tria_2",
-                                  std_cxx11::_1,
-                                  std_cxx11::cref(tria_2)))
+       .connect (std::bind (&copy_notification<dim,dim>,
+                            "tria_2",
+                            std::placeholders::_1,
+                            std::cref(tria_2)))
       };
 
 
@@ -147,7 +143,6 @@ int main ()
   deallog << std::setprecision(2);
   logfile << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1> ();
   test<2> ();

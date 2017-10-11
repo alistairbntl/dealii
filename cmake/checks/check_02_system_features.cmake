@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2017 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -20,10 +20,6 @@
 #   DEAL_II_HAVE_GETPID
 #   DEAL_II_HAVE_JN
 #   DEAL_II_HAVE_SYS_RESOURCE_H
-#   DEAL_II_HAVE_SYS_TIME_H
-#   DEAL_II_HAVE_SYS_TIMES_H
-#   DEAL_II_HAVE_SYS_TYPES_H
-#   DEAL_II_HAVE_TIMES
 #   DEAL_II_HAVE_UNISTD_H
 #   DEAL_II_MSVC
 #
@@ -39,13 +35,6 @@
 # Check for various posix (and linux) specific header files and symbols
 #
 CHECK_INCLUDE_FILE_CXX("sys/resource.h" DEAL_II_HAVE_SYS_RESOURCE_H)
-
-CHECK_INCLUDE_FILE_CXX("sys/time.h" DEAL_II_HAVE_SYS_TIME_H)
-
-CHECK_INCLUDE_FILE_CXX("sys/times.h" DEAL_II_HAVE_SYS_TIMES_H)
-CHECK_CXX_SYMBOL_EXISTS("times" "sys/times.h" DEAL_II_HAVE_TIMES)
-
-CHECK_INCLUDE_FILE_CXX("sys/types.h" DEAL_II_HAVE_SYS_TYPES_H)
 
 CHECK_INCLUDE_FILE_CXX("unistd.h" DEAL_II_HAVE_UNISTD_H)
 CHECK_CXX_SYMBOL_EXISTS("gethostname" "unistd.h" DEAL_II_HAVE_GETHOSTNAME)
@@ -141,6 +130,9 @@ IF(CMAKE_SYSTEM_NAME MATCHES "Windows")
       "BUILD_SHARED_LIBS forced to OFF\n\n"
       )
     SET(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+    # And disable compilation of examples:
+    SET(DEAL_II_COMPILE_EXAMPLES OFF CACHE BOOL "" FORCE)
   ENDIF()
 
 ENDIF()

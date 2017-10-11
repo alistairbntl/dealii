@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 // check ConeBoundary
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -31,7 +30,6 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_c1.h>
 
-#include <fstream>
 
 
 

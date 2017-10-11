@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -27,8 +26,6 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_out.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 int main ()
@@ -87,7 +84,7 @@ int main ()
             }
       }
 
-  GridTools::laplace_transform (new_points, tria);
+  GridTools::laplace_transform<dim> (new_points, tria, nullptr, true);
 
 
   GridOut grid_out;

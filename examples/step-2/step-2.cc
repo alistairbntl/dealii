@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 1999 - 2015 by the deal.II authors
+ * Copyright (C) 1999 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -64,8 +64,8 @@ using namespace dealii;
 // @sect3{Mesh generation}
 
 // This is the function that produced the circular grid in the previous step-1
-// example program with fewer refinements steps. The sole difference is that it returns the grid it
-// produces via its argument.
+// example program with fewer refinements steps. The sole difference is that it
+// returns the grid it produces via its argument.
 //
 // The details of what the function does are explained in step-1. The only
 // thing we would like to comment on is this:
@@ -88,16 +88,12 @@ void make_grid (Triangulation<2> &triangulation)
                               5 );
 
   static const SphericalManifold<2> manifold_description(center);
-  triangulation.set_all_manifold_ids(0);
   triangulation.set_manifold (0, manifold_description);
+  triangulation.set_all_manifold_ids(0);
 
   for (unsigned int step=0; step<3; ++step)
     {
-      Triangulation<2>::active_cell_iterator
-      cell = triangulation.begin_active(),
-      endc = triangulation.end();
-
-      for (; cell!=endc; ++cell)
+      for (auto cell: triangulation.active_cell_iterators())
         for (unsigned int v=0;
              v < GeometryInfo<2>::vertices_per_cell;
              ++v)

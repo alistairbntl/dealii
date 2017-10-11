@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,11 +16,9 @@
 
 
 #include "../tests.h"
-#include "testmatrix.h"
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 
-//#include <fstream>
 
 void graph_laplacian(const SparsityPattern &sparsity,
                      SparseMatrix<double> &matrix)

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2016 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_matrix_base_h
-#define dealii__block_matrix_base_h
+#ifndef dealii_block_matrix_base_h
+#define dealii_block_matrix_base_h
 
 
 #include <deal.II/base/config.h>
@@ -369,7 +369,7 @@ public:
   /**
    * Default constructor.
    */
-  BlockMatrixBase ();
+  BlockMatrixBase () = default;
 
   /**
    * Destructor.
@@ -413,13 +413,13 @@ public:
          const unsigned int column) const;
 
   /**
-   * Return the dimension of the codomain (or range) space. To remember: the
+   * Return the dimension of the codomain (or range) space. Note that the
    * matrix is of dimension $m \times n$.
    */
   size_type m () const;
 
   /**
-   * Return the dimension of the domain space. To remember: the matrix is of
+   * Return the dimension of the domain space. Note that the matrix is of
    * dimension $m \times n$.
    */
   size_type n () const;
@@ -1485,17 +1485,16 @@ namespace BlockMatrixIterators
 
 //---------------------------------------------------------------------------
 
-
-template <typename MatrixType>
-inline
-BlockMatrixBase<MatrixType>::BlockMatrixBase ()
-{}
-
 template <typename MatrixType>
 inline
 BlockMatrixBase<MatrixType>::~BlockMatrixBase ()
 {
-  clear ();
+  try
+    {
+      clear ();
+    }
+  catch (...)
+    {}
 }
 
 
@@ -1548,7 +1547,7 @@ BlockMatrixBase<MatrixType>::clear ()
     for (unsigned int c=0; c<n_block_cols(); ++c)
       {
         MatrixType *p = this->sub_objects[r][c];
-        this->sub_objects[r][c] = 0;
+        this->sub_objects[r][c] = nullptr;
         delete p;
       }
   sub_objects.reinit (0,0);
@@ -2674,4 +2673,4 @@ BlockMatrixBase<MatrixType>::prepare_set_operation ()
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif    // dealii__block_matrix_base_h
+#endif    // dealii_block_matrix_base_h

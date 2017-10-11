@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,7 +21,6 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
@@ -48,7 +47,6 @@
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <fstream>
 #include <sstream>
 
 
@@ -145,8 +143,6 @@ namespace Step37
     number el (const unsigned int row,
                const unsigned int col) const;
     void set_diagonal (const Vector<number> &diagonal);
-
-    std::size_t memory_consumption () const;
 
   private:
     void local_apply (const MatrixFree<dim,number>    &data,
@@ -346,19 +342,6 @@ namespace Step37
 
 
 
-  template <int dim, int fe_degree, typename number>
-  std::size_t
-  LaplaceOperator<dim,fe_degree,number>::memory_consumption () const
-  {
-    return (data.memory_consumption () +
-            coefficient.memory_consumption() +
-            diagonal_values.memory_consumption() +
-            MemoryConsumption::memory_consumption(diagonal_is_available));
-  }
-
-
-
-
   template <int dim>
   class LaplaceProblem
   {
@@ -395,6 +378,7 @@ namespace Step37
   template <int dim>
   LaplaceProblem<dim>::LaplaceProblem ()
     :
+    triangulation (Triangulation<dim>::limit_level_difference_at_vertices),
     fe (degree_finite_element),
     dof_handler (triangulation)
   {}
@@ -406,8 +390,8 @@ namespace Step37
   void LaplaceProblem<dim>::setup_system ()
   {
     system_matrix.clear();
-    mg_matrices.clear();
-    mg_constraints.clear();
+    mg_matrices.clear_elements();
+    mg_constraints.clear_elements();
 
     dof_handler.distribute_dofs (fe);
     dof_handler.distribute_mg_dofs (fe);
@@ -419,7 +403,7 @@ namespace Step37
     constraints.clear();
     VectorTools::interpolate_boundary_values (dof_handler,
                                               0,
-                                              ZeroFunction<dim>(),
+                                              Functions::ZeroFunction<dim>(),
                                               constraints);
     constraints.close();
 
@@ -432,7 +416,7 @@ namespace Step37
     mg_constraints.resize (0, nlevels-1);
 
     typename FunctionMap<dim>::type dirichlet_boundary;
-    ZeroFunction<dim>               homogeneous_dirichlet_bc (1);
+    Functions::ZeroFunction<dim>               homogeneous_dirichlet_bc (1);
     dirichlet_boundary[0] = &homogeneous_dirichlet_bc;
     std::vector<std::set<types::global_dof_index> > boundary_indices(triangulation.n_levels());
     MGTools::make_boundary_list (dof_handler,
@@ -596,11 +580,6 @@ namespace Step37
                    MGTransferPrebuilt<Vector<double> > >
                    preconditioner(dof_handler, mg, mg_transfer);
 
-    const std::size_t multigrid_memory
-      = (mg_matrices.memory_consumption() +
-         mg_transfer.memory_consumption() +
-         coarse_matrix.memory_consumption());
-
     SolverControl           solver_control (1000, 1e-12*system_rhs.l2_norm());
     SolverCG<>              cg (solver_control);
 
@@ -636,10 +615,8 @@ namespace Step37
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog << std::setprecision (3);
-  deallog.threshold_double(1e-10);
 
   {
     deallog.push("2d");
@@ -657,4 +634,3 @@ int main ()
 
   return 0;
 }
-

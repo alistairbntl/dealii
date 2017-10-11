@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,10 +21,9 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/sparsity_pattern.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -35,7 +34,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
 
 
 
@@ -102,7 +100,7 @@ check ()
   // second way: via direct elimination of
   // constraints
   SparsityPattern sparsity_2;
-  CompressedSparsityPattern csp_2 (dof.n_dofs());
+  DynamicSparsityPattern csp_2 (dof.n_dofs());
   DoFTools::make_sparsity_pattern (dof, csp_2, constraints);
   sparsity_2.copy_from (csp_2);
 
@@ -136,7 +134,7 @@ check ()
   sparsity_3.compress ();
 
   BlockSparsityPattern sparsity_4;
-  BlockCompressedSparsityPattern csp_4(2,2);
+  BlockDynamicSparsityPattern csp_4(2,2);
   csp_4.block(0,0).reinit (n1,n1);
   csp_4.block(1,0).reinit (n2,n1);
   csp_4.block(0,1).reinit (n1,n2);

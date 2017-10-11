@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,7 +23,6 @@ char logname[] = "output";
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 
@@ -40,7 +39,6 @@ char logname[] = "output";
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
 #include <vector>
 
 
@@ -51,7 +49,6 @@ int main ()
   logfile.precision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
 
   // create a mesh like this (viewed

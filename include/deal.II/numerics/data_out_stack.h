@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__data_out_stack_h
-#define dealii__data_out_stack_h
+#ifndef dealii_data_out_stack_h
+#define dealii_data_out_stack_h
 
 
 #include <deal.II/base/config.h>
@@ -78,8 +78,8 @@ template <int dim, int spacedim> class DoFHandler;
  *                                  // first declare the vectors
  *                                  // to be used later
  *   std::vector<std::string> solution_names;
- *   solution_names.push_back ("u");
- *   solution_names.push_back ("v");
+ *   solution_names.emplace_back ("u");
+ *   solution_names.emplace_back ("v");
  *   data_out_stack.declare_data_vector (solution_names,
  *                                       DataOutStack<dim>::dof_vector);
  *   data_out_stack.declare_data_vector ("error",
@@ -113,12 +113,22 @@ public:
    * Data type declaring the two types of vectors which are used in this
    * class.
    */
-  enum VectorType { cell_vector, dof_vector };
+  enum VectorType
+  {
+    /**
+     * The data describes one value for each cell.
+     */
+    cell_vector,
+    /**
+     * The data describes one value for each DoF.
+     */
+    dof_vector
+  };
 
   /**
    * Destructor. Only declared to make it @p virtual.
    */
-  virtual ~DataOutStack ();
+  virtual ~DataOutStack () = default;
 
   /**
    * Start the next set of data for a specific parameter value. The argument

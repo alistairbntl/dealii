@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mapping_collection_h
-#define dealii__mapping_collection_h
+#ifndef dealii_mapping_collection_h
+#define dealii_mapping_collection_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/subscriptor.h>
@@ -22,7 +22,7 @@
 #include <deal.II/fe/fe.h>
 
 #include <vector>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -50,7 +50,7 @@ namespace hp
    *
    * @author Oliver Kayser-Herold, 2005
    */
-  template<int dim, int spacedim=dim>
+  template <int dim, int spacedim=dim>
   class MappingCollection : public Subscriptor
   {
   public:
@@ -58,7 +58,7 @@ namespace hp
      * Default constructor. Leads to an empty collection that can later be
      * filled using push_back().
      */
-    MappingCollection ();
+    MappingCollection () = default;
 
     /**
      * Conversion constructor. This constructor creates a MappingCollection
@@ -74,15 +74,21 @@ namespace hp
     MappingCollection (const MappingCollection<dim,spacedim> &mapping_collection);
 
     /**
-     * Adds a new mapping to the MappingCollection.  The mappings have to be
-     * added in the order of the active_fe_indices. Thus the reference to the
-     * mapping object for active_fe_index 0 has to be added first, followed by
-     * the mapping object for active_fe_index 1.
+     * Adds a new mapping to the MappingCollection. Generally, you will
+     * want to use the same order for mappings as for the elements of
+     * the hp::FECollection object you use. However, the same
+     * considerations as discussed with the hp::QCollection::push_back()
+     * function also apply in the current context.
+     *
+     * This class creates a copy of the given mapping object, i.e., you can
+     * do things like <tt>push_back(MappingQ<dim>(3));</tt>. The internal copy
+     * is later destroyed by this object upon destruction of the entire
+     * collection.
      */
     void push_back (const Mapping<dim,spacedim> &new_mapping);
 
     /**
-     * Returns the mapping object which was specified by the user for the
+     * Return the mapping object which was specified by the user for the
      * active_fe_index which is provided as a parameter to this method.
      *
      * @pre @p index must be between zero and the number of elements of the
@@ -92,7 +98,7 @@ namespace hp
     operator[] (const unsigned int index) const;
 
     /**
-     * Returns the number of mapping objects stored in this container.
+     * Return the number of mapping objects stored in this container.
      */
     unsigned int size () const;
 
@@ -107,7 +113,7 @@ namespace hp
      * The real container, which stores pointers to the different Mapping
      * objects.
      */
-    std::vector<std_cxx11::shared_ptr<const Mapping<dim,spacedim> > > mappings;
+    std::vector<std::shared_ptr<const Mapping<dim,spacedim> > > mappings;
   };
 
 
@@ -127,7 +133,7 @@ namespace hp
    * collection can then be used in all of those places where such a
    * collection is needed.
    */
-  template<int dim, int spacedim=dim>
+  template <int dim, int spacedim=dim>
   struct StaticMappingQ1
   {
   public:
@@ -140,7 +146,7 @@ namespace hp
 
   /* --------------- inline functions ------------------- */
 
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   inline
   unsigned int
   MappingCollection<dim,spacedim>::size () const
@@ -150,7 +156,7 @@ namespace hp
 
 
 
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   inline
   const Mapping<dim,spacedim> &
   MappingCollection<dim,spacedim>::operator[] (const unsigned int index) const

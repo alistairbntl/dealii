@@ -17,7 +17,6 @@
 #include "../tests.h"
 #include  <deal.II/lac/constraint_matrix.h>
 
-#include <fstream>
 #include <vector>
 
 void test()
@@ -55,7 +54,6 @@ int main()
   logfile.precision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test();
 

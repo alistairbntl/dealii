@@ -19,7 +19,6 @@
 
 #include "serialization.h"
 #include <deal.II/base/parameter_handler.h>
-#include <boost/property_tree/ptree_serialization.hpp>
 #include <boost/serialization/vector.hpp>
 
 
@@ -123,7 +122,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2007 - 2015 by the deal.II authors
+// Copyright (C) 2007 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__parsed_function_h
-#define dealii__parsed_function_h
+#ifndef dealii_parsed_function_h
+#define dealii_parsed_function_h
 
 #include <deal.II/base/auto_derivative_function.h>
 #include <deal.II/base/function_parser.h>
@@ -48,7 +48,7 @@ namespace Functions
    *   ParsedFunction<dim> my_vector_function(dim);
    *
    *   // Parse an input file.
-   *   prm.read_input(some_input_file);
+   *   prm.parse_input(some_input_file);
    *
    *   // Initialize the ParsedFunction object with the given file
    *   prm.enter_subsection("My vector function");

@@ -19,7 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -27,12 +26,11 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 
-#include <fstream>
 
 
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   Triangulation<dim> triangulation (Triangulation<dim>::limit_level_difference_at_vertices);
@@ -102,7 +100,6 @@ void test()
 int main()
 {
   initlog();
-  deallog.threshold_double(1.e-10);
 
   deallog.push("1d");
   test<1>();

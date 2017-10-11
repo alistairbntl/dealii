@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_sparsity_pattern_h
-#define dealii__block_sparsity_pattern_h
+#ifndef dealii_block_sparsity_pattern_h
+#define dealii_block_sparsity_pattern_h
 
 
 #include <deal.II/base/config.h>
@@ -24,9 +24,7 @@
 #include <deal.II/base/smartpointer.h>
 #include <deal.II/lac/sparsity_pattern.h>
 #include <deal.II/lac/trilinos_sparsity_pattern.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
-#include <deal.II/lac/compressed_set_sparsity_pattern.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/block_indices.h>
 
 DEAL_II_NAMESPACE_OPEN
@@ -310,10 +308,6 @@ public:
                   int, int, int, int,
                   << "The blocks [" << arg1 << ',' << arg2 << "] and ["
                   << arg3 << ',' << arg4 << "] have differing column numbers.");
-  /**
-   * Exception
-   */
-  DeclException0 (ExcInvalidConstructorCall);
   //@}
 
 protected:
@@ -388,7 +382,7 @@ public:
    * useful if you want such objects as member variables in other classes. You
    * can make the structure usable by calling the reinit() function.
    */
-  BlockSparsityPattern ();
+  BlockSparsityPattern () = default;
 
   /**
    * Initialize the matrix with the given number of block rows and columns.
@@ -450,7 +444,7 @@ public:
  * rather acts as a @p typedef to introduce the name of this class, without
  * requiring the user to specify the templated name of the base class. For
  * information on the interface of this class refer to the base class. The
- * individual blocks are based on the CompressedSparsityPattern class.
+ * individual blocks are based on the DynamicSparsityPattern class.
  *
  * This class is an example of the "dynamic" type of
  * @ref Sparsity.
@@ -463,7 +457,7 @@ public:
  *
  * @dontinclude block_dynamic_sparsity_pattern.cc
  *
- * After the the DoFHandler <tt>dof</tt> and the ConstraintMatrix
+ * After the DoFHandler <tt>dof</tt> and the ConstraintMatrix
  * <tt>constraints</tt> have been set up with a system element, we must count
  * the degrees of freedom in each matrix block:
  *
@@ -494,7 +488,7 @@ public:
    * useful if you want such objects as member variables in other classes. You
    * can make the structure usable by calling the reinit() function.
    */
-  BlockDynamicSparsityPattern ();
+  BlockDynamicSparsityPattern () = default;
 
   /**
    * Initialize the matrix with the given number of block rows and columns.
@@ -568,48 +562,38 @@ public:
   using BlockSparsityPatternBase<DynamicSparsityPattern>::reinit;
 };
 
-/**
- * @deprecated Use  BlockDynamicSparsityPattern instead.
- */
-typedef BlockDynamicSparsityPattern BlockCompressedSparsityPattern DEAL_II_DEPRECATED;
-
-/**
- * @deprecated Use  BlockDynamicSparsityPattern instead.
- */
-typedef BlockDynamicSparsityPattern BlockCompressedSetSparsityPattern DEAL_II_DEPRECATED;
-
-/**
- * @deprecated Use  BlockDynamicSparsityPattern instead.
- */
-typedef BlockDynamicSparsityPattern BlockCompressedSimpleSparsityPattern DEAL_II_DEPRECATED;
-
-
+/*@}*/
 
 
 #ifdef DEAL_II_WITH_TRILINOS
 
 
-/**
- * This class extends the base class to implement an array of Trilinos
- * sparsity patterns that can be used to initialize Trilinos block sparse
- * matrices that can be distributed among different processors. It is used in
- * the same way as the BlockSparsityPattern except that it builds upon the
- * TrilinosWrappers::SparsityPattern instead of the dealii::SparsityPattern.
- * See the documentation of the BlockSparsityPattern for examples.
- *
- * This class is has properties of the "dynamic" type of
- * @ref Sparsity
- * (in the sense that it can extend the memory if too little elements were
- * allocated), but otherwise is more like the basic deal.II SparsityPattern
- * (in the sense that the method compress() needs to be called before the
- * pattern can be used).
- *
- * This class is used in step-32.
- *
- * @author Martin Kronbichler, 2008, 2009
- */
 namespace TrilinosWrappers
 {
+
+  /*! @addtogroup TrilinosWrappers
+   *@{
+   */
+
+  /**
+   * This class extends the base class to implement an array of Trilinos
+   * sparsity patterns that can be used to initialize Trilinos block sparse
+   * matrices that can be distributed among different processors. It is used in
+   * the same way as the dealii::BlockSparsityPattern except that it builds upon
+   * the TrilinosWrappers::SparsityPattern instead of the
+   * dealii::SparsityPattern.
+   *
+   * This class is has properties of the "dynamic" type of
+   * @ref Sparsity
+   * (in the sense that it can extend the memory if too little elements were
+   * allocated), but otherwise is more like the basic deal.II SparsityPattern
+   * (in the sense that the method compress() needs to be called before the
+   * pattern can be used).
+   *
+   * This class is used in step-32.
+   *
+   * @author Martin Kronbichler, 2008, 2009
+   */
   class BlockSparsityPattern :
     public dealii::BlockSparsityPatternBase<SparsityPattern>
   {
@@ -620,7 +604,7 @@ namespace TrilinosWrappers
      * useful if you want such objects as member variables in other classes.
      * You can make the structure usable by calling the reinit() function.
      */
-    BlockSparsityPattern ();
+    BlockSparsityPattern () = default;
 
     /**
      * Initialize the matrix with the given number of block rows and columns.
@@ -732,12 +716,13 @@ namespace TrilinosWrappers
      */
     using BlockSparsityPatternBase<SparsityPattern>::reinit;
   };
-}
+
+  /*@}*/
+
+} /* namespace TrilinosWrappers */
 
 #endif
 
-
-/*@}*/
 /*---------------------- Template functions -----------------------------------*/
 
 
@@ -855,7 +840,7 @@ BlockSparsityPatternBase<SparsityPatternType>::add_entries (const size_type row,
     {
       const size_type col = *it;
 
-      const std::pair<size_type , size_type>
+      const std::pair<size_type, size_type>
       col_index = this->column_indices.global_to_local(col);
 
       const size_type local_index = counter_within_block[col_index.first]++;
@@ -877,7 +862,7 @@ BlockSparsityPatternBase<SparsityPatternType>::add_entries (const size_type row,
   // where we should start reading out
   // data. Now let's write the data into
   // the individual blocks!
-  const std::pair<size_type , size_type>
+  const std::pair<size_type, size_type>
   row_index = this->row_indices.global_to_local (row);
   for (size_type block_col=0; block_col<n_block_cols(); ++block_col)
     {
@@ -902,7 +887,7 @@ BlockSparsityPatternBase<SparsityPatternType>::exists (const size_type i,
   // if you get an error here, are
   // you sure you called
   // <tt>collect_sizes()</tt> before?
-  const std::pair<size_type , size_type>
+  const std::pair<size_type, size_type>
   row_index = row_indices.global_to_local (i),
   col_index = column_indices.global_to_local (j);
   return sub_objects[row_index.first][col_index.first]->exists (row_index.second,
@@ -917,7 +902,7 @@ unsigned int
 BlockSparsityPatternBase<SparsityPatternType>::
 row_length (const size_type row) const
 {
-  const std::pair<size_type , size_type>
+  const std::pair<size_type, size_type>
   row_index = row_indices.global_to_local (row);
 
   unsigned int c = 0;
@@ -955,7 +940,7 @@ BlockDynamicSparsityPattern::column_number (const size_type row,
                                             const unsigned int index) const
 {
   // .first= ith block, .second = jth row in that block
-  const std::pair<size_type ,size_type >
+  const std::pair<size_type,size_type >
   row_index = row_indices.global_to_local (row);
 
   Assert(index<row_length(row), ExcIndexRange(index, 0, row_length(row)));

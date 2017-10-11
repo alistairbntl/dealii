@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_q.h>
@@ -39,7 +38,6 @@
 #include <deal.II/numerics/vector_tools.h>
 
 
-#include <fstream>
 
 
 template <int dim>
@@ -71,7 +69,7 @@ void test ()
   std::map<types::global_dof_index, double> bv;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim>(1),
+                                            Functions::ZeroFunction<dim>(1),
                                             bv);
   for (std::map<types::global_dof_index, double>::iterator
        p = bv.begin(); p!=bv.end(); ++p)
@@ -86,7 +84,6 @@ int main ()
   logfile.precision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1> ();
   test<2> ();

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -32,12 +31,9 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
-#include <cmath>
-#include <iomanip>
 
 
-template<int dim>
+template <int dim>
 class MySquareFunction : public Function<dim>
 {
 public:
@@ -57,7 +53,7 @@ public:
 };
 
 
-template<int dim>
+template <int dim>
 class MyExpFunction : public Function<dim>
 {
 public:
@@ -153,7 +149,7 @@ check ()
           deallog << difference(0) << std::endl;
           Assert (difference(0) < 2e-4, ExcInternalError());
 
-          VectorTools::point_difference (dof, v, ZeroFunction<dim>(),
+          VectorTools::point_difference (dof, v, Functions::ZeroFunction<dim>(),
                                          difference, p[i]);
           deallog << difference(0) << std::endl;
           Assert (std::abs(-difference(0) - function.value(p[i])) < 2e-4,

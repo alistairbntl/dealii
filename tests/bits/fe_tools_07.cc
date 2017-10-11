@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,7 +22,6 @@
 //   FETools::interpolation_difference(6)
 
 
-std::string output_file_name = "output";
 
 
 template <int dim>
@@ -46,9 +45,9 @@ check_this (const FiniteElement<dim> &fe1,
       !fe2.constraints_are_implemented())
     return;
 
-  std_cxx11::unique_ptr<Triangulation<dim> > tria(make_tria<dim>());
-  std_cxx11::unique_ptr<DoFHandler<dim> >    dof1(make_dof_handler (*tria, fe1));
-  std_cxx11::unique_ptr<DoFHandler<dim> >    dof2(make_dof_handler (*tria, fe2));
+  std::unique_ptr<Triangulation<dim> > tria(make_tria<dim>());
+  std::unique_ptr<DoFHandler<dim> >    dof1(make_dof_handler (*tria, fe1));
+  std::unique_ptr<DoFHandler<dim> >    dof2(make_dof_handler (*tria, fe2));
   ConstraintMatrix cm1, cm2;
   DoFTools::make_hanging_node_constraints (*dof1, cm1);
   DoFTools::make_hanging_node_constraints (*dof2, cm2);

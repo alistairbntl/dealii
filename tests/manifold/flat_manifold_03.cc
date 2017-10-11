@@ -1,5 +1,5 @@
 //----------------------------  manifold_id_01.cc  ---------------------------
-//    Copyright (C) 2011 - 2015 by the mathLab team.
+//    Copyright (C) 2011 - 2016 by the mathLab team.
 //
 //    This file is subject to LGPL and may not be  distributed
 //    without copyright and license information. Please refer
@@ -12,8 +12,6 @@
 // Test periodicity of FlatManifold
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 
 // all include files you need here
@@ -78,8 +76,8 @@ void test(unsigned int ref=1)
 
   for (unsigned int i=0; i<ps.size(); ++i)
     {
-      quad = Quadrature<spacedim>(ps[i],ws);
-      middle = manifold.get_new_point(quad);
+      middle = manifold.get_new_point(make_array_view(ps[i]),
+                                      make_array_view(ws));
       deallog << "P0: " << ps[i][0] << " , P1: " << ps[i][1] << " , Middle: " << middle << std::endl;
     }
 
@@ -87,9 +85,7 @@ void test(unsigned int ref=1)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-8);
+  initlog();
 
   test<1,1>();
   test<1,2>();
@@ -99,4 +95,3 @@ int main ()
 
   return 0;
 }
-

@@ -1,7 +1,17 @@
-//------------------  get_functions_common.h  ------------------------
-//    Version: $Name$
+// ---------------------------------------------------------------------
 //
-//------------------  get_functions_common.h  ------------------------
+// Copyright (C) 2011 - 2016 by the deal.II authors
+//
+// This file is part of the deal.II library.
+//
+// The deal.II library is free software; you can use it, redistribute
+// it, and/or modify it under the terms of the GNU Lesser General
+// Public License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+// The full text of the license can be found in the file LICENSE at
+// the top level of the deal.II distribution.
+//
+// ---------------------------------------------------------------------
 
 
 // this is a template for getting the function values and comparing them with
@@ -19,7 +29,7 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria_boundary_lib.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -142,7 +152,6 @@ public:
     // for floats for the relative error size
     if (types_are_equal<Number,double>::value == true)
       {
-        deallog.threshold_double (5e-14);
         deallog << "Error function values: "
                 << errors[0]/total[0] << std::endl;
         deallog << "Error function gradients: "
@@ -156,7 +165,6 @@ public:
         // some elements, it might also be zero
         // (linear elements on quadrilaterals), so
         // need to check for division by 0, too.
-        deallog.threshold_double (5e-7);
         const double output2 = total[2] == 0 ? 0. : errors[2] / total[2];
         deallog << "Error function Laplacians: " << output2 << std::endl;
         const double output3 = total[3] == 0 ? 0. : errors[3] / total[3];
@@ -166,13 +174,11 @@ public:
       }
     else if (types_are_equal<Number,float>::value == true)
       {
-        deallog.threshold_double (1e-6);
         deallog << "Error function values: "
                 << errors[0]/total[0] << std::endl;
         deallog << "Error function gradients: "
                 << errors[1]/total[1] << std::endl;
         const double output2 = total[2] == 0 ? 0. : errors[2] / total[2];
-        deallog.threshold_double (1e-5);
         deallog << "Error function Laplacians: " << output2 << std::endl;
         const double output3 = total[3] == 0 ? 0. : errors[3] / total[3];
         deallog << "Error function diagonal of Hessian: " << output3 << std::endl;
@@ -241,7 +247,7 @@ void do_test (const DoFHandler<dim> &dof,
     const QGauss<1> quad (fe_degree+1);
     typename MatrixFree<dim,number>::AdditionalData data;
     data.tasks_parallel_scheme = MatrixFree<dim,number>::AdditionalData::none;
-    data.mapping_update_flags = update_gradients | update_second_derivatives;
+    data.mapping_update_flags = update_gradients | update_hessians;
     mf_data.reinit (dof, constraints, quad, data);
   }
 

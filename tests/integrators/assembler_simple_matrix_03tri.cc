@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
  */
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/block_indices.h>
@@ -77,7 +76,7 @@ void test(FiniteElement<dim> &fe)
   typename DoFHandler<dim>::face_iterator face = cell->face(1);
   typename DoFHandler<dim>::active_cell_iterator neighbor = cell->neighbor(1);
 
-  CompressedSparsityPattern csp(dof.n_dofs(),dof.n_dofs());
+  DynamicSparsityPattern csp(dof.n_dofs(),dof.n_dofs());
   DoFTools::make_flux_sparsity_pattern(dof, csp);
   TrilinosWrappers::SparsityPattern sparsity;
   sparsity.copy_from(csp);

@@ -18,17 +18,14 @@
 // Test grid generation functions  in GridGenerator for spacedim>dim
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
 
-#include <fstream>
-#include <iomanip>
 
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void test(std::ostream &out)
 {
   Point<dim> p1;
@@ -86,7 +83,6 @@ int main()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("1-2");
   test<1,2>(logfile);

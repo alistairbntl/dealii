@@ -73,6 +73,13 @@ void test ()
   data.max_n_tmp_vectors = 202;
 
   SolverGMRES<Vector<number> > solver(control, data);
+  auto print_re_orthogonalization =
+    [](int accumulated_iterations)
+  {
+    deallog.get_file_stream() << "Re-orthogonalization enabled at step "
+                              << accumulated_iterations << std::endl;
+  };
+  solver.connect_re_orthogonalization_slot(print_re_orthogonalization);
   solver.solve(matrix, sol, rhs, PreconditionIdentity());
 }
 
@@ -81,12 +88,10 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("double");
   test<double>();
   deallog.pop();
-  deallog.threshold_double(2.e-4);
   deallog.push("float");
   test<float>();
   deallog.pop();

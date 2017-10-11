@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2008 - 2015 by the deal.II authors
+ * Copyright (C) 2008 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -126,6 +126,7 @@ namespace Step45
   BoundaryValues<dim>::value (const Point<dim>  &/*p*/,
                               const unsigned int component) const
   {
+    (void) component;
     Assert (component < this->n_components,
             ExcIndexRange (component, 0, this->n_components));
 
@@ -293,7 +294,7 @@ namespace Step45
     mpi_communicator (MPI_COMM_WORLD),
     triangulation (mpi_communicator),
     fe (FE_Q<dim>(degree+1), dim,
-        FE_Q<dim>(degree)  , 1),
+        FE_Q<dim>(degree), 1),
     dof_handler (triangulation),
     pcout (std::cout,
            Utilities::MPI::this_mpi_process(mpi_communicator) == 0),

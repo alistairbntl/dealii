@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_matrix_array_h
-#define dealii__block_matrix_array_h
+#ifndef dealii_block_matrix_array_h
+#define dealii_block_matrix_array_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/subscriptor.h>
@@ -272,7 +272,7 @@ protected:
      * Constructor initializing all data fields. A PointerMatrix object is
      * generated for <tt>matrix</tt>.
      */
-    template<typename MatrixType>
+    template <typename MatrixType>
     Entry (const MatrixType &matrix,
            size_type row,
            size_type col,
@@ -334,6 +334,13 @@ private:
    * number of blocks per row.
    */
   unsigned int block_cols;
+
+  /**
+   * Assignment operator. Since the copy constructor is destructive (see its
+   * documentation) and only exists for convenience there is no reasonable way
+   * to implement this. Hence this operator is both private and unimplemented.
+   */
+  Entry &operator= (const Entry &);
 };
 
 /*@}*/

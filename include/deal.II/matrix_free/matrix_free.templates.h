@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -12,6 +12,9 @@
 // the top level of the deal.II distribution.
 //
 // ---------------------------------------------------------------------
+
+#ifndef dealii_matrix_free_templates_h
+#define dealii_matrix_free_templates_h
 
 
 #include <deal.II/base/utilities.h>
@@ -38,6 +41,7 @@ DEAL_II_NAMESPACE_OPEN
 template <int dim, typename Number>
 MatrixFree<dim, Number>::MatrixFree()
   :
+  Subscriptor(),
   indices_are_initialized (false),
   mapping_is_initialized  (false)
 {}
@@ -45,8 +49,12 @@ MatrixFree<dim, Number>::MatrixFree()
 
 
 template <int dim, typename Number>
-MatrixFree<dim,Number>::~MatrixFree()
-{}
+MatrixFree<dim, Number>::MatrixFree(const MatrixFree<dim,Number> &other)
+  :
+  Subscriptor()
+{
+  copy_from(other);
+}
 
 
 
@@ -66,37 +74,6 @@ copy_from (const MatrixFree<dim,Number> &v)
   size_info = v.size_info;
   indices_are_initialized = v.indices_are_initialized;
   mapping_is_initialized  = v.mapping_is_initialized;
-}
-
-
-
-namespace internal
-{
-  template <int dim>
-  void assert_communicator_equality (const dealii::Triangulation<dim> &tria,
-                                     const MPI_Comm                  &comm_mf)
-  {
-#ifdef DEAL_II_WITH_MPI
-    const parallel::distributed::Triangulation<dim> *dist_tria =
-      dynamic_cast<const parallel::distributed::Triangulation<dim>*>(&tria);
-    if (dist_tria != 0)
-      {
-        if (Utilities::MPI::job_supports_mpi())
-          {
-            int communicators_same = 0;
-            MPI_Comm_compare (dist_tria->get_communicator(), comm_mf,
-                              &communicators_same);
-            Assert (communicators_same == MPI_IDENT ||
-                    communicators_same == MPI_CONGRUENT,
-                    ExcMessage ("MPI communicator in parallel::distributed::Triangulation "
-                                "and matrix free class must be the same!"));
-          }
-      }
-#else
-    (void)tria;
-    (void)comm_mf;
-#endif
-  }
 }
 
 
@@ -133,11 +110,14 @@ internal_reinit(const Mapping<dim>                          &mapping,
       AssertDimension (dof_handler.size(), locally_owned_set.size());
 
       // set variables that are independent of FE
-      internal::assert_communicator_equality (dof_handler[0]->get_triangulation(),
-                                              additional_data.mpi_communicator);
-      size_info.communicator = additional_data.mpi_communicator;
       if (Utilities::MPI::job_supports_mpi() == true)
         {
+          const parallel::Triangulation<dim> *dist_tria =
+            dynamic_cast<const parallel::Triangulation<dim>*>
+            (&(dof_handler[0]->get_triangulation()));
+          size_info.communicator = dist_tria != nullptr ?
+                                   dist_tria->get_communicator() :
+                                   MPI_COMM_SELF;
           size_info.my_pid  =
             Utilities::MPI::this_mpi_process(size_info.communicator);
           size_info.n_procs =
@@ -145,6 +125,7 @@ internal_reinit(const Mapping<dim>                          &mapping,
         }
       else
         {
+          size_info.communicator = MPI_COMM_SELF;
           size_info.my_pid = 0;
           size_info.n_procs = 1;
         }
@@ -240,7 +221,7 @@ internal_reinit(const Mapping<dim>                            &mapping,
     unsigned int n_fe_in_collection = 0;
     for (unsigned int i=0; i<n_components; ++i)
       n_fe_in_collection = std::max (n_fe_in_collection,
-                                     dof_handler[i]->get_fe().size());
+                                     dof_handler[i]->get_fe_collection().size());
     unsigned int n_quad_in_collection = 0;
     for (unsigned int q=0; q<n_quad; ++q)
       n_quad_in_collection = std::max (n_quad_in_collection, quad[q].size());
@@ -248,11 +229,11 @@ internal_reinit(const Mapping<dim>                            &mapping,
                                        n_fe_in_collection,
                                        n_quad_in_collection));
     for (unsigned int no=0; no<n_components; no++)
-      for (unsigned int fe_no=0; fe_no<dof_handler[no]->get_fe().size(); ++fe_no)
+      for (unsigned int fe_no=0; fe_no<dof_handler[no]->get_fe_collection().size(); ++fe_no)
         for (unsigned int nq =0; nq<n_quad; nq++)
           for (unsigned int q_no=0; q_no<quad[nq].size(); ++q_no)
             shape_info(no,nq,fe_no,q_no).reinit (quad[nq][q_no],
-                                                 dof_handler[no]->get_fe()[fe_no]);
+                                                 dof_handler[no]->get_fe(fe_no));
   }
 
   if (additional_data.initialize_indices == true)
@@ -263,11 +244,14 @@ internal_reinit(const Mapping<dim>                            &mapping,
       AssertDimension (dof_handler.size(), locally_owned_set.size());
 
       // set variables that are independent of FE
-      internal::assert_communicator_equality (dof_handler[0]->get_triangulation(),
-                                              additional_data.mpi_communicator);
-      size_info.communicator = additional_data.mpi_communicator;
       if (Utilities::MPI::job_supports_mpi() == true)
         {
+          const parallel::Triangulation<dim> *dist_tria =
+            dynamic_cast<const parallel::Triangulation<dim>*>
+            (&(dof_handler[0]->get_triangulation()));
+          size_info.communicator = dist_tria != nullptr ?
+                                   dist_tria->get_communicator() :
+                                   MPI_COMM_SELF;
           size_info.my_pid  =
             Utilities::MPI::this_mpi_process(size_info.communicator);
           size_info.n_procs =
@@ -275,6 +259,7 @@ internal_reinit(const Mapping<dim>                            &mapping,
         }
       else
         {
+          size_info.communicator = MPI_COMM_SELF;
           size_info.my_pid = 0;
           size_info.n_procs = 1;
         }
@@ -319,10 +304,10 @@ internal_reinit(const Mapping<dim>                            &mapping,
                              dummy, dummy);
       for (unsigned int i=0; i<dof_info.size(); ++i)
         {
-          Assert(dof_handler[i]->get_fe().size() == 1, ExcNotImplemented());
+          Assert(dof_handler[i]->get_fe_collection().size() == 1, ExcNotImplemented());
           dof_info[i].dimension    = dim;
-          dof_info[i].n_components = dof_handler[i]->get_fe()[0].element_multiplicity(0);
-          dof_info[i].dofs_per_cell.push_back(dof_handler[i]->get_fe()[0].dofs_per_cell);
+          dof_info[i].n_components = dof_handler[i]->get_fe(0).element_multiplicity(0);
+          dof_info[i].dofs_per_cell.push_back(dof_handler[i]->get_fe(0).dofs_per_cell);
           dof_info[i].row_starts.resize(size_info.n_macro_cells+1);
           dof_info[i].row_starts.back()[2] =
             cell_level_index.size() % VectorizedArray<Number>::n_array_elements;
@@ -350,6 +335,38 @@ internal_reinit(const Mapping<dim>                            &mapping,
 }
 
 
+template <int dim, typename Number>
+template <int spacedim>
+bool
+MatrixFree<dim, Number>::is_supported(const FiniteElement<dim, spacedim> &fe)
+{
+  if (dim != spacedim)
+    return false;
+
+  // first check for degree, number of base_elemnt and number of its components
+  if (fe.degree==0 || fe.n_base_elements()!=1)
+    return false;
+
+  const FiniteElement<dim, spacedim> *fe_ptr = &(fe.base_element(0));
+  if (fe_ptr->n_components() != 1)
+    return false;
+
+  // then check of the base element is supported
+  if (dynamic_cast<const FE_Poly<TensorProductPolynomials<dim>,dim,spacedim>*>(fe_ptr)!=nullptr)
+    return true;
+  if (dynamic_cast<const FE_Poly<TensorProductPolynomials<dim,
+      Polynomials::PiecewisePolynomial<double> >,dim,spacedim>*>(fe_ptr)!=nullptr)
+    return true;
+  if (dynamic_cast<const FE_DGP<dim, spacedim>*>(fe_ptr)!=nullptr)
+    return true;
+  if (dynamic_cast<const FE_Q_DG0<dim, spacedim>*>(fe_ptr)!=nullptr)
+    return true;
+
+  // if the base element is not in the above list it is not supported
+  return false;
+}
+
+
 
 namespace internal
 {
@@ -365,11 +382,11 @@ namespace internal
       for (unsigned int child=0; child<cell->n_children(); ++child)
         resolve_cell (cell->child(child), cell_its,
                       subdomain_id);
-    else if (cell->subdomain_id() == subdomain_id)
+    else if (subdomain_id == numbers::invalid_subdomain_id
+             || cell->subdomain_id() == subdomain_id)
       {
         Assert (cell->active(), ExcInternalError());
-        cell_its.push_back (std::pair<unsigned int,unsigned int>
-                            (cell->level(), cell->index()));
+        cell_its.emplace_back (cell->level(), cell->index());
       }
   }
 }
@@ -390,7 +407,7 @@ initialize_dof_handlers (const std::vector<const DoFHandler<dim>*> &dof_handler,
 
   dof_info.resize (dof_handlers.n_dof_handlers);
 
-  // go through cells on zeroth level and then successively step down into
+  // Go through cells on zeroth level and then successively step down into
   // children. This gives a z-ordering of the cells, which is beneficial when
   // setting up neighboring relations between cells for thread parallelization
   const unsigned int n_mpi_procs = size_info.n_procs;
@@ -403,8 +420,16 @@ initialize_dof_handlers (const std::vector<const DoFHandler<dim>*> &dof_handler,
         cell_level_index.reserve (tria.n_active_cells());
       typename Triangulation<dim>::cell_iterator cell = tria.begin(0),
                                                  end_cell = tria.end(0);
+      // For serial Triangulations always take all cells
+      const unsigned int subdomain_id
+        = (dynamic_cast<const parallel::Triangulation<dim> *>
+           (&dof_handler[0]->get_triangulation())!=nullptr)
+          ? my_pid : numbers::invalid_subdomain_id;
       for ( ; cell != end_cell; ++cell)
-        internal::resolve_cell (cell, cell_level_index, my_pid);
+        internal::resolve_cell (cell, cell_level_index, subdomain_id);
+
+      Assert(n_mpi_procs>1 || cell_level_index.size()==tria.n_active_cells(),
+             ExcInternalError());
     }
   else
     {
@@ -416,8 +441,7 @@ initialize_dof_handlers (const std::vector<const DoFHandler<dim>*> &dof_handler,
                                                      end_cell = tria.end(level);
           for ( ; cell != end_cell; ++cell)
             if (cell->level_subdomain_id() == my_pid)
-              cell_level_index.push_back (std::pair<unsigned int,unsigned int>
-                                          (cell->level(), cell->index()));
+              cell_level_index.emplace_back (cell->level(), cell->index());
         }
     }
 }
@@ -453,9 +477,17 @@ initialize_dof_handlers (const std::vector<const hp::DoFHandler<dim>*> &dof_hand
     }
   typename hp::DoFHandler<dim>::cell_iterator cell = dof_handler[0]->begin(0),
                                               end_cell = dof_handler[0]->end(0);
+  // For serial Triangulations always take all cells
+  const unsigned int subdomain_id
+    = (dynamic_cast<const parallel::Triangulation<dim> *>
+       (&dof_handler[0]->get_triangulation())!=nullptr)
+      ? my_pid : numbers::invalid_subdomain_id;
   for ( ; cell != end_cell; ++cell)
     internal::resolve_cell (cell, cell_level_index,
-                            my_pid);
+                            subdomain_id);
+
+  Assert(n_mpi_procs>1 || cell_level_index.size()==tria.n_active_cells(),
+         ExcInternalError());
 }
 
 
@@ -473,10 +505,8 @@ void MatrixFree<dim,Number>::initialize_indices
   AssertDimension (n_fe, constraint.size());
 
   std::vector<types::global_dof_index> local_dof_indices;
-  std::vector<std::vector<std::vector<unsigned int> > > lexicographic_inv(n_fe);
 
   internal::MatrixFreeFunctions::ConstraintValues<double> constraint_values;
-  std::vector<unsigned int> constraint_indices;
 
   for (unsigned int no=0; no<n_fe; ++no)
     {
@@ -484,13 +514,13 @@ void MatrixFree<dim,Number>::initialize_indices
       if (dof_handlers.active_dof_handler == DoFHandlers::hp)
         {
           const hp::DoFHandler<dim> *hpdof = dof_handlers.hp_dof_handler[no];
-          const hp::FECollection<dim> &fe = hpdof->get_fe();
+          const hp::FECollection<dim> &fe = hpdof->get_fe_collection();
           for (unsigned int f=0; f<fe.size(); ++f)
             fes.push_back (&fe[f]);
 
           dof_info[no].max_fe_index = fe.size();
           dof_info[no].fe_index_conversion.resize (fe.size());
-          for (unsigned int ind=0; ind<hpdof->get_fe().size(); ++ind)
+          for (unsigned int ind=0; ind<hpdof->get_fe_collection().size(); ++ind)
             dof_info[no].fe_index_conversion[ind] =
               std::pair<unsigned int,unsigned int>(fe[ind].degree,
                                                    fe[ind].dofs_per_cell);
@@ -605,7 +635,7 @@ void MatrixFree<dim,Number>::initialize_indices
                        cell_level_index[counter].first,
                        cell_level_index[counter].second,
                        dofh);
-              if (dofh->get_fe().size() > 1)
+              if (dofh->get_fe_collection().size() > 1)
                 dof_info[no].cell_active_fe_index[counter] =
                   cell_it->active_fe_index();
               local_dof_indices.resize (cell_it->get_fe().dofs_per_cell);
@@ -723,7 +753,7 @@ void MatrixFree<dim,Number>::initialize_indices
   constraint_pool_row_index.resize(1, 0);
   for (unsigned int i=0; i<constraints.size(); ++i)
     {
-      Assert(constraints[i] != 0, ExcInternalError());
+      Assert(constraints[i] != nullptr, ExcInternalError());
       constraint_pool_data.insert(constraint_pool_data.end(),
                                   constraints[i]->begin(),
                                   constraints[i]->end());
@@ -1076,3 +1106,5 @@ namespace internal
 
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

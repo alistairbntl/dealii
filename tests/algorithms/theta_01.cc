@@ -16,7 +16,6 @@
 
 // See documentation of ThetaTimestepping for documentation of this example
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 
@@ -59,7 +58,6 @@ int main()
   std::string logname = "output";
   std::ofstream logfile(logname.c_str());
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   FullMatrix<double> matrix(2);
   matrix(0,0) = 0.;

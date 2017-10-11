@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2014 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -39,9 +39,9 @@ void test ()
   DoFHandler<dim> dof (tria);
   dof.distribute_dofs(fe);
   ConstraintMatrix constraints;
-  VectorTools::interpolate_boundary_values (dof, 0, ZeroFunction<dim>(),
+  VectorTools::interpolate_boundary_values (dof, 0, Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close();
 
-  do_test<dim, fe_degree, double> (dof, constraints);
+  do_test<dim, fe_degree, double, fe_degree+1> (dof, constraints);
 }

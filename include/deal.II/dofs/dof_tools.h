@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2016 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__dof_tools_h
-#define dealii__dof_tools_h
+#ifndef dealii_dof_tools_h
+#define dealii_dof_tools_h
 
 
 #include <deal.II/base/config.h>
@@ -29,6 +29,8 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <ostream>
+
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -51,7 +53,6 @@ namespace GridTools
   template <typename CellIterator> struct PeriodicFacePair;
 }
 
-//TODO: map_support_points_to_dofs should generate a multimap, rather than just a map, since several dofs may be located at the same support point
 
 /**
  * This is a collection of functions operating on, and manipulating the
@@ -91,12 +92,12 @@ namespace GridTools
  * freedom. The map_dof_to_boundary_indices() function does exactly this: it
  * provides a vector with as many entries as there are degrees of freedom on
  * the whole domain, with each entry being the number in the numbering of the
- * boundary or DoFHandler::invalid_dof_index if the dof is not on the
+ * boundary or numbers::invalid_dof_index if the dof is not on the
  * boundary.
  *
  * With this vector, one can get, for any given degree of freedom, a unique
  * number among those DoFs that sit on the boundary; or, if your DoF was
- * interior to the domain, the result would be DoFHandler::invalid_dof_index.
+ * interior to the domain, the result would be numbers::invalid_dof_index.
  * We need this mapping, for example, to build the mass matrix on the boundary
  * (for this, see make_boundary_sparsity_pattern() function, the corresponding
  * section below, as well as the MatrixCreator namespace documentation).
@@ -115,10 +116,10 @@ namespace GridTools
  * intermixed.
  *
  * Degrees of freedom on the boundary but not on one of the specified boundary
- * parts are given the index DoFHandler::invalid_dof_index, as if they were in
+ * parts are given the index numbers::invalid_dof_index, as if they were in
  * the interior. If no boundary indicator was given or if no face of a cell
  * has a boundary indicator contained in the given list, the vector of new
- * indices consists solely of DoFHandler::invalid_dof_index.
+ * indices consists solely of numbers::invalid_dof_index.
  *
  * (As a side note, for corner cases: The question what a degree of freedom on
  * the boundary is, is not so easy.  It should really be a degree of freedom
@@ -174,6 +175,7 @@ namespace GridTools
  */
 namespace DoFTools
 {
+
   /**
    * The flags used in tables by certain <tt>make_*_pattern</tt> functions to
    * describe whether two components of the solution couple in the bilinear
@@ -204,26 +206,90 @@ namespace DoFTools
   };
 
   /**
+   * @name DoF couplings
+   * @{
+   */
+
+  /**
+   * Map a coupling table from the user friendly organization by components to
+   * the organization by blocks. Specializations of this function for
+   * DoFHandler and hp::DoFHandler are required due to the different results
+   * of their finite element access.
+   *
+   * The return vector will be initialized to the correct length inside this
+   * function.
+   */
+  template <int dim, int spacedim>
+  void
+  convert_couplings_to_blocks (const hp::DoFHandler<dim,spacedim> &dof_handler,
+                               const Table<2, Coupling> &table_by_component,
+                               std::vector<Table<2,Coupling> > &tables_by_block);
+
+  /**
+   * Map a coupling table from the user friendly organization by components to
+   * the organization by blocks. Specializations of this function for
+   * DoFHandler and hp::DoFHandler are required due to the different results
+   * of their finite element access.
+   *
+   * The return vector will be initialized to the correct length inside this
+   * function.
+   */
+  template <int dim, int spacedim>
+  void
+  convert_couplings_to_blocks (const DoFHandler<dim,spacedim> &dof_handler,
+                               const Table<2, Coupling> &table_by_component,
+                               std::vector<Table<2,Coupling> > &tables_by_block);
+
+  /**
+   * Given a finite element and a table how the vector components of it couple
+   * with each other, compute and return a table that describes how the
+   * individual shape functions couple with each other.
+   */
+  template <int dim, int spacedim>
+  Table<2,Coupling>
+  dof_couplings_from_component_couplings (const FiniteElement<dim,spacedim> &fe,
+                                          const Table<2,Coupling> &component_couplings);
+
+  /**
+   * Same function as above for a collection of finite elements, returning a
+   * collection of tables.
+   *
+   * The function currently treats DoFTools::Couplings::nonzero the same as
+   * DoFTools::Couplings::always .
+   */
+  template <int dim, int spacedim>
+  std::vector<Table<2,Coupling> >
+  dof_couplings_from_component_couplings (const hp::FECollection<dim,spacedim> &fe,
+                                          const Table<2,Coupling> &component_couplings);
+  /**
+   * @}
+   */
+
+  /**
    * @name Functions to support code that generically uses both DoFHandler and hp::DoFHandler
    * @{
    */
   /**
    * Maximal number of degrees of freedom on a cell.
    *
+   * @deprecated Use <code>dh.get_fe_collection().max_dofs_per_cell()</code>.
+   *
    * @relates DoFHandler
    */
   template <int dim, int spacedim>
   unsigned int
-  max_dofs_per_cell (const DoFHandler<dim,spacedim> &dh);
+  max_dofs_per_cell (const DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
    * Maximal number of degrees of freedom on a cell.
    *
+   * @deprecated Use <code>dh.get_fe_collection().max_dofs_per_cell()</code>.
+   *
    * @relates hp::DoFHandler
    */
   template <int dim, int spacedim>
   unsigned int
-  max_dofs_per_cell (const hp::DoFHandler<dim,spacedim> &dh);
+  max_dofs_per_cell (const hp::DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
 
   /**
@@ -232,11 +298,13 @@ namespace DoFTools
    * This function exists for both non-hp and hp DoFHandlers, to allow for a
    * uniform interface to query this property.
    *
+   * @deprecated Use <code>dh.get_fe_collection().max_dofs_per_face()</code>.
+   *
    * @relates DoFHandler
    */
   template <int dim, int spacedim>
   unsigned int
-  max_dofs_per_face (const DoFHandler<dim,spacedim> &dh);
+  max_dofs_per_face (const DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
    * Maximal number of degrees of freedom on a face.
@@ -244,23 +312,27 @@ namespace DoFTools
    * This function exists for both non-hp and hp DoFHandlers, to allow for a
    * uniform interface to query this property.
    *
+   * @deprecated Use <code>dh.get_fe_collection().max_dofs_per_face()</code>.
+   *
    * @relates hp::DoFHandler
    */
   template <int dim, int spacedim>
   unsigned int
-  max_dofs_per_face (const hp::DoFHandler<dim,spacedim> &dh);
+  max_dofs_per_face (const hp::DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
    * Maximal number of degrees of freedom on a vertex.
    *
    * This function exists for both non-hp and hp DoFHandlers, to allow for a
    * uniform interface to query this property.
+   *
+   * @deprecated Use <code>dh.get_fe_collection().max_dofs_per_vertex()</code>.
    *
    * @relates DoFHandler
    */
   template <int dim, int spacedim>
   unsigned int
-  max_dofs_per_vertex (const DoFHandler<dim,spacedim> &dh);
+  max_dofs_per_vertex (const DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
    * Maximal number of degrees of freedom on a vertex.
@@ -268,11 +340,13 @@ namespace DoFTools
    * This function exists for both non-hp and hp DoFHandlers, to allow for a
    * uniform interface to query this property.
    *
+   * @deprecated Use <code>dh.get_fe_collection().max_dofs_per_vertex()</code>.
+   *
    * @relates hp::DoFHandler
    */
   template <int dim, int spacedim>
   unsigned int
-  max_dofs_per_vertex (const hp::DoFHandler<dim,spacedim> &dh);
+  max_dofs_per_vertex (const hp::DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
    * Number of vector components in the finite element object used by this
@@ -281,11 +355,13 @@ namespace DoFTools
    * This function exists for both non-hp and hp DoFHandlers, to allow for a
    * uniform interface to query this property.
    *
+   * @deprecated Use <code>dh.get_fe_collection().n_components()</code>.
+   *
    * @relates DoFHandler
    */
   template <int dim, int spacedim>
   unsigned int
-  n_components (const DoFHandler<dim,spacedim> &dh);
+  n_components (const DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
    * Number of vector components in the finite element object used by this
@@ -294,37 +370,43 @@ namespace DoFTools
    * This function exists for both non-hp and hp DoFHandlers, to allow for a
    * uniform interface to query this property.
    *
+   * @deprecated Use <code>dh.get_fe_collection().n_components()</code>.
+   *
    * @relates hp::DoFHandler
    */
   template <int dim, int spacedim>
   unsigned int
-  n_components (const hp::DoFHandler<dim,spacedim> &dh);
+  n_components (const hp::DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
-   * Find out whether the FiniteElement used by this DoFHandler is primitive
-   * or not.
+   * Find out whether the first FiniteElement used by this DoFHandler is
+   * primitive or not.
    *
    * This function exists for both non-hp and hp DoFHandlers, to allow for a
    * uniform interface to query this property.
+   *
+   * @deprecated Use <code>dh.get_fe(0).is_primitive()</code>.
    *
    * @relates DoFHandler
    */
   template <int dim, int spacedim>
   bool
-  fe_is_primitive (const DoFHandler<dim,spacedim> &dh);
+  fe_is_primitive (const DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
-   * Find out whether the FiniteElement used by this DoFHandler is primitive
+   * Find out whether the first FiniteElement used by this DoFHandler is primitive
    * or not.
    *
    * This function exists for both non-hp and hp DoFHandlers, to allow for a
    * uniform interface to query this property.
    *
+   * @deprecated Use <code>dh.get_fe(0).is_primitive()</code>.
+   *
    * @relates hp::DoFHandler
    */
   template <int dim, int spacedim>
   bool
-  fe_is_primitive (const hp::DoFHandler<dim,spacedim> &dh);
+  fe_is_primitive (const hp::DoFHandler<dim,spacedim> &dh) DEAL_II_DEPRECATED;
 
   /**
    * @}
@@ -603,7 +685,7 @@ namespace DoFTools
    *
    * @ingroup constraints
    */
-  template<typename DoFHandlerType, typename SparsityPatternType>
+  template <typename DoFHandlerType, typename SparsityPatternType>
   void
   make_flux_sparsity_pattern (const DoFHandlerType &dof_handler,
                               SparsityPatternType  &sparsity_pattern);
@@ -616,13 +698,13 @@ namespace DoFTools
    *
    * @ingroup constraints
    */
-  template<typename DoFHandlerType, typename SparsityPatternType>
+  template <typename DoFHandlerType, typename SparsityPatternType>
   void
   make_flux_sparsity_pattern (const DoFHandlerType      &dof_handler,
                               SparsityPatternType       &sparsity_pattern,
                               const ConstraintMatrix    &constraints,
                               const bool                 keep_constrained_dofs = true,
-                              const types::subdomain_id  subdomain_id          = numbers::invalid_unsigned_int);
+                              const types::subdomain_id  subdomain_id          = numbers::invalid_subdomain_id);
 
   /**
    * This function does essentially the same as the other
@@ -634,7 +716,7 @@ namespace DoFTools
    *
    * In fact, this function takes two such masks, one describing which
    * variables couple with each other in the cell integrals that make up your
-   * bilinear form, and which variables coupld with each other in the face
+   * bilinear form, and which variables couple with each other in the face
    * integrals. If you passed masks consisting of only 1s to both of these,
    * then you would get the same sparsity pattern as if you had called the
    * first of the make_sparsity_pattern() functions above. By setting some of
@@ -645,10 +727,28 @@ namespace DoFTools
    */
   template <typename DoFHandlerType, typename SparsityPatternType>
   void
-  make_flux_sparsity_pattern (const DoFHandlerType    &dof,
-                              SparsityPatternType     &sparsity,
-                              const Table<2,Coupling> &cell_integrals_mask,
-                              const Table<2,Coupling> &face_integrals_mask);
+  make_flux_sparsity_pattern (const DoFHandlerType      &dof,
+                              SparsityPatternType       &sparsity,
+                              const Table<2,Coupling>   &cell_integrals_mask,
+                              const Table<2,Coupling>   &face_integrals_mask,
+                              const types::subdomain_id  subdomain_id = numbers::invalid_subdomain_id);
+  /**
+   * This function does essentially the same as the previous
+   * make_flux_sparsity_pattern() function but allows the application of
+   * a constraint matrix. This is useful in the case where some components
+   * of a finite element are continuous and some discontinuous, allowing
+   * constraints to be imposed on the continuous part while also building
+   * the flux terms needed for the discontinuous part.
+   */
+  template <typename DoFHandlerType, typename SparsityPatternType>
+  void
+  make_flux_sparsity_pattern (const DoFHandlerType      &dof,
+                              SparsityPatternType       &sparsity,
+                              const ConstraintMatrix    &constraints,
+                              const bool                 keep_constrained_dofs,
+                              const Table<2,Coupling>   &couplings,
+                              const Table<2,Coupling>   &face_couplings,
+                              const types::subdomain_id  subdomain_id);
 
   /**
    * Create the sparsity pattern for boundary matrices. See the general
@@ -1001,7 +1101,7 @@ namespace DoFTools
    *
    * @author Matthias Maier, 2012 - 2015
    */
-  template<typename FaceIterator>
+  template <typename FaceIterator>
   void
   make_periodicity_constraints
   (const FaceIterator                          &face_1,
@@ -1037,7 +1137,7 @@ namespace DoFTools
    *
    * @author Daniel Arndt, Matthias Maier, 2013 - 2015
    */
-  template<typename DoFHandlerType>
+  template <typename DoFHandlerType>
   void
   make_periodicity_constraints
   (const std::vector<GridTools::PeriodicFacePair<typename DoFHandlerType::cell_iterator> >
@@ -1078,7 +1178,7 @@ namespace DoFTools
    *
    * @author Matthias Maier, 2012
    */
-  template<typename DoFHandlerType>
+  template <typename DoFHandlerType>
   void
   make_periodicity_constraints
   (const DoFHandlerType     &dof_handler,
@@ -1114,7 +1214,7 @@ namespace DoFTools
    * @ref GlossPeriodicConstraints "Glossary entry on periodic boundary conditions"
    * for further information.
    */
-  template<typename DoFHandlerType>
+  template <typename DoFHandlerType>
   void
   make_periodicity_constraints
   (const DoFHandlerType     &dof_handler,
@@ -1124,41 +1224,6 @@ namespace DoFTools
    const ComponentMask      &component_mask = ComponentMask());
 
   /**
-   * Take a vector of values which live on cells (e.g. an error per cell) and
-   * distribute it to the dofs in such a way that a finite element field
-   * results, which can then be further processed, e.g. for output. You should
-   * note that the resulting field will not be continuous at hanging nodes.
-   * This can, however, easily be arranged by calling the appropriate @p
-   * distribute function of a ConstraintMatrix object created for this
-   * DoFHandler object, after the vector has been fully assembled.
-   *
-   * It is assumed that the number of elements in @p cell_data equals the
-   * number of active cells and that the number of elements in @p dof_data
-   * equals <tt>dof_handler.n_dofs()</tt>.
-   *
-   * Note that the input vector may be a vector of any data type as long as it
-   * is convertible to @p double.  The output vector, being a data vector on a
-   * DoF handler, always consists of elements of type @p double.
-   *
-   * In case the finite element used by this DoFHandler consists of more than
-   * one component, you need to specify which component in the output vector
-   * should be used to store the finite element field in; the default is zero
-   * (no other value is allowed if the finite element consists only of one
-   * component). All other components of the vector remain untouched, i.e.
-   * their contents are not changed.
-   *
-   * This function cannot be used if the finite element in use has shape
-   * functions that are non-zero in more than one vector component (in deal.II
-   * speak: they are non-primitive).
-   */
-  template <typename DoFHandlerType, typename Number>
-  void
-  distribute_cell_to_dof_vector (const DoFHandlerType  &dof_handler,
-                                 const Vector<Number>  &cell_data,
-                                 Vector<double>        &dof_data,
-                                 const unsigned int     component = 0);
-
-  /**
    * @}
    */
 
@@ -1166,6 +1231,18 @@ namespace DoFTools
    * @name Identifying subsets of degrees of freedom with particular properties
    * @{
    */
+
+  /**
+   * Select all dofs that will be constrained by interface constraints, i.e.
+   * all hanging nodes.
+   *
+   * The size of @p selected_dofs shall equal <tt>dof_handler.n_dofs()</tt>.
+   * Previous contents of this array or overwritten.
+   */
+  template <int dim, int spacedim>
+  void
+  extract_hanging_node_dofs (const DoFHandler<dim,spacedim> &dof_handler,
+                             std::vector<bool>              &selected_dofs);
 
   /**
    * Extract the indices of the degrees of freedom belonging to certain vector
@@ -1380,6 +1457,39 @@ namespace DoFTools
                                          const std::set<types::boundary_id> &boundary_ids = std::set<types::boundary_id>());
 
   /**
+   * Extract all indices of shape functions such that their support is entirely
+   * contained within the cells for which the @p predicate is <code>true</code>.
+   * The result is returned as an IndexSet.
+   *
+   * Consider the following FE space where predicate returns <code>true</code>
+   * for all cells on the left half of the domain:
+   *
+   * @image html extract_dofs_with_support_contained_within.png
+   *
+   * This functions will return the union of all DoF indices on those cells minus
+   * DoF 11, 13, 2 and 0; the result will be <code>[9,10], 12, [14,38]</code>.
+   * In the image above the returned DoFs are separated from the rest by the
+   * red line
+   *
+   * Essentially, the question this functions answers is the following:
+   * Given a subdomain with associated DoFs, what is the largest subset of
+   * these DoFs that are allowed to be non-zero such that after calling
+   * ConstraintMatrix::distribute() the resulting solution vector will have
+   * support only within the given domain. Here @p cm is the ConstraintMatrix
+   * containing hanging nodes constraints.
+   *
+   * In case of parallel::distributed::Triangulation @p predicate will be called
+   * only for locally owned and ghost cells. The resulting index set may contain
+   * DoFs that are associated with the locally owned or ghost cells, but are not
+   * owned by the current MPI core.
+   */
+  template <typename DoFHandlerType>
+  IndexSet
+  extract_dofs_with_support_contained_within(const DoFHandlerType &dof_handler,
+                                             const std::function< bool(const typename DoFHandlerType::active_cell_iterator &)> &predicate,
+                                             const ConstraintMatrix &cm = ConstraintMatrix());
+
+  /**
    * Extract a vector that represents the constant modes of the DoFHandler for
    * the components chosen by <tt>component_mask</tt> (see
    * @ref GlossComponentMask).
@@ -1417,26 +1527,6 @@ namespace DoFTools
   extract_constant_modes (const DoFHandlerType            &dof_handler,
                           const ComponentMask             &component_mask,
                           std::vector<std::vector<bool> > &constant_modes);
-
-  /**
-   * @}
-   */
-  /**
-   * @name Hanging nodes
-   * @{
-   */
-
-  /**
-   * Select all dofs that will be constrained by interface constraints, i.e.
-   * all hanging nodes.
-   *
-   * The size of @p selected_dofs shall equal <tt>dof_handler.n_dofs()</tt>.
-   * Previous contents of this array or overwritten.
-   */
-  template <int dim, int spacedim>
-  void
-  extract_hanging_node_dofs (const DoFHandler<dim,spacedim> &dof_handler,
-                             std::vector<bool>              &selected_dofs);
   //@}
 
   /**
@@ -1680,23 +1770,88 @@ namespace DoFTools
    * where the subdomains consist of small numbers of cells only.
    */
   //@{
+
   /**
-   * Create an incidence matrix that for every cell on a given level of a
-   * multilevel DoFHandler flags which degrees of freedom are associated with
-   * the corresponding cell. This data structure is a matrix with as many rows
-   * as there are cells on a given level, as many columns as there are degrees
-   * of freedom on this level, and entries that are either true or false. This
-   * data structure is conveniently represented by a SparsityPattern object.
+   * Return the set of degrees of freedom that live on a set of cells (i.e., a
+   * patch) described by the argument.
    *
-   * @note The ordering of rows (cells) follows the ordering of the standard
-   * cell iterators.
+   * Patches are often used in defining error estimators that require the
+   * solution of a local problem on the patch surrounding each of the cells of
+   * the mesh. You can get a list of cells that form the patch around a given
+   * cell using GridTools::get_patch_around_cell(). While
+   * DoFTools::count_dofs_on_patch() can be used to determine the size of
+   * these local problems, so that one can assemble the local system and then
+   * solve it, it is still necessary to provide a mapping between the global
+   * indices of the degrees of freedom that live on the patch and a local
+   * enumeration. This function provides such a local enumeration by returning
+   * the set of degrees of freedom that live on the patch.
+   *
+   * Since this set is returned in the form of a std::vector, one can also
+   * think of it as a mapping
+   * @code
+   *   i -> global_dof_index
+   * @endcode
+   * where <code>i</code> is an index into the returned vector (i.e., a the
+   * <i>local</i> index of a degree of freedom on the patch) and
+   * <code>global_dof_index</code> is the global index of a degree of freedom
+   * located on the patch. The array returned has size equal to
+   * DoFTools::count_dofs_on_patch().
+   *
+   * @note The array returned is sorted by global DoF index. Consequently, if
+   * one considers the index into this array a local DoF index, then the local
+   * system that results retains the block structure of the global system.
+   *
+   * @tparam DoFHandlerType A type that is either DoFHandler or
+   * hp::DoFHandler. In C++, the compiler can not determine the type of
+   * <code>DoFHandlerType</code> from the function call. You need to specify
+   * it as an explicit template argument following the function name.
+   *
+   * @param patch A collection of cells within an object of type
+   * DoFHandlerType
+   *
+   * @return A list of those global degrees of freedom located on the patch,
+   * as defined above.
+   *
+   * @note In the context of a parallel distributed computation, it only makes
+   * sense to call this function on patches around locally owned cells. This
+   * is because the neighbors of locally owned cells are either locally owned
+   * themselves, or ghost cells. For both, we know that these are in fact the
+   * real cells of the complete, parallel triangulation. We can also query the
+   * degrees of freedom on these. In other words, this function can only work
+   * if all cells in the patch are either locally owned or ghost cells.
+   *
+   * @author Arezou Ghesmati, Wolfgang Bangerth, 2014
    */
-  template <typename DoFHandlerType, class SparsityPatternType>
-  void make_cell_patches(SparsityPatternType     &block_list,
-                         const DoFHandlerType    &dof_handler,
+  template <typename DoFHandlerType>
+  std::vector<types::global_dof_index>
+  get_dofs_on_patch (const std::vector<typename DoFHandlerType::active_cell_iterator> &patch);
+
+  /**
+   * Creates a sparsity pattern, which lists
+   * the degrees of freedom associated to each cell on the given
+   * level. This pattern can be used in RelaxationBlock classes as
+   * block list for additive and multiplicative Schwarz methods.
+   *
+   * The row index in this pattern is the cell index resulting from
+   * standard iteration through a level of the Triangulation. For a
+   * parallel::distributed::Triangulation, only locally owned cells
+   * are entered.
+   *
+   * The sparsity pattern is resized in this function to contain as
+   * many rows as there are locally owned cells on a given level, as
+   * many columns as there are degrees of freedom on this level.
+   *
+   * <tt>selected_dofs</tt> is a vector indexed by the local degrees
+   * of freedom on a cell. If it is used, only such dofs are entered
+   * into the block list which are selected. This allows for instance
+   * the exclusion of components or of dofs on the boundary.
+   */
+  template <int dim, int spacedim>
+  void make_cell_patches(SparsityPattern         &block_list,
+                         const DoFHandler<dim,spacedim> &dof_handler,
                          const unsigned int       level,
                          const std::vector<bool> &selected_dofs = std::vector<bool>(),
-                         types::global_dof_index  offset        = 0);
+                         const types::global_dof_index  offset        = 0);
 
   /**
    * Create an incidence matrix that for every vertex on a given level of a
@@ -1715,10 +1870,18 @@ namespace DoFTools
    * are possible, in particular changing <tt>boundary_patches</tt> for non-
    * essential boundary conditions.
    *
+   * This function returns the <tt>vertex_mapping</tt>,
+   * that contains the mapping from the vertex indices to the block indices
+   * of the <tt>block_list</tt>. For vertices that do not lead to a vertex patch, the
+   * entry in <tt>vertex_mapping</tt> contains the value <tt>invalid_unsigned_int</tt>.
+   * If <tt>invert_vertex_mapping</tt> is set to <tt>true</tt>, then the
+   * <tt>vertex_mapping</tt> is inverted such that it contains the mapping from
+   * the block indices to the corresponding vertex indices.
+   *
    * @arg <tt>block_list</tt>: the SparsityPattern into which the patches will
    * be stored.
    *
-   * @arg <tt>dof_handler</tt>: The multilevel dof handler providing the
+   * @arg <tt>dof_handler</tt>: the multilevel dof handler providing the
    * topology operated on.
    *
    * @arg <tt>interior_dofs_only</tt>: for each patch of cells around a
@@ -1735,15 +1898,45 @@ namespace DoFTools
    *
    * @arg <tt>single_cell_patches</tt>: if not true, patches containing a
    * single cell are eliminated.
+   *
+   * @arg <tt>invert_vertex_mapping</tt>: if true, then the return value
+   * contains one vertex index for each block; if false, then the return value
+   * contains one block index or <tt>invalid_unsigned_int</tt> for each vertex.
    */
   template <typename DoFHandlerType>
-  void make_vertex_patches(SparsityPattern      &block_list,
-                           const DoFHandlerType &dof_handler,
-                           const unsigned int    level,
-                           const bool            interior_dofs_only,
-                           const bool            boundary_patches       = false,
-                           const bool            level_boundary_patches = false,
-                           const bool            single_cell_patches    = false);
+  std::vector<unsigned int>
+  make_vertex_patches(SparsityPattern      &block_list,
+                      const DoFHandlerType &dof_handler,
+                      const unsigned int    level,
+                      const bool            interior_dofs_only,
+                      const bool            boundary_patches       = false,
+                      const bool            level_boundary_patches = false,
+                      const bool            single_cell_patches    = false,
+                      const bool            invert_vertex_mapping  = false);
+
+  /**
+   * Same as above but allows boundary dofs on blocks to be excluded individually.
+   *
+   * This is helpful if you want to use, for example, Taylor Hood elements as
+   * it allows you to not include the boundary DoFs for the velocity block on
+   * the patches while also letting you include the boundary DoFs for the
+   * pressure block.
+   *
+   * For each patch of cells around a vertex, collect all of the interior
+   * degrees of freedom of the patch and disregard those on the boundary of
+   * the patch if the boolean value for the corresponding block in the
+   * BlockMask of @p exclude_boundary_dofs is false.
+   */
+  template <typename DoFHandlerType>
+  std::vector<unsigned int>
+  make_vertex_patches(SparsityPattern      &block_list,
+                      const DoFHandlerType &dof_handler,
+                      const unsigned int    level,
+                      const BlockMask      &exclude_boundary_dofs  = BlockMask(),
+                      const bool            boundary_patches       = false,
+                      const bool            level_boundary_patches = false,
+                      const bool            single_cell_patches    = false,
+                      const bool            invert_vertex_mapping  = false);
 
   /**
    * Create an incidence matrix that for every cell on a given level of a
@@ -1941,62 +2134,12 @@ namespace DoFTools
   count_dofs_on_patch (const std::vector<typename DoFHandlerType::active_cell_iterator> &patch);
 
   /**
-   * Return the set of degrees of freedom that live on a set of cells (i.e., a
-   * patch) described by the argument.
-   *
-   * Patches are often used in defining error estimators that require the
-   * solution of a local problem on the patch surrounding each of the cells of
-   * the mesh. You can get a list of cells that form the patch around a given
-   * cell using GridTools::get_patch_around_cell(). While
-   * DoFTools::count_dofs_on_patch() can be used to determine the size of
-   * these local problems, so that one can assemble the local system and then
-   * solve it, it is still necessary to provide a mapping between the global
-   * indices of the degrees of freedom that live on the patch and a local
-   * enumeration. This function provides such a local enumeration by returning
-   * the set of degrees of freedom that live on the patch.
-   *
-   * Since this set is returned in the form of a std::vector, one can also
-   * think of it as a mapping
-   * @code
-   *   i -> global_dof_index
-   * @endcode
-   * where <code>i</code> is an index into the returned vector (i.e., a the
-   * <i>local</i> index of a degree of freedom on the patch) and
-   * <code>global_dof_index</code> is the global index of a degree of freedom
-   * located on the patch. The array returned has size equal to
-   * DoFTools::count_dofs_on_patch().
-   *
-   * @note The array returned is sorted by global DoF index. Consequently, if
-   * one considers the index into this array a local DoF index, then the local
-   * system that results retains the block structure of the global system.
-   *
-   * @tparam DoFHandlerType A type that is either DoFHandler or
-   * hp::DoFHandler. In C++, the compiler can not determine the type of
-   * <code>DoFHandlerType</code> from the function call. You need to specify
-   * it as an explicit template argument following the function name.
-   *
-   * @param patch A collection of cells within an object of type
-   * DoFHandlerType
-   *
-   * @return A list of those global degrees of freedom located on the patch,
-   * as defined above.
-   *
-   * @note In the context of a parallel distributed computation, it only makes
-   * sense to call this function on patches around locally owned cells. This
-   * is because the neighbors of locally owned cells are either locally owned
-   * themselves, or ghost cells. For both, we know that these are in fact the
-   * real cells of the complete, parallel triangulation. We can also query the
-   * degrees of freedom on these. In other words, this function can only work
-   * if all cells in the patch are either locally owned or ghost cells.
-   *
-   * @author Arezou Ghesmati, Wolfgang Bangerth, 2014
+   * @}
    */
-  template <typename DoFHandlerType>
-  std::vector<types::global_dof_index>
-  get_dofs_on_patch (const std::vector<typename DoFHandlerType::active_cell_iterator> &patch);
 
   /**
-   * @}
+   * @name Functions that return different DoF mappings
+   * @{
    */
 
   /**
@@ -2005,7 +2148,7 @@ namespace DoFTools
    * <tt>mapping[dof]</tt> gives the index of the degree of freedom with
    * global number @p dof in the list of degrees of freedom on the boundary.
    * If the degree of freedom requested is not on the boundary, the value of
-   * <tt>mapping[dof]</tt> is @p invalid_dof_index. This function is mainly
+   * <tt>mapping[dof]</tt> is numbers::invalid_dof_index. This function is mainly
    * used when setting up matrices and vectors on the boundary from the trial
    * functions, which have global numbers, while the matrices and vectors use
    * numbers of the trial functions local to the boundary.
@@ -2123,6 +2266,11 @@ namespace DoFTools
    * Just as with the function above, it is assumed that the finite element in
    * use here actually supports the notion of support points of all its
    * components.
+   *
+   * @todo This function should generate a multimap, rather than just a map,
+   * since several dofs may be located at the same support point. Currently,
+   * only the last value in the map returned by map_dofs_to_support_points() for
+   * each point will be returned.
    */
   template <typename DoFHandlerType, class Comp>
   void
@@ -2130,21 +2278,81 @@ namespace DoFTools
   (const Mapping<DoFHandlerType::dimension, DoFHandlerType::space_dimension>       &mapping,
    const DoFHandlerType                                                            &dof_handler,
    std::map<Point<DoFHandlerType::space_dimension>, types::global_dof_index, Comp> &point_to_index_map);
+  /**
+   * @}
+   */
 
   /**
-   * Map a coupling table from the user friendly organization by components to
-   * the organization by blocks. Specializations of this function for
-   * DoFHandler and hp::DoFHandler are required due to the different results
-   * of their finite element access.
-   *
-   * The return vector will be initialized to the correct length inside this
-   * function.
+   * @name Miscellaneous
+   * @{
    */
-  template <int dim, int spacedim>
+
+  /**
+   * Take a vector of values which live on cells (e.g. an error per cell) and
+   * distribute it to the dofs in such a way that a finite element field
+   * results, which can then be further processed, e.g. for output. You should
+   * note that the resulting field will not be continuous at hanging nodes.
+   * This can, however, easily be arranged by calling the appropriate @p
+   * distribute function of a ConstraintMatrix object created for this
+   * DoFHandler object, after the vector has been fully assembled.
+   *
+   * It is assumed that the number of elements in @p cell_data equals the
+   * number of active cells and that the number of elements in @p dof_data
+   * equals <tt>dof_handler.n_dofs()</tt>.
+   *
+   * Note that the input vector may be a vector of any data type as long as it
+   * is convertible to @p double.  The output vector, being a data vector on a
+   * DoF handler, always consists of elements of type @p double.
+   *
+   * In case the finite element used by this DoFHandler consists of more than
+   * one component, you need to specify which component in the output vector
+   * should be used to store the finite element field in; the default is zero
+   * (no other value is allowed if the finite element consists only of one
+   * component). All other components of the vector remain untouched, i.e.
+   * their contents are not changed.
+   *
+   * This function cannot be used if the finite element in use has shape
+   * functions that are non-zero in more than one vector component (in deal.II
+   * speak: they are non-primitive).
+   */
+  template <typename DoFHandlerType, typename Number>
   void
-  convert_couplings_to_blocks (const hp::DoFHandler<dim,spacedim> &dof_handler,
-                               const Table<2, Coupling> &table_by_component,
-                               std::vector<Table<2,Coupling> > &tables_by_block);
+  distribute_cell_to_dof_vector (const DoFHandlerType  &dof_handler,
+                                 const Vector<Number>  &cell_data,
+                                 Vector<double>        &dof_data,
+                                 const unsigned int     component = 0);
+
+
+  /**
+   * Generate text output readable by gnuplot with point data based on the
+   * given map @p support_points.  For each support point location, a string
+   * label containing a list of all DoFs from the map is generated.  The map
+   * can be generated with a call to map_dofs_to_support_points() and is useful
+   * to visualize location and global numbering of unknowns.
+   *
+   * An example for the format of each line in the output is:
+   * @code
+   * x [y] [z] "dof1, dof2"
+   * @endcode
+   * where x, y, and z (present only in corresponding dimension) are the
+   * coordinates of the support point, followed by a list of DoF numbers.
+   *
+   * The points with labels can be plotted as follows in gnuplot:
+   * @code
+   * plot "./points.gpl" using 1:2:3 with labels point offset 1,1
+   * @endcode
+   *
+   * Examples (this also includes the grid written separately using GridOut):
+   * <p ALIGN="center">
+   * @image html support_point_dofs1.png
+   * @image html support_point_dofs2.png
+   * </p>
+   */
+  template <int spacedim>
+  void
+  write_gnuplot_dof_support_point_info(std::ostream &out,
+                                       const std::map<types::global_dof_index, Point<spacedim> > &support_points);
+
 
   /**
    * Make a constraint matrix for the constraints that result from zero
@@ -2209,43 +2417,15 @@ namespace DoFTools
                                   ConstraintMatrix                   &zero_boundary_constraints,
                                   const ComponentMask                &component_mask = ComponentMask());
 
+  /**
+   * @}
+   */
 
   /**
-   * Map a coupling table from the user friendly organization by components to
-   * the organization by blocks. Specializations of this function for
-   * DoFHandler and hp::DoFHandler are required due to the different results
-   * of their finite element access.
-   *
-   * The return vector will be initialized to the correct length inside this
-   * function.
+   * @name Exceptions
+   * @{
    */
-  template <int dim, int spacedim>
-  void
-  convert_couplings_to_blocks (const DoFHandler<dim,spacedim> &dof_handler,
-                               const Table<2, Coupling> &table_by_component,
-                               std::vector<Table<2,Coupling> > &tables_by_block);
 
-  /**
-   * Given a finite element and a table how the vector components of it couple
-   * with each other, compute and return a table that describes how the
-   * individual shape functions couple with each other.
-   */
-  template <int dim, int spacedim>
-  Table<2,Coupling>
-  dof_couplings_from_component_couplings (const FiniteElement<dim,spacedim> &fe,
-                                          const Table<2,Coupling> &component_couplings);
-
-  /**
-   * Same function as above for a collection of finite elements, returning a
-   * collection of tables.
-   *
-   * The function currently treats DoFTools::Couplings::nonzero the same as
-   * DoFTools::Couplings::always .
-   */
-  template <int dim, int spacedim>
-  std::vector<Table<2,Coupling> >
-  dof_couplings_from_component_couplings (const hp::FECollection<dim,spacedim> &fe,
-                                          const Table<2,Coupling> &component_couplings);
   /**
    * @todo Write description
    *
@@ -2278,6 +2458,9 @@ namespace DoFTools
    * @ingroup Exceptions
    */
   DeclException0 (ExcInvalidBoundaryIndicator);
+  /**
+   * @}
+   */
 }
 
 
@@ -2375,7 +2558,7 @@ namespace DoFTools
   unsigned int
   max_dofs_per_cell (const hp::DoFHandler<dim,spacedim> &dh)
   {
-    return dh.get_fe().max_dofs_per_cell ();
+    return dh.get_fe_collection().max_dofs_per_cell ();
   }
 
 
@@ -2384,7 +2567,7 @@ namespace DoFTools
   unsigned int
   max_dofs_per_face (const hp::DoFHandler<dim,spacedim> &dh)
   {
-    return dh.get_fe().max_dofs_per_face ();
+    return dh.get_fe_collection().max_dofs_per_face ();
   }
 
 
@@ -2393,7 +2576,7 @@ namespace DoFTools
   unsigned int
   max_dofs_per_vertex (const hp::DoFHandler<dim,spacedim> &dh)
   {
-    return dh.get_fe().max_dofs_per_vertex ();
+    return dh.get_fe_collection().max_dofs_per_vertex ();
   }
 
 
@@ -2402,7 +2585,7 @@ namespace DoFTools
   unsigned int
   n_components (const hp::DoFHandler<dim,spacedim> &dh)
   {
-    return dh.get_fe()[0].n_components();
+    return dh.get_fe(0).n_components();
   }
 
 
@@ -2411,7 +2594,7 @@ namespace DoFTools
   bool
   fe_is_primitive (const hp::DoFHandler<dim,spacedim> &dh)
   {
-    return dh.get_fe()[0].is_primitive();
+    return dh.get_fe(0).is_primitive();
   }
 
 

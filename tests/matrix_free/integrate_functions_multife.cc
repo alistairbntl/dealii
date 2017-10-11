@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -25,12 +25,11 @@
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria_boundary_lib.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -226,13 +225,19 @@ void test ()
 {
   // create hyper ball geometry and refine some
   // cells
+  const SphericalManifold<dim> manifold;
   Triangulation<dim> tria;
   GridGenerator::hyper_ball (tria);
-  static const HyperBallBoundary<dim> boundary;
-  tria.set_boundary (0, boundary);
   typename Triangulation<dim>::active_cell_iterator
   cell = tria.begin_active (),
   endc = tria.end();
+  for (; cell!=endc; ++cell)
+    for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+      if (cell->at_boundary(f))
+        cell->face(f)->set_all_manifold_ids(0);
+  tria.set_manifold (0, manifold);
+
+  cell = tria.begin_active ();
   for (; cell!=endc; ++cell)
     if (cell->center().norm()<1e-8)
       cell->set_refine_flag();
@@ -301,7 +306,7 @@ void test ()
     for (unsigned int no=0; no<2; ++no)
       quad.push_back(QGauss<1>(fe_degree+1+no));
     mf_data.reinit (dof, constraints, quad,
-                    typename MatrixFree<dim,number>::AdditionalData(MPI_COMM_SELF,MatrixFree<dim,number>::AdditionalData::none));
+                    typename MatrixFree<dim,number>::AdditionalData(MatrixFree<dim,number>::AdditionalData::none));
   }
 
   MatrixFreeTest<dim,fe_degree,number> mf (mf_data);
@@ -331,7 +336,6 @@ int main ()
   deallog << std::setprecision (3);
 
   {
-    deallog.threshold_double(1.e-12);
     deallog.push("2d");
     test<2,1,double>();
     test<2,2,double>();
@@ -345,7 +349,6 @@ int main ()
 
   {
     deallog << std::endl << "Test with floats" << std::endl << std::endl;
-    deallog.threshold_double(1.e-7);
     deallog.push("2d");
     test<2,1,float>();
     deallog.pop();
@@ -354,4 +357,3 @@ int main ()
     deallog.pop();
   }
 }
-

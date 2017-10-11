@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__numbers_h
-#define dealii__numbers_h
+#ifndef dealii_numbers_h
+#define dealii_numbers_h
 
 
 #include <deal.II/base/config.h>
@@ -23,6 +23,45 @@
 #include <cmath>
 #include <cstdlib>
 #include <complex>
+
+#ifdef DEAL_II_WITH_CUDA
+#  include <cuda_runtime_api.h>
+#  define DEAL_II_CUDA_HOST_DEV __host__ __device__
+#else
+#  define DEAL_II_CUDA_HOST_DEV
+#endif
+
+DEAL_II_NAMESPACE_OPEN
+
+// forward declarations to support abs or sqrt operations on VectorizedArray
+template <typename Number> class VectorizedArray;
+template <typename T> struct EnableIfScalar;
+
+DEAL_II_NAMESPACE_CLOSE
+
+namespace std
+{
+  template <typename Number> DEAL_II_ALWAYS_INLINE ::dealii::VectorizedArray<Number>
+  sqrt(const ::dealii::VectorizedArray<Number> &);
+  template <typename Number> DEAL_II_ALWAYS_INLINE ::dealii::VectorizedArray<Number>
+  abs(const ::dealii::VectorizedArray<Number> &);
+  template <typename Number> DEAL_II_ALWAYS_INLINE ::dealii::VectorizedArray<Number>
+  max(const ::dealii::VectorizedArray<Number> &, const ::dealii::VectorizedArray<Number> &);
+  template <typename Number> DEAL_II_ALWAYS_INLINE ::dealii::VectorizedArray<Number>
+  min (const ::dealii::VectorizedArray<Number> &, const ::dealii::VectorizedArray<Number> &);
+  template <typename Number> ::dealii::VectorizedArray<Number>
+  pow(const ::dealii::VectorizedArray<Number> &, const Number p);
+  template <typename Number> ::dealii::VectorizedArray<Number>
+  sin(const ::dealii::VectorizedArray<Number> &);
+  template <typename Number> ::dealii::VectorizedArray<Number>
+  cos(const ::dealii::VectorizedArray<Number> &);
+  template <typename Number> ::dealii::VectorizedArray<Number>
+  tan(const ::dealii::VectorizedArray<Number> &);
+  template <typename Number> ::dealii::VectorizedArray<Number>
+  exp(const ::dealii::VectorizedArray<Number> &);
+  template <typename Number> ::dealii::VectorizedArray<Number>
+  log(const ::dealii::VectorizedArray<Number> &);
+}
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -102,8 +141,11 @@ namespace numbers
    *
    * If none of the functions detecting NaN is available, this function
    * returns false.
+   *
+   * @deprecated This function has been deprecated in favor of the C++11
+   * function <code>std::isnan</code>.
    */
-  bool is_nan (const double x);
+  bool is_nan (const double x) DEAL_II_DEPRECATED;
 
   /**
    * Return @p true if the given value is a finite floating point number, i.e.
@@ -178,8 +220,11 @@ namespace numbers
      * Return the square of the absolute value of the given number. Since the
      * general template is chosen for types not equal to std::complex, this
      * function simply returns the square of the given number.
+     *
+     * @ingroup CUDAWrappers
      */
     static
+    DEAL_II_CUDA_HOST_DEV
     real_type abs_square (const number &x);
 
     /**
@@ -241,29 +286,12 @@ namespace numbers
 
   inline bool is_nan (const double x)
   {
-#ifdef DEAL_II_HAVE_STD_ISNAN
     return std::isnan(x);
-#elif defined(DEAL_II_HAVE_ISNAN)
-    return isnan(x);
-#elif defined(DEAL_II_HAVE_UNDERSCORE_ISNAN)
-    return _isnan(x);
-#else
-    return false;
-#endif
   }
 
   inline bool is_finite (const double x)
   {
-#ifdef DEAL_II_HAVE_ISFINITE
-    return !is_nan(x) && std::isfinite (x);
-#else
-    // Check against infinities. Note
-    // that if x is a NaN, then both
-    // comparisons will be false
-    return ((x >= -std::numeric_limits<double>::max())
-            &&
-            (x <= std::numeric_limits<double>::max()));
-#endif
+    return std::isfinite(x);
   }
 
 
@@ -309,6 +337,7 @@ namespace numbers
 
 
   template <typename number>
+  DEAL_II_CUDA_HOST_DEV
   typename NumberTraits<number>::real_type
   NumberTraits<number>::abs_square (const number &x)
   {
@@ -353,7 +382,50 @@ namespace numbers
 
 }
 
+namespace internal
+{
+  /**
+  * The structs below are needed since VectorizedArray<T1> is a POD-type without a constructor and
+  * can be a template argument for SymmetricTensor<...,T2> where T2 would equal VectorizedArray<T1>.
+  * Internally, in previous versions of deal.II, SymmetricTensor<...,T2> would make use of the constructor
+  * of T2 leading to a compile-time error. However simply adding a constructor for VectorizedArray<T1>
+  * breaks the POD-idioms needed elsewhere. Calls to constructors of T2 subsequently got replaced by a
+  * call to internal::NumberType<T2> which then determines the right function to use by template deduction.
+  * A detailled discussion can be found at https://github.com/dealii/dealii/pull/3967 . Also see
+  * numbers.h for another specialization.
+  */
+  template <typename T>
+  struct NumberType
+  {
+    static DEAL_II_CUDA_HOST_DEV const T &value (const T &t)
+    {
+      return t;
+    }
+  };
 
+  template <typename T>
+  struct NumberType<std::complex<T> >
+  {
+    static const std::complex<T> &value (const std::complex<T> &t)
+    {
+      return t;
+    }
+
+    static std::complex<T> value (const T &t)
+    {
+      return std::complex<T>(t);
+    }
+
+    // Facilitate cast from complex<double> to complex<float>
+    template <typename U>
+    static std::complex<T> value (const std::complex<U> &t)
+    {
+      return std::complex<T>(
+               NumberType<T>::value(t.real()),
+               NumberType<T>::value(t.imag()));
+    }
+  };
+}
 
 DEAL_II_NAMESPACE_CLOSE
 

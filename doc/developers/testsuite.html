@@ -5,7 +5,7 @@
   <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
   <title>The deal.II Testsuite</title>
   <link href="../screen.css" rel="StyleSheet">
-  <meta name="copyright" content="Copyright (C) 1998 - 2015 by the deal.II Authors">
+  <meta name="copyright" content="Copyright (C) 1998 - 2017 by the deal.II Authors">
   <meta name="keywords" content="deal dealii finite elements fem triangulation">
   <meta http-equiv="content-language" content="en">
 </head>
@@ -82,7 +82,7 @@ $ git clone https://github.com/dealii/dealii
 
     <p>
       To enable the testsuite for a given build directory, ensure that
-      deal.II is successfully configured and build (installation is not
+      deal.II is successfully configured and built (installation is not
       necessary). After that you can set up the testsuite via the
       "setup_tests" target:
 <pre>
@@ -130,9 +130,9 @@ name.
       the testsuite and run cmake pointing to the <code>tests</code>
       subdirectory, e.g.,
 <pre>
-$ mkdir tests/build
-$ cd tests/build
-$ cmake ..
+$ mkdir tests_for_installed_dealii
+$ cd tests_for_installed_dealii
+$ cmake -DDEAL_II_DIR=/path/to/installed/dealii /path/to/dealii_source/tests
 </pre>
       After that the same configuration targets as described <a
       href="setupbuild">above</a> are available.
@@ -597,7 +597,7 @@ category/test.expect=run.output
 <pre>
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II Authors
+// Copyright (C) 2015 - 2017 by the deal.II Authors
 //
 // This file is part of the deal.II library.
 //
@@ -703,7 +703,7 @@ $ ctest -V -R "category/my_new_test"
       a <code>CMakeLists.txt</code> file into it containing
     </p>
 <pre>
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
 INCLUDE(../setup_testsubproject.cmake)
 PROJECT(testsuite CXX)
 INCLUDE(${DEAL_II_TARGET_CONFIG})
@@ -725,6 +725,28 @@ $ ctest [...] -V -S ../tests/run_testsuite.cmake
       to the CDash server. It does not matter whether the configure, build
       or ctest stages were run before that. Also in script mode, you can
       specify the same options for <code>ctest</code> as explained above.
+    </p>
+
+    <p>
+      <b>Note:</b>
+      For also building the tests in parallel you have to provide suitable flags
+      using MAKEOPTS as well, i.e. you would typically use
+<pre>
+$ ctest -DMAKEOPTS="-j N" -j N [...] -V -S ../tests/run_testsuite.cmake
+</pre>
+      for compiling the library and running the tests in parallel.
+    </p>
+
+    <p>
+      It is possible to run tests and submit results for an already installed library by
+<pre>
+mkdir build && cd build
+cp $DEAL_II_SOURCE_DIR/CTestConfig.cmake .
+ctest \
+  -DCTEST_SOURCE_DIRECTORY=$DEAL_II_SOURCE_DIR/tests \
+  -DDEAL_II_DIR=$DEAL_II_DIR \
+  [...] -S $DEAL_II_SOURCE_DIR/tests/run_testsuite.cmake -V
+</pre>
     </p>
 
     <p>
@@ -767,9 +789,9 @@ TRACK
     "Experimental"     - all tests that are not specifically "build" or
                          "regression" tests should go into this track
 
-    "Build Tests"      - Build tests that configure and build in a
-                         clean directory and run the build tests
-                         "build_tests/*"
+    "Build Tests"      - Build tests that configure and build in a clean
+                         directory (without actually running the
+                         testsuite)
 
     "Nightly"          - Reserved for nightly regression tests for
                          build bots on various architectures
@@ -824,9 +846,9 @@ ctest -j4 -S ../tests/run_buildtest.cmake
 
     <p>
       What this does is to compile and build deal.II in the directory
-      <code>build</code>, try to configure, build (and run a subset) of all
-      tutorial programs supported by the current configuration and send the
-      results to the CDash instance.
+      <code>build</code> (which includes building all configurable tutorial
+      programs as well) but does not run the full testsuite. The results
+      are sent to the CDash instance.
     </p>
 
     <p>

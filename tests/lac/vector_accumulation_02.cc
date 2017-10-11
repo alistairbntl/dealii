@@ -21,12 +21,8 @@
 // data array allocated as usual.
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_view.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -70,7 +66,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1e-50); // exact equality required!
 
   check_norms<float>();
   check_norms<double>();

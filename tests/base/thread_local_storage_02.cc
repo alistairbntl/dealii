@@ -18,8 +18,7 @@
 // the initialization with an exemplar
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
+#include <atomic>
 
 #include <deal.II/base/thread_management.h>
 #include <deal.II/base/thread_local_storage.h>
@@ -49,7 +48,7 @@ struct X
 
 Threads::ThreadLocalStorage<X> *tls_data;
 
-volatile int counter = 0;
+static std::atomic<int> counter(0);
 
 void execute (int i)
 {
@@ -118,9 +117,7 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test ();
 }

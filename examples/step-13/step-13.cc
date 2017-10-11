@@ -497,7 +497,7 @@ namespace Step13
     // which uses a counter in the triangulation class to denote the fact that
     // there is still an object out there using this triangulation, thus
     // leading to an abort in case the triangulation is attempted to be
-    // destructed while this object still uses it.
+    // destroyed while this object still uses it.
     //
     // Note that while the pointer itself is declared constant
     // (i.e. throughout the lifetime of this object, the pointer points to the
@@ -777,20 +777,20 @@ namespace Step13
 
       WorkStream::run(dof_handler.begin_active(),
                       dof_handler.end(),
-                      std_cxx11::bind(&Solver<dim>::local_assemble_matrix,
-                                      this,
-                                      std_cxx11::_1,
-                                      std_cxx11::_2,
-                                      std_cxx11::_3),
-                      std_cxx11::bind(&Solver<dim>::copy_local_to_global,
-                                      this,
-                                      std_cxx11::_1,
-                                      std_cxx11::ref(linear_system)),
+                      std::bind(&Solver<dim>::local_assemble_matrix,
+                                this,
+                                std::placeholders::_1,
+                                std::placeholders::_2,
+                                std::placeholders::_3),
+                      std::bind(&Solver<dim>::copy_local_to_global,
+                                this,
+                                std::placeholders::_1,
+                                std::ref(linear_system)),
                       AssemblyScratchData(*fe, *quadrature),
                       AssemblyCopyData());
       linear_system.hanging_node_constraints.condense (linear_system.matrix);
 
-      // The syntax above using <code>std_cxx11::bind</code> requires
+      // The syntax above using <code>std::bind</code> requires
       // some explanation. There are multiple version of
       // WorkStream::run that expect different arguments. In step-9,
       // we used one version that took a pair of iterators, a pair of
@@ -824,7 +824,7 @@ namespace Step13
       // typical way to generate such function objects is using
       // <code>std::bind</code> (or, if the compiler is too old, a
       // replacement for it, which we generically call
-      // <code>std_cxx11::bind</code>) which takes a pointer to a
+      // <code>std::bind</code>) which takes a pointer to a
       // (member) function and then <i>binds</i> individual arguments
       // to fixed values. For example, you can create a function that
       // takes an iterator, a scratch object and a copy object by
@@ -840,9 +840,9 @@ namespace Step13
       // that can then be filled by WorkStream::run().
       //
       // There remains the question of what the
-      // <code>std_cxx11::_1</code>, <code>std_cxx11::_2</code>, etc.,
+      // <code>std::placeholders::_1</code>, <code>std::placeholders::_2</code>, etc.,
       // mean. (These arguments are called <i>placeholders</i>.) The
-      // idea of using <code>std_cxx11::bind</code> in the first of
+      // idea of using <code>std::bind</code> in the first of
       // the two cases above is that it produces an object that can be
       // called with three arguments. But how are the three arguments
       // the function object is being called with going to be
@@ -855,9 +855,9 @@ namespace Step13
       // games in other circumstances. Consider, for example, having a
       // function <code>void f(double x, double y)</code>. Then,
       // creating a variable <code>p</code> of type
-      // <code>std_cxx11::function@<void f(double,double)@></code> and
-      // initializing <code>p=std_cxx11::bind(&f, std_cxx11::_2,
-      // std_cxx11::_1)</code> then calling <code>p(1,2)</code> will
+      // <code>std::function@<void f(double,double)@></code> and
+      // initializing <code>p=std::bind(&f, std::placeholders::_2,
+      // std::placeholders::_1)</code> then calling <code>p(1,2)</code> will
       // result in calling <code>f(2,1)</code>.
       //
       // @note Once deal.II can rely on every compiler being able to
@@ -1466,7 +1466,7 @@ namespace Step13
 
     // Create a solver object of the kind indicated by the argument to this
     // function. If the name is not recognized, throw an exception!
-    LaplaceSolver::Base<dim> *solver = 0;
+    LaplaceSolver::Base<dim> *solver = nullptr;
     if (solver_name == "global")
       solver = new LaplaceSolver::RefinementGlobal<dim> (triangulation, fe,
                                                          quadrature,

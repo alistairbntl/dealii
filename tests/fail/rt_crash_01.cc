@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -28,7 +28,6 @@
 // elements, when computing some sort of edge directions. This is the
 // case left over from dof_tools_19
 
-std::string output_file_name = "output";
 
 
 template <int dim>
@@ -44,7 +43,7 @@ check_this (const DoFHandler<dim> &dof_handler)
       std::string::npos)
     return;
 
-  ConstantFunction<dim> test_func (1, dof_handler.get_fe().n_components ());
+  Functions::ConstantFunction<dim> test_func (1, dof_handler.get_fe().n_components ());
 
   // don't run this test if hanging
   // nodes are not implemented

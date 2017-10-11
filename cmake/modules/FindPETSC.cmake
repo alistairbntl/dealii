@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2017 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -26,9 +26,11 @@
 #     PETSC_VERSION_MINOR
 #     PETSC_VERSION_SUBMINOR
 #     PETSC_VERSION_PATCH
-#     PETSC_WITH_MPIUNI
 #     PETSC_WITH_64BIT_INDICES
 #     PETSC_WITH_COMPLEX
+#     PETSC_WITH_HYPRE
+#     PETSC_WITH_MPIUNI
+#     PETSC_WITH_MUMPS
 #
 
 SET(PETSC_DIR "" CACHE PATH "An optional hint to a PETSc directory")
@@ -37,7 +39,7 @@ SET_IF_EMPTY(PETSC_DIR "$ENV{PETSC_DIR}")
 SET_IF_EMPTY(PETSC_ARCH "$ENV{PETSC_ARCH}")
 
 DEAL_II_FIND_LIBRARY(PETSC_LIBRARY
-  NAMES petsc
+  NAMES petsc libpetsc
   HINTS ${PETSC_DIR} ${PETSC_DIR}/${PETSC_ARCH}
   PATH_SUFFIXES lib${LIB_SUFFIX} lib64 lib
   )
@@ -52,39 +54,23 @@ DEAL_II_FIND_PATH(PETSC_INCLUDE_DIR_ARCH petscconf.h
 )
 
 SET(PETSC_PETSCCONF_H "${PETSC_INCLUDE_DIR_ARCH}/petscconf.h")
+
+MACRO(_petsc_feature_check _var _regex)
+  FILE(STRINGS "${PETSC_PETSCCONF_H}" PETSC_${_var}_STRING
+    REGEX "${_regex}")
+  IF("${PETSC_${_var}_STRING}" STREQUAL "")
+    SET(PETSC_WITH_${_var} FALSE)
+  ELSE()
+    SET(PETSC_WITH_${_var} TRUE)
+  ENDIF()
+ENDMACRO()
+
 IF(EXISTS ${PETSC_PETSCCONF_H})
-  #
-  # Is petsc compiled with support for MPIUNI?
-  #
-  FILE(STRINGS "${PETSC_PETSCCONF_H}" PETSC_MPIUNI_STRING
-    REGEX "#define.*PETSC_HAVE_MPIUNI 1")
-  IF("${PETSC_MPIUNI_STRING}" STREQUAL "")
-    SET(PETSC_WITH_MPIUNI FALSE)
-  ELSE()
-    SET(PETSC_WITH_MPIUNI TRUE)
-  ENDIF()
-
-  #
-  # Is petsc compiled with support for 64BIT_INDICES?
-  #
-  FILE(STRINGS "${PETSC_PETSCCONF_H}" PETSC_64BIT_INDICES_STRING
-    REGEX "#define.*PETSC_USE_64BIT_INDICES 1")
-  IF("${PETSC_64BIT_INDICES_STRING}" STREQUAL "")
-    SET(PETSC_WITH_64BIT_INDICES FALSE)
-  ELSE()
-    SET(PETSC_WITH_64BIT_INDICES TRUE)
-  ENDIF()
-
-  #
-  # Is petsc compiled with support for COMPLEX numbers?
-  #
-  FILE(STRINGS "${PETSC_PETSCCONF_H}" PETSC_COMPLEX_STRING
-    REGEX "#define.*PETSC_USE_COMPLEX 1")
-  IF("${PETSC_COMPLEX_STRING}" STREQUAL "")
-    SET(PETSC_WITH_COMPLEX FALSE)
-  ELSE()
-    SET(PETSC_WITH_COMPLEX TRUE)
-  ENDIF()
+  _petsc_feature_check(64BIT_INDICES "#define.*PETSC_USE_64BIT_INDICES 1")
+  _petsc_feature_check(COMPLEX "#define.*PETSC_USE_COMPLEX 1")
+  _petsc_feature_check(HYPRE "#define.*PETSC_HAVE_HYPRE 1")
+  _petsc_feature_check(MPIUNI "#define.*PETSC_HAVE_MPIUNI 1")
+  _petsc_feature_check(MUMPS "#define.*PETSC_HAVE_MUMPS 1")
 ENDIF()
 
 #
@@ -142,7 +128,7 @@ ENDIF()
 DEAL_II_FIND_FILE(PETSC_PETSCVARIABLES
   NAMES petscvariables
   HINTS ${PETSC_DIR}/${PETSC_ARCH} ${PETSC_DIR}
-  PATH_SUFFIXES conf
+  PATH_SUFFIXES conf lib/petsc/conf
   )
 
 IF(NOT PETSC_PETSCVARIABLES MATCHES "-NOTFOUND")
@@ -213,16 +199,29 @@ IF(NOT PETSC_PETSCVARIABLES MATCHES "-NOTFOUND")
   ENDFOREACH()
 ENDIF()
 
+IF(PETSC_WITH_MPIUNI)
+  #
+  # Workaround: Some distributions happen to not install petscvariables and
+  # we consequently might miss some essential include directories. Let's
+  # try at least to find the mpiuni include directory.
+  #
+  DEAL_II_FIND_PATH(PETSC_INCLUDE_DIR_MPIUNI mpiuni/mpi.h
+    HINTS ${PETSC_INCLUDE_DIR_COMMON} ${PETSC_INCLUDE_DIR_ARCH} ${_petsc_includes}
+    PATH_SUFFIXES petsc
+    )
+  SET(PETSC_INCLUDE_DIR_MPIUNI "${PETSC_INCLUDE_DIR_MPIUNI}/mpiuni")
+ENDIF()
+
 DEAL_II_PACKAGE_HANDLE(PETSC
   LIBRARIES
     REQUIRED PETSC_LIBRARY
     OPTIONAL _petsc_libraries
   INCLUDE_DIRS
     REQUIRED PETSC_INCLUDE_DIR_COMMON PETSC_INCLUDE_DIR_ARCH
-    OPTIONAL _petsc_includes
+    OPTIONAL PETSC_INCLUDE_DIR_MPIUNI _petsc_includes
   USER_INCLUDE_DIRS
     REQUIRED PETSC_INCLUDE_DIR_COMMON PETSC_INCLUDE_DIR_ARCH
-    OPTIONAL _petsc_includes
+    OPTIONAL PETSC_INCLUDE_DIR_MPIUNI _petsc_includes
   CLEAR
     PETSC_LIBRARY PETSC_INCLUDE_DIR_COMMON PETSC_INCLUDE_DIR_ARCH
     PETSC_PETSCVARIABLES ${_cleanup_variables}

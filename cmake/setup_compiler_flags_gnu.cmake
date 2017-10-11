@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2015 by the deal.II authors
+## Copyright (C) 2012 - 2017 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -21,10 +21,10 @@
 #
 
 IF( CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND
-    CMAKE_CXX_COMPILER_VERSION VERSION_LESS "3.4" )
+    CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.8" )
   MESSAGE(WARNING "\n"
-    "You're using an old version of the GNU Compiler Collection (gcc/g++)!\n"
-    "It is strongly recommended to use at least version 3.4.\n"
+    "deal.II requires support for features of C++11 that are not present in\n"
+    "versions of GCC prior to 4.8."
     )
 ENDIF()
 
@@ -38,15 +38,12 @@ ENDIF()
 #
 # Set -pedantic if the compiler supports it.
 #
-IF(NOT (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND
-        CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.4"))
-  ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-pedantic")
-ENDIF()
+ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-pedantic")
 
 #
 # Set the pic flag.
 #
-ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-fpic")
+ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-fPIC")
 
 #
 # Check whether the -as-needed flag is available. If so set it to link
@@ -67,10 +64,11 @@ ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wswitch")
 ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Woverloaded-virtual")
 
 #
-# Disable Wlong-long that will trigger a lot of warnings when compiling
-# with disabled C++11 support:
+# Disable Wplacement-new that will trigger a lot of warnings
+# in the BOOST function classes that we include via the
+# BOOST signals classes:
 #
-ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wno-long-long")
+ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wno-placement-new")
 
 #
 # Disable deprecation warnings
@@ -98,10 +96,11 @@ IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wno-unused-parameter")
   ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wno-unused-variable")
 
-  # without c++11 enabled, clang produces a ton of warnings in boost:
-  ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wno-c99-extensions")
-  ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wno-variadic-macros")
-  ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wno-c++11-extensions")
+  #
+  # Disable a diagnostic that warns about potentially uninstantiated static
+  # members. This leads to a ton of false positives.
+  #
+  ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS "-Wno-undefined-var-template")
 
   #
   # Clang versions prior to 3.6 emit a lot of false positives wrt
@@ -145,6 +144,13 @@ IF (CMAKE_BUILD_TYPE MATCHES "Release")
   ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS_RELEASE "-funroll-loops")
   ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS_RELEASE "-funroll-all-loops")
   ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS_RELEASE "-fstrict-aliasing")
+
+  #
+  # There are many places in the library where we create a new typedef and then
+  # immediately use it in an Assert. Hence, only ignore unused typedefs in Release
+  # mode.
+  #
+  ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS_RELEASE "-Wno-unused-local-typedefs")
 ENDIF()
 
 
@@ -182,8 +188,8 @@ IF (CMAKE_BUILD_TYPE MATCHES "Debug")
     # Enable test coverage
     #
     ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS_DEBUG "-fno-elide-constructors")
-    ENABLE_IF_SUPPORTED(DEAL_II_CXX_FLAGS_DEBUG "-ftest-coverage -fprofile-arcs")
-    ENABLE_IF_SUPPORTED(DEAL_II_LINKER_FLAGS_DEBUG "-ftest-coverage -fprofile-arcs")
+    ADD_FLAGS(DEAL_II_CXX_FLAGS_DEBUG "-ftest-coverage -fprofile-arcs")
+    ADD_FLAGS(DEAL_II_LINKER_FLAGS_DEBUG "-ftest-coverage -fprofile-arcs")
   ENDIF()
 
 ENDIF()

@@ -25,12 +25,11 @@
 #include <deal.II/lac/petsc_parallel_sparse_matrix.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
 #include <iostream>
 #include <vector>
 
 
-template<typename MatrixType>
+template <typename MatrixType>
 void test (MatrixType &m)
 {
   m.add(0,0,1);
@@ -46,9 +45,7 @@ void test (MatrixType &m)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

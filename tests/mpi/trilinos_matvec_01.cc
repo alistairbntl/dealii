@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,8 +24,7 @@
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/trilinos_sparsity_pattern.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <fstream>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
@@ -92,7 +91,7 @@ void test ()
   x.reinit (col_partitioning, MPI_COMM_WORLD);
   y.reinit (row_partitioning, MPI_COMM_WORLD);
 
-  parallel::distributed::Vector<double>
+  LinearAlgebra::distributed::Vector<double>
   dx (col_partitioning, col_partitioning, MPI_COMM_WORLD),
   dy (row_partitioning, row_partitioning, MPI_COMM_WORLD);
 
@@ -129,10 +128,8 @@ int main (int argc, char **argv)
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       test();
     }

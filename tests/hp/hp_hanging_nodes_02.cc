@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 // random distribution of FEs
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -48,7 +47,6 @@
 #include <deal.II/lac/precondition.h>
 
 #include <deal.II/numerics/data_out.h>
-#include <fstream>
 #include <iostream>
 
 std::ofstream logfile("output");
@@ -141,7 +139,6 @@ int main ()
   logfile.precision(8);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   unsigned int index[] =
   {

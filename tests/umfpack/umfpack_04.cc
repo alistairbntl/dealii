@@ -18,8 +18,6 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
-#include <cstdlib>
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
@@ -168,7 +166,7 @@ void test ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim>(size.size()),
+                                            Functions::ZeroFunction<dim>(size.size()),
                                             boundary_values);
   MatrixTools::apply_boundary_values (boundary_values, Bb, bx, bb);
   MatrixTools::apply_boundary_values (boundary_values, B, x, b);
@@ -258,9 +256,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<1> ();
   test<2> ();

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2016 by the deal.II authors
+// Copyright (C) 2008 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__trilinos_parallel_block_vector_h
-#define dealii__trilinos_parallel_block_vector_h
+#ifndef dealii_trilinos_parallel_block_vector_h
+#define dealii_trilinos_parallel_block_vector_h
 
 
 #include <deal.II/base/config.h>
@@ -31,7 +31,7 @@
 DEAL_II_NAMESPACE_OPEN
 
 // forward declaration
-template <typename Number> class BlockVector;
+template <typename Number> class BlockVectorBase;
 
 /*! @addtogroup TrilinosWrappers
  *@{
@@ -44,7 +44,6 @@ namespace TrilinosWrappers
   {
     class BlockVector;
   }
-  class BlockVector;
   class BlockSparseMatrix;
 
 
@@ -68,13 +67,13 @@ namespace TrilinosWrappers
      * @ref GlossBlockLA "Block (linear algebra)"
      * @author Martin Kronbichler, Wolfgang Bangerth, 2008, 2009
      */
-    class BlockVector : public BlockVectorBase<Vector>
+    class BlockVector : public dealii::BlockVectorBase<MPI::Vector>
     {
     public:
       /**
        * Typedef the base class for simpler access to its own typedefs.
        */
-      typedef BlockVectorBase<Vector> BaseClass;
+      typedef dealii::BlockVectorBase<MPI::Vector> BaseClass;
 
       /**
        * Typedef the type of the underlying vector.
@@ -96,16 +95,7 @@ namespace TrilinosWrappers
       /**
        * Default constructor. Generate an empty vector without any blocks.
        */
-      BlockVector ();
-
-      /**
-       * Constructor. Generate a block vector with as many blocks as there are
-       * entries in @p partitioning. Each Epetra_Map contains the layout of
-       * the distribution of data among the MPI processes.
-       *
-       * This function is deprecated.
-       */
-      explicit BlockVector (const std::vector<Epetra_Map> &parallel_partitioning) DEAL_II_DEPRECATED;
+      BlockVector () = default;
 
       /**
        * Constructor. Generate a block vector with as many blocks as there are
@@ -132,16 +122,11 @@ namespace TrilinosWrappers
        */
       BlockVector (const BlockVector  &v);
 
-#ifdef DEAL_II_WITH_CXX11
       /**
        * Move constructor. Creates a new vector by stealing the internal data
        * of the vector @p v.
-       *
-       * @note This constructor is only available if deal.II is configured
-       * with C++11 support.
        */
       BlockVector (BlockVector &&v);
-#endif
 
       /**
        * Creates a block vector consisting of <tt>num_blocks</tt> components,
@@ -153,7 +138,7 @@ namespace TrilinosWrappers
       /**
        * Destructor. Clears memory
        */
-      ~BlockVector ();
+      ~BlockVector () = default;
 
       /**
        * Copy operator: fill all components of the vector that are locally
@@ -166,22 +151,11 @@ namespace TrilinosWrappers
        */
       BlockVector &operator= (const BlockVector &v);
 
-#ifdef DEAL_II_WITH_CXX11
       /**
        * Move the given vector. This operator replaces the present vector with
        * @p v by efficiently swapping the internal data structures.
-       *
-       * @note This operator is only available if deal.II is configured with
-       * C++11 support.
        */
       BlockVector &operator= (BlockVector &&v);
-#endif
-
-      /**
-       * Copy operator for arguments of the localized Trilinos vector type.
-       */
-      BlockVector &
-      operator= (const ::dealii::TrilinosWrappers::BlockVector &v);
 
       /**
        * Another copy function. This one takes a deal.II block vector and
@@ -195,19 +169,6 @@ namespace TrilinosWrappers
        */
       template <typename Number>
       BlockVector &operator= (const ::dealii::BlockVector<Number> &v);
-
-      /**
-       * Reinitialize the BlockVector to contain as many blocks as there are
-       * Epetra_Maps given in the input argument, according to the parallel
-       * distribution of the individual components described in the maps.
-       *
-       * If <tt>omit_zeroing_entries==false</tt>, the vector is filled with
-       * zeros.
-       *
-       * This function is deprecated.
-       */
-      void reinit (const std::vector<Epetra_Map> &parallel_partitioning,
-                   const bool                     omit_zeroing_entries = false) DEAL_II_DEPRECATED;
 
       /**
        * Reinitialize the BlockVector to contain as many blocks as there are
@@ -290,18 +251,7 @@ namespace TrilinosWrappers
                                         const BlockVector                         &v);
 
       /**
-       * Returns the state of the vector, i.e., whether compress() needs to be
-       * called after an operation requiring data exchange. Does only return
-       * non-true values when used in <tt>debug</tt> mode, since it is quite
-       * expensive to keep track of all operations that lead to the need for
-       * compress().
-       *
-       * This function is deprecated.
-       */
-      bool is_compressed () const DEAL_II_DEPRECATED;
-
-      /**
-       * Returns if this Vector contains ghost elements.
+       * Return if this Vector contains ghost elements.
        *
        * @see
        * @ref GlossGhostedVector "vectors with ghost elements"
@@ -320,7 +270,7 @@ namespace TrilinosWrappers
        * the same number of blocks. If needed, the numbers of blocks should be
        * exchanged, too.
        *
-       * This function is analog to the the swap() function of all C++
+       * This function is analogous to the swap() function of all C++
        * standard containers. Also, there is a global function swap(u,v) that
        * simply calls <tt>u.swap(v)</tt>, again in analogy to standard
        * functions.
@@ -349,14 +299,6 @@ namespace TrilinosWrappers
 
 
     /*----------------------- Inline functions ----------------------------------*/
-
-
-    inline
-    BlockVector::BlockVector ()
-    {}
-
-
-
     inline
     BlockVector::BlockVector (const std::vector<IndexSet> &parallel_partitioning,
                               const MPI_Comm              &communicator)
@@ -389,7 +331,7 @@ namespace TrilinosWrappers
     inline
     BlockVector::BlockVector (const BlockVector &v)
       :
-      BlockVectorBase<Vector > ()
+      dealii::BlockVectorBase<MPI::Vector> ()
     {
       this->components.resize (v.n_blocks());
       this->block_indices = v.block_indices;
@@ -400,7 +342,6 @@ namespace TrilinosWrappers
 
 
 
-#ifdef DEAL_II_WITH_CXX11
     inline
     BlockVector::BlockVector (BlockVector &&v)
     {
@@ -408,7 +349,6 @@ namespace TrilinosWrappers
       reinit (0);
       swap(v);
     }
-#endif
 
 
 
@@ -491,7 +431,7 @@ namespace internal
      * A helper class used internally in linear_operator.h. Specialization for
      * TrilinosWrappers::MPI::BlockVector.
      */
-    template<>
+    template <>
     class ReinitHelper<TrilinosWrappers::MPI::BlockVector>
     {
     public:
@@ -501,7 +441,8 @@ namespace internal
                                 TrilinosWrappers::MPI::BlockVector &v,
                                 bool omit_zeroing_entries)
       {
-        v.reinit(matrix.range_partitioner(), omit_zeroing_entries);
+        v.reinit(matrix.locally_owned_range_indices(),
+                 matrix.get_mpi_communicator(), omit_zeroing_entries);
       }
 
       template <typename Matrix>
@@ -510,13 +451,24 @@ namespace internal
                                 TrilinosWrappers::MPI::BlockVector &v,
                                 bool omit_zeroing_entries)
       {
-        v.reinit(matrix.domain_partitioner(), omit_zeroing_entries);
+        v.reinit(matrix.locally_owned_domain_indices(),
+                 matrix.get_mpi_communicator(), omit_zeroing_entries);
       }
     };
 
   } /* namespace LinearOperator */
 } /* namespace internal */
 
+
+/**
+ * Declare dealii::TrilinosWrappers::MPI::BlockVector as distributed vector.
+ *
+ * @author Uwe Koecher, 2017
+ */
+template <>
+struct is_serial_vector< TrilinosWrappers::MPI::BlockVector > : std::false_type
+{
+};
 
 DEAL_II_NAMESPACE_CLOSE
 

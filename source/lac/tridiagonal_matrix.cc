@@ -22,7 +22,7 @@ DEAL_II_NAMESPACE_OPEN
 
 using namespace LAPACKSupport;
 
-template<typename number>
+template <typename number>
 TridiagonalMatrix<number>::TridiagonalMatrix(
   size_type size,
   bool symmetric)
@@ -35,7 +35,7 @@ TridiagonalMatrix<number>::TridiagonalMatrix(
 {}
 
 
-template<typename number>
+template <typename number>
 void
 TridiagonalMatrix<number>::reinit(
   size_type size,
@@ -49,7 +49,7 @@ TridiagonalMatrix<number>::reinit(
 }
 
 
-template<typename number>
+template <typename number>
 bool
 TridiagonalMatrix<number>::all_zero() const
 {
@@ -73,7 +73,7 @@ TridiagonalMatrix<number>::all_zero() const
 }
 
 
-template<typename number>
+template <typename number>
 void
 TridiagonalMatrix<number>::vmult (
   Vector<number>       &w,
@@ -127,7 +127,7 @@ TridiagonalMatrix<number>::vmult (
 }
 
 
-template<typename number>
+template <typename number>
 void
 TridiagonalMatrix<number>::vmult_add (
   Vector<number>       &w,
@@ -137,7 +137,7 @@ TridiagonalMatrix<number>::vmult_add (
 }
 
 
-template<typename number>
+template <typename number>
 void
 TridiagonalMatrix<number>::Tvmult (
   Vector<number>       &w,
@@ -181,7 +181,7 @@ TridiagonalMatrix<number>::Tvmult (
 }
 
 
-template<typename number>
+template <typename number>
 void
 TridiagonalMatrix<number>::Tvmult_add (
   Vector<number>       &w,
@@ -191,7 +191,7 @@ TridiagonalMatrix<number>::Tvmult_add (
 }
 
 
-template<typename number>
+template <typename number>
 number
 TridiagonalMatrix<number>::matrix_scalar_product(
   const Vector<number> &w,
@@ -218,7 +218,7 @@ TridiagonalMatrix<number>::matrix_scalar_product(
 }
 
 
-template<typename number>
+template <typename number>
 number
 TridiagonalMatrix<number>::matrix_norm_square(
   const Vector<number> &v) const
@@ -227,7 +227,7 @@ TridiagonalMatrix<number>::matrix_norm_square(
 }
 
 
-template<>
+template <>
 void
 TridiagonalMatrix<double>::compute_eigenvalues()
 {
@@ -237,28 +237,28 @@ TridiagonalMatrix<double>::compute_eigenvalues()
 
   const int nn = n();
   int info;
-  stev (&N, &nn, &*diagonal.begin(), &*right.begin(), 0, &one, 0, &info);
+  stev (&N, &nn, &*diagonal.begin(), &*right.begin(), nullptr, &one, nullptr, &info);
   Assert(info == 0, ExcInternalError());
 
-  state = eigenvalues;
+  state = LAPACKSupport::eigenvalues;
 #else
   Assert(false, ExcNeedsLAPACK());
 #endif
 }
 
 
-template<typename number>
+template <typename number>
 number
 TridiagonalMatrix<number>::eigenvalue(const size_type i) const
 {
-  Assert(state == eigenvalues, ExcState(state));
+  Assert(state == LAPACKSupport::eigenvalues, ExcState(state));
   Assert(i<n(), ExcIndexRange(i,0,n()));
   return diagonal[i];
 }
 
 
 /*
-template<typename number>
+template <typename number>
 TridiagonalMatrix<number>::
 {
 }

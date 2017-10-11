@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------
-// $Id$
 //
-// Copyright (C) 2007 - 2015 by the deal.II authors
+// Copyright (C) 2007 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,7 +22,6 @@ int
 main()
 {
   initlog();
-  deallog.threshold_double(1.e-10);
 
   CHECK_ALL(Q_Bubbles,1,2);
   CHECK_ALL(Q_Bubbles,2,2);

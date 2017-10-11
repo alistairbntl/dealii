@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,7 +24,6 @@
 // transform (leading to a missing power of h in the determinant)
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -40,11 +39,10 @@
 #include <deal.II/fe/mapping_q1.h>
 
 #include <sstream>
-#include <fstream>
 
 
 
-template<int dim>
+template <int dim>
 Tensor<1,dim> ones ()
 {
   Tensor<1,dim> result;
@@ -53,7 +51,7 @@ Tensor<1,dim> ones ()
   return result;
 }
 
-template<int dim>
+template <int dim>
 void test (const Triangulation<dim> &tr,
            const FiniteElement<dim> &fe,
            const double tolerance)
@@ -85,7 +83,7 @@ void test (const Triangulation<dim> &tr,
 
       deallog << "Cell nodes:" << std::endl;
       for (unsigned int i=0; i<GeometryInfo<dim>::vertices_per_cell; ++i)
-        deallog << i << ": (" << cell->vertex(i) << ")" << std::endl;
+        deallog << i << ": ( " << cell->vertex(i) << " )" << std::endl;
 
       bool cell_ok = true;
 
@@ -138,7 +136,7 @@ void test (const Triangulation<dim> &tr,
 
 
 
-template<int dim>
+template <int dim>
 void test_hyper_ball(const double tolerance)
 {
   Triangulation<dim> tr;
@@ -160,11 +158,9 @@ int main()
   deallog << std::setprecision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   test_hyper_ball<2>(1e-6);
   test_hyper_ball<3>(1e-6);
 
   deallog << "done..." << std::endl;
 }
-

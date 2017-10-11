@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2012 - 2015 by the deal.II authors
+ * Copyright (C) 2012 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -41,7 +41,7 @@
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/trilinos_block_sparse_matrix.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_precondition.h>
 #include <deal.II/lac/trilinos_solver.h>
 
@@ -751,7 +751,7 @@ namespace Step42
     // one shot at setting it; the same is true for the mesh refinement
     // criterion):
     const std::string                                  base_mesh;
-    const std_cxx11::shared_ptr<const Function<dim> >  obstacle;
+    const std::shared_ptr<const Function<dim> >  obstacle;
 
     struct RefinementStrategy
     {
@@ -861,7 +861,9 @@ namespace Step42
               (new EquationData::SphereObstacle<dim>(base_mesh == "box" ? 1.0 : 0.5))),
 
     transfer_solution (prm.get_bool("transfer solution")),
-    n_refinement_cycles (prm.get_integer("number of cycles"))
+    n_refinement_cycles (prm.get_integer("number of cycles")),
+    current_refinement_cycle (0)
+
   {
     std::string strat = prm.get("refinement strategy");
     if (strat == "global")
@@ -874,7 +876,8 @@ namespace Step42
     output_dir = prm.get("output directory");
     if (output_dir != "" && *(output_dir.rbegin()) != '/')
       output_dir += "/";
-    mkdir(output_dir.c_str(), 0777);
+    const int ierr = mkdir(output_dir.c_str(), 0777);
+    AssertThrow(ierr == 0, ExcIO());
 
     pcout << "    Using output directory '" << output_dir << "'" << std::endl;
     pcout << "    FE degree " << fe_degree << std::endl;
@@ -2059,7 +2062,7 @@ namespace Step42
         data_out.write_pvtu_record(pvtu_master_output, filenames);
 
         std::ofstream visit_master_output((output_dir + filename_base + ".visit").c_str());
-        data_out.write_visit_record(visit_master_output, filenames);
+        DataOutBase::write_visit_record(visit_master_output, filenames);
       }
 
     TrilinosWrappers::MPI::Vector tmp(solution);
@@ -2151,8 +2154,7 @@ namespace Step42
   PlasticityContactProblem<dim>::run ()
   {
     computing_timer.reset();
-    for (current_refinement_cycle = 0;
-         current_refinement_cycle < n_refinement_cycles;
+    for (; current_refinement_cycle < n_refinement_cycles;
          ++current_refinement_cycle)
       {
         {
@@ -2211,7 +2213,7 @@ int main (int argc, char *argv[])
           return 1;
         }
 
-      prm.read_input(argv[1]);
+      prm.parse_input(argv[1]);
       Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv,
                                                            numbers::invalid_unsigned_int);
       {

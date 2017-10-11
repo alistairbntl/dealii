@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,11 +13,11 @@
 //
 // ---------------------------------------------------------------------
 
+#include <deal.II/base/mpi.h>
 #include <deal.II/lac/petsc_parallel_vector.h>
 
 #ifdef DEAL_II_WITH_PETSC
 
-#  include <deal.II/lac/petsc_vector.h>
 #  include <cmath>
 #  include <algorithm>
 
@@ -29,14 +29,9 @@ namespace PETScWrappers
   {
 
     Vector::Vector ()
+      : communicator (MPI_COMM_SELF)
     {
-      // this is an invalid empty vector, so we can just as well create a
-      // sequential one to avoid all the overhead incurred by parallelism
-      const int n = 0;
-      const int ierr
-        = VecCreateSeq (PETSC_COMM_SELF, n, &vector);
-      AssertThrow (ierr == 0, ExcPETScError(ierr));
-      ghosted = false;
+      create_vector(0, 0);
     }
 
 
@@ -56,11 +51,19 @@ namespace PETScWrappers
                     const VectorBase  &v,
                     const size_type   local_size)
       :
+      VectorBase (v),
       communicator (communicator)
     {
-      Vector::create_vector (v.size(), local_size);
-
-      VectorBase::operator = (v);
+      // In the past (before it was deprecated) this constructor did a
+      // byte-for-byte copy of v. This choice resulted in two problems:
+      // 1. The created vector will have the same size as v, not local size.
+      // 2. Since both the created vector and v maintain ownership of the same
+      // PETSc Vec, both will try to destroy it: this does not make sense.
+      //
+      // For the sake of backwards compatibility, preserve the behavior of the
+      // copy, but correct the ownership bug. Note that in both this (and the
+      // original) implementation local_size is ultimately unused.
+      (void)local_size;
     }
 
 
@@ -71,7 +74,7 @@ namespace PETScWrappers
       :
       communicator (communicator)
     {
-      Assert(local.is_contiguous(), ExcNotImplemented());
+      Assert(local.is_ascending_and_one_to_one(communicator), ExcNotImplemented());
 
       IndexSet ghost_set = ghost;
       ghost_set.subtract_set(local);
@@ -86,8 +89,44 @@ namespace PETScWrappers
       :
       communicator (communicator)
     {
-      Assert(local.is_contiguous(), ExcNotImplemented());
+      Assert(local.is_ascending_and_one_to_one(communicator), ExcNotImplemented());
       Vector::create_vector(local.size(), local.n_elements());
+    }
+
+
+
+    Vector &
+    Vector::operator= (const Vector &v)
+    {
+      // make sure left- and right-hand side of the assignment are compress()'ed:
+      Assert(v.last_action == VectorOperation::unknown,
+             internal::VectorReference::ExcWrongMode (VectorOperation::unknown,
+                                                      v.last_action));
+      Assert(last_action == VectorOperation::unknown,
+             internal::VectorReference::ExcWrongMode (VectorOperation::unknown,
+                                                      last_action));
+
+      // if the vectors have different sizes,
+      // then first resize the present one
+      if (size() != v.size())
+        {
+          if (v.has_ghost_elements())
+            reinit( v.locally_owned_elements(), v.ghost_indices, v.communicator);
+          else
+            reinit (v.communicator, v.size(), v.local_size(), true);
+        }
+
+      PetscErrorCode ierr = VecCopy (v.vector, vector);
+      AssertThrow (ierr == 0, ExcPETScError(ierr));
+
+      if (has_ghost_elements())
+        {
+          ierr = VecGhostUpdateBegin(vector, INSERT_VALUES, SCATTER_FORWARD);
+          AssertThrow (ierr == 0, ExcPETScError(ierr));
+          ierr = VecGhostUpdateEnd(vector, INSERT_VALUES, SCATTER_FORWARD);
+          AssertThrow (ierr == 0, ExcPETScError(ierr));
+        }
+      return *this;
     }
 
 
@@ -95,15 +134,10 @@ namespace PETScWrappers
     void
     Vector::clear ()
     {
-      // destroy the PETSc Vec and create an invalid empty vector,
-      // so we can just as well create a sequential one to avoid
-      // all the overhead incurred by parallelism
-      attained_ownership = true;
+      obtained_ownership = true;
       VectorBase::clear ();
 
-      const int n = 0;
-      int ierr = VecCreateSeq (PETSC_COMM_SELF, n, &vector);
-      AssertThrow (ierr == 0, ExcPETScError(ierr));
+      create_vector(0, 0);
     }
 
 
@@ -120,8 +154,11 @@ namespace PETScWrappers
       // mismatch (may not be true for every proc)
 
       int k_global, k = ((size() != n) || (local_size() != local_sz));
-      MPI_Allreduce (&k, &k_global, 1,
-                     MPI_INT, MPI_LOR, communicator);
+      {
+        const int ierr = MPI_Allreduce (&k, &k_global, 1,
+                                        MPI_INT, MPI_LOR, communicator);
+        AssertThrowMPI(ierr);
+      }
 
       if (k_global || has_ghost_elements())
         {
@@ -129,18 +166,12 @@ namespace PETScWrappers
           // but somehow it leads to odd errors
           // somewhere down the line in some of
           // the tests:
-//         const int ierr = VecSetSizes (vector, n, n);
+//         const PetscErrorCode ierr = VecSetSizes (vector, n, n);
 //         AssertThrow (ierr == 0, ExcPETScError(ierr));
 
           // so let's go the slow way:
-          int ierr;
 
-#if DEAL_II_PETSC_VERSION_LT(3,2,0)
-          ierr = VecDestroy (vector);
-#else
-          ierr = VecDestroy (&vector);
-#endif
-
+          const PetscErrorCode ierr = VecDestroy (&vector);
           AssertThrow (ierr == 0, ExcPETScError(ierr));
 
           create_vector (n, local_sz);
@@ -163,7 +194,7 @@ namespace PETScWrappers
           reinit (v.locally_owned_elements(), v.ghost_indices, v.communicator);
           if (!omit_zeroing_entries)
             {
-              int ierr = VecSet(vector, 0.0);
+              const PetscErrorCode ierr = VecSet(vector, 0.0);
               AssertThrow (ierr == 0, ExcPETScError(ierr));
             }
         }
@@ -178,17 +209,12 @@ namespace PETScWrappers
                     const IndexSet &ghost,
                     const MPI_Comm     &comm)
     {
-      int ierr;
-#if DEAL_II_PETSC_VERSION_LT(3,2,0)
-      ierr = VecDestroy (vector);
-#else
-      ierr = VecDestroy (&vector);
-#endif
+      const PetscErrorCode ierr = VecDestroy (&vector);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       communicator = comm;
 
-      Assert(local.is_contiguous(), ExcNotImplemented());
+      Assert(local.is_ascending_and_one_to_one(comm), ExcNotImplemented());
 
       IndexSet ghost_set = ghost;
       ghost_set.subtract_set(local);
@@ -200,66 +226,14 @@ namespace PETScWrappers
     Vector::reinit (const IndexSet &local,
                     const MPI_Comm &comm)
     {
-      int ierr;
-#if DEAL_II_PETSC_VERSION_LT(3,2,0)
-      ierr = VecDestroy (vector);
-#else
-      ierr = VecDestroy (&vector);
-#endif
+      const PetscErrorCode ierr = VecDestroy (&vector);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       communicator = comm;
 
-      Assert(local.is_contiguous(), ExcNotImplemented());
+      Assert(local.is_ascending_and_one_to_one(comm), ExcNotImplemented());
       Assert(local.size()>0, ExcMessage("can not create vector of size 0."));
       create_vector(local.size(), local.n_elements());
-    }
-
-
-    Vector &
-    Vector::operator = (const PETScWrappers::Vector &v)
-    {
-      Assert(last_action==VectorOperation::unknown,
-             ExcMessage("Call to compress() required before calling operator=."));
-      //TODO [TH]: can not access v.last_action here. Implement is_compressed()?
-      //Assert(v.last_action==VectorOperation::unknown,
-      //    ExcMessage("Call to compress() required before calling operator=."));
-      int ierr;
-
-      // get a pointer to the local memory of
-      // this vector
-      PetscScalar *dest_array;
-      ierr = VecGetArray (vector, &dest_array);
-      AssertThrow (ierr == 0, ExcPETScError(ierr));
-
-      // then also a pointer to the source
-      // vector
-      PetscScalar *src_array;
-      ierr = VecGetArray (static_cast<const Vec &>(v), &src_array);
-      AssertThrow (ierr == 0, ExcPETScError(ierr));
-
-      // then copy:
-      const std::pair<size_type, size_type>
-      local_elements = local_range ();
-      std::copy (src_array + local_elements.first,
-                 src_array + local_elements.second,
-                 dest_array);
-
-      // finally restore the arrays
-      ierr = VecRestoreArray (vector, &dest_array);
-      AssertThrow (ierr == 0, ExcPETScError(ierr));
-
-      ierr = VecRestoreArray (static_cast<const Vec &>(v), &src_array);
-      AssertThrow (ierr == 0, ExcPETScError(ierr));
-
-      if (has_ghost_elements())
-        {
-          ierr = VecGhostUpdateBegin(vector, INSERT_VALUES, SCATTER_FORWARD);
-          AssertThrow (ierr == 0, ExcPETScError(ierr));
-          ierr = VecGhostUpdateEnd(vector, INSERT_VALUES, SCATTER_FORWARD);
-          AssertThrow (ierr == 0, ExcPETScError(ierr));
-        }
-      return *this;
     }
 
 
@@ -271,9 +245,8 @@ namespace PETScWrappers
       Assert (local_size <= n, ExcIndexRange (local_size, 0, n));
       ghosted = false;
 
-      const int ierr
-        = VecCreateMPI (communicator, local_size, PETSC_DETERMINE,
-                        &vector);
+      const PetscErrorCode ierr = VecCreateMPI (communicator, local_size, PETSC_DETERMINE,
+                                                &vector);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       Assert (size() == n,
@@ -300,16 +273,14 @@ namespace PETScWrappers
            ?
            (const PetscInt *)(&(ghostindices[0]))
            :
-           0);
+           nullptr);
 
-      int ierr
-        = VecCreateGhost(communicator,
-                         local_size,
-                         PETSC_DETERMINE,
-                         ghostindices.size(),
-                         ptr,
-                         &vector);
-
+      PetscErrorCode ierr = VecCreateGhost(communicator,
+                                           local_size,
+                                           PETSC_DETERMINE,
+                                           ghostindices.size(),
+                                           ptr,
+                                           &vector);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       Assert (size() == n,
@@ -321,6 +292,7 @@ namespace PETScWrappers
         PetscInt begin, end;
 
         ierr = VecGetOwnershipRange (vector, &begin, &end);
+        AssertThrow (ierr == 0, ExcPETScError(ierr));
 
         Assert(local_size==(size_type)(end-begin), ExcInternalError());
 
@@ -384,16 +356,13 @@ namespace PETScWrappers
       PetscScalar *val;
       PetscInt    nlocal, istart, iend;
 
-      int ierr = VecGetArray (vector, &val);
-
+      PetscErrorCode ierr = VecGetArray (vector, &val);
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       ierr = VecGetLocalSize (vector, &nlocal);
-
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       ierr = VecGetOwnershipRange (vector, &istart, &iend);
-
       AssertThrow (ierr == 0, ExcPETScError(ierr));
 
       // save the state of out stream
@@ -411,7 +380,8 @@ namespace PETScWrappers
             i++)
         {
           // This is slow, but most likely only used to debug.
-          MPI_Barrier(communicator);
+          const int mpi_ierr = MPI_Barrier(communicator);
+          AssertThrowMPI(mpi_ierr);
           if (i == Utilities::MPI::this_mpi_process(communicator))
             {
               if (across)

@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2011 - 2015 by the deal.II authors
+ * Copyright (C) 2011 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -86,7 +86,7 @@ namespace Step47
     bool interface_intersects_cell (const typename Triangulation<dim>::cell_iterator &cell) const;
     std::pair<unsigned int, Quadrature<dim> > compute_quadrature(const Quadrature<dim> &plain_quadrature, const typename hp::DoFHandler<dim>::active_cell_iterator &cell, const std::vector<double> &level_set_values);
     void append_quadrature(const Quadrature<dim> &plain_quadrature,
-                           const std::vector<Point<dim> > &v      ,
+                           const std::vector<Point<dim> > &v,
                            std::vector<Point<dim> > &xfem_points,
                            std::vector<double>      &xfem_weights);
 
@@ -152,8 +152,8 @@ namespace Step47
     Assert (values.size() == n_points,
             ExcDimensionMismatch (values.size(), n_points));
 
-    Assert (component == 0,
-            ExcIndexRange (component, 0, 1));
+    (void) component;
+    Assert(component == 0, ExcIndexRange(component, 0, 1));
 
     for (unsigned int i=0; i<n_points; ++i)
       {
@@ -432,7 +432,7 @@ namespace Step47
     std::map<types::global_dof_index,double> boundary_values;
     VectorTools::interpolate_boundary_values (dof_handler,
                                               0,
-                                              ZeroFunction<dim>(2),
+                                              Functions::ZeroFunction<dim>(2),
                                               boundary_values);
     MatrixTools::apply_boundary_values (boundary_values,
                                         system_matrix,
@@ -905,12 +905,9 @@ namespace Step47
   public:
     virtual
     void
-    compute_derived_quantities_vector (const std::vector<Vector<double> >              &uh,
-                                       const std::vector<std::vector<Tensor<1,dim> > > &duh,
-                                       const std::vector<std::vector<Tensor<2,dim> > > &dduh,
-                                       const std::vector<Point<dim> >                  &normals,
-                                       const std::vector<Point<dim> >                  &evaluation_points,
-                                       std::vector<Vector<double> >                    &computed_quantities) const;
+    evaluate_vector_field
+    (const dealii::DataPostprocessorInputs::Vector<dim> &inputs,
+     std::vector<Vector<double> >                       &computed_quantities) const;
 
     virtual std::vector<std::string> get_names () const;
 
@@ -955,28 +952,27 @@ namespace Step47
   template <int dim>
   void
   Postprocessor<dim>::
-  compute_derived_quantities_vector (const std::vector<Vector<double> >              &uh,
-                                     const std::vector<std::vector<Tensor<1,dim> > > &/*duh*/,
-                                     const std::vector<std::vector<Tensor<2,dim> > > &/*dduh*/,
-                                     const std::vector<Point<dim> >                  &/*normals*/,
-                                     const std::vector<Point<dim> >                  &evaluation_points,
-                                     std::vector<Vector<double> >                    &computed_quantities) const
+  evaluate_vector_field
+  (const dealii::DataPostprocessorInputs::Vector<dim> &inputs,
+   std::vector<Vector<double> >                       &computed_quantities) const
   {
-    const unsigned int n_quadrature_points = uh.size();
-    Assert (computed_quantities.size() == n_quadrature_points,  ExcInternalError());
-    Assert (uh[0].size() == 2,                                  ExcInternalError());
+    const unsigned int n_quadrature_points = inputs.solution_values.size();
+    Assert (computed_quantities.size() == n_quadrature_points,
+            ExcInternalError());
+    Assert (inputs.solution_values[0].size() == 2,
+            ExcInternalError());
 
     for (unsigned int q=0; q<n_quadrature_points; ++q)
       {
         computed_quantities[q](0)
-          = (uh[q](0)
+          = (inputs.solution_values[q](0)
              +
 //TODO: shift in weight function is missing!
-             uh[q](1) * std::fabs(level_set(evaluation_points[q])));
+             inputs.solution_values[q](1) * std::fabs(level_set(inputs.evaluation_points[q])));
         computed_quantities[q](1)
           = (computed_quantities[q](0)
              -
-             exact_solution (evaluation_points[q]));
+             exact_solution (inputs.evaluation_points[q]));
       }
   }
 

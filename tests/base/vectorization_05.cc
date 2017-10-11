@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 - 2015 by the deal.II authors
+// Copyright (C) 2015 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 // (otherwise the same as vectorization_05)
 
 #include "../tests.h"
-#include <iomanip>
 #include <limits>
 
 #include <deal.II/base/vectorization.h>
@@ -94,9 +93,7 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   deallog.push("double");
   test<double,1> ();
@@ -105,7 +102,7 @@ int main()
   deallog.pop();
   deallog.push("float");
   test<float,1> ();
-  test<float,9> ();
+  test<float,17> ();
   test<float,32> ();
   deallog.pop();
 

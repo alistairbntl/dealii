@@ -25,6 +25,7 @@
 
 #ifdef DEAL_II_WITH_MPI
 #include <deal.II/base/utilities.h>
+#include <deal.II/base/mpi.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
 #endif
@@ -119,15 +120,15 @@ namespace SparsityTools
     // Use recursive if the number of partitions is less than or equal to 8
     if (nparts <= 8)
       ierr = METIS_PartGraphRecursive(&n, &ncon, &int_rowstart[0], &int_colnums[0],
-                                      NULL, NULL, NULL,
-                                      &nparts,NULL,NULL,&options[0],
+                                      nullptr, nullptr, nullptr,
+                                      &nparts,nullptr,nullptr,&options[0],
                                       &dummy,&int_partition_indices[0]);
 
     // Otherwise use kway
     else
       ierr = METIS_PartGraphKway(&n, &ncon, &int_rowstart[0], &int_colnums[0],
-                                 NULL, NULL, NULL,
-                                 &nparts,NULL,NULL,&options[0],
+                                 nullptr, nullptr, nullptr,
+                                 &nparts,nullptr,nullptr,&options[0],
                                  &dummy,&int_partition_indices[0]);
 
     // If metis returns normally, an error code METIS_OK=1 is returned from
@@ -208,7 +209,9 @@ namespace SparsityTools
             ExcMessage("Only valid for sparsity patterns which store all rows."));
     for (SparsityPattern::size_type i=0; i<starting_indices.size(); ++i)
       Assert (starting_indices[i] < sparsity.n_rows(),
-              ExcMessage ("Invalid starting index"));
+              ExcMessage ("Invalid starting index: All starting indices need "
+                          "to be between zero and the number of rows in the "
+                          "sparsity pattern."));
 
     // store the indices of the dofs renumbered in the last round. Default to
     // starting points
@@ -218,17 +221,7 @@ namespace SparsityTools
     std::fill (new_indices.begin(), new_indices.end(),
                numbers::invalid_size_type);
 
-    // delete disallowed elements
-    for (DynamicSparsityPattern::size_type i=0; i<last_round_dofs.size(); ++i)
-      if ((last_round_dofs[i]==numbers::invalid_size_type) ||
-          (last_round_dofs[i]>=sparsity.n_rows()))
-        last_round_dofs[i] = numbers::invalid_size_type;
-
-    std::remove_if (last_round_dofs.begin(), last_round_dofs.end(),
-                    std::bind2nd(std::equal_to<DynamicSparsityPattern::size_type>(),
-                                 numbers::invalid_size_type));
-
-    // now if no valid points remain: find dof with lowest coordination number
+    // if no starting indices were given: find dof with lowest coordination number
     if (last_round_dofs.empty())
       last_round_dofs
       .push_back (internal::find_unnumbered_starting_index (sparsity,
@@ -335,23 +328,6 @@ namespace SparsityTools
 
 
 
-  void
-  reorder_Cuthill_McKee (const SparsityPattern                   &sparsity,
-                         std::vector<SparsityPattern::size_type> &new_indices,
-                         const std::vector<SparsityPattern::size_type> &starting_indices)
-  {
-    DynamicSparsityPattern dsp(sparsity.n_rows(), sparsity.n_cols());
-    for (unsigned int row=0; row<sparsity.n_rows(); ++row)
-      {
-        for (SparsityPattern::iterator it=sparsity.begin(row); it!=sparsity.end(row)
-             && it->is_valid_entry() ; ++it)
-          dsp.add(row, it->column());
-      }
-    reorder_Cuthill_McKee(dsp, new_indices, starting_indices);
-  }
-
-
-
   namespace internal
   {
     void
@@ -438,7 +414,7 @@ namespace SparsityTools
 
               // Add the pivot and all direct neighbors of the pivot node not
               // yet touched to the list of new entries.
-              groups.push_back(std::vector<types::global_dof_index>());
+              groups.emplace_back();
               std::vector<types::global_dof_index> &next_group = groups.back();
 
               next_group.push_back(min_neighbors.first);
@@ -602,13 +578,16 @@ namespace SparsityTools
     {
       unsigned int idx=0;
       for (map_vec_t::iterator it=send_data.begin(); it!=send_data.end(); ++it, ++idx)
-        MPI_Isend(&(it->second[0]),
-                  it->second.size(),
-                  DEAL_II_DOF_INDEX_MPI_TYPE,
-                  it->first,
-                  124,
-                  mpi_comm,
-                  &requests[idx]);
+        {
+          const int ierr = MPI_Isend(&(it->second[0]),
+                                     it->second.size(),
+                                     DEAL_II_DOF_INDEX_MPI_TYPE,
+                                     it->first,
+                                     124,
+                                     mpi_comm,
+                                     &requests[idx]);
+          AssertThrowMPI(ierr);
+        }
     }
 
     {
@@ -618,13 +597,16 @@ namespace SparsityTools
         {
           MPI_Status status;
           int len;
-          MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, mpi_comm, &status);
+          int ierr = MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, mpi_comm, &status);
+          AssertThrowMPI(ierr);
           Assert (status.MPI_TAG==124, ExcInternalError());
 
-          MPI_Get_count(&status, DEAL_II_DOF_INDEX_MPI_TYPE, &len);
+          ierr = MPI_Get_count(&status, DEAL_II_DOF_INDEX_MPI_TYPE, &len);
+          AssertThrowMPI(ierr);
           recv_buf.resize(len);
-          MPI_Recv(&recv_buf[0], len, DEAL_II_DOF_INDEX_MPI_TYPE, status.MPI_SOURCE,
-                   status.MPI_TAG, mpi_comm, &status);
+          ierr = MPI_Recv(&recv_buf[0], len, DEAL_II_DOF_INDEX_MPI_TYPE, status.MPI_SOURCE,
+                          status.MPI_TAG, mpi_comm, &status);
+          AssertThrowMPI(ierr);
 
           std::vector<DynamicSparsityPattern::size_type>::const_iterator ptr = recv_buf.begin();
           std::vector<DynamicSparsityPattern::size_type>::const_iterator end = recv_buf.end();
@@ -637,7 +619,7 @@ namespace SparsityTools
                 {
                   Assert(ptr!=end, ExcInternalError());
                   dsp.add(row, *ptr);
-                  ptr++;
+                  ++ptr;
                 }
             }
           Assert(ptr==end, ExcInternalError());
@@ -646,7 +628,10 @@ namespace SparsityTools
 
     // complete all sends, so that we can safely destroy the buffers.
     if (requests.size())
-      MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
+      {
+        const int ierr = MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
+        AssertThrowMPI(ierr);
+      }
 
   }
 
@@ -724,13 +709,16 @@ namespace SparsityTools
     {
       unsigned int idx=0;
       for (map_vec_t::iterator it=send_data.begin(); it!=send_data.end(); ++it, ++idx)
-        MPI_Isend(&(it->second[0]),
-                  it->second.size(),
-                  DEAL_II_DOF_INDEX_MPI_TYPE,
-                  it->first,
-                  124,
-                  mpi_comm,
-                  &requests[idx]);
+        {
+          const int ierr = MPI_Isend(&(it->second[0]),
+                                     it->second.size(),
+                                     DEAL_II_DOF_INDEX_MPI_TYPE,
+                                     it->first,
+                                     124,
+                                     mpi_comm,
+                                     &requests[idx]);
+          AssertThrowMPI(ierr);
+        }
     }
 
     {
@@ -740,13 +728,16 @@ namespace SparsityTools
         {
           MPI_Status status;
           int len;
-          MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, mpi_comm, &status);
+          int ierr = MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, mpi_comm, &status);
+          AssertThrowMPI(ierr);
           Assert (status.MPI_TAG==124, ExcInternalError());
 
-          MPI_Get_count(&status, DEAL_II_DOF_INDEX_MPI_TYPE, &len);
+          ierr = MPI_Get_count(&status, DEAL_II_DOF_INDEX_MPI_TYPE, &len);
+          AssertThrowMPI(ierr);
           recv_buf.resize(len);
-          MPI_Recv(&recv_buf[0], len, DEAL_II_DOF_INDEX_MPI_TYPE, status.MPI_SOURCE,
-                   status.MPI_TAG, mpi_comm, &status);
+          ierr = MPI_Recv(&recv_buf[0], len, DEAL_II_DOF_INDEX_MPI_TYPE, status.MPI_SOURCE,
+                          status.MPI_TAG, mpi_comm, &status);
+          AssertThrowMPI(ierr);
 
           std::vector<BlockDynamicSparsityPattern::size_type>::const_iterator ptr = recv_buf.begin();
           std::vector<BlockDynamicSparsityPattern::size_type>::const_iterator end = recv_buf.end();
@@ -759,7 +750,7 @@ namespace SparsityTools
                 {
                   Assert(ptr!=end, ExcInternalError());
                   dsp.add(row, *ptr);
-                  ptr++;
+                  ++ptr;
                 }
             }
           Assert(ptr==end, ExcInternalError());
@@ -768,7 +759,10 @@ namespace SparsityTools
 
     // complete all sends, so that we can safely destroy the buffers.
     if (requests.size())
-      MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
+      {
+        const int ierr = MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
+        AssertThrowMPI(ierr);
+      }
   }
 #endif
 }

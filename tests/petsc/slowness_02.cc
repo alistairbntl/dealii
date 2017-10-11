@@ -25,8 +25,7 @@
 #include "../tests.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 
 
@@ -68,7 +67,10 @@ void test ()
   // then do a single matrix-vector
   // multiplication with subsequent formation
   // of the matrix norm
-  PETScWrappers::Vector v1(N*N), v2(N*N);
+  IndexSet indices(N*N);
+  indices.add_range(0, N*N);
+  PETScWrappers::MPI::Vector v1(indices, MPI_COMM_WORLD),
+                v2(indices, MPI_COMM_WORLD);
   for (unsigned int i=0; i<N*N; ++i)
     v1(i) = i;
   matrix.vmult (v2, v1);
@@ -80,8 +82,7 @@ void test ()
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   try
     {

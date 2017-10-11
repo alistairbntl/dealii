@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/dofs/dof_accessor.h>
@@ -101,7 +100,6 @@ int main ()
   logfile.precision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   Step27::MixedFECollection<1>().run();
   Step27::MixedFECollection<2>().run();

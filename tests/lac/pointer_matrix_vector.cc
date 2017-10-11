@@ -17,16 +17,13 @@
 // Test vmult and Tvmult of PointerMatrixVector
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/pointer_matrix.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   Vector<double> u(5);
   Vector<double> v(5);

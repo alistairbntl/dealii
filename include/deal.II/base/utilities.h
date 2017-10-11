@@ -13,12 +13,11 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__utilities_h
-#define dealii__utilities_h
+#ifndef dealii_utilities_h
+#define dealii_utilities_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
-#include <deal.II/base/mpi.h>
 
 #include <vector>
 #include <utility>
@@ -133,6 +132,7 @@ namespace Utilities
   std::vector<double>
   string_to_double (const std::vector<std::string> &s);
 
+
   /**
    * Given a string that contains text separated by a @p delimiter, split it
    * into its components; for each component, remove leading and trailing
@@ -177,7 +177,17 @@ namespace Utilities
    */
   std::vector<std::string>
   split_string_list (const std::string &s,
-                     const char         delimiter = ',');
+                     const std::string &delimiter = ",");
+
+
+  /**
+   * Specializatin of split_string_list() for the case where the delimiter
+   * is a single char.
+   */
+  std::vector<std::string>
+  split_string_list (const std::string &s,
+                     const char delimiter);
+
 
   /**
    * Take a text, usually a documentation or something, and try to break it
@@ -316,7 +326,7 @@ namespace Utilities
    * This function simply makes the assumption that the sequence is sorted,
    * and we simply don't do the additional check.
    */
-  template<typename Iterator, typename T>
+  template <typename Iterator, typename T>
   Iterator
   lower_bound (Iterator  first,
                Iterator  last,
@@ -328,7 +338,7 @@ namespace Utilities
    * compare individual elements of the sequence of objects pointed to by the
    * iterators.
    */
-  template<typename Iterator, typename T, typename Comp>
+  template <typename Iterator, typename T, typename Comp>
   Iterator
   lower_bound (Iterator   first,
                Iterator   last,
@@ -390,10 +400,25 @@ namespace Utilities
      */
     struct MemoryStats
     {
-      unsigned long int VmPeak; /** peak virtual memory size in kB */
-      unsigned long int VmSize; /** current virtual memory size in kB */
-      unsigned long int VmHWM; /** peak resident memory size in kB */
-      unsigned long int VmRSS; /** current resident memory size in kB */
+      /**
+       * Peak virtual memory size in kB.
+       */
+      unsigned long int VmPeak;
+
+      /**
+       * Current virtual memory size in kB.
+       */
+      unsigned long int VmSize;
+
+      /**
+       * Peak resident memory size in kB. Also known as "high water mark" (HWM).
+       */
+      unsigned long int VmHWM;
+
+      /**
+       * Current resident memory size in kB. Also known as "resident set size" (RSS).
+       */
+      unsigned long int VmRSS;
     };
 
 
@@ -436,11 +461,6 @@ namespace Utilities
      * leaving this task to the calling site.
      */
     void posix_memalign (void **memptr, size_t alignment, size_t size);
-
-    /**
-     * @deprecated Use Utilities::MPI::job_supports_mpi() instead.
-     */
-    bool job_supports_mpi () DEAL_II_DEPRECATED;
   }
 
 
@@ -453,7 +473,7 @@ namespace Utilities
   namespace Trilinos
   {
     /**
-     * Returns a Trilinos Epetra_Comm object needed for creation of
+     * Return a Trilinos Epetra_Comm object needed for creation of
      * Epetra_Maps.
      *
      * If deal.II has been configured to use a compiler that does not support
@@ -464,7 +484,7 @@ namespace Utilities
     const Epetra_Comm &comm_world();
 
     /**
-     * Returns a Trilinos Epetra_Comm object needed for creation of
+     * Return a Trilinos Epetra_Comm object needed for creation of
      * Epetra_Maps.
      *
      * If deal.II has been configured to use a compiler that does not support
@@ -577,9 +597,11 @@ namespace Utilities
   inline
   T fixed_power (const T n)
   {
-    Assert (N>0, ExcNotImplemented());
+    Assert (N>=0, ExcNotImplemented());
     switch (N)
       {
+      case 0:
+        return dealii::internal::NumberType<T>::value(1);
       case 1:
         return n;
       case 2:
@@ -598,7 +620,7 @@ namespace Utilities
 
 
 
-  template<typename Iterator, typename T>
+  template <typename Iterator, typename T>
   inline
   Iterator
   lower_bound (Iterator  first,
@@ -611,7 +633,7 @@ namespace Utilities
 
 
 
-  template<typename Iterator, typename T, typename Comp>
+  template <typename Iterator, typename T, typename Comp>
   inline
   Iterator
   lower_bound (Iterator    first,
@@ -645,26 +667,32 @@ namespace Utilities
                 if (!comp(*first, val))
                   return first;
                 ++first;
+                DEAL_II_FALLTHROUGH;
               case 6:
                 if (!comp(*first, val))
                   return first;
                 ++first;
+                DEAL_II_FALLTHROUGH;
               case 5:
                 if (!comp(*first, val))
                   return first;
                 ++first;
+                DEAL_II_FALLTHROUGH;
               case 4:
                 if (!comp(*first, val))
                   return first;
                 ++first;
+                DEAL_II_FALLTHROUGH;
               case 3:
                 if (!comp(*first, val))
                   return first;
                 ++first;
+                DEAL_II_FALLTHROUGH;
               case 2:
                 if (!comp(*first, val))
                   return first;
                 ++first;
+                DEAL_II_FALLTHROUGH;
               case 1:
                 if (!comp(*first, val))
                   return first;

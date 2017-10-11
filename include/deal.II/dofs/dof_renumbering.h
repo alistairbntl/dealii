@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__dof_renumbering_h
-#define dealii__dof_renumbering_h
+#ifndef dealii_dof_renumbering_h
+#define dealii_dof_renumbering_h
 
 
 #include <deal.II/base/config.h>
@@ -438,7 +438,7 @@ namespace DoFRenumbering
                    const bool      use_constraints    = false);
 
     /**
-     * Computes the renumbering vector needed by the Cuthill_McKee() function.
+     * Compute the renumbering vector needed by the Cuthill_McKee() function.
      * Does not perform the renumbering on the DoFHandler dofs but returns the
      * renumbering vector.
      */
@@ -549,7 +549,7 @@ namespace DoFRenumbering
                  = std::vector<types::global_dof_index>());
 
   /**
-   * Computes the renumbering vector needed by the Cuthill_McKee() function.
+   * Compute the renumbering vector needed by the Cuthill_McKee() function.
    * Does not perform the renumbering on the DoFHandler dofs but returns the
    * renumbering vector.
    */
@@ -614,26 +614,17 @@ namespace DoFRenumbering
    * For finite elements with only one component, or a single non-primitive
    * base element, this function is the identity operation.
    */
-  template <int dim, int spacedim>
+  template <typename DoFHandlerType>
   void
-  component_wise (DoFHandler<dim,spacedim>        &dof_handler,
+  component_wise (DoFHandlerType                  &dof_handler,
                   const std::vector<unsigned int> &target_component
                   = std::vector<unsigned int>());
 
 
   /**
    * Sort the degrees of freedom by component. It does the same thing as the
-   * above function.
-   */
-  template <int dim>
-  void
-  component_wise (hp::DoFHandler<dim>             &dof_handler,
-                  const std::vector<unsigned int> &target_component = std::vector<unsigned int> ());
-
-  /**
-   * Sort the degrees of freedom by component. It does the same thing as the
    * above function, only that it does this for one single level of a
-   * multilevel discretization. The non-multigrid part of the the DoFHandler
+   * multilevel discretization. The non-multigrid part of the DoFHandler
    * is not touched.
    */
   template <typename DoFHandlerType>
@@ -644,17 +635,17 @@ namespace DoFRenumbering
                   = std::vector<unsigned int>());
 
   /**
-   * Computes the renumbering vector needed by the component_wise() functions.
+   * Compute the renumbering vector needed by the component_wise() functions.
    * Does not perform the renumbering on the DoFHandler dofs but returns the
    * renumbering vector.
    */
-  template <int dim, int spacedim, class ITERATOR, class ENDITERATOR>
+  template <int dim, int spacedim, typename CellIterator>
   types::global_dof_index
-  compute_component_wise (std::vector<types::global_dof_index> &new_dof_indices,
-                          const ITERATOR &start,
-                          const ENDITERATOR &end,
-                          const std::vector<unsigned int> &target_component,
-                          bool is_level_operation);
+  compute_component_wise (std::vector<types::global_dof_index>        &new_dof_indices,
+                          const CellIterator                          &start,
+                          const typename identity<CellIterator>::type &end,
+                          const std::vector<unsigned int>             &target_component,
+                          const bool                                   is_level_operation);
 
   /**
    * @}
@@ -679,7 +670,7 @@ namespace DoFRenumbering
   /**
    * Sort the degrees of freedom by vector block. It does the same thing as
    * the above function, only that it does this for one single level of a
-   * multilevel discretization. The non-multigrid part of the the DoFHandler
+   * multilevel discretization. The non-multigrid part of the DoFHandler
    * is not touched.
    */
   template <int dim, int spacedim>
@@ -707,7 +698,7 @@ namespace DoFRenumbering
   block_wise (hp::DoFHandler<dim,spacedim> &dof_handler);
 
   /**
-   * Computes the renumbering vector needed by the block_wise() functions.
+   * Compute the renumbering vector needed by the block_wise() functions.
    * Does not perform the renumbering on the DoFHandler dofs but returns the
    * renumbering vector.
    */
@@ -878,7 +869,7 @@ namespace DoFRenumbering
               const bool                                    dof_wise_renumbering = false);
 
   /**
-   * Computes the renumbering vector needed by the downstream() function. Does
+   * Compute the renumbering vector needed by the downstream() function. Does
    * not perform the renumbering on the DoFHandler dofs but returns the
    * renumbering vector.
    */
@@ -891,7 +882,7 @@ namespace DoFRenumbering
                       const bool                                    dof_wise_renumbering);
 
   /**
-   * Computes the renumbering vector needed by the downstream() function. Does
+   * Compute the renumbering vector needed by the downstream() function. Does
    * not perform the renumbering on the DoFHandler dofs but returns the
    * renumbering vector.
    */
@@ -930,7 +921,7 @@ namespace DoFRenumbering
                 const bool                                    counter = false);
 
   /**
-   * Computes the renumbering vector needed by the clockwise_dg() functions.
+   * Compute the renumbering vector needed by the clockwise_dg() functions.
    * Does not perform the renumbering on the DoFHandler dofs but returns the
    * renumbering vector.
    */
@@ -981,7 +972,7 @@ namespace DoFRenumbering
                            const unsigned int       level);
 
   /**
-   * Computes the renumbering vector needed by the sort_selected_dofs_back()
+   * Compute the renumbering vector needed by the sort_selected_dofs_back()
    * function. Does not perform the renumbering on the DoFHandler dofs but
    * returns the renumbering vector.
    *
@@ -1025,7 +1016,7 @@ namespace DoFRenumbering
   random (DoFHandlerType &dof_handler);
 
   /**
-   * Computes the renumbering vector needed by the random() function. See
+   * Compute the renumbering vector needed by the random() function. See
    * there for more information on the computed random renumbering.
    *
    * This function does not perform the renumbering on the DoFHandler dofs but
@@ -1068,7 +1059,7 @@ namespace DoFRenumbering
   subdomain_wise (DoFHandlerType &dof_handler);
 
   /**
-   * Computes the renumbering vector needed by the subdomain_wise() function.
+   * Compute the renumbering vector needed by the subdomain_wise() function.
    * Does not perform the renumbering on the @p DoFHandler dofs but returns
    * the renumbering vector.
    */
@@ -1081,18 +1072,32 @@ namespace DoFRenumbering
    * @}
    */
 
+
+
+  /**
+   * Exception
+   *
+   * @ingroup Exceptions
+   */
+  DeclExceptionMsg (ExcDoFHandlerNotInitialized,
+                    "The DoFHandler on which this function should work has not "
+                    "been initialized, i.e., it doesn't appear that DoF indices "
+                    "have been distributed on it.");
+
   /**
    * Exception
    *
    * @ingroup Exceptions
    */
   DeclException0 (ExcRenumberingIncomplete);
+
   /**
    * Exception
    *
    * @ingroup Exceptions
    */
   DeclException0 (ExcInvalidComponentOrder);
+
   /**
    * The function is only implemented for Discontinuous Galerkin Finite
    * elements.

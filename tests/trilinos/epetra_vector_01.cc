@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/read_write_vector.h>
 #include <deal.II/lac/trilinos_epetra_vector.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -203,10 +202,8 @@ void test()
 
 int main(int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   Utilities::MPI::MPI_InitFinalize mpi_init(argc, argv, 1);
 

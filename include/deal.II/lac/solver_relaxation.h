@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__solver_relaxation_h
-#define dealii__solver_relaxation_h
+#ifndef dealii_solver_relaxation_h
+#define dealii_solver_relaxation_h
 
 
 #include <deal.II/base/config.h>
@@ -79,7 +79,7 @@ public:
    * R(x_k,b)$. The matrix <i>A</i> itself is only used to compute the
    * residual.
    */
-  template<typename MatrixType, class RelaxationType>
+  template <typename MatrixType, class RelaxationType>
   void
   solve (const MatrixType     &A,
          VectorType           &x,
@@ -122,35 +122,26 @@ SolverRelaxation<VectorType>::solve (const MatrixType     &A,
   VectorType &d  = *Vd;
   d.reinit(x);
 
-  deallog.push("Relaxation");
+  LogStream::Prefix prefix("Relaxation");
 
   int iter=0;
-  try
+  // Main loop
+  for (; conv==SolverControl::iterate; iter++)
     {
-      // Main loop
-      for (; conv==SolverControl::iterate; iter++)
-        {
-          // Compute residual
-          A.vmult(r,x);
-          r.sadd(-1.,1.,b);
+      // Compute residual
+      A.vmult(r,x);
+      r.sadd(-1.,1.,b);
 
-          // The required norm of the
-          // (preconditioned)
-          // residual is computed in
-          // criterion() and stored
-          // in res.
-          conv = this->iteration_status (iter, r.l2_norm(), x);
-          if (conv != SolverControl::iterate)
-            break;
-          R.step(x,b);
-        }
+      // The required norm of the
+      // (preconditioned)
+      // residual is computed in
+      // criterion() and stored
+      // in res.
+      conv = this->iteration_status (iter, r.l2_norm(), x);
+      if (conv != SolverControl::iterate)
+        break;
+      R.step(x,b);
     }
-  catch (...)
-    {
-      deallog.pop();
-      throw;
-    }
-  deallog.pop();
 
   // in case of failure: throw exception
   AssertThrow(conv == SolverControl::success,

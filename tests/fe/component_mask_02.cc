@@ -23,8 +23,6 @@
 #include "../tests.h"
 #include <deal.II/fe/component_mask.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -63,7 +61,6 @@ int main()
   deallog << std::setprecision (4);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   test();
 }

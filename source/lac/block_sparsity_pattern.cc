@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -47,14 +47,15 @@ template <class SparsityPatternBase>
 BlockSparsityPatternBase<SparsityPatternBase>::
 BlockSparsityPatternBase (const BlockSparsityPatternBase &s)
   :
-  Subscriptor ()
+  Subscriptor (),
+  rows (0),
+  columns (0)
 {
   (void)s;
-  Assert(s.rows==0, ExcInvalidConstructorCall());
-  Assert(s.columns==0, ExcInvalidConstructorCall());
-
-  rows = 0;
-  columns=0;
+  Assert (s.rows==0 && s.columns==0,
+          ExcMessage("This constructor can only be called if the provided argument "
+                     "is the sparsity pattern for an empty matrix. This constructor can "
+                     "not be used to copy-construct a non-empty sparsity pattern."));
 }
 
 
@@ -63,7 +64,12 @@ template <class SparsityPatternBase>
 BlockSparsityPatternBase<SparsityPatternBase>::~BlockSparsityPatternBase ()
 {
   // clear all memory
-  reinit (0,0);
+  try
+    {
+      reinit (0,0);
+    }
+  catch (...)
+    {}
 }
 
 
@@ -81,7 +87,7 @@ reinit (const size_type n_block_rows,
     for (size_type j=0; j<columns; ++j)
       {
         SparsityPatternBase *sp = sub_objects[i][j];
-        sub_objects[i][j] = 0;
+        sub_objects[i][j] = nullptr;
         delete sp;
       };
   sub_objects.reinit (0,0);
@@ -321,11 +327,6 @@ BlockSparsityPatternBase<SparsityPatternBase>::print_gnuplot(std::ostream &out) 
 
 
 
-BlockSparsityPattern::BlockSparsityPattern ()
-{}
-
-
-
 BlockSparsityPattern::BlockSparsityPattern (const size_type n_rows,
                                             const size_type n_columns)
   :
@@ -412,12 +413,6 @@ BlockSparsityPattern::copy_from  (const BlockDynamicSparsityPattern &dsp)
   // sizes
   collect_sizes();
 }
-
-
-
-
-BlockDynamicSparsityPattern::BlockDynamicSparsityPattern ()
-{}
 
 
 
@@ -513,11 +508,6 @@ BlockDynamicSparsityPattern::reinit (
 #ifdef DEAL_II_WITH_TRILINOS
 namespace TrilinosWrappers
 {
-
-  BlockSparsityPattern::BlockSparsityPattern ()
-  {}
-
-
 
   BlockSparsityPattern::
   BlockSparsityPattern (const size_type n_rows,

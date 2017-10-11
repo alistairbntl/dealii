@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -39,11 +39,6 @@ DataOutStack<dim,spacedim,DoFHandlerType>::DataVector::memory_consumption () con
           MemoryConsumption::memory_consumption (names));
 }
 
-
-
-template <int dim, int spacedim, typename DoFHandlerType>
-DataOutStack<dim,spacedim,DoFHandlerType>::~DataOutStack ()
-{}
 
 
 template <int dim, int spacedim, typename DoFHandlerType>
@@ -118,12 +113,12 @@ void DataOutStack<dim,spacedim,DoFHandlerType>::declare_data_vector (const std::
   switch (vector_type)
     {
     case dof_vector:
-      dof_data.push_back (DataVector());
+      dof_data.emplace_back ();
       dof_data.back().names = names;
       break;
 
     case cell_vector:
-      cell_data.push_back (DataVector());
+      cell_data.emplace_back ();
       cell_data.back().names = names;
       break;
     };
@@ -135,7 +130,7 @@ template <typename number>
 void DataOutStack<dim,spacedim,DoFHandlerType>::add_data_vector (const Vector<number> &vec,
     const std::string    &name)
 {
-  const unsigned int n_components = dof_handler->get_fe().n_components ();
+  const unsigned int n_components = dof_handler->get_fe(0).n_components ();
 
   std::vector<std::string> names;
   // if only one component or vector
@@ -168,7 +163,7 @@ template <typename number>
 void DataOutStack<dim,spacedim,DoFHandlerType>::add_data_vector (const Vector<number> &vec,
     const std::vector<std::string> &names)
 {
-  Assert (dof_handler != 0,
+  Assert (dof_handler != nullptr,
           Exceptions::DataOut::ExcNoDoFHandlerSelected ());
   // either cell data and one name,
   // or dof data and n_components names
@@ -176,9 +171,9 @@ void DataOutStack<dim,spacedim,DoFHandlerType>::add_data_vector (const Vector<nu
            (names.size() == 1))
           ||
           ((vec.size() == dof_handler->n_dofs()) &&
-           (names.size() == dof_handler->get_fe().n_components())),
+           (names.size() == dof_handler->get_fe(0).n_components())),
           Exceptions::DataOut::ExcInvalidNumberOfNames (names.size(),
-                                                        dof_handler->get_fe().n_components()));
+                                                        dof_handler->get_fe(0).n_components()));
   for (unsigned int i=0; i<names.size(); ++i)
     Assert (names[i].find_first_not_of("abcdefghijklmnopqrstuvwxyz"
                                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -243,10 +238,12 @@ void DataOutStack<dim,spacedim,DoFHandlerType>::build_patches (const unsigned in
 
   Assert (n_subdivisions >= 1,
           Exceptions::DataOut::ExcInvalidNumberOfSubdivisions(n_subdivisions));
-  Assert (dof_handler != 0,
+  Assert (dof_handler != nullptr,
           Exceptions::DataOut::ExcNoDoFHandlerSelected());
 
-  const unsigned int n_components   = dof_handler->get_fe().n_components();
+  this->validate_dataset_names();
+
+  const unsigned int n_components   = dof_handler->get_fe(0).n_components();
   const unsigned int n_datasets     = dof_data.size() * n_components +
                                       cell_data.size();
 
@@ -277,7 +274,7 @@ void DataOutStack<dim,spacedim,DoFHandlerType>::build_patches (const unsigned in
   // collection of which we do a
   // shallow copy instead
   const hp::QCollection<dim>       q_collection (patch_points);
-  const hp::FECollection<dim>      fe_collection(dof_handler->get_fe());
+  const hp::FECollection<dim>     &fe_collection = dof_handler->get_fe_collection();
 
   hp::FEValues<dim> x_fe_patch_values (fe_collection, q_collection,
                                        update_values);
@@ -289,7 +286,7 @@ void DataOutStack<dim,spacedim,DoFHandlerType>::build_patches (const unsigned in
 
   // add the required number of
   // patches. first initialize a template
-  // patch with n_q_points (in the the plane
+  // patch with n_q_points (in the plane
   // of the cells) times n_subdivisions+1 (in
   // the time direction) points
   dealii::DataOutBase::Patch<dim+1,dim+1>  default_patch;
@@ -364,7 +361,7 @@ void DataOutStack<dim,spacedim,DoFHandlerType>::build_patches (const unsigned in
         };
 
 
-      // now fill in the the data values.
+      // now fill in the data values.
       // note that the required order is
       // with highest coordinate running
       // fastest, we need to enter each
@@ -419,7 +416,7 @@ template <int dim, int spacedim, typename DoFHandlerType>
 void DataOutStack<dim,spacedim,DoFHandlerType>::finish_parameter_value ()
 {
   // release lock on dof handler
-  dof_handler = 0;
+  dof_handler = nullptr;
   for (typename std::vector<DataVector>::iterator i=dof_data.begin();
        i!=dof_data.end(); ++i)
     i->data.reinit (0);

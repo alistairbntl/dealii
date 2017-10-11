@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,8 +21,6 @@
 
 #include "../tests.h"
 #include <deal.II/lac/chunk_sparse_matrix.h>
-#include <fstream>
-#include <iomanip>
 
 
 void test (const unsigned int chunk_size)
@@ -42,7 +40,7 @@ void test (const unsigned int chunk_size)
 
   // and loop over the elements of it
   for (ChunkSparseMatrix<double>::const_iterator k=A.begin();
-       k!=A.end(); ++k)
+       k!=A.end(); k++)
     deallog << k->row() << ' ' << k->column() << ' ' << k->value()
             << std::endl;
 }
@@ -51,9 +49,7 @@ void test (const unsigned int chunk_size)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

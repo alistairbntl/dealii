@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,17 +13,23 @@
 //
 // ---------------------------------------------------------------------
 
-#include <deal.II/base/timer.h>
 #include <deal.II/base/exceptions.h>
+#include <deal.II/base/mpi.h>
+#include <deal.II/base/signaling_nan.h>
+#include <deal.II/base/thread_management.h>
+#include <deal.II/base/timer.h>
 #include <deal.II/base/utilities.h>
-#include <sstream>
+
+#include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <iomanip>
-#include <algorithm>
-#include <stddef.h>
+#include <map>
+#include <sstream>
+#include <string>
+#include <type_traits>
 
-#if defined(DEAL_II_HAVE_SYS_TIME_H) && defined(DEAL_II_HAVE_SYS_RESOURCE_H)
-#  include <sys/time.h>
+#ifdef DEAL_II_HAVE_SYS_RESOURCE_H
 #  include <sys/resource.h>
 #endif
 
@@ -35,102 +41,147 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-// in case we use an MPI compiler, need
-// to create a communicator just for the
-// current process
-Timer::Timer()
-  :
-  cumulative_time (0.),
-  cumulative_wall_time (0.)
-#ifdef DEAL_II_WITH_MPI
-  , mpi_communicator (MPI_COMM_SELF)
-  , sync_wall_time (false)
-#endif
+namespace internal
 {
-  start();
-}
-
-
-
-// in case we use an MPI compiler, use
-// the communicator given from input
-#ifdef DEAL_II_WITH_MPI
-Timer::Timer(MPI_Comm mpi_communicator,
-             bool sync_wall_time_)
-  :
-  cumulative_time (0.),
-  cumulative_wall_time (0.),
-  mpi_communicator (mpi_communicator),
-  sync_wall_time(sync_wall_time_)
-{
-  start();
-}
-#endif
-
-#ifdef DEAL_II_MSVC
-
-namespace
-{
-  namespace windows
+  namespace Timer
   {
-    double wall_clock()
+    namespace
     {
-      LARGE_INTEGER freq, time;
-      QueryPerformanceFrequency(&freq);
-      QueryPerformanceCounter(&time);
-      return (double) time.QuadPart / freq.QuadPart;
-    }
+      /**
+       * Type trait for checking whether or not a type is a std::chrono::duration.
+       */
+      template <typename T>
+      struct is_duration : std::false_type {};
 
+      /**
+       * Specialization to get the right truth value.
+       */
+      template <typename Rep, typename Period>
+      struct is_duration<std::chrono::duration<Rep, Period>> : std::true_type {};
 
-    double cpu_clock()
-    {
-      FILETIME cpuTime, sysTime, createTime, exitTime;
-      if (GetProcessTimes(GetCurrentProcess(),  &createTime,
-                          &exitTime, &sysTime, &cpuTime))
-        {
-          return (double)(((unsigned long long)cpuTime.dwHighDateTime << 32)
-                          | cpuTime.dwLowDateTime) / 1e6;
-        }
-      return 0;
+      /**
+       * Convert a double precision number with units of seconds into a
+       * specified duration type T. Only valid when T is a
+       * std::chrono::duration type.
+       */
+      template <typename T>
+      T
+      from_seconds(const double time)
+      {
+        static_assert(is_duration<T>::value,
+                      "The template type should be a duration type.");
+        return T(std::lround(T::period::den*(time/T::period::num)));
+      }
+
+      /**
+       * Convert a given duration into a double precision number with units of
+       * seconds.
+       */
+      template <typename Rep, typename Period>
+      double
+      to_seconds(const std::chrono::duration<Rep, Period> duration)
+      {
+        return Period::num*double(duration.count())/Period::den;
+      }
+
+      /**
+       * Fill a MinMaxAvg struct with default values.
+       */
+      void
+      clear_timing_data(Utilities::MPI::MinMaxAvg &data)
+      {
+        data.sum = numbers::signaling_nan<double>();
+        data.min = numbers::signaling_nan<double>();
+        data.max = numbers::signaling_nan<double>();
+        data.avg = numbers::signaling_nan<double>();
+        data.min_index = numbers::invalid_unsigned_int;
+        data.max_index = numbers::invalid_unsigned_int;
+      }
     }
   }
 }
 
+
+
+CPUClock::time_point CPUClock::now() noexcept
+{
+  double system_cpu_duration = 0.0;
+#ifdef DEAL_II_MSVC
+  FILETIME cpuTime, sysTime, createTime, exitTime;
+  const auto succeeded = GetProcessTimes
+  (GetCurrentProcess(), &createTime, &exitTime, &sysTime, &cpuTime);
+  if (succeeded)
+    {
+      system_cpu_duration = (double)
+      (((unsigned long long)cpuTime.dwHighDateTime << 32)
+      | cpuTime.dwLowDateTime) / 1e7;
+    }
+  // keep the zero value if GetProcessTimes didn't work
+#elif defined(DEAL_II_HAVE_SYS_RESOURCE_H)
+  rusage usage;
+  getrusage (RUSAGE_SELF, &usage);
+  system_cpu_duration = usage.ru_utime.tv_sec + 1.e-6 * usage.ru_utime.tv_usec;
+#else
+#  warning "Unsupported platform. Porting not finished."
 #endif
+  return time_point(internal::Timer::from_seconds<duration>(system_cpu_duration));
+}
+
+
+
+template <typename clock_type_>
+Timer::ClockMeasurements<clock_type_>::ClockMeasurements()
+  :
+  current_lap_start_time(clock_type::now()),
+  accumulated_time(duration_type::zero()),
+  last_lap_time(duration_type::zero())
+{}
+
+
+
+template <typename clock_type_>
+void
+Timer::ClockMeasurements<clock_type_>::reset()
+{
+  current_lap_start_time = clock_type::now();
+  accumulated_time = duration_type::zero();
+  last_lap_time = duration_type::zero();
+}
+
+
+
+Timer::Timer()
+  :
+  Timer(MPI_COMM_SELF, /*sync_lap_times=*/false)
+{}
+
+
+
+Timer::Timer(MPI_Comm mpi_communicator,
+             const bool sync_lap_times_)
+  :
+  running (false),
+  mpi_communicator (mpi_communicator),
+  sync_lap_times(sync_lap_times_)
+{
+  reset();
+  start();
+}
+
 
 
 void Timer::start ()
 {
-  running    = true;
-
+  running = true;
 #ifdef DEAL_II_WITH_MPI
-  if (sync_wall_time)
-    MPI_Barrier(mpi_communicator);
+  if (sync_lap_times)
+    {
+      const int ierr = MPI_Barrier(mpi_communicator);
+      AssertThrowMPI(ierr);
+    }
 #endif
-
-#if defined(DEAL_II_HAVE_SYS_TIME_H) && defined(DEAL_II_HAVE_SYS_RESOURCE_H)
-
-//TODO: Break this out into a function like the functions in
-//namespace windows above
-  struct timeval wall_timer;
-  gettimeofday(&wall_timer, NULL);
-  start_wall_time = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec;
-
-  rusage usage;
-  getrusage (RUSAGE_SELF, &usage);
-  start_time = usage.ru_utime.tv_sec + 1.e-6 * usage.ru_utime.tv_usec;
-
-  rusage usage_children;
-  getrusage (RUSAGE_CHILDREN, &usage_children);
-  start_time_children = usage_children.ru_utime.tv_sec + 1.e-6 * usage_children.ru_utime.tv_usec;
-
-#elif defined(DEAL_II_MSVC)
-  start_wall_time = windows::wall_clock();
-  start_time = windows::cpu_clock();
-  start_time_children = start_time;
-#else
-#  error Unsupported platform. Porting not finished.
-#endif
+  wall_times.current_lap_start_time = wall_clock_type::now();
+  cpu_times.current_lap_start_time = cpu_clock_type::now();
 }
 
 
@@ -141,122 +192,101 @@ double Timer::stop ()
     {
       running = false;
 
-#if defined(DEAL_II_HAVE_SYS_TIME_H) && defined(DEAL_II_HAVE_SYS_RESOURCE_H)
-//TODO: Break this out into a function like the functions in
-//namespace windows above
-      rusage usage;
-      getrusage (RUSAGE_SELF, &usage);
-      const double dtime = usage.ru_utime.tv_sec + 1.e-6 * usage.ru_utime.tv_usec;
-      cumulative_time += dtime - start_time;
+      wall_times.last_lap_time = wall_clock_type::now() - wall_times.current_lap_start_time;
+      cpu_times.last_lap_time = cpu_clock_type::now() - cpu_times.current_lap_start_time;
 
-      rusage usage_children;
-      getrusage (RUSAGE_CHILDREN, &usage_children);
-      const double dtime_children =
-        usage_children.ru_utime.tv_sec + 1.e-6 * usage_children.ru_utime.tv_usec;
-      cumulative_time += dtime_children - start_time_children;
-
-      struct timeval wall_timer;
-      gettimeofday(&wall_timer, NULL);
-      last_lap_time = wall_timer.tv_sec + 1.e-6 * wall_timer.tv_usec
-                      - start_wall_time;
-#elif defined(DEAL_II_MSVC)
-      last_lap_time = windows::wall_clock() - start_wall_time;
-      cumulative_time += windows::cpu_clock() - start_time;
-#else
-#  error Unsupported platform. Porting not finished.
-#endif
-
-#ifdef DEAL_II_WITH_MPI
-      if (sync_wall_time && Utilities::MPI::job_supports_mpi())
+      last_lap_wall_time_data = Utilities::MPI::min_max_avg
+                                (internal::Timer::to_seconds(wall_times.last_lap_time),
+                                 mpi_communicator);
+      if (sync_lap_times)
         {
-          this->mpi_data
-            = Utilities::MPI::min_max_avg (last_lap_time, mpi_communicator);
-          last_lap_time = this->mpi_data.max;
-          cumulative_wall_time += last_lap_time;
+          wall_times.last_lap_time = internal::Timer::from_seconds<decltype(wall_times)::duration_type>
+                                     (last_lap_wall_time_data.max);
+          cpu_times.last_lap_time = internal::Timer::from_seconds<decltype(cpu_times)::duration_type>
+                                    (Utilities::MPI::min_max_avg
+                                     (internal::Timer::to_seconds(cpu_times.last_lap_time),
+                                      mpi_communicator).max);
         }
-      else
-#endif
-        cumulative_wall_time += last_lap_time;
+      wall_times.accumulated_time += wall_times.last_lap_time;
+      cpu_times.accumulated_time += cpu_times.last_lap_time;
+      accumulated_wall_time_data = Utilities::MPI::min_max_avg
+                                   (internal::Timer::to_seconds(wall_times.accumulated_time),
+                                    mpi_communicator);
     }
-  return cumulative_time;
+  return internal::Timer::to_seconds(cpu_times.accumulated_time);
+}
+
+
+
+double Timer::cpu_time() const
+{
+  if (running)
+    {
+      const double running_time = internal::Timer::to_seconds
+                                  (cpu_clock_type::now()
+                                   - cpu_times.current_lap_start_time
+                                   + cpu_times.accumulated_time);
+      return Utilities::MPI::sum (running_time, mpi_communicator);
+    }
+  else
+    {
+      return Utilities::MPI::sum (internal::Timer::to_seconds(cpu_times.accumulated_time),
+                                  mpi_communicator);
+    }
+}
+
+
+
+double Timer::last_cpu_time() const
+{
+  return internal::Timer::to_seconds(cpu_times.last_lap_time);
 }
 
 
 
 double Timer::get_lap_time() const
 {
-  // time already has the difference between the last start()/stop() cycle.
-  return Utilities::MPI::max (last_lap_time, mpi_communicator);
+  return internal::Timer::to_seconds(wall_times.last_lap_time);
 }
 
 
 
 double Timer::operator() () const
 {
-  if (running)
-    {
-#if defined(DEAL_II_HAVE_SYS_TIME_H) && defined(DEAL_II_HAVE_SYS_RESOURCE_H)
-      rusage usage;
-      getrusage (RUSAGE_SELF, &usage);
-      const double dtime =  usage.ru_utime.tv_sec + 1.e-6 * usage.ru_utime.tv_usec;
-
-      rusage usage_children;
-      getrusage (RUSAGE_CHILDREN, &usage_children);
-      const double dtime_children =
-        usage_children.ru_utime.tv_sec + 1.e-6 * usage_children.ru_utime.tv_usec;
-
-      const double running_time = dtime - start_time + dtime_children
-                                  - start_time_children + cumulative_time;
-
-      // in case of MPI, need to get the time passed by summing the time over
-      // all processes in the network. works also in case we just want to have
-      // the time of a single thread, since then the communicator is
-      // MPI_COMM_SELF
-      return Utilities::MPI::sum (running_time, mpi_communicator);
-
-#elif defined(DEAL_II_MSVC)
-      const double running_time = windows::cpu_clock() - start_time + cumulative_time;
-      return running_time;
-#else
-#  error Unsupported platform. Porting not finished.
-#endif
-    }
-  else
-    {
-      return Utilities::MPI::sum (cumulative_time, mpi_communicator);
-    }
+  return cpu_time();
 }
 
 
 
 double Timer::wall_time () const
 {
+  wall_clock_type::duration current_elapsed_wall_time;
   if (running)
-    {
-#if defined(DEAL_II_HAVE_SYS_TIME_H) && defined(DEAL_II_HAVE_SYS_RESOURCE_H)
-      struct timeval wall_timer;
-      gettimeofday(&wall_timer, NULL);
-      return (wall_timer.tv_sec
-              + 1.e-6 * wall_timer.tv_usec
-              - start_wall_time
-              + cumulative_wall_time);
-#else
-//TODO[BG]: Do something useful here
-      return 0;
-#endif
-    }
+    current_elapsed_wall_time = wall_clock_type::now()
+                                - wall_times.current_lap_start_time
+                                + wall_times.accumulated_time;
   else
-    return cumulative_wall_time;
+    current_elapsed_wall_time = wall_times.accumulated_time;
+
+  return internal::Timer::to_seconds(current_elapsed_wall_time);
+}
+
+
+
+double Timer::last_wall_time () const
+{
+  return internal::Timer::to_seconds(wall_times.last_lap_time);
 }
 
 
 
 void Timer::reset ()
 {
-  last_lap_time = 0.;
-  cumulative_time = 0.;
-  cumulative_wall_time = 0.;
-  running         = false;
+  wall_times.reset();
+  cpu_times.reset();
+  running = false;
+  internal::Timer::clear_timing_data(last_lap_wall_time_data);
+  internal::Timer::clear_timing_data(accumulated_wall_time_data);
 }
 
 
@@ -264,40 +294,35 @@ void Timer::reset ()
 /* ---------------------------- TimerOutput -------------------------- */
 
 TimerOutput::TimerOutput (std::ostream &stream,
-                          const enum OutputFrequency output_frequency,
-                          const enum OutputType output_type)
+                          const OutputFrequency output_frequency,
+                          const OutputType output_type)
   :
   output_frequency (output_frequency),
   output_type (output_type),
   out_stream (stream, true),
-  output_is_enabled (true)
-#ifdef DEAL_II_WITH_MPI
-  , mpi_communicator (MPI_COMM_SELF)
-#endif
+  output_is_enabled (true),
+  mpi_communicator (MPI_COMM_SELF)
 {}
 
 
 
 TimerOutput::TimerOutput (ConditionalOStream &stream,
-                          const enum OutputFrequency output_frequency,
-                          const enum OutputType output_type)
+                          const OutputFrequency output_frequency,
+                          const OutputType output_type)
   :
   output_frequency (output_frequency),
   output_type (output_type),
   out_stream (stream),
-  output_is_enabled (true)
-#ifdef DEAL_II_WITH_MPI
-  , mpi_communicator (MPI_COMM_SELF)
-#endif
+  output_is_enabled (true),
+  mpi_communicator (MPI_COMM_SELF)
 {}
 
 
-#ifdef DEAL_II_WITH_MPI
 
 TimerOutput::TimerOutput (MPI_Comm      mpi_communicator,
                           std::ostream &stream,
-                          const enum OutputFrequency output_frequency,
-                          const enum OutputType output_type)
+                          const OutputFrequency output_frequency,
+                          const OutputType output_type)
   :
   output_frequency (output_frequency),
   output_type (output_type),
@@ -310,8 +335,8 @@ TimerOutput::TimerOutput (MPI_Comm      mpi_communicator,
 
 TimerOutput::TimerOutput (MPI_Comm      mpi_communicator,
                           ConditionalOStream &stream,
-                          const enum OutputFrequency output_frequency,
-                          const enum OutputType output_type)
+                          const OutputFrequency output_frequency,
+                          const OutputType output_type)
   :
   output_frequency (output_frequency),
   output_type (output_type),
@@ -320,13 +345,17 @@ TimerOutput::TimerOutput (MPI_Comm      mpi_communicator,
   mpi_communicator (mpi_communicator)
 {}
 
-#endif
 
 
 TimerOutput::~TimerOutput()
 {
-  while (active_sections.size() > 0)
-    leave_subsection();
+  try
+    {
+      while (active_sections.size() > 0)
+        leave_subsection();
+    }
+  catch (...)
+    {}
 
   if ( (output_frequency == summary || output_frequency == every_call_and_summary)
        && output_is_enabled == true)
@@ -350,7 +379,6 @@ TimerOutput::enter_subsection (const std::string &section_name)
 
   if (sections.find (section_name) == sections.end())
     {
-#ifdef DEAL_II_WITH_MPI
       if (mpi_communicator != MPI_COMM_SELF)
         {
           // create a new timer for this section. the second argument
@@ -362,7 +390,6 @@ TimerOutput::enter_subsection (const std::string &section_name)
           // among all processes inside mpi_communicator.
           sections[section_name].timer = Timer(mpi_communicator, true);
         }
-#endif
 
 
       sections[section_name].total_cpu_time = 0;
@@ -404,13 +431,13 @@ TimerOutput::leave_subsection (const std::string &section_name)
 
   sections[actual_section_name].timer.stop();
   sections[actual_section_name].total_wall_time
-  += sections[actual_section_name].timer.wall_time();
+  += sections[actual_section_name].timer.last_wall_time();
 
   // Get cpu time. On MPI systems, if constructed with an mpi_communicator
   // like MPI_COMM_WORLD, then the Timer will sum up the CPU time between
   // processors among the provided mpi_communicator. Therefore, no
   // communication is needed here.
-  const double cpu_time = sections[actual_section_name].timer();
+  const double cpu_time = sections[actual_section_name].timer.last_cpu_time();
   sections[actual_section_name].total_cpu_time += cpu_time;
 
   // in case we have to print out something, do that here...
@@ -421,7 +448,7 @@ TimerOutput::leave_subsection (const std::string &section_name)
       std::ostringstream cpu;
       cpu << cpu_time << "s";
       std::ostringstream wall;
-      wall << sections[actual_section_name].timer.wall_time() << "s";
+      wall << sections[actual_section_name].timer.last_wall_time() << "s";
       if (output_type == cpu_times)
         output_time = ", CPU time: " + cpu.str();
       else if (output_type == wall_times)
@@ -437,6 +464,32 @@ TimerOutput::leave_subsection (const std::string &section_name)
   // active ones
   active_sections.erase (std::find (active_sections.begin(), active_sections.end(),
                                     actual_section_name));
+}
+
+
+
+std::map<std::string, double>
+TimerOutput::get_summary_data (const OutputData kind) const
+{
+  std::map<std::string, double> output;
+  for (const auto &section : sections)
+    {
+      switch (kind)
+        {
+        case TimerOutput::OutputData::total_cpu_time:
+          output[section.first] = section.second.total_cpu_time;
+          break;
+        case TimerOutput::OutputData::total_wall_time:
+          output[section.first] = section.second.total_wall_time;
+          break;
+        case TimerOutput::OutputData::n_calls:
+          output[section.first] = section.second.n_calls;
+          break;
+        default:
+          Assert(false, ExcNotImplemented());
+        }
+    }
+  return output;
 }
 
 
@@ -493,7 +546,7 @@ TimerOutput::print_summary () const
 
           // resize the array so that it is always
           // of the same size
-          unsigned int pos_non_space = name_out.find_first_not_of (" ");
+          unsigned int pos_non_space = name_out.find_first_not_of (' ');
           name_out.erase(0, pos_non_space);
           name_out.resize (32, ' ');
           out_stream << std::endl;
@@ -505,9 +558,22 @@ TimerOutput::print_summary () const
           out_stream << std::setprecision(3);
           out_stream << i->second.total_cpu_time << "s |";
           out_stream << std::setw(10);
-          out_stream << std::setprecision(2);
           if (total_cpu_time != 0)
-            out_stream << i->second.total_cpu_time/total_cpu_time * 100 << "% |";
+            {
+              // if run time was less than 0.1%, just print a zero to avoid
+              // printing silly things such as "2.45e-6%". otherwise print
+              // the actual percentage
+              const double fraction = i->second.total_cpu_time/total_cpu_time;
+              if (fraction > 0.001)
+                {
+                  out_stream << std::setprecision(2);
+                  out_stream << fraction * 100;
+                }
+              else
+                out_stream << 0.0;
+
+              out_stream << "% |";
+            }
           else
             out_stream << 0.0 << "% |";
         }
@@ -551,7 +617,7 @@ TimerOutput::print_summary () const
 
           // resize the array so that it is always
           // of the same size
-          unsigned int pos_non_space = name_out.find_first_not_of (" ");
+          unsigned int pos_non_space = name_out.find_first_not_of (' ');
           name_out.erase(0, pos_non_space);
           name_out.resize (32, ' ');
           out_stream << std::endl;
@@ -563,11 +629,25 @@ TimerOutput::print_summary () const
           out_stream << std::setprecision(3);
           out_stream << i->second.total_wall_time << "s |";
           out_stream << std::setw(10);
-          out_stream << std::setprecision(2);
-          double value = i->second.total_wall_time/total_wall_time * 100;
-          if (!numbers::is_finite(value))
-            value = 0.0;
-          out_stream << value << "% |";
+
+          if (total_wall_time != 0)
+            {
+              // if run time was less than 0.1%, just print a zero to avoid
+              // printing silly things such as "2.45e-6%". otherwise print
+              // the actual percentage
+              const double fraction = i->second.total_wall_time/total_wall_time;
+              if (fraction > 0.001)
+                {
+                  out_stream << std::setprecision(2);
+                  out_stream << fraction * 100;
+                }
+              else
+                out_stream << 0.0;
+
+              out_stream << "% |";
+            }
+          else
+            out_stream << 0.0 << "% |";
         }
       out_stream << std::endl
                  << "+---------------------------------+-----------+"

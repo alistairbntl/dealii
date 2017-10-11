@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,8 +18,6 @@
 // test manual repartitioning and transfering data
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -30,9 +28,8 @@
 #include <deal.II/base/utilities.h>
 
 
-#include <fstream>
 
-template<int dim>
+template <int dim>
 void pack_function (const typename parallel::distributed::Triangulation<dim,dim>::cell_iterator &cell,
                     const typename parallel::distributed::Triangulation<dim,dim>::CellStatus status,
                     void *data)
@@ -62,7 +59,7 @@ void pack_function (const typename parallel::distributed::Triangulation<dim,dim>
   ++some_number;
 }
 
-template<int dim>
+template <int dim>
 void unpack_function (const typename parallel::distributed::Triangulation<dim,dim>::cell_iterator &cell,
                       const typename parallel::distributed::Triangulation<dim,dim>::CellStatus status,
                       const void *data)
@@ -88,7 +85,7 @@ void unpack_function (const typename parallel::distributed::Triangulation<dim,di
     }
 }
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -117,7 +117,7 @@ void EvaluateDerivative (DoFHandler<2> *dof_handler,
   QGauss<2> quad (3);
   FEValues<2> fe_values (dof_handler->get_fe (), quad,
                          UpdateFlags(update_values    |
-                                     update_q_points  |
+                                     update_quadrature_points  |
                                      update_gradients |
                                      update_JxW_values));
 
@@ -193,11 +193,11 @@ void create_mass_matrix (const Mapping<dim>       &mapping,
                          SparseMatrix<double>     &matrix,
                          const Function<dim>   &rhs_function,
                          Vector<double>        &rhs_vector,
-                         const Function<dim> *const coefficient = 0)
+                         const Function<dim> *const coefficient = nullptr)
 {
-  UpdateFlags update_flags = UpdateFlags(update_values | update_JxW_values | update_q_points);
-  if (coefficient != 0)
-    update_flags = UpdateFlags (update_flags | update_q_points);
+  UpdateFlags update_flags = UpdateFlags(update_values | update_JxW_values | update_quadrature_points);
+  if (coefficient != nullptr)
+    update_flags = UpdateFlags (update_flags | update_quadrature_points);
 
   FEValues<dim> fe_values (mapping, dof.get_fe(), q, update_flags);
 
@@ -206,7 +206,7 @@ void create_mass_matrix (const Mapping<dim>       &mapping,
   const FiniteElement<dim>    &fe  = fe_values.get_fe();
   const unsigned int n_components  = fe.n_components();
 
-  Assert(coefficient == 0 ||
+  Assert(coefficient == nullptr ||
          coefficient->n_components==1 ||
          coefficient->n_components==n_components, ExcInternalError());
 
@@ -233,7 +233,7 @@ void create_mass_matrix (const Mapping<dim>       &mapping,
       rhs_function.vector_value_list (fe_values.get_quadrature_points(), rhs_values);
       cell_vector = 0;
 
-      if (coefficient != 0)
+      if (coefficient != nullptr)
         {
           if (coefficient->n_components==1)
             {
@@ -393,7 +393,7 @@ void create_right_hand_side (const Mapping<dim>    &mapping,
   rhs_vector = 0;
 
   UpdateFlags update_flags = UpdateFlags(update_values   |
-                                         update_q_points |
+                                         update_quadrature_points |
                                          update_JxW_values);
   FEValues<dim> fe_values (mapping, fe, quadrature, update_flags);
 
@@ -476,6 +476,7 @@ void project (const Mapping<dim>       &mapping,
               const Quadrature<dim>    &quadrature,
               const Function<dim>      &function,
               Vector<double>           &vec,
+              const unsigned int        min_convergence_steps,
               const bool                enforce_zero_boundary = false,
               const Quadrature<dim-1>  & = QGauss<dim-1>(2),
               const bool                project_to_boundary_first = false)
@@ -582,7 +583,9 @@ void project (const Mapping<dim>       &mapping,
   PreconditionSSOR<> prec;
   prec.initialize(mass_matrix, 1.2);
   // solve
-  cg.solve (mass_matrix, vec, tmp, prec);
+  check_solver_within_range(cg.solve(mass_matrix,vec,tmp,prec),
+                            control.last_step(),
+                            min_convergence_steps, min_convergence_steps+2);
 
   // distribute solution
   constraints.distribute (vec);
@@ -695,14 +698,13 @@ int main (int /*argc*/, char **/*argv*/)
   deallog << std::fixed;
   deallog.attach(logfile);
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   test ();
 }
 
 
 
-void check (const FiniteElement<2> &fe)
+void check (const FiniteElement<2> &fe, const std::array<unsigned int,3> &min_convergence_steps)
 {
   Triangulation<2> tria_test;
   DoFHandler<2> *dof_handler;
@@ -734,7 +736,7 @@ void check (const FiniteElement<2> &fe)
 
       project (map_default, *dof_handler, hn_constraints,
                QGauss<2> (6), TestMap1<2>(2),
-               solution);
+               solution, min_convergence_steps[elm]);
 
       // Test the core functionality
       DataOut<2> *data_out = new DataOut<2>;

@@ -25,8 +25,6 @@
 // vertices are randomly mixed between cells.
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -43,7 +41,7 @@
 #include <deal.II/fe/mapping_q_eulerian.h>
 #include <deal.II/fe/mapping_fe_field.h>
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void test(const unsigned int refs,
           const unsigned int degree,
           const unsigned int subdivisions)

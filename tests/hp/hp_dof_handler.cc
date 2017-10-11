@@ -19,7 +19,6 @@
   the mg_dof_handler.cc test for the hp::DoFHandler. */
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -27,16 +26,11 @@
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/hp/dof_handler.h>
 
-#include <fstream>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  logfile.precision(2);
-
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   const unsigned int dim=2;
   Triangulation<dim> tria;

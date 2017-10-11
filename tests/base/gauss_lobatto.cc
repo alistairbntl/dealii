@@ -17,19 +17,13 @@
 // check points and weights for Gauss-Lobatto quadrature formula
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
-#include <cmath>
 
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   for (unsigned int n=2; n<20; ++n)
     {

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__swappable_vector_templates_h
-#define dealii__swappable_vector_templates_h
+#ifndef dealii_swappable_vector_templates_h
+#define dealii_swappable_vector_templates_h
 
 
 #include <deal.II/base/memory_consumption.h>
@@ -117,7 +117,7 @@ void SwappableVector<number>::swap_out (const std::string &name)
 template <typename number>
 void SwappableVector<number>::reload ()
 {
-  // if in MT mode: synchronise with
+  // if in MT mode: synchronize with
   // possibly existing @p alert
   // calls. if not in MT mode, this
   // is a no-op
@@ -155,7 +155,7 @@ void SwappableVector<number>::alert ()
   return;
 #else
 
-  // synchronise with possible other
+  // synchronize with possible other
   // invocations of this function and
   // other functions in this class
   lock.acquire ();
@@ -223,7 +223,8 @@ void SwappableVector<number>::kill_file ()
   if (filename != "")
     {
       int status = std::remove (filename.c_str());
-      AssertThrow (status == 0, ExcInternalError());
+      (void)status;
+      AssertThrow (status == 0, ExcIO());
 
       filename = "";
     };
@@ -255,4 +256,4 @@ SwappableVector<number>::memory_consumption () const
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif // dealii__swappable_vector_templates_h
+#endif // dealii_swappable_vector_templates_h

@@ -19,8 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 
@@ -39,9 +37,6 @@ std::ofstream logfile("output");
 
 #include <deal.II/fe/mapping_q.h>
 
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
 const long double pi = 3.141592653589793238462643;
 
@@ -215,7 +210,6 @@ int main ()
   logfile << std::setprecision(6);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   gnuplot_output<2>();
 

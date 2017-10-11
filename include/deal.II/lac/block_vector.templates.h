@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,13 +13,13 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_vector_templates_h
-#define dealii__block_vector_templates_h
+#ifndef dealii_block_vector_templates_h
+#define dealii_block_vector_templates_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <cmath>
 #include <algorithm>
 
@@ -61,7 +61,6 @@ BlockVector<Number>::BlockVector (const BlockVector<Number> &v)
 }
 
 
-#ifndef DEAL_II_EXPLICIT_CONSTRUCTOR_BUG
 
 template <typename Number>
 template <typename OtherNumber>
@@ -71,13 +70,12 @@ BlockVector<Number>::BlockVector (const BlockVector<OtherNumber> &v)
   *this = v;
 }
 
-#endif
 
 
 #ifdef DEAL_II_WITH_TRILINOS
 
 template <typename Number>
-BlockVector<Number>::BlockVector (const TrilinosWrappers::BlockVector &v)
+BlockVector<Number>::BlockVector (const TrilinosWrappers::MPI::BlockVector &v)
 {
   this->block_indices = v.get_block_indices();
   this->components.resize(this->n_blocks());
@@ -142,16 +140,12 @@ void BlockVector<Number>::reinit (const BlockVector<Number2> &v,
 }
 
 
-template <typename Number>
-BlockVector<Number>::~BlockVector ()
-{}
-
 
 #ifdef DEAL_II_WITH_TRILINOS
 template <typename Number>
 inline
 BlockVector<Number> &
-BlockVector<Number>::operator= (const TrilinosWrappers::BlockVector &v)
+BlockVector<Number>::operator= (const TrilinosWrappers::MPI::BlockVector &v)
 {
   BaseClass::operator= (v);
   return *this;

@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparse_mic_h
-#define dealii__sparse_mic_h
+#ifndef dealii_sparse_mic_h
+#define dealii_sparse_mic_h
 
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/sparse_decomposition.h>
@@ -158,7 +158,7 @@ private:
   std::vector<number> diag;
 
   /**
-   * Inverses of the the diagonal: precomputed for faster vmult.
+   * Inverses of the diagonal: precomputed for faster vmult.
    */
   std::vector<number> inv_diag;
 
@@ -178,4 +178,4 @@ private:
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif  // dealii__
+#endif  // dealii_

@@ -18,15 +18,10 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
-#include <cmath>
 
 
 class FullMatrixModified : public FullMatrix<double>
@@ -106,7 +101,6 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check();
 

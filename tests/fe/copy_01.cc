@@ -21,17 +21,15 @@
 // table
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
 #include <string>
 
 #define PRECISION 2
 
 
 
-template<int dim>
+template <int dim>
 void
 test(const unsigned int degree)
 {
@@ -50,7 +48,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // no constraints in 1d, but we had
   // the matrices precomputed up to

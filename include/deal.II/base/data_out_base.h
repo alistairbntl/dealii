@@ -13,20 +13,20 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__data_out_base_h
-#define dealii__data_out_base_h
+#ifndef dealii_data_out_base_h
+#define dealii_data_out_base_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/table.h>
 #include <deal.II/base/geometry_info.h>
-#include <deal.II/base/std_cxx11/tuple.h>
 
 #include <vector>
 #include <string>
 #include <limits>
 #include <typeinfo>
+#include <tuple>
 
 #include <deal.II/base/mpi.h>
 
@@ -216,12 +216,12 @@ namespace DataOutBase
    *
    * A patch consists of the following data:
    * <ul>
-   * <li>the corner #vertices,
+   * <li> the corner #vertices,
    * <li> the number #n_subdivisions of the number of cells the Patch has in
    * each space direction,
    * <li> the #data attached to each vertex, in the usual lexicographic
    * ordering,
-   * <li> Information on #neighbors.
+   * <li> information on #neighbors.
    * </ul>
    *
    * See the general documentation of the DataOutBase class for more
@@ -243,18 +243,24 @@ namespace DataOutBase
     static const unsigned int space_dim=spacedim;
 
     /**
-     * Corner points of a patch.  Inner points are computed by a multilinear
-     * transform of the unit cell to the cell specified by these corner
-     * points. The order of points is the same as for cells in the
+     * Corner points of a patch.  Interior points are computed by a multilinear
+     * transformation of the unit cell to the cell specified by these corner
+     * points, if <code>points_are_available==false</code>.
+     *
+     * On the other hand, if <code>points_are_available==true</code>, then
+     * the coordinates of the points at which output is to be generated
+     * is attached in additional rows to the <code>data</code> table.
+     *
+     * The order of points is the same as for cells in the
      * triangulation.
      */
     Point<spacedim> vertices[GeometryInfo<dim>::vertices_per_cell];
 
     /**
-     * Numbers of neighbors of a patch.  OpenDX format requires neighbor
-     * information for advanced output. Here the neighborship relationship of
-     * patches is stored. During output, this must be transformed into
-     * neighborship of sub-grid cells.
+     * Patch indices of neighbors of the current patch. This is made available
+     * for the OpenDX format that requires neighbor
+     * information for advanced output. For dim==0 we still allow one
+     * neighbor, to avoid compiler warnings about zero-sized arrays.
      */
     unsigned int neighbors[dim > 0
                            ?
@@ -263,8 +269,8 @@ namespace DataOutBase
                            1];
 
     /**
-     * Number of this patch. Since we are not sure patches are handled in the
-     * same order, always, we better store this.
+     * Number of this patch. Since we are not sure patches are always
+     * handled in the same order, we better store this.
      */
     unsigned int patch_index;
 
@@ -277,10 +283,11 @@ namespace DataOutBase
 
     /**
      * Data vectors. The format is as follows: <tt>data(i,.)</tt> denotes the
-     * data belonging to the <tt>i</tt>th data vector. <tt>data.n()</tt>
+     * data belonging to the <tt>i</tt>th data vector. <tt>data.n_cols()</tt>
      * therefore equals the number of output points; this number is
-     * <tt>(subdivisions+1)^{dim</tt>}. <tt>data.m()</tt> equals the number of
-     * data vectors.
+     * <tt>(subdivisions+1)^{dim}</tt>. <tt>data.n_rows()</tt> equals the number of
+     * data vectors. For the current purpose, a data vector equals one scalar,
+     * even if multiple scalars may later be interpreted as vectors.
      *
      * Within each column, <tt>data(.,j)</tt> are the data values at the
      * output point <tt>j</tt>, where <tt>j</tt> denotes the usual
@@ -340,6 +347,149 @@ namespace DataOutBase
      * Value to be used if this patch has no neighbor on one side.
      */
     static const unsigned int no_neighbor = numbers::invalid_unsigned_int;
+
+    /**
+     * @addtogroup Exceptions
+     * @{
+     */
+
+    /**
+     * Exception
+     */
+    DeclException2 (ExcInvalidCombinationOfDimensions,
+                    int, int,
+                    << "It is not possible to have a structural dimension of " << arg1
+                    << " to be larger than the space dimension of the surrounding"
+                    << " space " << arg2);
+    //@}
+  };
+
+
+
+  /**
+   * A specialization of the general Patch<dim,spacedim> template that is
+   * tailored to the case of points, i.e., zero-dimensional objects embedded
+   * in @p spacedim dimensional space.
+   *
+   * The current class is compatible with the general template to allow for
+   * using the same functions accessing patches of arbitrary dimensionality
+   * in a generic way. However, it makes some variables that are nonsensical
+   * for zero-dimensional patches into @p static variables that exist only
+   * once in the entire program, as opposed to once per patch. Specifically,
+   * this is the case for the @p neighbors array and the @p n_subdivisions
+   * member variable that make no sense for zero-dimensional patches because
+   * points have no natural neighbors across their non-existent faces, nor
+   * can they reasonably be subdivided.
+   *
+   * @author Wolfgang Bangerth, 2017.
+   */
+  template <int spacedim>
+  struct Patch<0,spacedim>
+  {
+    /**
+     * Make the <tt>spacedim</tt> template parameter available.
+     */
+    static const unsigned int space_dim=spacedim;
+
+    /**
+     * Corner points of a patch.  For the current class of zero-dimensional
+     * patches, there is of course only a single vertex.
+     *
+     * If <code>points_are_available==true</code>, then
+     * the coordinates of the point at which output is to be generated
+     * is attached as an additional row to the <code>data</code> table.
+     */
+    Point<spacedim> vertices[1];
+
+    /**
+     * An unused, @p static variable that exists only to allow access
+     * from general code in a generic fashion.
+     */
+    static unsigned int neighbors[1];
+
+    /**
+     * Number of this patch. Since we are not sure patches are always
+     * handled in the same order, we better store this.
+     */
+    unsigned int patch_index;
+
+    /**
+     * Number of subdivisions with which this patch is to be written.
+     * <tt>1</tt> means no subdivision, <tt>2</tt> means bisection, <tt>3</tt>
+     * trisection, etc.
+     *
+     * Since subdivision makes no sense for zero-dimensional patches,
+     * this variable is not used but exists only to allow access
+     * from general code in a generic fashion.
+     */
+    static unsigned int n_subdivisions;
+
+    /**
+     * Data vectors. The format is as follows: <tt>data(i,.)</tt> denotes the
+     * data belonging to the <tt>i</tt>th data vector. <tt>data.n_cols()</tt>
+     * therefore equals the number of output points; this number is
+     * of course one for the current class, given that we produce output on
+     * points. <tt>data.n_rows()</tt> equals the number of
+     * data vectors. For the current purpose, a data vector equals one scalar,
+     * even if multiple scalars may later be interpreted as vectors.
+     *
+     * Within each column, <tt>data(.,j)</tt> are the data values at the
+     * output point <tt>j</tt>; for the current class, @p j can only
+     * be zero.
+     *
+     * Since the number of data vectors is usually the same for all patches to
+     * be printed, <tt>data.size()</tt> should yield the same value for all
+     * patches provided. The exception are patches for which
+     * points_are_available are set, where the actual coordinates of the point
+     * are appended to the 'data' field, see the documentation of the
+     * points_are_available flag.
+     */
+    Table<2,float> data;
+
+    /**
+     * A flag indicating whether the coordinates of the interior patch points
+     * (assuming that the patch is supposed to be subdivided further) are
+     * appended to the @p data table (@p true) or not (@p false). The latter
+     * is the default and in this case the locations of the points interior to
+     * this patch are computed by (bi-, tri-)linear interpolation from the
+     * vertices of the patch.
+     *
+     * This option exists since patch points may be evaluated using a Mapping
+     * (rather than by a linear interpolation) and therefore have to be stored
+     * in the Patch structure.
+     */
+    bool points_are_available;
+
+    /**
+     * Default constructor. Sets #points_are_available
+     * to false, and #patch_index to #no_neighbor.
+     */
+    Patch ();
+
+    /**
+     * Compare the present patch for equality with another one. This is used
+     * in a few of the automated tests in our testsuite.
+     */
+    bool operator == (const Patch &patch) const;
+
+    /**
+     * Return an estimate for the memory consumption, in bytes, of this
+     * object. This is not exact (but will usually be close) because
+     * calculating the memory usage of trees (e.g., <tt>std::map</tt>) is
+     * difficult.
+     */
+    std::size_t memory_consumption () const;
+
+    /**
+     * Swap the current object's contents with those of the given argument.
+     */
+    void swap (Patch<0,spacedim> &other_patch);
+
+    /**
+     * Value to be used if this patch has no neighbor on one side.
+     */
+    static const unsigned int no_neighbor = numbers::invalid_unsigned_int;
+
     /**
      * @addtogroup Exceptions
      * @{
@@ -368,7 +518,7 @@ namespace DataOutBase
    *
    * @ingroup output
    */
-  template<typename FlagsType>
+  template <typename FlagsType>
   struct OutputFlagsBase
   {
     /**
@@ -399,17 +549,17 @@ namespace DataOutBase
   };
 
 
-  template<typename FlagsType>
+  template <typename FlagsType>
   void OutputFlagsBase<FlagsType>::declare_parameters (ParameterHandler &)
   {}
 
 
-  template<typename FlagsType>
+  template <typename FlagsType>
   void OutputFlagsBase<FlagsType>::parse_parameters (const ParameterHandler &)
   {}
 
 
-  template<typename FlagsType>
+  template <typename FlagsType>
   std::size_t OutputFlagsBase<FlagsType>::memory_consumption () const
   {
     return sizeof(FlagsType);
@@ -511,13 +661,54 @@ namespace DataOutBase
   };
 
   /**
-   * Flags controlling the details of output in Gnuplot format. At present no
-   * flags are implemented.
+   * Flags controlling the details of output in Gnuplot format.
    *
    * @ingroup output
    */
   struct GnuplotFlags : public OutputFlagsBase<GnuplotFlags>
-  {};
+  {
+    /**
+     * Default constructor. Sets up the dimension labels with the default values
+     of <tt>"x"</tt>, <tt>"y"</tt>, and <tt>"z"</tt>.
+     */
+    GnuplotFlags();
+
+    /**
+     * Constructor which sets up non-default values for the dimension labels.
+     */
+    GnuplotFlags(const std::vector<std::string> &space_dimension_labels);
+
+    /**
+     * Labels to use in each spatial dimension. These default to <tt>"x"</tt>,
+     * <tt>"y"</tt>, and <tt>"z"</tt>. Labels are printed to the Gnuplot file
+     * surrounded by angle brackets: For example, if the space dimension is 2
+     * and the labels are <tt>"x"</tt> and <tt>"t"</tt>, then the relevant
+     * line will start with
+     * @verbatim
+     * # <x> <t>
+     * @endverbatim
+     * Any extra labels will be ignored.
+     *
+     * If you specify these labels yourself then there should be at least
+     * <tt>spacedim</tt> labels, where <tt>spacedim</tt> is the spatial
+     * dimension of the output data.
+     */
+    std::vector<std::string> space_dimension_labels;
+
+    /**
+     * Return an estimate for the memory consumption, in bytes, of this
+     * object.
+     */
+    std::size_t memory_consumption () const;
+
+    /**
+     * Exception to raise when there are not enough specified dimension
+     * labels.
+     */
+    DeclExceptionMsg(ExcNotEnoughSpaceDimensionLabels,
+                     "There should be at least one space dimension per spatial "
+                     "dimension (extras are ignored).");
+  };
 
   /**
    * Flags controlling the details of output in Povray format. Several flags
@@ -848,8 +1039,8 @@ namespace DataOutBase
     /**
      * Constructor.
      */
-    TecplotFlags (const char *tecplot_binary_file_name = NULL,
-                  const char *zone_name = NULL,
+    TecplotFlags (const char *tecplot_binary_file_name = nullptr,
+                  const char *zone_name = nullptr,
                   const double solution_time = -1.0);
 
     /**
@@ -899,13 +1090,28 @@ namespace DataOutBase
     bool print_date_and_time;
 
     /**
-     * A data type providing the different possible zlib compression levels.
+     * A data type providing the different possible zlib compression
+     * levels. These map directly to constants defined by zlib.
      */
     enum ZlibCompressionLevel
     {
+      /**
+       * Do not use any compression.
+       */
       no_compression,
+      /**
+       * Use the fastest available compression algorithm.
+       */
       best_speed,
+      /**
+       * Use the algorithm which results in the smallest compressed
+       * files. This is the default flag.
+       */
       best_compression,
+      /**
+       * Use the default compression algorithm. This is a compromise between
+       * speed and file size.
+       */
       default_compression
     };
 
@@ -994,7 +1200,7 @@ namespace DataOutBase
      * this number is used only to verify that the format we are writing is
      * what the current readers and writers understand.
      */
-    static const unsigned int format_version = 3;
+    static const unsigned int format_version;
   };
 
   /**
@@ -1085,11 +1291,21 @@ namespace DataOutBase
     /// Flags used to specify filtering behavior
     DataOutBase::DataOutFilterFlags   flags;
 
-    /// Dimensionality of the nodes, used to properly output filtered data
-    int         node_dim;
+    /**
+     * The number of space dimensions in which the vertices represented
+     * by the current object live. This corresponds to the usual
+     * @p dim argument, but since this class is not templated on the
+     * dimension, we need to store it here.
+     */
+    unsigned int      node_dim;
 
-    /// Number of vertices per cell
-    int         n_cell_verts;
+    /**
+     * The number of vertices per cell. Equal to
+     * GeometryInfo<node_dim>::vertices_per_cell. We need to store
+     * it as a run-time variable here because the dimension
+     * node_dim is also a run-time variable.
+     */
+    unsigned int      vertices_per_cell;
 
     /// Map of points to an internal index
     Map3DPoint        existing_points;
@@ -1115,21 +1331,32 @@ namespace DataOutBase
     void internal_add_cell(const unsigned int &cell_index, const unsigned int &pt_index);
 
   public:
-    DataOutFilter() : flags(false, true) {};
-    DataOutFilter(const DataOutBase::DataOutFilterFlags &flags) : flags(flags) {};
+    DataOutFilter()
+      :
+      flags(false, true),
+      node_dim (numbers::invalid_unsigned_int),
+      vertices_per_cell (numbers::invalid_unsigned_int)
+    {}
+
+    DataOutFilter(const DataOutBase::DataOutFilterFlags &flags)
+      :
+      flags(flags),
+      node_dim (numbers::invalid_unsigned_int),
+      vertices_per_cell (numbers::invalid_unsigned_int)
+    {}
 
     /**
      * Write a point with the specified index into the filtered data set. If
      * the point already exists and we are filtering redundant values, the
      * provided index will internally refer to another recorded point.
      */
-    template<int dim>
+    template <int dim>
     void write_point(const unsigned int &index, const Point<dim> &p);
 
     /**
      * Record a deal.II cell in the internal reordered format.
      */
-    template<int dim>
+    template <int dim>
     void write_cell(unsigned int index, unsigned int start, unsigned int d1, unsigned int d2, unsigned int d3);
 
     /**
@@ -1192,7 +1419,7 @@ namespace DataOutBase
      */
     unsigned int n_cells() const
     {
-      return filtered_cells.size()/n_cell_verts;
+      return filtered_cells.size()/vertices_per_cell;
     };
 
     /**
@@ -1298,7 +1525,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_dx (const std::vector<Patch<dim,spacedim> > &patches,
                  const std::vector<std::string>          &data_names,
-                 const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                 const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                  const DXFlags                           &flags,
                  std::ostream                            &out);
 
@@ -1349,7 +1576,7 @@ namespace DataOutBase
   template <int spacedim>
   void write_eps (const std::vector<Patch<2,spacedim> > &patches,
                   const std::vector<std::string>          &data_names,
-                  const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                  const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                   const EpsFlags                          &flags,
                   std::ostream                            &out);
 
@@ -1361,7 +1588,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_eps (const std::vector<Patch<dim,spacedim> > &patches,
                   const std::vector<std::string>          &data_names,
-                  const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                  const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                   const EpsFlags                          &flags,
                   std::ostream                            &out);
 
@@ -1378,7 +1605,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_gmv (const std::vector<Patch<dim,spacedim> > &patches,
                   const std::vector<std::string>          &data_names,
-                  const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                  const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                   const GmvFlags                          &flags,
                   std::ostream                            &out);
 
@@ -1441,7 +1668,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_gnuplot (const std::vector<Patch<dim,spacedim> > &patches,
                       const std::vector<std::string>          &data_names,
-                      const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                      const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                       const GnuplotFlags                      &flags,
                       std::ostream                            &out);
 
@@ -1493,7 +1720,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_povray (const std::vector<Patch<dim,spacedim> > &patches,
                      const std::vector<std::string>          &data_names,
-                     const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                     const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                      const PovrayFlags                       &flags,
                      std::ostream                            &out);
 
@@ -1506,7 +1733,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_tecplot (const std::vector<Patch<dim,spacedim> > &patches,
                       const std::vector<std::string>          &data_names,
-                      const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                      const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                       const TecplotFlags                      &flags,
                       std::ostream                            &out);
 
@@ -1533,7 +1760,7 @@ namespace DataOutBase
   void write_tecplot_binary (
     const std::vector<Patch<dim,spacedim> > &patches,
     const std::vector<std::string>          &data_names,
-    const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+    const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
     const TecplotFlags                      &flags,
     std::ostream                            &out);
 
@@ -1554,7 +1781,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_ucd (const std::vector<Patch<dim,spacedim> > &patches,
                   const std::vector<std::string>          &data_names,
-                  const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                  const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                   const UcdFlags                          &flags,
                   std::ostream                            &out);
 
@@ -1580,7 +1807,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_vtk (const std::vector<Patch<dim,spacedim> > &patches,
                   const std::vector<std::string>          &data_names,
-                  const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                  const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                   const VtkFlags                          &flags,
                   std::ostream                            &out);
 
@@ -1611,7 +1838,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_vtu (const std::vector<Patch<dim,spacedim> > &patches,
                   const std::vector<std::string>          &data_names,
-                  const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                  const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                   const VtkFlags                          &flags,
                   std::ostream                            &out);
 
@@ -1624,23 +1851,201 @@ namespace DataOutBase
                          const VtkFlags &flags);
 
   /**
-   * This writes the footer for the xml based vtu file format. This routine is
+   * This function writes the footer for the xml based vtu file format. This routine is
    * used internally together with DataOutInterface::write_vtu_header() and
    * DataOutInterface::write_vtu_main() by DataOutBase::write_vtu().
    */
   void write_vtu_footer (std::ostream &out);
 
   /**
-   * This writes the main part for the xml based vtu file format. This routine
+   * This function writes the main part for the xml based vtu file format. This routine
    * is used internally together with DataOutInterface::write_vtu_header() and
    * DataOutInterface::write_vtu_footer() by DataOutBase::write_vtu().
    */
   template <int dim, int spacedim>
   void write_vtu_main (const std::vector<Patch<dim,spacedim> > &patches,
                        const std::vector<std::string>          &data_names,
-                       const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                       const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                        const VtkFlags                          &flags,
                        std::ostream                            &out);
+
+  /**
+   * Some visualization programs, such as ParaView, can read several separate
+   * VTU files that all form part of the same simulation, in order to
+   * parallelize visualization. In that case, you need a
+   * <code>.pvtu</code> file that describes which VTU files (written, for
+   * example, through the DataOutInterface::write_vtu() function) form a group.
+   * The current function can generate such a master record.
+   *
+   * This function is typically not called by itself from user space, but
+   * you may want to call it through DataOutInterface::write_pvtu_record()
+   * since the DataOutInterface class has access to information that you
+   * would have to provide to the current function by hand.
+   *
+   * In any case, whether this function is called directly or via
+   * DataOutInterface::write_pvtu_record(), the master record file so
+   * written contains a list of (scalar or vector) fields that describes which
+   * fields can actually be found in the individual files that comprise the set of
+   * parallel VTU files along with the names of these files. This function
+   * gets the names and types of fields through the third and fourth
+   * argument; you can determine these by hand, but in practice, this function
+   * is most easily called by calling DataOutInterfaces::write_pvtu_record(),
+   * which determines the last two arguments by calling
+   * DataOutInterface::get_dataset_names() and
+   * DataOutInterface::get_vector_data_ranges() functions. The second argument
+   * to this function specifies the names of the files that form the parallel
+   * set.
+   *
+   * @note Use DataOutBase::write_vtu() and DataOutInterface::write_vtu()
+   * for writing each piece. Also note that
+   * only one parallel process needs to call the current function, listing the
+   * names of the files written by all parallel processes.
+   *
+   * @note In order to tell Paraview to group together multiple
+   * <code>pvtu</code> files that each describe one time step of a time
+   * dependent simulation, see the DataOutBase::write_pvd_record()
+   * function.
+   *
+   * @note Older versions of VisIt (before 2.5.1), can not read
+   * <code>pvtu</code> records. However, it can read visit records as written
+   * by the write_visit_record() function.
+   */
+  void
+  write_pvtu_record (std::ostream                                                                  &out,
+                     const std::vector<std::string>                                                &piece_names,
+                     const std::vector<std::string>                                                &data_names,
+                     const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges);
+
+  /**
+   * In ParaView it is possible to visualize time-dependent data tagged with
+   * the current integration time of a time dependent simulation. To use this
+   * feature you need a <code>.pvd</code> file that describes which VTU or
+   * PVTU file belongs to which timestep. This function writes a file that
+   * provides this mapping, i.e., it takes a list of pairs each of which
+   * indicates a particular time instant and the corresponding file that
+   * contains the graphical data for this time instant.
+   *
+   * A typical use case, in program that computes a time dependent solution,
+   * would be the following (<code>time</code> and <code>time_step</code> are
+   * member variables of the class with types <code>double</code> and
+   * <code>unsigned int</code>, respectively; the variable
+   * <code>times_and_names</code> is of type
+   * <code>std::vector@<std::pair@<double,std::string@> @></code>):
+   *
+   * @code
+   *  template <int dim>
+   *  void MyEquation<dim>::output_results () const
+   *  {
+   *    DataOut<dim> data_out;
+   *
+   *    data_out.attach_dof_handler (dof_handler);
+   *    data_out.add_data_vector (solution, "U");
+   *    data_out.build_patches ();
+   *
+   *    const std::string filename = "solution-" +
+   *                                 Utilities::int_to_string (timestep_number, 3) +
+   *                                 ".vtu";
+   *    std::ofstream output (filename.c_str());
+   *    data_out.write_vtu (output);
+   *
+   *    times_and_names.emplace_back (time, filename);
+   *    std::ofstream pvd_output ("solution.pvd");
+   *    DataOutBase::write_pvd_record (pvd_output, times_and_names);
+   *  }
+   * @endcode
+   *
+   * @note See DataOutInterface::write_vtu, DataOutInterface::write_pvtu_record,
+   * and DataOutInterface::write_vtu_in_parallel
+   * for writing solutions at each timestep.
+   *
+   * @note The second element of each pair, i.e., the file in which the
+   * graphical data for each time is stored, may itself be again a file that
+   * references other files. For example, it could be the name for a
+   * <code>.pvtu</code> file that references multiple parts of a parallel
+   * computation.
+   *
+   * @author Marco Engelhard, 2012
+   */
+  void write_pvd_record (std::ostream &out,
+                         const std::vector<std::pair<double,std::string> >  &times_and_names);
+
+  /**
+   * This function is the exact equivalent of the write_pvtu_record() function
+   * but for older versions of the VisIt visualization program and for one
+   * visualization graph (or one time step only). See there for the purpose of
+   * this function.
+   *
+   * This function is documented in the "Creating a master file for parallel"
+   * section (section 5.7) of the "Getting data into VisIt" report that can be
+   * found here:
+   * https://wci.llnl.gov/codes/visit/2.0.0/GettingDataIntoVisIt2.0.0.pdf
+   */
+  void write_visit_record (std::ostream &out,
+                           const std::vector<std::string> &piece_names);
+
+  /**
+   * This function is equivalent to the write_visit_record() above but for
+   * multiple time steps. Here is an example of how the function would be
+   * used:
+   * @code
+   *  const unsigned int number_of_time_steps = 3;
+   *  std::vector<std::vector<std::string > > piece_names(number_of_time_steps);
+   *
+   *  piece_names[0].emplace_back("subdomain_01.time_step_0.vtk");
+   *  piece_names[0].emplace_back("subdomain_02.time_step_0.vtk");
+   *
+   *  piece_names[1].emplace_back("subdomain_01.time_step_1.vtk");
+   *  piece_names[1].emplace_back("subdomain_02.time_step_1.vtk");
+   *
+   *  piece_names[2].emplace_back("subdomain_01.time_step_2.vtk");
+   *  piece_names[2].emplace_back("subdomain_02.time_step_2.vtk");
+   *
+   *  std::ofstream visit_output ("master_file.visit");
+   *
+   *  DataOutBase::write_visit_record(visit_output, piece_names);
+   * @endcode
+   *
+   * This function is documented in the "Creating a master file for parallel"
+   * section (section 5.7) of the "Getting data into VisIt" report that can be
+   * found here:
+   * https://wci.llnl.gov/codes/visit/2.0.0/GettingDataIntoVisIt2.0.0.pdf
+   */
+  void write_visit_record (std::ostream &out,
+                           const std::vector<std::vector<std::string> > &piece_names);
+
+  /**
+   * This function is equivalent to the write_visit_record() above but for
+   * multiple time steps and with additional information about the time for
+   * each timestep. Here is an example of how the function would be
+   * used:
+   * @code
+   *  const unsigned int number_of_time_steps = 3;
+   *  std::vector<std::pair<double,std::vector<std::string > > > times_and_piece_names(number_of_time_steps);
+   *
+   *  times_and_piece_names[0].first = 0.0;
+   *  times_and_piece_names[0].second.emplace_back("subdomain_01.time_step_0.vtk");
+   *  times_and_piece_names[0].second.emplace_back("subdomain_02.time_step_0.vtk");
+   *
+   *  times_and_piece_names[1].first = 0.5;
+   *  times_and_piece_names[1].second.emplace_back("subdomain_01.time_step_1.vtk");
+   *  times_and_piece_names[1].second.emplace_back("subdomain_02.time_step_1.vtk");
+   *
+   *  times_and_piece_names[2].first = 1.0;
+   *  times_and_piece_names[2].second.emplace_back("subdomain_01.time_step_2.vtk");
+   *  times_and_piece_names[2].second.emplace_back("subdomain_02.time_step_2.vtk");
+   *
+   *  std::ofstream visit_output ("master_file.visit");
+   *
+   *  DataOutBase::write_visit_record(visit_output, times_and_piece_names);
+   * @endcode
+   *
+   * This function is documented in the "Creating a master file for parallel"
+   * section (section 5.7) of the "Getting data into VisIt" report that can be
+   * found here:
+   * https://wci.llnl.gov/codes/visit/2.0.0/GettingDataIntoVisIt2.0.0.pdf
+   */
+  void write_visit_record (std::ostream &out,
+                           const std::vector<std::pair<double,std::vector<std::string> > > &times_and_piece_names);
 
   /**
    * Write the given list of patches to the output stream in SVG format.
@@ -1665,7 +2070,7 @@ namespace DataOutBase
   template <int spacedim>
   void write_svg (const std::vector<Patch<2,spacedim> > &patches,
                   const std::vector<std::string>          &data_names,
-                  const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                  const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                   const SvgFlags                          &flags,
                   std::ostream                            &out);
 
@@ -1710,7 +2115,7 @@ namespace DataOutBase
   void write_deal_II_intermediate (
     const std::vector<Patch<dim,spacedim> > &patches,
     const std::vector<std::string>          &data_names,
-    const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+    const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
     const Deal_II_IntermediateFlags         &flags,
     std::ostream                            &out);
 
@@ -1748,7 +2153,7 @@ namespace DataOutBase
   template <int dim, int spacedim>
   void write_filtered_data (const std::vector<Patch<dim,spacedim> > &patches,
                             const std::vector<std::string>          &data_names,
-                            const std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
+                            const std::vector<std::tuple<unsigned int, unsigned int, std::string> > &vector_data_ranges,
                             DataOutFilter &filtered_data);
 
   /**
@@ -1820,18 +2225,24 @@ namespace DataOutBase
   /**
    * An output function did not receive any patches for writing.
    */
-  DeclException0 (ExcNoPatches);
+  DeclExceptionMsg (ExcNoPatches,
+                    "You are trying to write graphical data into a file, but "
+                    "no data is available in the intermediate format that "
+                    "the DataOutBase functions require. Did you forget to "
+                    "call a function such as DataOut::build_patches()?");
   /**
    * Exception
    */
-  DeclException0 (ExcTecplotAPIError);
+  DeclExceptionMsg (ExcTecplotAPIError,
+                    "The error code of one of the Tecplot functions was "
+                    "not zero as expected.");
   /**
    * Exception
    */
   DeclException1 (ExcErrorOpeningTecplotFile,
                   char *,
                   << "There was an error opening Tecplot file " << arg1
-                  << " for output");
+                  << " for output.");
 
   //@}
 }
@@ -1963,7 +2374,7 @@ public:
    * Destructor. Does nothing, but is declared virtual since this class has
    * virtual functions.
    */
-  virtual ~DataOutInterface ();
+  virtual ~DataOutInterface () = default;
 
   /**
    * Obtain data through get_patches() and write it to <tt>out</tt> in OpenDX
@@ -2051,24 +2462,28 @@ public:
    * performance on parallel filesystems. Also see
    * DataOutInterface::write_vtu().
    */
-  void write_vtu_in_parallel (const char *filename, MPI_Comm comm) const;
+  void write_vtu_in_parallel (const char *filename,
+                              MPI_Comm comm) const;
 
   /**
    * Some visualization programs, such as ParaView, can read several separate
-   * VTU files to parallelize visualization. In that case, you need a
+   * VTU files that all form part of the same simulation, in order to
+   * parallelize visualization. In that case, you need a
    * <code>.pvtu</code> file that describes which VTU files (written, for
-   * example, through the write_vtu() function) form a group. The current
-   * function can generate such a master record.
+   * example, through the DataOutInterface::write_vtu() function) form a group.
+   * The current function can generate such a master record.
    *
-   * The file so written contains a list of (scalar or vector) fields whose
-   * values are described by the individual files that comprise the set of
+   * The master record file generated by this function
+   * contains a list of (scalar or vector) fields that describes which
+   * fields can actually be found in the individual files that comprise the set of
    * parallel VTU files along with the names of these files. This function
-   * gets the names and types of fields through the get_patches() function of
-   * this class like all the other write_xxx() functions. The second argument
+   * gets the names and types of fields through the get_dataset_names() and
+   * get_vector_data_ranges() functions of this class. The second argument
    * to this function specifies the names of the files that form the parallel
    * set.
    *
-   * @note See DataOutBase::write_vtu for writing each piece. Also note that
+   * @note Use DataOutBase::write_vtu() and DataOutInterface::write_vtu()
+   * for writing each piece. Also note that
    * only one parallel process needs to call the current function, listing the
    * names of the files written by all parallel processes.
    *
@@ -2076,7 +2491,7 @@ public:
    *
    * @note In order to tell Paraview to group together multiple
    * <code>pvtu</code> files that each describe one time step of a time
-   * dependent simulation, see the DataOutInterface::write_pvd_record()
+   * dependent simulation, see the DataOutBase::write_pvd_record()
    * function.
    *
    * @note Older versions of VisIt (before 2.5.1), can not read
@@ -2085,104 +2500,6 @@ public:
    */
   void write_pvtu_record (std::ostream &out,
                           const std::vector<std::string> &piece_names) const;
-
-  /**
-   * In ParaView it is possible to visualize time-dependent data tagged with
-   * the current integration time of a time dependent simulation. To use this
-   * feature you need a <code>.pvd</code> file that describes which VTU or
-   * PVTU file belongs to which timestep. This function writes a file that
-   * provides this mapping, i.e., it takes a list of pairs each of which
-   * indicates a particular time instant and the corresponding file that
-   * contains the graphical data for this time instant.
-   *
-   * A typical use case, in program that computes a time dependent solution,
-   * would be the following (<code>time</code> and <code>time_step</code> are
-   * member variables of the class with types <code>double</code> and
-   * <code>unsigned int</code>, respectively; the variable
-   * <code>times_and_names</code> is of type
-   * <code>std::vector@<std::pair@<double,std::string@> @></code>):
-   *
-   * @code
-   *  template <int dim>
-   *  void MyEquation<dim>::output_results () const
-   *  {
-   *    DataOut<dim> data_out;
-   *
-   *    data_out.attach_dof_handler (dof_handler);
-   *    data_out.add_data_vector (solution, "U");
-   *    data_out.build_patches ();
-   *
-   *    const std::string filename = "solution-" +
-   *                                 Utilities::int_to_string (timestep_number, 3) +
-   *                                 ".vtu";
-   *    std::ofstream output (filename.c_str());
-   *    data_out.write_vtu (output);
-   *
-   *    times_and_names.push_back (std::pair<double,std::string> (time, filename));
-   *    std::ofstream pvd_output ("solution.pvd");
-   *    data_out.write_pvd_record (pvd_output, times_and_names);
-   *  }
-   * @endcode
-   *
-   * @note See DataOutBase::write_vtu or DataOutInterface::write_pvtu_record
-   * for writing solutions at each timestep.
-   *
-   * @note The second element of each pair, i.e., the file in which the
-   * graphical data for each time is stored, may itself be again a file that
-   * references other files. For example, it could be the name for a
-   * <code>.pvtu</code> file that references multiple parts of a parallel
-   * computation.
-   *
-   * @author Marco Engelhard, 2012
-   */
-  void write_pvd_record (std::ostream &out,
-                         const std::vector<std::pair<double,std::string> >  &times_and_names) const;
-
-  /**
-   * This function is the exact equivalent of the write_pvtu_record() function
-   * but for older versions of the VisIt visualization program and for one
-   * visualization graph (or one time step only). See there for the purpose of
-   * this function.
-   *
-   * This function is documented in the "Creating a master file for parallel"
-   * section (section 5.7) of the "Getting data into VisIt" report that can be
-   * found here:
-   * https://wci.llnl.gov/codes/visit/2.0.0/GettingDataIntoVisIt2.0.0.pdf
-   */
-  void write_visit_record (std::ostream &out,
-                           const std::vector<std::string> &piece_names) const;
-
-  /**
-   * This function is equivalent to the write_visit_record() above but for
-   * multiple time steps. Here is an example of how the function would be
-   * used:
-   * @code
-   *  DataOut<dim> data_out;
-   *
-   *  const unsigned int number_of_time_steps = 3;
-   *  std::vector<std::vector<std::string > > piece_names(number_of_time_steps);
-   *
-   *  piece_names[0].push_back("subdomain_01.time_step_0.vtk");
-   *  piece_names[0].push_back("subdomain_02.time_step_0.vtk");
-   *
-   *  piece_names[1].push_back("subdomain_01.time_step_1.vtk");
-   *  piece_names[1].push_back("subdomain_02.time_step_1.vtk");
-   *
-   *  piece_names[2].push_back("subdomain_01.time_step_2.vtk");
-   *  piece_names[2].push_back("subdomain_02.time_step_2.vtk");
-   *
-   *  std::ofstream visit_output ("master_file.visit");
-   *
-   *  data_out.write_visit_record(visit_output, piece_names);
-   * @endcode
-   *
-   * This function is documented in the "Creating a master file for parallel"
-   * section (section 5.7) of the "Getting data into VisIt" report that can be
-   * found here:
-   * https://wci.llnl.gov/codes/visit/2.0.0/GettingDataIntoVisIt2.0.0.pdf
-   */
-  void write_visit_record (std::ostream &out,
-                           const std::vector<std::vector<std::string> > &piece_names) const;
 
   /**
    * Obtain data through get_patches() and write it to <tt>out</tt> in SVG
@@ -2308,7 +2625,7 @@ public:
    * Set the flags to be used for output. This method expects <tt>flags</tt>
    * to be a member of one of the child classes of <tt>OutputFlagsBase</tt>.
    */
-  template<typename FlagType>
+  template <typename FlagType>
   void set_flags (const FlagType &flags);
 
 
@@ -2393,8 +2710,17 @@ protected:
    * fields.
    */
   virtual
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> >
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> >
   get_vector_data_ranges () const;
+
+  /**
+   * Validate that the names of the datasets returned by get_dataset_names() and
+   * get_vector_data_ranges() are valid. This currently consists of checking
+   * that names are not used more than once. If an invalid state is encountered,
+   * an Assert() will be triggered in debug mode.
+   */
+  void validate_dataset_names () const;
+
 
   /**
    * The default number of subdivisions for patches. This is filled by
@@ -2561,15 +2887,16 @@ public:
   /**
    * Exception
    */
-  DeclException0 (ExcNoPatches);
+  DeclExceptionMsg (ExcIncompatibleDatasetNames,
+                    "You are trying to merge two sets of patches for which the "
+                    "declared names of the variables do not match.");
   /**
    * Exception
    */
-  DeclException0 (ExcIncompatibleDatasetNames);
-  /**
-   * Exception
-   */
-  DeclException0 (ExcIncompatiblePatchLists);
+  DeclExceptionMsg (ExcIncompatiblePatchLists,
+                    "You are trying to merge two sets of patches for which the "
+                    "number of subdivisions or the number of vector components "
+                    "do not match.");
   /**
    * Exception
    */
@@ -2619,7 +2946,7 @@ protected:
    * fields.
    */
   virtual
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> >
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> >
   get_vector_data_ranges () const;
 
 private:
@@ -2634,7 +2961,7 @@ private:
    * Information about whether certain components of the output field are to
    * be considered vectors.
    */
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> >
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> >
   vector_data_ranges;
 };
 
@@ -2642,47 +2969,57 @@ private:
 
 
 /**
- * A class to store relevant data to use when writing the light data XDMF
- * file. This should only contain valid data on the root node which writes the
- * files, the rest of the nodes will have valid set to false. The XDMF file in
- * turn points to heavy data files (such as HDF5) where the actual simulation
- * data is stored. This allows flexibility in arranging the data, and also
- * allows the mesh to be separated from the the point data.
+ * A class to store relevant data to use when writing a lightweight XDMF
+ * file. The XDMF file in turn points to heavy data files (such as HDF5)
+ * where the actual simulation data is stored.
+ * This allows flexibility in arranging the data, and also
+ * allows the mesh to be separated from the point data.
  */
 class XDMFEntry
 {
-private:
-  /// Whether this entry is valid and contains data to be written
-  bool                                valid;
-  /// The name of the HDF5 heavy data solution and/or mesh files this entry references
-  std::string                         h5_sol_filename, h5_mesh_filename;
-  /// The simulation time associated with this entry
-  double                              entry_time;
-  /// The number of nodes, cells and dimensionality associated with the data
-  unsigned int                        num_nodes, num_cells, dimension;
-  /// The attributes associated with this entry and their dimension
-  std::map<std::string, unsigned int> attribute_dims;
-
-  /// Small function to create indentation for XML file
-  std::string indent(const unsigned int indent_level) const
-  {
-    std::string res = "";
-    for (unsigned int i=0; i<indent_level; ++i) res += "  ";
-    return res;
-  }
-
 public:
-  XDMFEntry() : valid(false) {};
-  XDMFEntry(const std::string filename, const double time, const unsigned int nodes, const unsigned int cells, const unsigned int dim) : valid(true), h5_sol_filename(filename), h5_mesh_filename(filename), entry_time(time), num_nodes(nodes), num_cells(cells), dimension(dim) {};
-  XDMFEntry(const std::string mesh_filename, const std::string solution_filename, const double time, const unsigned int nodes, const unsigned int cells, const unsigned int dim) : valid(true), h5_sol_filename(solution_filename), h5_mesh_filename(mesh_filename), entry_time(time), num_nodes(nodes), num_cells(cells), dimension(dim) {};
+  /**
+   * Default constructor that creates an invalid object.
+   */
+  XDMFEntry();
+
+  /**
+   * Simplified constructor that calls the complete constructor for
+   * cases where <code>solution_filename == mesh_filename</code>, and
+   * <code>dim==spacedim</code>.
+   */
+  XDMFEntry(const std::string &filename,
+            const double time,
+            const unsigned int nodes,
+            const unsigned int cells,
+            const unsigned int dim);
+
+  /**
+   * Simplified constructor that calls the complete constructor for
+   * cases where <code>dim==spacedim</code>.
+   */
+  XDMFEntry(const std::string &mesh_filename,
+            const std::string &solution_filename,
+            const double time,
+            const unsigned int nodes,
+            const unsigned int cells,
+            const unsigned int dim);
+
+  /**
+   * Constructor that sets all members to provided parameters.
+   */
+  XDMFEntry(const std::string &mesh_filename,
+            const std::string &solution_filename,
+            const double time,
+            const unsigned int nodes,
+            const unsigned int cells,
+            const unsigned int dim,
+            const unsigned int spacedim);
 
   /**
    * Record an attribute and associated dimensionality.
    */
-  void add_attribute(const std::string &attr_name, const unsigned int dimension)
-  {
-    attribute_dims[attr_name] = dimension;
-  }
+  void add_attribute(const std::string &attr_name, const unsigned int dimension);
 
   /**
    * Read or write the data of this object for serialization
@@ -2700,9 +3037,58 @@ public:
     &attribute_dims;
   }
 
-  /// Get the XDMF content associated with this entry.
-  /// If the entry is not valid, this returns an empty string.
+  /**
+   * Get the XDMF content associated with this entry.
+   * If the entry is not valid, this returns an empty string.
+   */
   std::string get_xdmf_content(const unsigned int indent_level) const;
+
+private:
+  /**
+   * Whether this entry is valid and contains data to be written.
+   */
+  bool valid;
+
+  /**
+   * The name of the HDF5 heavy data solution file this entry references.
+   */
+  std::string h5_sol_filename;
+
+  /**
+   * The name of the HDF5 mesh file this entry references.
+   */
+  std::string h5_mesh_filename;
+
+  /**
+   * The simulation time associated with this entry.
+   */
+  double entry_time;
+
+  /**
+   * The number of data nodes.
+   */
+  unsigned int num_nodes;
+
+  /**
+   * The number of data cells.
+   */
+  unsigned int num_cells;
+
+  /**
+   * The dimension associated with the data.
+   */
+  unsigned int dimension;
+
+  /**
+   * The dimension of the space the data lives in.
+   * Note that dimension <= space_dimension.
+   */
+  unsigned int space_dimension;
+
+  /**
+   * The attributes associated with this entry and their dimension.
+   */
+  std::map<std::string, unsigned int> attribute_dims;
 };
 
 

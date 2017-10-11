@@ -1,15 +1,17 @@
-//----------------------------  periodicity_05.cc  ---------------------------
-//    Version: $Name$
+// ---------------------------------------------------------------------
 //
-//    Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2017 by the deal.II authors
 //
-//    This file is subject to QPL and may not be  distributed
-//    without copyright and license information. Please refer
-//    to the file deal.II/doc/license.html for the  text  and
-//    further information on this license.
+// This file is part of the deal.II library.
 //
-//----------------------------  periodicity_05.cc  ---------------------------
-
+// The deal.II library is free software; you can use it, redistribute
+// it, and/or modify it under the terms of the GNU Lesser General
+// Public License as published by the Free Software Foundation; either
+// version 2.1 of the License, or (at your option) any later version.
+// The full text of the license can be found in the file LICENSE at
+// the top level of the deal.II distribution.
+//
+// ---------------------------------------------------------------------
 
 // test for bug #82
 // (http://code.google.com/p/dealii/issues/detail?id=82) which
@@ -17,11 +19,8 @@
 // constraints
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/tensor_function.h>
@@ -33,7 +32,6 @@
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/precondition.h>
-#include <deal.II/lac/iterative_inverse.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/block_sparse_matrix.h>
 #include <deal.II/lac/sparse_direct.h>
@@ -64,7 +62,6 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/solution_transfer.h>
 
-#include <fstream>
 #include <sstream>
 #include <iostream>
 #include <vector>
@@ -156,9 +153,7 @@ void Deal2PeriodicBug::makeGrid()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Deal2PeriodicBug Deal2Bug;
   Deal2Bug.run();

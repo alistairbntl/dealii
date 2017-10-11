@@ -20,11 +20,10 @@
 #include <deal.II/lac/vector_memory.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
 
 using namespace dealii;
 
-template<typename VectorType>
+template <typename VectorType>
 void
 test_leak()
 {
@@ -34,7 +33,7 @@ test_leak()
 }
 
 
-template<typename VectorType>
+template <typename VectorType>
 void
 test_stat()
 {
@@ -71,9 +70,7 @@ test_stat()
 int
 main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
   deal_II_exceptions::disable_abort_on_exception();
 
   test_stat<Vector<double> >();

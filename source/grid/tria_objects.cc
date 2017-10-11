@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2014 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -30,7 +30,7 @@ namespace internal
 {
   namespace Triangulation
   {
-    template<class G>
+    template <class G>
     void
     TriaObjects<G>::reserve_space (const unsigned int new_objects_in_pairs,
                                    const unsigned int new_objects_single)
@@ -170,7 +170,7 @@ namespace internal
       const unsigned int new_size = new_hexes +
                                     std::count_if (used.begin(),
                                                    used.end(),
-                                                   std::bind2nd (std::equal_to<bool>(), true));
+                                                   std::bind (std::equal_to<bool>(), std::placeholders::_1, true));
 
       // see above...
       if (new_size>cells.size())
@@ -195,7 +195,7 @@ namespace internal
                            4*new_size-children.size(),
                            -1);
 
-          // for the following two fields, we know exactly how many elements
+          // for the following fields, we know exactly how many elements
           // we need, so first reserve then resize (resize itself, at least
           // with some compiler libraries, appears to round up the size it
           // actually reserves)
@@ -307,7 +307,7 @@ namespace internal
     }
 
 
-    template<>
+    template <>
     void
     TriaObjects<TriaObject<1> >::monitor_memory (const unsigned int) const
     {
@@ -326,7 +326,7 @@ namespace internal
     }
 
 
-    template<>
+    template <>
     void
     TriaObjects<TriaObject<2> >::monitor_memory (const unsigned int) const
     {
@@ -426,7 +426,7 @@ namespace internal
     }
 
 
-    template<typename G>
+    template <typename G>
     std::size_t
     TriaObjects<G>::memory_consumption () const
     {

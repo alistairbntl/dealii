@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__manifold_lib_h
-#define dealii__manifold_lib_h
+#ifndef dealii_manifold_lib_h
+#define dealii_manifold_lib_h
 
 
 #include <deal.II/base/config.h>
@@ -22,40 +22,43 @@
 #include <deal.II/base/function.h>
 #include <deal.II/base/function_parser.h>
 
+#include <boost/container/small_vector.hpp>
+
 DEAL_II_NAMESPACE_OPEN
 
 /**
- * Manifold description for a spherical space coordinate system.
+ * Manifold description for a polar coordinate system.
  *
  * You can use this Manifold object to describe any sphere, circle,
- * hypersphere or hyperdisc in two or three dimensions, both as a co-dimension
- * one manifold descriptor or as co-dimension zero manifold descriptor.
+ * hypersphere or hyperdisc in two or three dimensions, both as a
+ * co-dimension one manifold descriptor or as co-dimension zero
+ * manifold descriptor, provided that the north and south poles (in
+ * three dimensions) and the center (in both two and three dimensions)
+ * are excluded from the Manifold (as they are singular points of the
+ * polar change of coordinates).
  *
  * The two template arguments match the meaning of the two template arguments
  * in Triangulation<dim, spacedim>, however this Manifold can be used to
  * describe both thin and thick objects, and the behavior is identical when
- * dim <= spacedim, i.e., the functionality of SphericalManifold<2,3> is
- * identical to SphericalManifold<3,3>.
+ * dim <= spacedim, i.e., the functionality of PolarManifold<2,3> is
+ * identical to PolarManifold<3,3>.
  *
- * The two dimensional implementation of this class works by transforming
- * points to spherical coordinates, taking the average in that coordinate
- * system, and then transforming back the point to Cartesian coordinates. For
- * the three dimensional case, we use a simpler approach: we take the average
- * of the norm of the points, and use this value to shift the average point
- * along the radial direction. In order for this manifold to work correctly,
- * it cannot be attached to cells containing the center of the coordinate
- * system. This point is a singular point of the coordinate transformation,
- * and there taking averages does not make any sense.
- *
- * This class is used in step-1 and step-2 to describe the boundaries of
- * circles. Its use is also discussed in the results section of step-6.
+ * This class works by transforming points to polar coordinates (in
+ * both two and three dimensions), taking the average in that
+ * coordinate system, and then transforming back the point to
+ * Cartesian coordinates. In order for this manifold to work
+ * correctly, it cannot be attached to cells containing the center of
+ * the coordinate system or the north and south poles in three
+ * dimensions. These points are singular points of the coordinate
+ * transformation, and taking averages around these points does not
+ * make any sense.
  *
  * @ingroup manifold
  *
- * @author Luca Heltai, 2014
+ * @author Luca Heltai, Mauro Bardelloni, 2014-2016
  */
 template <int dim, int spacedim = dim>
-class SphericalManifold : public ChartManifold<dim, spacedim, spacedim>
+class PolarManifold : public ChartManifold<dim, spacedim, spacedim>
 {
 public:
   /**
@@ -66,7 +69,7 @@ public:
    * it takes the middle point, and project it along the radius using the
    * average radius of the surrounding points.
    */
-  SphericalManifold(const Point<spacedim> center = Point<spacedim>());
+  PolarManifold(const Point<spacedim> center = Point<spacedim>());
 
   /**
    * Pull back the given point from the Euclidean space. Will return the polar
@@ -84,7 +87,6 @@ public:
   virtual Point<spacedim>
   push_forward(const Point<spacedim> &chart_point) const;
 
-
   /**
    * Given a point in the spacedim dimensional Euclidean space, this
    * method returns the derivatives of the function $F$ that maps from
@@ -101,17 +103,6 @@ public:
   DerivativeForm<1,spacedim,spacedim>
   push_forward_gradient(const Point<spacedim> &chart_point) const;
 
-
-  /**
-   * Let the new point be the average sum of surrounding vertices.
-   *
-   * In the two dimensional implementation, we use the pull_back and
-   * push_forward mechanism. For three dimensions, this does not work well, so
-   * we overload the get_new_point function directly.
-   */
-  virtual Point<spacedim>
-  get_new_point(const Quadrature<spacedim> &quad) const;
-
   /**
    * The center of the spherical coordinate system.
    */
@@ -127,6 +118,134 @@ private:
 
 
 /**
+ * Manifold description for a spherical space coordinate system.
+ *
+ * You can use this Manifold object to describe any sphere, circle,
+ * hypersphere or hyperdisc in two or three dimensions. This manifold
+ * can be used as a co-dimension one manifold descriptor of a
+ * spherical surface embedded in a higher dimensional space, or as a
+ * co-dimension zero manifold descriptor for a body with positive
+ * volume, provided that the center of the spherical space is excluded
+ * from the domain.
+ *
+ * The two template arguments match the meaning of the two template arguments
+ * in Triangulation<dim, spacedim>, however this Manifold can be used to
+ * describe both thin and thick objects, and the behavior is identical when
+ * dim <= spacedim, i.e., the functionality of SphericalManifold<2,3> is
+ * identical to SphericalManifold<3,3>.
+ *
+ * While PolarManifold reflects the usual notion of polar coordinates,
+ * it may not be suitable for domains that contain either the north or
+ * south poles.  Consider for instance the pair of points
+ * $x_1=(1,\pi/3,0)$ and $x_2=(1,\pi/3,\pi)$ in polar
+ * coordinates (lying on the surface of a sphere with radius one, on
+ * a parallel at at height $\pi/3$). In this case connecting the points
+ * with a straight line in polar coordinates would take the long road
+ * around the globe, without passing through the north pole.
+ *
+ * These two points would be connented (using a PolarManifold) by the curve
+ * @f{align*}{
+ *   s: [0,1]  & \rightarrow &  \mathbb S^3 \\
+ *           t & \mapsto     &  (1,\pi/3,0) + (0,0,t\pi)
+ * @f}
+ * This curve is not a geodesic on the sphere, and it is not how we
+ * would connect those two points. A better curve, would be the one
+ * passing through the North pole:
+ * @f[
+ *  s(t) = x_1 \cos(\alpha(t)) + \kappa \times x_1 \sin(\alpha(t)) +
+ *  \kappa ( \kappa \cdot x_1) (1-\cos(\alpha(t))).
+ * @f]
+ * where $\kappa = \frac{x_1 \times x_2}{\Vert x_1 \times x_2 \Vert}$
+ * and $\alpha(t) = t \cdot \arccos(x_1 \cdot x_2)$ for $t\in[0,1]$.
+ * Indeed, this is a geodesic, and it is the natural choice when
+ * connecting points on the surface of the sphere. In the examples above,
+ * the PolarManifold class implements the first way of connecting two
+ * points on the surface of a sphere, while SphericalManifold implements
+ * the second way, i.e., if the codimension of the Manifold is one,
+ * than this Manifold connects points using geodesics. In all other cases
+ * it is a continuus extension of the codimension one case.
+ *
+ * In particular, this class implements a Manifold that joins any two
+ * points in space by first projecting them onto the surface of a
+ * sphere with unit radius, then connecting them with a geodesic, and
+ * finally rescaling the final radius so that the resulting one is the
+ * weighted average of the starting radii. This Manifold is identical
+ * to PolarManifold in dimension two, while for dimension three it
+ * returns points that are more uniformly distributed on the sphere,
+ * and it is invariant with respect to rotations of the coordinate
+ * system, therefore avoiding the problems that PolarManifold has at
+ * the poles. Notice, in particular, that computing tangent vectors at
+ * the poles with a PolarManifold is not well defined, while it is
+ * perfectly fine with this class.
+ *
+ * For mathematical reasons, it is impossible to construct a unique
+ * map of a sphere using only geodesic curves, and therefore, using
+ * this class with MappingManifold is discouraged. If you use this
+ * Manifold to describe the geometry of a sphere, you should use
+ * MappingQ as the underlying mapping, and not MappingManifold.
+ *
+ * This Manifold can be used *only* on geometries where a ball with
+ * finite radius is removed from the center. Indeed, the center is a
+ * singular point for this manifold, and if you try to connect two
+ * points across the center, they would travel on spherical
+ * coordinates, avoiding the center.
+ *
+ * The ideal geometry for this Manifold is an HyperShell. If you plan
+ * to use this Manifold on a HyperBall, you have to make sure you do
+ * not attach this Manifold to the cell containing the center.
+ *
+ * @ingroup manifold
+ *
+ * @author Mauro Bardelloni, Luca Heltai, 2016
+ */
+template <int dim, int spacedim = dim>
+class SphericalManifold : public Manifold<dim, spacedim>
+{
+public:
+  /**
+   * The Constructor takes the center of the spherical coordinates.
+   */
+  SphericalManifold(const Point<spacedim> center = Point<spacedim>());
+
+  /**
+   * Given any two points in space, first project them on the surface
+   * of a sphere with unit radius, then connect them with a geodesic
+   * and find the intermediate point, and finally rescale the final
+   * radius so that the resulting one is the convex combination of the
+   * starting radii.
+   */
+  virtual
+  Point<spacedim>
+  get_intermediate_point(const Point<spacedim> &p1,
+                         const Point<spacedim> &p2,
+                         const double w) const override;
+
+  /**
+   * Compute the derivative of the get_intermediate_point() function
+   * with parameter w equal to zero.
+   */
+  virtual
+  Tensor<1,spacedim>
+  get_tangent_vector (const Point<spacedim> &x1,
+                      const Point<spacedim> &x2) const override;
+
+  /**
+   * Return a point on the spherical manifold which is intermediate
+   * with respect to the surrounding points.
+   */
+  virtual
+  Point<spacedim>
+  get_new_point (const ArrayView<const Point<spacedim>> &vertices,
+                 const ArrayView<const double>          &weights) const override;
+
+  /**
+   * The center of the spherical coordinate system.
+   */
+  const Point<spacedim> center;
+};
+
+
+/**
  * Cylindrical Manifold description.  In three dimensions, points are
  * transformed using a cylindrical coordinate system along the <tt>x-</tt>,
  * <tt>y-</tt> or <tt>z</tt>-axis (when using the first constructor of this
@@ -134,15 +253,15 @@ private:
  * its axis and a point located on the axis.
  *
  * This class was developed to be used in conjunction with the @p cylinder or
- * @p cylinder_shell functions of GridGenerator. This function will throw an
- * exception whenever spacedim is not equal to three.
+ * @p cylinder_shell functions of GridGenerator. This function will throw a
+ * compile time exception whenever spacedim is not equal to three.
  *
  * @ingroup manifold
  *
- * @author Luca Heltai, 2014
+ * @author Luca Heltai, Daniel Arndt, 2014, 2017
  */
 template <int dim, int spacedim = dim>
-class CylindricalManifold : public Manifold<dim,spacedim>
+class CylindricalManifold : public ChartManifold<dim,spacedim,3>
 {
 public:
   /**
@@ -166,17 +285,39 @@ public:
                        const double tolerance = 1e-10);
 
   /**
+   * Compute the Cartesian coordinates for a point given in cylindrical
+   * coordinates.
+   */
+  virtual Point<3>
+  pull_back(const Point<spacedim> &space_point) const override;
+
+  /**
+   * Compute the cylindrical coordinates $(r, \phi, \lambda)$ for the given
+   * point where $r$ denotes the distance from the axis,
+   * $\phi$ the angle between the given point and the computed normal
+   * direction and $\lambda$ the axial position.
+   */
+  virtual Point<spacedim>
+  push_forward(const Point<3> &chart_point) const override;
+
+  /**
    * Compute new points on the CylindricalManifold. See the documentation of
    * the base class for a detailed description of what this function does.
    */
   virtual Point<spacedim>
-  get_new_point(const Quadrature<spacedim> &quad) const;
+  get_new_point (const ArrayView<const Point<spacedim>> &surrounding_points,
+                 const ArrayView<const double>          &weights) const override;
 
 protected:
   /**
+   * A vector orthogonal to the normal direction.
+   */
+  const Tensor<1,spacedim> normal_direction;
+
+  /**
    * The direction vector of the axis.
    */
-  const Point<spacedim> direction;
+  const Tensor<1,spacedim> direction;
 
   /**
    * An arbitrary point on the axis.
@@ -185,14 +326,17 @@ protected:
 
 private:
   /**
-   * Helper FlatManifold to compute tentative midpoints.
-   */
-  FlatManifold<dim,spacedim> flat_manifold;
-
-  /**
    * Relative tolerance to measure zero distances.
    */
   double tolerance;
+
+  // explicitly check for sensible template arguments, but not on windows
+  // because MSVC creates bogus warnings during normal compilation
+#ifndef DEAL_II_MSVC
+  static_assert (spacedim==3,
+                 "CylindricalManifold can only be used for spacedim==3!");
+#endif
+
 };
 
 
@@ -383,6 +527,289 @@ public:
 
 private:
   double r, R;
+};
+
+
+
+/**
+ * A mapping class that extends curved boundary descriptions into the interior
+ * of the computational domain. The outer curved boundary description is
+ * assumed to be given by another manifold (e.g. a polar manifold on a circle).
+ * The mechanism to extend the boundary information is a so-called transfinite
+ * interpolation.
+ *
+ * The formula for extending such a description in 2D is, for example,
+ * described on
+ * <a href="https://en.wikipedia.org/wiki/Transfinite_interpolation">
+ * Wikipedia</a>.  Given a point $(u,v)$ on the chart, the image of this point
+ * in real space is given by
+ * @f{align*}{
+ * \mathbf S(u,v) &= (1-v)\mathbf c_0(u)+v \mathbf c_1(u) + (1-u)\mathbf c_2(v) + u \mathbf c_3(v) \\
+ * &\quad - \left[(1-u)(1-v) \mathbf x_0 + u(1-v) \mathbf x_1 + (1-u)v \mathbf x_2 + uv \mathbf x_3 \right]
+ * @f}
+ * where $\bf x_0, \bf x_1, \bf x_2, \bf x_3$ denote the four bounding vertices
+ * bounding the image space and $\bf c_0, \bf c_1, \bf c_2, \bf c_3$ are the
+ * four curves describing the lines of the cell. If a curved manifold is
+ * attached to any of these lines, the evaluation is done according to
+ * Manifold::get_new_point() with the two end points of the line and
+ * appropriate weight. In 3D, the generalization of this formula is
+ * implemented, creating a weighted sum of the vertices (positive
+ * contribution), the lines (negative), and the faces (positive contribution).
+ *
+ * This manifold is usually attached to a coarse mesh and then places new
+ * points as a combination of the descriptions on the boundaries, weighted
+ * appropriately according to the position of the point in the original chart
+ * coordinates $(u,v)$. Whenever possible, this manifold should be preferred over
+ * setting only a curved manifold on the boundary of a mesh, since the latter
+ * will need to switch from a curved description to a straight description in a
+ * single layer of elements, which causes an error order on cells close to the
+ * boundary that does not exceed 3 no matter how high the degree of the
+ * polynomial mapping and the finite element space. Using this class instead,
+ * the curved nature of the manifold that is originally contained in one
+ * <i>coarse</i> mesh layer will be applied to more than one <i>fine</i> mesh
+ * layer once the mesh gets refined, restoring the optimal convergence rates of
+ * the underlying finite element and mapping as appropriate.
+ *
+ * If no curved boundaries surround a coarse cell, this class reduces to a flat
+ * manifold description.
+ *
+ * To give an example of using this class, the following code attaches a
+ * transfinite manifold to a circle:
+ *
+ * @code
+ * PolarManifold<dim> polar_manifold;
+ * TransfiniteInterpolationManifold<dim> inner_manifold;
+ *
+ * Triangulation<dim> triangulation;
+ * GridGenerator::hyper_ball (triangulation);
+ *
+ * triangulation.set_all_manifold_ids(1);
+ * triangulation.set_all_manifold_ids_on_boundary(0);
+ * triangulation.set_manifold (0, polar_manifold);
+ * inner_manifold.initialize(triangulation);
+ * triangulation.set_manifold (1, inner_manifold);
+ * triangulation.refine_global(4);
+ * @endcode
+ *
+ * In this code, we first set all manifold ids to the id of the transfinite
+ * interpolation, and then re-set the manifold ids on the boundary to identify
+ * the curved boundary described by the polar manifold. With this code, one
+ * gets a really nice mesh:
+ *
+ * <p ALIGN="center">
+ * @image html circular_mesh_transfinite_interpolation.png
+ * </p>
+ *
+ * which is obviously much nicer than the polar manifold applied to just the
+ * boundary:
+ *
+ * <p ALIGN="center">
+ * @image html circular_mesh_only_boundary_manifold.png
+ * </p>
+ *
+ * <h3>Implementation details</h3>
+ *
+ * In the implementation of this class, the manifolds surrounding a coarse
+ * cell are queried repeatedly to compute points on their interior. For
+ * optimal mesh quality, those manifolds should be compatible with a chart
+ * notion. For example, computing a point that is 0.25 along the line between
+ * two vertices using the weights 0.25 and 0.75 for the two vertices should
+ * give the same result as first computing the mid point at 0.5 and then again
+ * compute the midpoint between the first vertex and coarse mid point. This is
+ * the case for PolarManifold but not for Spherical manifold, so be careful
+ * when using the latter. In case the quality of the manifold is not good
+ * enough, upon mesh refinement it may happen that the transformation to a
+ * chart inside the get_new_point() or get_new_points() methods produces
+ * points that are outside the unit cell. Then this class throws an exception
+ * of type Mapping::ExcTransformationFailed. In that case, the mesh should be
+ * refined before attaching this class, as done in the following example:
+ *
+ * @code
+ * SphericalManifold<dim> spherical_manifold;
+ * TransfiniteInterpolationManifold<dim> inner_manifold;
+ * Triangulation<dim> triangulation;
+ * GridGenerator::hyper_ball (triangulation);
+ *
+ * triangulation.set_all_manifold_ids(1);
+ * triangulation.set_all_manifold_ids_on_boundary(0);
+ * triangulation.set_manifold (0, polar_manifold);
+ * inner_manifold.initialize(triangulation);
+ * triangulation.set_manifold (1, inner_manifold);
+ * triangulation.refine_global(1);
+ *
+ * // initialize the transfinite manifold again
+ * inner_manifold.initialize(triangulation);
+ * triangulation.refine_global(4);
+ * @endcode
+ *
+ * @note For performance and accuracy reasons, it is recommended to apply the
+ * transfinite manifold to as coarse a mesh as possible. Regarding accuracy,
+ * the curved description can only be applied to new points created from a
+ * given neighborhood, and the grid quality is typically higher when extending
+ * the curved description over as large a domain as possible. Regarding
+ * performance, the identification of the correct coarse cell in the
+ * get_new_point() method needs to pass all coarse cells, so expect a linear
+ * complexity in the number of coarse cells for each single mapping operation,
+ * i.e., at least quadratic in the number of coarse mesh cells for any global
+ * operation on the whole mesh. Thus, the current implementation is only
+ * economical when there are not more than a few hundreds of coarse cells. To
+ * make performance better for larger numbers of cells, one could extend the
+ * current implementation by a pre-identification of relevant cells with
+ * axis-aligned bounding boxes.
+ *
+ * @ingroup manifold
+ *
+ * @author Martin Kronbichler, Luca Heltai, 2017
+ */
+template <int dim, int spacedim=dim>
+class TransfiniteInterpolationManifold : public Manifold<dim,spacedim>
+{
+public:
+  /**
+   * Constructor.
+   */
+  TransfiniteInterpolationManifold();
+
+  /**
+   * Initializes the manifold with a coarse mesh. The prerequisite for using
+   * this class is that the input triangulation is uniformly refined and the
+   * manifold is later attached to the same triangulation.
+   *
+   * @note The triangulation used to construct the manifold must not be
+   * destroyed during the usage of this object.
+   */
+  void initialize (const Triangulation<dim,spacedim> &triangulation);
+
+  /**
+   * Return the point which shall become the new vertex surrounded by the
+   * given points @p surrounding_points. @p weights contains appropriate
+   * weights for the surrounding points according to which the manifold
+   * determines the new point's position.
+   *
+   * The implementation in this class overrides the method in the base class
+   * and computes the new point by a transfinite interpolation. The first step
+   * in the implementation is to identify the coarse cell on which the
+   * surrounding points are located. Then, the coordinates are transformed to
+   * the unit coordinates on the coarse cell by a Newton iteration, where the
+   * new point is then computed according to the weights. Finally, it is
+   * pushed forward to the real space according to the transfinite
+   * interpolation.
+   */
+  virtual
+  Point<spacedim>
+  get_new_point (const ArrayView<const Point<spacedim>> &surrounding_points,
+                 const ArrayView<const double>          &weights) const override;
+
+  /**
+   * Compute a new set of points that interpolate between the given points @p
+   * surrounding_points. @p weights is a table with as many columns as @p
+   * surrounding_points.size(). The number of columns in @p weights must match
+   * the length of @p new_points.
+   *
+   * The implementation in this class overrides the method in the base class
+   * and computes the new point by a transfinite interpolation. The first step
+   * in the implementation is to identify the coarse cell on which the
+   * surrounding points are located. Then, the coordinates are transformed to
+   * the unit coordinates on the coarse cell by a Newton iteration, where the
+   * new points are then computed according to the weights. Finally, the is
+   * pushed forward to the real space according to the transfinite
+   * interpolation.
+   *
+   * The implementation does not allow for @p surrounding_points and
+   * @p new_points to point to the same vector, so make sure to pass different
+   * objects into the function.
+   */
+  virtual
+  void
+  get_new_points (const ArrayView<const Point<spacedim>> &surrounding_points,
+                  const Table<2,double>                  &weights,
+                  ArrayView<Point<spacedim>>              new_points) const override;
+
+private:
+  /**
+   * Internal function to identify the most suitable cells (=charts) where the
+   * given surrounding points are located. We use a cheap algorithm to identify
+   * the cells and rank the cells by probability before we actually do the
+   * search inside the relevant cells. The cells are sorted by the distance of
+   * a Q1 approximation of the inverse mapping to the unit cell of the
+   * surrounding points. We expect at most 10 cells (it should be less than 8
+   * candidates even in 3D, typically only two or three), so get an array with
+   * 10 entries of a the indices <tt>cell->index()</tt>.
+   */
+  std::array<unsigned int, 10>
+  get_possible_cells_around_points(const ArrayView<const Point<spacedim>> &surrounding_points) const;
+
+  /**
+   * Finalizes the identification of the correct chart and populates @p
+   * chart_points with the pullbacks of the surrounding points. This method
+   * internally calls @p get_possible_cells_around_points().
+   *
+   * Returns an iterator to the cell on which the chart is defined.
+   */
+  typename Triangulation<dim,spacedim>::cell_iterator
+  compute_chart_points(const ArrayView<const Point<spacedim>> &surrounding_points,
+                       ArrayView<Point<dim>>                   chart_points) const;
+
+  /**
+   * Pull back operation into the unit coordinates on the given coarse cell.
+   *
+   * @note This internal function is currently not compatible with the
+   * ChartManifold::pull_back() function because the given class represents an
+   * atlas of charts, not a single chart. Thus, the pull_back() operation is
+   * only valid with the additional information of the chart, given by a cell
+   * on the coarse grid. An alternative implementation could shift the index
+   * depending on the coarse cell for a 1-to-1 relation between the chart space
+   * and the image space.
+   */
+  Point<dim>
+  pull_back(const typename Triangulation<dim,spacedim>::cell_iterator &cell,
+            const Point<spacedim> &p) const;
+
+  /**
+   * Push forward operation.
+   *
+   * @note This internal function is currently not compatible with the
+   * ChartManifold::pull_back() function because the given class represents an
+   * atlas of charts, not a single chart. Thus, the pull_back() operation is
+   * only valid with the additional information of the chart, given by a cell
+   * on the coarse grid. An alternative implementation could shift the index
+   * depending on the coarse cell for a 1-to-1 relation between the chart space
+   * and the image space.
+   */
+  Point<spacedim>
+  push_forward(const typename Triangulation<dim,spacedim>::cell_iterator &cell,
+               const Point<dim> &chart_point) const;
+
+  /**
+   * Gradient of the push_forward method.
+   */
+  DerivativeForm<1,dim,spacedim>
+  push_forward_gradient(const typename Triangulation<dim,spacedim>::cell_iterator &cell,
+                        const Point<dim> &chart_point) const;
+
+  /**
+   * The underlying triangulation.
+   */
+  const Triangulation<dim,spacedim> *triangulation;
+
+  /**
+   * The level of the mesh cells where the transfinite approximation is
+   * applied, usually level 0.
+   */
+  int level_coarse;
+
+  /**
+   * In case there all surrounding manifolds are the transfinite manifold or
+   * have default (invalid) manifold id, the manifold degenerates to a flat
+   * manifold and we can choose cheaper algorithms for the push_forward method.
+   */
+  std::vector<bool> coarse_cell_is_flat;
+
+  /**
+   * A flat manifold used to compute new points in the chart space where it we
+   * use a FlatManifold description.
+   */
+  FlatManifold<dim> chart_manifold;
 };
 
 DEAL_II_NAMESPACE_CLOSE

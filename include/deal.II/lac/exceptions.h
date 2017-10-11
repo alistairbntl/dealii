@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__lac_exceptions_h
-#define dealii__lac_exceptions_h
+#ifndef dealii_lac_exceptions_h
+#define dealii_lac_exceptions_h
 
 #include <deal.II/base/exceptions.h>
 
@@ -30,7 +30,8 @@ namespace LACExceptions
   /**
    * This function only works for quadratic matrices.
    */
-  DeclException0 (ExcNotQuadratic);
+  DeclExceptionMsg (ExcNotQuadratic,
+                    "This function only works for quadratic objects!");
 
   /**
    * The operation cannot be finished since the matrix is singular.
@@ -43,13 +44,22 @@ namespace LACExceptions
   DeclException0 (ExcDifferentBlockIndices);
 
   /**
-   * An error of a PETSc function was encountered. Check the PETSc
-   * documentation for details.
+   * Exception thrown when a PETSc function reports an error. If possible,
+   * this exception uses the message provided by
+   * <code>PetscErrorMessage</code> to print a description of the error.
+   *
+   * @note For backwards compatibility this is defined whether or not deal.II
+   * is compiled with PETSc.
    */
-  DeclException1 (ExcPETScError,
-                  int,
-                  << "An error with error number " << arg1
-                  << " occurred while calling a PETSc function");
+  class ExcPETScError : public dealii::ExceptionBase
+  {
+  public:
+    ExcPETScError (const int error_code);
+
+    virtual void print_info (std::ostream &out) const;
+
+    const int error_code;
+  };
 
   /**
    * An error of a Trilinos function was encountered. Check the Trilinos

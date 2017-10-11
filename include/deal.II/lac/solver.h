@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__solver_h
-#define dealii__solver_h
+#ifndef dealii_solver_h
+#define dealii_solver_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/subscriptor.h>
@@ -211,7 +211,7 @@ template <typename number> class Vector;
  * function). A pointer to a function with this argument list satisfies the
  * requirements, but you can also pass a member function whose
  * <code>this</code> argument has been bound using the
- * <code>std_cxx11::bind</code> mechanism (see the example below). - Each of
+ * <code>std::bind</code> mechanism (see the example below). - Each of
  * the slots will return a value that indicates whether the iteration should
  * continue, should stop because it has succeeded, or stop because it has
  * failed. The return type of slots is therefore of type SolverControl::State.
@@ -277,16 +277,16 @@ template <typename number> class Vector;
  *   SolverControl           solver_control (1000, 1e-12);
  *   SolverCG<>              solver (solver_control);
  *
- *   solver.connect (std_cxx11::bind (&Step3::write_intermediate_solution,
- *                                    this,
- *                                    std_cxx11::_1,
- *                                    std_cxx11::_2,
- *                                    std_cxx11::_3));
+ *   solver.connect (std::bind (&Step3::write_intermediate_solution,
+ *                              this,
+ *                              std::placeholders::_1,
+ *                              std::placeholders::_2,
+ *                              std::placeholders::_3));
  *   solver.solve (system_matrix, solution, system_rhs,
  *                 PreconditionIdentity());
  * }
  * @endcode
- * The use of <code>std_cxx11::bind</code> here ensures that we convert the
+ * The use of <code>std::bind</code> here ensures that we convert the
  * member function with its three arguments plus the <code>this</code>
  * pointer, to a function that only takes three arguments, by fixing the
  * implicit <code>this</code> argument of the function to the
@@ -383,9 +383,9 @@ public:
    * library for more information on connection management.
    */
   boost::signals2::connection
-  connect (const std_cxx11::function<SolverControl::State (const unsigned int iteration,
-                                                           const double       check_value,
-                                                           const VectorType   &current_iterate)> &slot);
+  connect (const std::function<SolverControl::State (const unsigned int iteration,
+                                                     const double       check_value,
+                                                     const VectorType   &current_iterate)> &slot);
 
 
 
@@ -405,9 +405,11 @@ private:
   /**
    * A class whose operator() combines two states indicating whether we should
    * continue iterating or stop, and returns a state that dominates. The rules
-   * are: - If one of the two states indicates failure, return failure. -
-   * Otherwise, if one of the two states indicates to continue iterating, then
-   * continue iterating. - Otherwise, return success.
+   * are:
+   * - If one of the two states indicates failure, return failure.
+   * - Otherwise, if one of the two states indicates to continue iterating, then
+   * continue iterating.
+   * - Otherwise, return success.
    */
   struct StateCombiner
   {
@@ -491,7 +493,7 @@ Solver<VectorType>::StateCombiner::operator ()(const Iterator begin,
 }
 
 
-template<class VectorType>
+template <class VectorType>
 inline
 Solver<VectorType>::Solver (SolverControl        &solver_control,
                             VectorMemory<VectorType> &vector_memory)
@@ -502,15 +504,15 @@ Solver<VectorType>::Solver (SolverControl        &solver_control,
   // only takes two arguments, the iteration and the check_value, and so
   // we simply ignore the third argument that is passed in whenever the
   // signal is executed
-  connect (std_cxx11::bind(&SolverControl::check,
-                           std_cxx11::ref(solver_control),
-                           std_cxx11::_1,
-                           std_cxx11::_2));
+  connect (std::bind(&SolverControl::check,
+                     std::ref(solver_control),
+                     std::placeholders::_1,
+                     std::placeholders::_2));
 }
 
 
 
-template<class VectorType>
+template <class VectorType>
 inline
 Solver<VectorType>::Solver (SolverControl &solver_control)
   :
@@ -521,21 +523,21 @@ Solver<VectorType>::Solver (SolverControl &solver_control)
   // only takes two arguments, the iteration and the check_value, and so
   // we simply ignore the third argument that is passed in whenever the
   // signal is executed
-  connect (std_cxx11::bind(&SolverControl::check,
-                           std_cxx11::ref(solver_control),
-                           std_cxx11::_1,
-                           std_cxx11::_2));
+  connect (std::bind(&SolverControl::check,
+                     std::ref(solver_control),
+                     std::placeholders::_1,
+                     std::placeholders::_2));
 }
 
 
 
-template<class VectorType>
+template <class VectorType>
 inline
 boost::signals2::connection
 Solver<VectorType>::
-connect (const std_cxx11::function<SolverControl::State (const unsigned int iteration,
-                                                         const double       check_value,
-                                                         const VectorType   &current_iterate)> &slot)
+connect (const std::function<SolverControl::State (const unsigned int iteration,
+                                                   const double       check_value,
+                                                   const VectorType   &current_iterate)> &slot)
 {
   return iteration_status.connect (slot);
 }

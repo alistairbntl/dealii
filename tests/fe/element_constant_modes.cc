@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,11 +23,10 @@
 #include <deal.II/fe/fe_q_dg0.h>
 #include <deal.II/fe/fe_q_hierarchical.h>
 #include <deal.II/fe/fe_system.h>
-#include <fstream>
 #include <string>
 
 
-template<int dim>
+template <int dim>
 void print_constant_modes(const FiniteElement<dim> &fe)
 {
   deallog << "Testing " << fe.get_name() << std::endl;
@@ -43,12 +42,15 @@ void print_constant_modes(const FiniteElement<dim> &fe)
 }
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   print_constant_modes(FE_Q<dim>(1));
   print_constant_modes(FE_Q<dim>(2));
   print_constant_modes(FE_DGQ<dim>(1));
+  print_constant_modes(FE_DGQLegendre<dim>(2));
+  print_constant_modes(FE_DGQHermite<dim>(2));
+  print_constant_modes(FE_DGQHermite<dim>(3));
   print_constant_modes(FE_DGP<dim>(2));
   print_constant_modes(FE_Q_Hierarchical<dim>(1));
   print_constant_modes(FE_Q_Hierarchical<dim>(2));
@@ -82,6 +84,3 @@ main()
 
   return 0;
 }
-
-
-

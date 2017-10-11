@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -30,9 +29,7 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/dofs/dof_tools.h>
 
-#include <fstream>
 #include <algorithm>
-#include <cmath>
 
 
 std::ofstream logfile("output");
@@ -72,7 +69,7 @@ void test ()
   dof_handler.distribute_dofs (fe);
   deallog << dof_handler.n_dofs() << std::endl;
 
-  std::vector<unsigned int> subdomain_association (dof_handler.n_dofs());
+  std::vector<types::subdomain_id> subdomain_association (dof_handler.n_dofs());
   DoFTools::get_subdomain_association (dof_handler,
                                        subdomain_association);
   for (unsigned int subdomain=0; subdomain<(1<<dim); ++subdomain)
@@ -95,7 +92,6 @@ int main ()
 {
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1> ();
   test<2> ();

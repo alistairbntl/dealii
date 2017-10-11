@@ -1,5 +1,4 @@
 // ---------------------------------------------------------------------
-// $Id: 3d_refinement_01.cc 31349 2013-10-20 19:07:06Z maier $
 //
 // Copyright (C) 2008 - 2015 by the deal.II authors
 //
@@ -18,18 +17,15 @@
 // create a shared tria mesh with artificial cells and refine it
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/shared_tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/grid_out.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <fstream>
 
 template <int dim, int spacedim>
 void write_mesh (const parallel::shared::Triangulation<dim,spacedim> &tria,
@@ -56,7 +52,7 @@ void write_mesh (const parallel::shared::Triangulation<dim,spacedim> &tria,
 
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   parallel::shared::Triangulation<dim> tr(MPI_COMM_WORLD,

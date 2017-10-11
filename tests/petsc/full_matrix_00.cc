@@ -20,7 +20,6 @@
 
 #include "../tests.h"
 #include <deal.II/lac/petsc_full_matrix.h>
-#include <fstream>
 #include <iostream>
 
 // Simply take an already intialised full matrix, fill in some of the
@@ -79,9 +78,7 @@ void test (PETScWrappers::FullMatrix &m)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

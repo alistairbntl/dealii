@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -25,9 +25,7 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 
 #include <deal.II/lac/vector.h>
@@ -44,11 +42,10 @@
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/fe/fe_dgq.h>
-#include <deal.II/lac/compressed_set_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/hp/dof_handler.h>
 #include <deal.II/hp/fe_values.h>
 
-#include <fstream>
 
 namespace Step
 {
@@ -110,8 +107,8 @@ namespace Step
     constraints.close ();
 
 
-    CompressedSetSparsityPattern csp (dof_handler.n_dofs(),
-                                      dof_handler.n_dofs());
+    DynamicSparsityPattern csp (dof_handler.n_dofs(),
+                                dof_handler.n_dofs());
     DoFTools::make_flux_sparsity_pattern (dof_handler, csp, constraints, false);
     sparsity_pattern.copy_from (csp);
     system_matrix.reinit (sparsity_pattern);
@@ -161,7 +158,6 @@ int main ()
   logfile.precision(2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1> ();
   test<2> ();

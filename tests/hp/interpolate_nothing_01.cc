@@ -23,7 +23,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 
@@ -42,7 +41,6 @@
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/hp/q_collection.h>
 
-#include <fstream>
 #include <vector>
 
 
@@ -63,7 +61,7 @@ void test ()
 
   // interpolate the function
   VectorTools::interpolate (dof_handler,
-                            ZeroFunction<dim>(hp_fe[0].n_components()),
+                            Functions::ZeroFunction<dim>(hp_fe[0].n_components()),
                             interpolant);
   deallog << interpolant.l2_norm() << std::endl;
 }
@@ -77,7 +75,6 @@ int main ()
   deallog << std::setprecision(3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1>();
   test<2>();

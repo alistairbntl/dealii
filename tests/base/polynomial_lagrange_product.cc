@@ -18,11 +18,7 @@
 // Lagrange product form
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/polynomial.h>
 #include <deal.II/base/quadrature_lib.h>
 
@@ -96,7 +92,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("LagrangeEquidistant");
   for (unsigned i=1; i<8; i+=2)

@@ -20,30 +20,38 @@
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/householder.h>
+
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 DEAL_II_NAMESPACE_OPEN
 
 
-namespace
+namespace internal
 {
-  std::vector<Point<1> >
-  get_QGaussLobatto_points (const unsigned int degree)
+  namespace FE_FaceQ
   {
-    if (degree > 0)
-      return QGaussLobatto<1>(degree+1).get_points();
-    else
-      return std::vector<Point<1> >(1, Point<1>(0.5));
+    namespace
+    {
+      std::vector<Point<1> >
+      get_QGaussLobatto_points (const unsigned int degree)
+      {
+        if (degree > 0)
+          return QGaussLobatto<1>(degree+1).get_points();
+        else
+          return std::vector<Point<1> >(1, Point<1>(0.5));
+      }
+    }
   }
 }
 
 template <int dim, int spacedim>
 FE_FaceQ<dim,spacedim>::FE_FaceQ (const unsigned int degree)
   :
-  FE_PolyFace<TensorProductPolynomials<dim-1>, dim, spacedim> (
-    TensorProductPolynomials<dim-1>(Polynomials::generate_complete_Lagrange_basis(get_QGaussLobatto_points(degree))),
-    FiniteElementData<dim>(get_dpo_vector(degree), 1, degree, FiniteElementData<dim>::L2),
-    std::vector<bool>(1,true))
+  FE_PolyFace<TensorProductPolynomials<dim-1>, dim, spacedim>
+  (TensorProductPolynomials<dim-1>(Polynomials::generate_complete_Lagrange_basis(internal::FE_FaceQ::get_QGaussLobatto_points(degree))),
+   FiniteElementData<dim>(get_dpo_vector(degree), 1, degree, FiniteElementData<dim>::L2),
+   std::vector<bool>(1,true))
 {
   // initialize unit face support points
   const unsigned int codim = dim-1;
@@ -54,7 +62,7 @@ FE_FaceQ<dim,spacedim>::FE_FaceQ (const unsigned int degree)
       this->unit_face_support_points[0][d] = 0.5;
   else
     {
-      std::vector<Point<1> > points = get_QGaussLobatto_points(degree);
+      std::vector<Point<1> > points = internal::FE_FaceQ::get_QGaussLobatto_points(degree);
 
       unsigned int k=0;
       for (unsigned int iz=0; iz <= ((codim>2) ? this->degree : 0) ; ++iz)
@@ -102,10 +110,10 @@ FE_FaceQ<dim,spacedim>::FE_FaceQ (const unsigned int degree)
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_FaceQ<dim,spacedim>::clone() const
 {
-  return new FE_FaceQ<dim,spacedim>(this->degree);
+  return std_cxx14::make_unique<FE_FaceQ<dim,spacedim>>(this->degree);
 }
 
 
@@ -114,7 +122,7 @@ template <int dim, int spacedim>
 std::string
 FE_FaceQ<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
   std::ostringstream namebuf;
@@ -217,7 +225,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe
           Assert (std::fabs(sum-1) < eps, ExcInternalError());
         }
     }
-  else if (dynamic_cast<const FE_Nothing<dim> *>(&x_source_fe) != 0)
+  else if (dynamic_cast<const FE_Nothing<dim> *>(&x_source_fe) != nullptr)
     {
       // nothing to do here, the FE_Nothing has no degrees of freedom anyway
     }
@@ -329,10 +337,10 @@ FE_FaceQ<1,spacedim>::FE_FaceQ (const unsigned int degree)
 
 
 template <int spacedim>
-FiniteElement<1,spacedim> *
-FE_FaceQ<1,spacedim>::clone() const
+std::unique_ptr<FiniteElement<1,spacedim>>
+                                        FE_FaceQ<1,spacedim>::clone() const
 {
-  return new FE_FaceQ<1,spacedim>(this->degree);
+  return std_cxx14::make_unique<FE_FaceQ<1,spacedim>>(this->degree);
 }
 
 
@@ -341,7 +349,7 @@ template <int spacedim>
 std::string
 FE_FaceQ<1,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
   std::ostringstream namebuf;
@@ -449,8 +457,8 @@ FE_FaceQ<1,spacedim>::requires_update_flags (const UpdateFlags flags) const
     out |= update_gradients | update_covariant_transformation;
   if (flags & update_hessians)
     out |= update_hessians | update_covariant_transformation;
-  if (flags & update_cell_normal_vectors)
-    out |= update_cell_normal_vectors | update_JxW_values;
+  if (flags & update_normal_vectors)
+    out |= update_normal_vectors | update_JxW_values;
 
   return out;
 }
@@ -460,7 +468,7 @@ template <int spacedim>
 void
 FE_FaceQ<1,spacedim>::
 fill_fe_values(const typename Triangulation<1,spacedim>::cell_iterator &,
-               const CellSimilarity::Similarity                                   ,
+               const CellSimilarity::Similarity,
                const Quadrature<1> &,
                const Mapping<1,spacedim> &,
                const typename Mapping<1,spacedim>::InternalDataBase &,
@@ -499,8 +507,8 @@ template <int spacedim>
 void
 FE_FaceQ<1,spacedim>::
 fill_fe_subface_values (const typename Triangulation<1,spacedim>::cell_iterator &,
-                        const unsigned int                                                 ,
-                        const unsigned int                                                 ,
+                        const unsigned int,
+                        const unsigned int,
                         const Quadrature<0> &,
                         const Mapping<1,spacedim> &,
                         const typename Mapping<1,spacedim>::InternalDataBase &,
@@ -527,10 +535,10 @@ FE_FaceP<dim,spacedim>::FE_FaceP (const unsigned int degree)
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_FaceP<dim,spacedim>::clone() const
 {
-  return new FE_FaceP<dim,spacedim>(this->degree);
+  return std_cxx14::make_unique<FE_FaceP<dim,spacedim>>(this->degree);
 }
 
 
@@ -539,7 +547,7 @@ template <int dim, int spacedim>
 std::string
 FE_FaceP<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
   std::ostringstream namebuf;
@@ -687,7 +695,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe
                                                             subface);
 
           for (unsigned int j = 0; j < source_fe->dofs_per_face; ++j)
-            mass (k , j) = source_fe->poly_space.compute_value(j, p);
+            mass (k, j) = source_fe->poly_space.compute_value(j, p);
         }
 
       Householder<double> H(mass);
@@ -727,7 +735,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe
             }
         }
     }
-  else if (dynamic_cast<const FE_Nothing<dim> *>(&x_source_fe) != 0)
+  else if (dynamic_cast<const FE_Nothing<dim> *>(&x_source_fe) != nullptr)
     {
       // nothing to do here, the FE_Nothing has no degrees of freedom anyway
     }
@@ -763,7 +771,7 @@ template <int spacedim>
 std::string
 FE_FaceP<1,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
   std::ostringstream namebuf;

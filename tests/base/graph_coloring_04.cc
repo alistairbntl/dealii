@@ -19,10 +19,8 @@
 
 
 #include "../tests.h"
-#include <fstream>
 #include <vector>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/graph_coloring.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_accessor.h>
@@ -81,7 +79,7 @@ void check ()
   std::vector<std::vector<typename DoFHandler<dim>::active_cell_iterator> > coloring
     = GraphColoring::make_graph_coloring(stokes_dof_handler.begin_active(),
                                          stokes_dof_handler.end(),
-                                         std_cxx11::function<std::vector<types::global_dof_index> (
+                                         std::function<std::vector<types::global_dof_index> (
                                            const typename DoFHandler<dim>::active_cell_iterator &)>(&get_conflict_indices<dim>));
 
   for (unsigned int c=0; c<coloring.size(); ++c)
@@ -97,8 +95,7 @@ void check ()
 
 int main (int argc, char *argv[])
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   check<2> ();
 

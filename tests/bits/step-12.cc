@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,8 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 #include <deal.II/base/quadrature_lib.h>
@@ -46,8 +44,6 @@ std::ofstream logfile("output");
 #include <deal.II/numerics/derivative_approximation.h>
 #include <deal.II/base/timer.h>
 
-#include <iomanip>
-#include <fstream>
 
 
 template <int dim>
@@ -409,11 +405,11 @@ void DGMethod<dim>::assemble_system1 ()
 
   const UpdateFlags update_flags = update_values
                                    | update_gradients
-                                   | update_q_points
+                                   | update_quadrature_points
                                    | update_JxW_values;
 
   const UpdateFlags face_update_flags = update_values
-                                        | update_q_points
+                                        | update_quadrature_points
                                         | update_JxW_values
                                         | update_normal_vectors;
 
@@ -575,11 +571,11 @@ void DGMethod<dim>::assemble_system2 ()
 
   const UpdateFlags update_flags = update_values
                                    | update_gradients
-                                   | update_q_points
+                                   | update_quadrature_points
                                    | update_JxW_values;
 
   const UpdateFlags face_update_flags = update_values
-                                        | update_q_points
+                                        | update_quadrature_points
                                         | update_JxW_values
                                         | update_normal_vectors;
 
@@ -857,7 +853,6 @@ int main ()
       logfile << std::setprecision(2);
 
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       DGMethod<2> dgmethod;
       dgmethod.run ();

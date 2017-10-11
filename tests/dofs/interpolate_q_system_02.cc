@@ -20,7 +20,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 
@@ -39,7 +38,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
 #include <vector>
 
 
@@ -81,7 +79,7 @@ void test ()
     {
       FE_Q<dim> fe1(p);
       FE_Q<dim> fe2(p+1);
-      FESystem<dim> fe(fe1, 2, fe2 , 1);
+      FESystem<dim> fe(fe1, 2, fe2, 1);
       DoFHandler<dim> dof_handler(triangulation);
       dof_handler.distribute_dofs (fe);
 
@@ -125,7 +123,6 @@ int main ()
   deallog << std::setprecision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1>();
   test<2>();

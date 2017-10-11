@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tria_boundary_h
-#define dealii__tria_boundary_h
+#ifndef dealii_tria_boundary_h
+#define dealii_tria_boundary_h
 
 
 /*----------------------------   boundary-function.h     ---------------------------*/
@@ -73,6 +73,9 @@ DEAL_II_NAMESPACE_OPEN
  * right into the middle of the given points, and HyperBallBoundary creating a
  * hyperball with given radius around a given center point.
  *
+ * @deprecated This class has been deprecated in favor of the more general
+ * Manifold class.
+ *
  * @ingroup boundary
  * @author Wolfgang Bangerth, 1999, 2001, 2009, Ralf Hartmann, 2001, 2008,
  * Luca Heltai, 2014
@@ -86,7 +89,7 @@ public:
    * Destructor. Does nothing here, but needs to be declared to make it
    * virtual.
    */
-  virtual ~Boundary ();
+  virtual ~Boundary () = default;
 
 
   /**
@@ -196,7 +199,7 @@ public:
 
 protected:
   /**
-   * Returns the support points of the Gauss-Lobatto quadrature formula used
+   * Return the support points of the Gauss-Lobatto quadrature formula used
    * for intermediate points.
    *
    * @note Since the boundary description is closely tied to the unit cell
@@ -210,13 +213,13 @@ private:
   /**
    * Point generator for the intermediate points on a boundary.
    */
-  mutable std::vector<std_cxx11::shared_ptr<QGaussLobatto<1> > > points;
+  mutable std::vector<std::shared_ptr<QGaussLobatto<1> > > points;
 
   /**
    * Mutex for protecting the points array.
    */
   mutable Threads::Mutex mutex;
-};
+} DEAL_II_DEPRECATED;
 
 
 
@@ -229,6 +232,9 @@ private:
  * placing new points in the middle of old ones, it rather assumes that the
  * boundary of the domain is given by the polygon/polyhedron defined by the
  * boundary of the initial coarse triangulation.
+ *
+ * @deprecated This class has been deprecated in favor of the more general
+ * FlatManifold class.
  *
  * @ingroup boundary
  *
@@ -361,7 +367,7 @@ public:
   Point<spacedim>
   project_to_surface (const typename Triangulation<dim,spacedim>::hex_iterator &hex,
                       const Point<spacedim> &candidate) const;
-};
+} DEAL_II_DEPRECATED;
 
 
 

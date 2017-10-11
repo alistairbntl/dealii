@@ -29,8 +29,6 @@
 #include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_out.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -130,9 +128,7 @@ void check (Triangulation<3> &tria)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<3> coarse_grid;
   GridIn<3> in;

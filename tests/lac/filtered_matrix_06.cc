@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -36,7 +36,6 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 #include <vector>
-#include <fstream>
 #include <string>
 
 
@@ -117,7 +116,7 @@ check ()
 
   FEValues<dim> fe (mapping, element, quadrature,
                     update_values | update_gradients
-                    | update_q_points | update_JxW_values);
+                    | update_quadrature_points | update_JxW_values);
 
   std::vector <types::global_dof_index> global_dofs (element.dofs_per_cell);
   std::vector <double> function (quadrature.size());
@@ -201,7 +200,6 @@ int main ()
   deallog << std::setprecision (2);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push ("1d");
   check<1> ();

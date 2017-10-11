@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -90,7 +90,7 @@ get_new_point_on_line (const typename Triangulation<dim,spacedim>::line_iterator
 
 
 
-template<>
+template <>
 Point<3>
 CylinderBoundary<3>::
 get_new_point_on_quad (const Triangulation<3>::quad_iterator &quad) const
@@ -110,7 +110,7 @@ get_new_point_on_quad (const Triangulation<3>::quad_iterator &quad) const
                     point_on_axis);
 }
 
-template<>
+template <>
 Point<3>
 CylinderBoundary<2,3>::
 get_new_point_on_quad (const Triangulation<2,3>::quad_iterator &quad) const
@@ -271,7 +271,7 @@ CylinderBoundary<dim,spacedim>::get_radius () const
 
 //======================================================================//
 
-template<int dim>
+template <int dim>
 ConeBoundary<dim>::ConeBoundary (const double radius_0,
                                  const double radius_1,
                                  const Point<dim> x_0,
@@ -285,7 +285,7 @@ ConeBoundary<dim>::ConeBoundary (const double radius_0,
 
 
 
-template<int dim>
+template <int dim>
 double ConeBoundary<dim>::get_radius (Point<dim> x) const
 {
   for (unsigned int i = 0; i < dim; ++i)
@@ -297,7 +297,7 @@ double ConeBoundary<dim>::get_radius (Point<dim> x) const
 
 
 
-template<int dim>
+template <int dim>
 void
 ConeBoundary<dim>::
 get_intermediate_points_between_points (const Point<dim> &p0,
@@ -327,7 +327,7 @@ get_intermediate_points_between_points (const Point<dim> &p0,
     }
 }
 
-template<int dim>
+template <int dim>
 Point<dim>
 ConeBoundary<dim>::
 get_new_point_on_line (const typename Triangulation<dim>::line_iterator &line) const
@@ -366,7 +366,7 @@ get_new_point_on_quad (const Triangulation<3>::quad_iterator &quad) const
 
 
 
-template<int dim>
+template <int dim>
 Point<dim>
 ConeBoundary<dim>::
 get_new_point_on_quad (const typename Triangulation<dim>::quad_iterator &) const
@@ -378,7 +378,7 @@ get_new_point_on_quad (const typename Triangulation<dim>::quad_iterator &) const
 
 
 
-template<int dim>
+template <int dim>
 void
 ConeBoundary<dim>::
 get_intermediate_points_on_line (const typename Triangulation<dim>::line_iterator &line,
@@ -393,7 +393,7 @@ get_intermediate_points_on_line (const typename Triangulation<dim>::line_iterato
 
 
 
-template<>
+template <>
 void
 ConeBoundary<3>::
 get_intermediate_points_on_quad (const Triangulation<3>::quad_iterator &quad,
@@ -441,7 +441,7 @@ get_intermediate_points_on_quad (const typename Triangulation<dim>::quad_iterato
 
 
 
-template<>
+template <>
 void
 ConeBoundary<1>::
 get_normals_at_vertices (const Triangulation<1>::face_iterator &,
@@ -452,7 +452,7 @@ get_normals_at_vertices (const Triangulation<1>::face_iterator &,
 
 
 
-template<int dim>
+template <int dim>
 void
 ConeBoundary<dim>::
 get_normals_at_vertices (const typename Triangulation<dim>::face_iterator &face,
@@ -473,6 +473,33 @@ get_normals_at_vertices (const typename Triangulation<dim>::face_iterator &face,
       face_vertex_normals[vertex] = axis_to_vertex / axis_to_vertex.norm ();
     }
 }
+
+
+template <int dim>
+inline
+Tensor<1,dim>
+ConeBoundary<dim>::
+normal_vector (const typename Triangulation<dim>::face_iterator &,
+               const Point<dim> &p) const
+{
+// TODO only for cone opening along z-axis
+  Assert (dim == 3, ExcNotImplemented());
+  Assert (this->radius_0 == 0., ExcNotImplemented());
+  Assert (this->x_0 == Point<dim>(), ExcNotImplemented());
+  for (unsigned int d=0; d<dim; ++d)
+    if (d != dim-1)  // don't test the last component of the vector
+      Assert (this->x_1[d] == 0., ExcNotImplemented());
+  Assert (this->x_1[dim-1] > 0, ExcNotImplemented());
+
+  const double c_squared = (this->radius_1 / this->x_1[dim-1])*(this->radius_1 / this->x_1[dim-1]);
+  Tensor<1,dim> normal = p;
+  normal[0] *= -2.0/c_squared;
+  normal[1] *= -2.0/c_squared;
+  normal[dim-1] *= 2.0;
+
+  return normal/normal.norm();
+}
+
 
 
 //======================================================================//
@@ -601,8 +628,17 @@ HyperBallBoundary<dim,spacedim>::get_intermediate_points_between_points (
   else
     r = radius;
 
-  Assert(std::fabs(v0*v0-r*r)<eps*r*r, ExcInternalError());
-  Assert(std::fabs(v1*v1-r*r)<eps*r*r, ExcInternalError());
+  Assert((std::fabs(v0*v0-r*r)<eps*r*r)
+         &&
+         (std::fabs(v1*v1-r*r)<eps*r*r),
+         ExcMessage("In computing the location of midpoints of an edge of a "
+                    "HyperBallBoundary, one of the vertices of the edge "
+                    "does not have the expected distance from the center "
+                    "of the sphere. This may happen if the geometry has "
+                    "been deformed, or if the HyperBallBoundary object has "
+                    "been assigned to a part of the boundary that is not "
+                    "in fact a sphere (e.g., the sides of a quarter shell "
+                    "or one octant of a ball)."));
 
   const double alpha=std::acos((v0*v1)/std::sqrt((v0*v0)*(v1*v1)));
   const Tensor<1,spacedim> pm=0.5*(v0+v1);
@@ -1183,11 +1219,11 @@ get_normals_at_vertices (const typename Triangulation<dim>::face_iterator &face,
 
 
 template <int dim, int spacedim>
-TorusBoundary<dim,spacedim>::TorusBoundary (const double R__,
-                                            const double r__)
+TorusBoundary<dim,spacedim>::TorusBoundary (const double R_,
+                                            const double r_)
   :
-  R(R__),
-  r(r__)
+  R(R_),
+  r(r_)
 {
   Assert (false, ExcNotImplemented());
 }
@@ -1195,11 +1231,11 @@ TorusBoundary<dim,spacedim>::TorusBoundary (const double R__,
 
 
 template <>
-TorusBoundary<2,3>::TorusBoundary (const double R__,
-                                   const double r__)
+TorusBoundary<2,3>::TorusBoundary (const double R_,
+                                   const double r_)
   :
-  R(R__),
-  r(r__)
+  R(R_),
+  r(r_)
 {
   Assert (R>r, ExcMessage("Outer radius must be greater than inner radius."));
 }
@@ -1333,7 +1369,7 @@ TorusBoundary<2,3>::get_new_point_on_quad (const Triangulation<2,3>::quad_iterat
 //Normal field without unit length
 template <>
 Point<3>
-TorusBoundary<2,3>:: get_surf_norm_from_sp(const Point<2> &surfP) const
+TorusBoundary<2,3>::get_surf_norm_from_sp(const Point<2> &surfP) const
 {
 
   Point<3> n;
@@ -1364,7 +1400,7 @@ TorusBoundary<2,3>::get_surf_norm(const Point<3> &p) const
 
 
 
-template<>
+template <>
 void
 TorusBoundary<2,3>::
 get_intermediate_points_on_line (const Triangulation<2, 3>::line_iterator   &line,
@@ -1415,7 +1451,7 @@ get_intermediate_points_on_line (const Triangulation<2, 3>::line_iterator   &lin
 
 
 
-template<>
+template <>
 void
 TorusBoundary<2,3>::
 get_intermediate_points_on_quad (const Triangulation< 2, 3 >::quad_iterator &quad,
@@ -1475,7 +1511,7 @@ get_intermediate_points_on_quad (const Triangulation< 2, 3 >::quad_iterator &qua
 
 
 
-template<>
+template <>
 void
 TorusBoundary<2,3>::
 get_normals_at_vertices (const Triangulation<2,3 >::face_iterator &face,

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/function.h>
 #include <deal.II/lac/vector.h>
@@ -33,13 +32,11 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 
 
 namespace Step48
@@ -57,17 +54,17 @@ namespace Step48
     SineGordonOperation(const MatrixFree<dim,double> &data_in,
                         const double                      time_step);
 
-    void apply (parallel::distributed::Vector<double>                        &dst,
-                const std::vector<parallel::distributed::Vector<double>*> &src) const;
+    void apply (LinearAlgebra::distributed::Vector<double>                        &dst,
+                const std::vector<LinearAlgebra::distributed::Vector<double>*> &src) const;
 
   private:
     const MatrixFree<dim,double>         &data;
     const VectorizedArray<double>         delta_t_sqr;
-    parallel::distributed::Vector<double> inv_mass_matrix;
+    LinearAlgebra::distributed::Vector<double> inv_mass_matrix;
 
     void local_apply (const MatrixFree<dim,double>               &data,
-                      parallel::distributed::Vector<double>      &dst,
-                      const std::vector<parallel::distributed::Vector<double>*> &src,
+                      LinearAlgebra::distributed::Vector<double>      &dst,
+                      const std::vector<LinearAlgebra::distributed::Vector<double>*> &src,
                       const std::pair<unsigned int,unsigned int> &cell_range) const;
   };
 
@@ -113,8 +110,8 @@ namespace Step48
   template <int dim, int fe_degree>
   void SineGordonOperation<dim, fe_degree>::
   local_apply (const MatrixFree<dim>                 &data,
-               parallel::distributed::Vector<double>     &dst,
-               const std::vector<parallel::distributed::Vector<double>*> &src,
+               LinearAlgebra::distributed::Vector<double>     &dst,
+               const std::vector<LinearAlgebra::distributed::Vector<double>*> &src,
                const std::pair<unsigned int,unsigned int> &cell_range) const
   {
     AssertDimension (src.size(), 2);
@@ -164,8 +161,8 @@ namespace Step48
 
   template <int dim, int fe_degree>
   void SineGordonOperation<dim, fe_degree>::
-  apply (parallel::distributed::Vector<double>                        &dst,
-         const std::vector<parallel::distributed::Vector<double>*> &src) const
+  apply (LinearAlgebra::distributed::Vector<double>                        &dst,
+         const std::vector<LinearAlgebra::distributed::Vector<double>*> &src) const
   {
     dst = 0;
     data.cell_loop (&SineGordonOperation<dim,fe_degree>::local_apply,
@@ -214,7 +211,7 @@ namespace Step48
 
     MatrixFree<dim,double> matrix_free_data;
 
-    parallel::distributed::Vector<double> solution, old_solution, old_old_solution;
+    LinearAlgebra::distributed::Vector<double> solution, old_solution, old_old_solution;
 
     const unsigned int n_global_refinements;
     double time, time_step;
@@ -285,7 +282,7 @@ namespace Step48
     Vector<float> norm_per_cell (triangulation.n_active_cells());
     VectorTools::integrate_difference (dof_handler,
                                        solution,
-                                       ZeroFunction<dim>(),
+                                       Functions::ZeroFunction<dim>(),
                                        norm_per_cell,
                                        QGauss<dim>(fe_degree+1),
                                        VectorTools::L2_norm);
@@ -322,7 +319,7 @@ namespace Step48
                               old_solution);
     output_norm ();
 
-    std::vector<parallel::distributed::Vector<double>*> previous_solutions;
+    std::vector<LinearAlgebra::distributed::Vector<double>*> previous_solutions;
     previous_solutions.push_back(&old_solution);
     previous_solutions.push_back(&old_old_solution);
 
@@ -350,10 +347,8 @@ namespace Step48
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog << std::setprecision(4);
-  deallog.threshold_double(1.e-10);
 
   Step48::SineGordonProblem<2> sg_problem;
   sg_problem.run ();

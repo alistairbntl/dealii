@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,12 +15,13 @@
 
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
+#include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/sparse_matrix.h>
 
 #include <deal.II/dofs/dof_accessor.h>
@@ -52,7 +53,7 @@ get_interpolated_dof_values (const InputVector &values,
     {
       if ((dynamic_cast<DoFHandler<DoFHandlerType::dimension,DoFHandlerType::space_dimension>*>
            (this->dof_handler)
-           != 0)
+           != nullptr)
           ||
           // for hp-DoFHandlers, we need to require that on
           // active cells, you either don't specify an fe_index,
@@ -69,9 +70,9 @@ get_interpolated_dof_values (const InputVector &values,
           Vector<number> tmp (this->get_fe().dofs_per_cell);
           this->get_dof_values (values, tmp);
 
-          FullMatrix<double> interpolation (this->dof_handler->get_fe()[fe_index].dofs_per_cell,
+          FullMatrix<double> interpolation (this->dof_handler->get_fe(fe_index).dofs_per_cell,
                                             this->get_fe().dofs_per_cell);
-          this->dof_handler->get_fe()[fe_index].get_interpolation_matrix (this->get_fe(),
+          this->dof_handler->get_fe(fe_index).get_interpolation_matrix (this->get_fe(),
               interpolation);
           interpolation.vmult (interpolated_values, tmp);
         }
@@ -88,7 +89,7 @@ get_interpolated_dof_values (const InputVector &values,
       // fe_index is given
       Assert ((dynamic_cast<DoFHandler<DoFHandlerType::dimension,DoFHandlerType::space_dimension>*>
                (this->dof_handler)
-               != 0)
+               != nullptr)
               ||
               (fe_index != DoFHandlerType::default_fe_index),
               ExcMessage ("You cannot call this function on non-active cells "
@@ -98,10 +99,10 @@ get_interpolated_dof_values (const InputVector &values,
                           "of freedom are only distributed on active cells for which "
                           "the active_fe_index has been set."));
 
-      const FiniteElement<dim,spacedim> &fe            = this->get_dof_handler().get_fe()[fe_index];
+      const FiniteElement<dim,spacedim> &fe            = this->get_dof_handler().get_fe(fe_index);
       const unsigned int                 dofs_per_cell = fe.dofs_per_cell;
 
-      Assert (this->dof_handler != 0,
+      Assert (this->dof_handler != nullptr,
               typename BaseClass::ExcInvalidObject());
       Assert (interpolated_values.size() == dofs_per_cell,
               typename BaseClass::ExcVectorDoesNotMatch());

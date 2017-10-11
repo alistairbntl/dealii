@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
@@ -33,7 +32,6 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 
 
 
@@ -43,24 +41,24 @@ print_dofs (const DoFHandler<dim> &dof)
 {
   const FiniteElement<dim> &fe = dof.get_fe();
   std::vector<types::global_dof_index> v (fe.dofs_per_cell);
-  std_cxx11::shared_ptr<FEValues<dim> > fevalues;
+  std::shared_ptr<FEValues<dim> > fevalues;
 
   if (fe.has_support_points())
     {
       Quadrature<dim> quad(fe.get_unit_support_points());
-      fevalues = std_cxx11::shared_ptr<FEValues<dim> >(new FEValues<dim>(fe, quad, update_q_points));
+      fevalues = std::shared_ptr<FEValues<dim> >(new FEValues<dim>(fe, quad, update_quadrature_points));
     }
 
   for (typename DoFHandler<dim>::active_cell_iterator cell=dof.begin_active();
        cell != dof.end(); ++cell)
     {
       Point<dim> p = cell->center();
-      if (fevalues.get() != 0)
+      if (fevalues.get() != nullptr)
         fevalues->reinit(cell);
 
       cell->get_dof_indices (v);
       for (unsigned int i=0; i<v.size(); ++i)
-        if (fevalues.get() != 0)
+        if (fevalues.get() != nullptr)
           deallog << fevalues->quadrature_point(i) << '\t' << v[i] << std::endl;
         else
           deallog << p << '\t' << v[i] << std::endl;
@@ -86,7 +84,7 @@ template <int dim>
 void
 check ()
 {
-  Triangulation<dim> tr;
+  Triangulation<dim> tr(Triangulation<dim>::limit_level_difference_at_vertices);
   GridGenerator::hyper_cube(tr, -1., 1.);
   tr.refine_global (1);
   tr.begin_active()->set_refine_flag ();

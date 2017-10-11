@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------
 // $Id: tria.inst.in 32674 2014-03-20 16:57:24Z denis.davydov $
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,20 +17,20 @@
 
 
 for (deal_II_dimension : DIMENSIONS)
-  {
+{
     namespace parallel
     \{
-      namespace shared
-      \{
-        template class Triangulation<deal_II_dimension>;
+    namespace shared
+    \{
+    template class Triangulation<deal_II_dimension>;
 #       if deal_II_dimension < 3
-        template class Triangulation<deal_II_dimension, deal_II_dimension+1>;
+    template class Triangulation<deal_II_dimension, deal_II_dimension+1>;
 #       endif
 #       if deal_II_dimension < 2
-        template class Triangulation<deal_II_dimension, deal_II_dimension+2>;
+    template class Triangulation<deal_II_dimension, deal_II_dimension+2>;
 #       endif
-      \}
+    \}
     \}
 
-  }
+}
 

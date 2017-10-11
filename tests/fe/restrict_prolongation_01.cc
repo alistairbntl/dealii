@@ -1,7 +1,6 @@
 /* ---------------------------------------------------------------------
- * $Id$
  *
- * Copyright (C) 1999 - 2015 by the deal.II authors
+ * Copyright (C) 1999 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -36,7 +35,6 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 #include <iostream>
 
 using namespace dealii;
@@ -160,7 +158,6 @@ int main ()
 {
   initlog();
   deallog.depth_file (1);
-  deallog.threshold_double(1.e-10);
   for (unsigned int i=1; i<=3; ++i)
     {
       {

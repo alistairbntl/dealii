@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,8 +19,6 @@
 
 #  include <deal.II/lac/slepc_solver.h>
 #  include <deal.II/lac/petsc_matrix_base.h>
-#  include <deal.II/lac/petsc_vector_base.h>
-#  include <deal.II/lac/petsc_vector.h>
 
 #  include <cmath>
 #  include <vector>
@@ -33,28 +31,29 @@ namespace SLEPcWrappers
 {
   TransformationBase::TransformationBase (const MPI_Comm &mpi_communicator)
   {
-    int ierr = STCreate(mpi_communicator, &st);
+    const PetscErrorCode ierr = STCreate(mpi_communicator, &st);
     AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
   }
 
   TransformationBase::~TransformationBase ()
   {
-    if (st!=NULL)
+    if (st!=nullptr)
       {
-        int ierr = STDestroy(&st);
-        AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
+        const PetscErrorCode ierr = STDestroy(&st);
+        (void)ierr;
+        AssertNothrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
       }
   }
 
   void TransformationBase::set_matrix_mode(const STMatMode mode)
   {
-    int ierr = STSetMatMode(st,mode);
+    const PetscErrorCode ierr = STSetMatMode(st,mode);
     AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
   }
 
   void TransformationBase::set_solver(const PETScWrappers::SolverBase &solver)
   {
-    int ierr = STSetKSP(st,solver.solver_data->ksp);
+    PetscErrorCode ierr = STSetKSP(st,solver.solver_data->ksp);
     AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
   }
 
@@ -72,8 +71,7 @@ namespace SLEPcWrappers
     TransformationBase(mpi_communicator),
     additional_data (data)
   {
-    int ierr;
-    ierr = STSetType (st, const_cast<char *>(STSHIFT));
+    PetscErrorCode ierr = STSetType (st, const_cast<char *>(STSHIFT));
     AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
 
     ierr = STSetShift (st, additional_data.shift_parameter);
@@ -94,12 +92,7 @@ namespace SLEPcWrappers
     TransformationBase(mpi_communicator),
     additional_data (data)
   {
-    int ierr;
-#if DEAL_II_PETSC_VERSION_LT(3,1,0)
-    ierr = STSetType (st, const_cast<char *>(STSINV));
-#else
-    ierr = STSetType (st, const_cast<char *>(STSINVERT));
-#endif
+    PetscErrorCode ierr = STSetType (st, const_cast<char *>(STSINVERT));
     AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
 
     ierr = STSetShift (st, additional_data.shift_parameter);
@@ -121,13 +114,10 @@ namespace SLEPcWrappers
     additional_data (data)
   {
 #if DEAL_II_PETSC_VERSION_LT(3,5,0)
-    int ierr;
-    ierr = STSetType (st, const_cast<char *>(STFOLD));
-    (void)ierr;
+    PetscErrorCode ierr = STSetType (st, const_cast<char *>(STFOLD));
     AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
 
     ierr = STSetShift (st, additional_data.shift_parameter);
-    (void)ierr;
     AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
 #else
     // PETSc/SLEPc version must be < 3.5.0.
@@ -155,7 +145,7 @@ namespace SLEPcWrappers
     TransformationBase(mpi_communicator),
     additional_data (data)
   {
-    int ierr = STSetType (st, const_cast<char *>(STCAYLEY));
+    PetscErrorCode ierr = STSetType (st, const_cast<char *>(STCAYLEY));
     AssertThrow (ierr == 0, SolverBase::ExcSLEPcError(ierr));
 
     ierr = STSetShift (st, additional_data.shift_parameter);

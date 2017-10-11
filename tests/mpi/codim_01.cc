@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,8 +18,6 @@
 // Test Tria<2,3> and DataOutput.
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -29,7 +27,6 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <fstream>
 #include <deal.II/fe/fe_q.h>
 
 template <int dim, int spacedim>
@@ -59,7 +56,7 @@ void write_vtk (const parallel::distributed::Triangulation<dim,spacedim> &tria,
 
 }
 
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 void test(std::ostream & /*out*/)
 {
   parallel::distributed::Triangulation<dim,spacedim> tr(MPI_COMM_WORLD);

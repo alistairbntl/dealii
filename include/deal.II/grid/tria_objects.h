@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tria_objects_h
-#define dealii__tria_objects_h
+#ifndef dealii_tria_objects_h
+#define dealii_tria_objects_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
@@ -117,7 +117,7 @@ namespace internal
 
       /**
        * We use this union to store boundary and material data. Because only
-       * one one out of these two is actually needed here, we use an union.
+       * one out of these two is actually needed here, we use an union.
        */
       struct BoundaryOrMaterialId
       {
@@ -371,7 +371,7 @@ namespace internal
          */
         UserData()
         {
-          p = 0;
+          p = nullptr;
         }
 
         /**
@@ -430,13 +430,15 @@ namespace internal
 
 
       /**
-       * For edges, we enforce a standard convention that opposite edges
-       * should be parallel. Now, that's enforceable in most cases, and we
-       * have code that makes sure that if a mesh allows this to happen, that
-       * we have this convention. We also know that it is always possible to
-       * have opposite faces have parallel normal vectors. (For both things,
-       * see the Agelek, Anderson, Bangerth, Barth paper mentioned in the
-       * publications list.)
+       * For edges, we enforce a standard convention that opposite
+       * edges should be parallel. Now, that's enforceable in most
+       * cases, and we have code that makes sure that if a mesh allows
+       * this to happen, that we have this convention. We also know
+       * that it is always possible to have opposite faces have
+       * parallel normal vectors. (For both things, see the paper by
+       * Agelek, Anderson, Bangerth, Barth in the ACM Transactions on
+       * Mathematical Software mentioned in the documentation of the
+       * GridReordering class.)
        *
        * The problem is that we originally had another condition, namely that
        * faces 0, 2 and 6 have normals that point into the cell, while the
@@ -601,7 +603,7 @@ namespace internal
     }
 
 
-    template<typename G>
+    template <typename G>
     inline
     bool
     TriaObjects<G>::
@@ -611,7 +613,7 @@ namespace internal
     }
 
 
-    template<typename G>
+    template <typename G>
     inline
     void *&
     TriaObjects<G>::user_pointer (const unsigned int i)
@@ -625,7 +627,7 @@ namespace internal
     }
 
 
-    template<typename G>
+    template <typename G>
     inline
     const void *
     TriaObjects<G>::user_pointer (const unsigned int i) const
@@ -639,7 +641,7 @@ namespace internal
     }
 
 
-    template<typename G>
+    template <typename G>
     inline
     unsigned int &
     TriaObjects<G>::user_index (const unsigned int i)
@@ -653,7 +655,7 @@ namespace internal
     }
 
 
-    template<typename G>
+    template <typename G>
     inline
     void
     TriaObjects<G>::clear_user_data (const unsigned int i)
@@ -667,12 +669,14 @@ namespace internal
     inline
     TriaObjects<G>::TriaObjects()
       :
+      next_free_single (numbers::invalid_unsigned_int),
+      next_free_pair (numbers::invalid_unsigned_int),
       reverse_order_next_free_single (false),
       user_data_type(data_unknown)
     {}
 
 
-    template<typename G>
+    template <typename G>
     inline
     unsigned int TriaObjects<G>::user_index (const unsigned int i) const
     {
@@ -685,17 +689,17 @@ namespace internal
     }
 
 
-    template<typename G>
+    template <typename G>
     inline
     void TriaObjects<G>::clear_user_data ()
     {
       user_data_type = data_unknown;
       for (unsigned int i=0; i<user_data.size(); ++i)
-        user_data[i].p = 0;
+        user_data[i].p = nullptr;
     }
 
 
-    template<typename G>
+    template <typename G>
     inline
     void TriaObjects<G>::clear_user_flags ()
     {
@@ -703,7 +707,7 @@ namespace internal
     }
 
 
-    template<typename G>
+    template <typename G>
     template <class Archive>
     void
     TriaObjects<G>::UserData::serialize (Archive &ar,
@@ -860,7 +864,7 @@ namespace internal
 
 // declaration of explicit specializations
 
-    template<>
+    template <>
     void
     TriaObjects<TriaObject<2> >::monitor_memory (const unsigned int) const;
 

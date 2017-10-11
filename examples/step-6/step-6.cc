@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2000 - 2015 by the deal.II authors
+ * Copyright (C) 2000 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -109,10 +109,11 @@ private:
   void refine_grid ();
   void output_results (const unsigned int cycle) const;
 
-  Triangulation<dim>   triangulation;
+  Triangulation<dim>           triangulation;
+  const SphericalManifold<dim> boundary;
 
-  DoFHandler<dim>      dof_handler;
   FE_Q<dim>            fe;
+  DoFHandler<dim>      dof_handler;
 
   // This is the new variable in the main class. We need an object which holds
   // a list of constraints to hold the hanging nodes and the boundary
@@ -131,26 +132,8 @@ private:
 
 // The implementation of nonconstant coefficients is copied verbatim from
 // step-5:
-
 template <int dim>
-class Coefficient : public Function<dim>
-{
-public:
-  Coefficient () : Function<dim>() {}
-
-  virtual double value (const Point<dim>   &p,
-                        const unsigned int  component = 0) const;
-
-  virtual void value_list (const std::vector<Point<dim> > &points,
-                           std::vector<double>            &values,
-                           const unsigned int              component = 0) const;
-};
-
-
-
-template <int dim>
-double Coefficient<dim>::value (const Point<dim> &p,
-                                const unsigned int) const
+double coefficient (const Point<dim> &p)
 {
   if (p.square() < 0.5*0.5)
     return 20;
@@ -158,29 +141,6 @@ double Coefficient<dim>::value (const Point<dim> &p,
     return 1;
 }
 
-
-
-template <int dim>
-void Coefficient<dim>::value_list (const std::vector<Point<dim> > &points,
-                                   std::vector<double>            &values,
-                                   const unsigned int              component) const
-{
-  const unsigned int n_points = points.size();
-
-  Assert (values.size() == n_points,
-          ExcDimensionMismatch (values.size(), n_points));
-
-  Assert (component == 0,
-          ExcIndexRange (component, 0, 1));
-
-  for (unsigned int i=0; i<n_points; ++i)
-    {
-      if (points[i].square() < 0.5*0.5)
-        values[i] = 20;
-      else
-        values[i] = 1;
-    }
-}
 
 
 // @sect3{The <code>Step6</code> class implementation}
@@ -194,45 +154,45 @@ void Coefficient<dim>::value_list (const std::vector<Point<dim> > &points,
 template <int dim>
 Step6<dim>::Step6 ()
   :
-  dof_handler (triangulation),
-  fe (2)
+  fe (2),
+  dof_handler (triangulation)
 {}
 
 
 // @sect4{Step6::~Step6}
 
 // Here comes the added destructor of the class. The reason why we want to add
-// it is a subtle change in the order of data elements in the class as
-// compared to all previous examples: the <code>dof_handler</code> object was
-// defined before and not after the <code>fe</code> object. Of course we could
-// have left this order unchanged, but we would like to show what happens if
-// the order is reversed since this produces a rather nasty side-effect and
-// results in an error which is difficult to track down if one does not know
-// what happens.
+// it is to pick up an issue we already started to discuss in step-1:
+// the <code>boundary</code> object was defined before and not after the
+// <code>triangulation</code> object. Of course we could have left this order
+// unchanged, but we would like to show what happens if the order is reversed
+// since this produces a rather nasty side-effect and results in an error which
+// is difficult to track down if one does not know what happens.
 //
-// Basically what happens is the following: when we distribute the degrees of
-// freedom using the function call <code>dof_handler.distribute_dofs()</code>,
-// the <code>dof_handler</code> also stores a pointer to the finite element in
-// use. Since this pointer is used every now and then until either the degrees
-// of freedom are re-distributed using another finite element object or until
-// the <code>dof_handler</code> object is destroyed, it would be unwise if we
-// would allow the finite element object to be deleted before the
-// <code>dof_handler</code> object. To disallow this, the DoF handler
-// increases a counter inside the finite element object which counts how many
-// objects use that finite element (this is what the
+// Basically what happens is the following: when we set a manifold description
+// to the triangulation using the function call
+// <code>triangulation.set_manifold (0, boundary)</code>, the
+// <code>Triangulation</code> object also stores a pointer to the
+// <code>Manifold</code> object in use. Since this pointer is used until either
+// another <code>Manifold</code> object is set as boundary description or until
+// the <code>Triangulation</code> object is destroyed, it would be unwise if we
+// would allow the <code>boundary</code> to be deleted before the
+// <code>triangulation</code>. To disallow this, the <code>triangulation</code>
+// increases a counter inside the <code>boundary</code> which counts how many
+// objects use it (this is what the
 // <code>Subscriptor</code>/<code>SmartPointer</code> class pair is used for,
 // in case you want something like this for your own programs; see step-7 for
-// a more complete discussion of this topic). The finite element object will
+// a more complete discussion of this topic). The <code>boundary</code> will
 // refuse its destruction if that counter is larger than zero, since then some
-// other objects might rely on the persistence of the finite element
-// object. An exception will then be thrown and the program will usually abort
-// upon the attempt to destroy the finite element.
+// other objects might rely on its persistence. An exception will then be
+// thrown and the program will usually abort upon the attempt to destroy
+// <code>boundary</code>.
 //
 // To be fair, such exceptions about still used objects are not particularly
 // popular among programmers using deal.II, since they only tell us that
-// something is wrong, namely that some other object is still using the object
-// that is presently being destructed, but most of the time not who this user
-// is. It is therefore often rather time-consuming to find out where the
+// something is wrong, namely that <i>some</i> other object is still using the object
+// that is presently being destroyed, but most of the time not <i>which</i> object is
+// still using it. It is therefore often rather time-consuming to find out where the
 // problem exactly is, although it is then usually straightforward to remedy
 // the situation. However, we believe that the effort to find invalid
 // references to objects that do no longer exist is less if the problem is
@@ -243,19 +203,19 @@ Step6<dim>::Step6 ()
 // Coming back to the present situation, if we did not write this destructor,
 // the compiler will generate code that triggers exactly the behavior sketched
 // above. The reason is that member variables of the <code>Step6</code> class
-// are destructed bottom-up (i.e. in reverse order of their declaration in the
-// class), as always in C++. Thus, the finite element object will be
-// destructed before the DoF handler object, since its declaration is below
-// the one of the DoF handler. This triggers the situation above, and an
-// exception will be raised when the <code>fe</code> object is
-// destructed. What needs to be done is to tell the <code>dof_handler</code>
-// object to release its lock to the finite element. Of course, the
-// <code>dof_handler</code> will only release its lock if it really does not
-// need the finite element any more, i.e. when all finite element related data
-// is deleted from it. For this purpose, the <code>DoFHandler</code> class has
-// a function <code>clear</code> which deletes all degrees of freedom, and
-// releases its lock to the finite element. After this, you can safely
-// destruct the finite element object since its internal counter is then zero.
+// are destroyed bottom-up (i.e., in reverse order of their declaration in the
+// class), as always in C++. Thus, the boundary object will be
+// destroyed before the triangulation object, since its declaration is below
+// the one of the triangulation. This triggers the situation above, and an
+// exception will be raised when the boundary object is
+// destroyed. What needs to be done is to tell the <code>triangulation</code>
+// object to release its lock to <code>boundary</code>. Of course, the
+// <code>triangulation</code> will only release its lock if it really does not
+// need the <code>boundary</code> any more. For this purpose, the
+// <code>Triangulation</code> class has a function <code>clear</code> which
+// resets the object into a virgin state by deleting all data and releases its
+// lock to the finite element. After this, you can safely destruct the
+// <code>boundary</code> object since its internal counter is then zero.
 //
 // For completeness, we add the output of the exception that would have been
 // triggered without this destructor, to the end of the results section of
@@ -263,7 +223,7 @@ Step6<dim>::Step6 ()
 template <int dim>
 Step6<dim>::~Step6 ()
 {
-  dof_handler.clear ();
+  triangulation.clear ();
 }
 
 
@@ -309,7 +269,7 @@ void Step6<dim>::setup_system ()
                                            constraints);
 
 
-  // Now we are ready to interpolate the ZeroFunction to our boundary with
+  // Now we are ready to interpolate the Functions::ZeroFunction to our boundary with
   // indicator 0 (the whole boundary) and store the resulting constraints in
   // our <code>constraints</code> object. Note that we do not to apply the
   // boundary conditions after assembly, like we did in earlier steps.  As
@@ -321,7 +281,7 @@ void Step6<dim>::setup_system ()
   // values into the ContraintMatrix after the hanging node constraints.
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim>(),
+                                            Functions::ZeroFunction<dim>(),
                                             constraints);
 
 
@@ -407,9 +367,6 @@ void Step6<dim>::assemble_system ()
 
   std::vector<types::global_dof_index> local_dof_indices (dofs_per_cell);
 
-  const Coefficient<dim> coefficient;
-  std::vector<double>    coefficient_values (n_q_points);
-
   typename DoFHandler<dim>::active_cell_iterator
   cell = dof_handler.begin_active(),
   endc = dof_handler.end();
@@ -420,22 +377,23 @@ void Step6<dim>::assemble_system ()
 
       fe_values.reinit (cell);
 
-      coefficient.value_list (fe_values.get_quadrature_points(),
-                              coefficient_values);
-
       for (unsigned int q_index=0; q_index<n_q_points; ++q_index)
-        for (unsigned int i=0; i<dofs_per_cell; ++i)
-          {
-            for (unsigned int j=0; j<dofs_per_cell; ++j)
-              cell_matrix(i,j) += (coefficient_values[q_index] *
-                                   fe_values.shape_grad(i,q_index) *
-                                   fe_values.shape_grad(j,q_index) *
-                                   fe_values.JxW(q_index));
+        {
+          const double current_coefficient = coefficient<dim>
+                                             (fe_values.quadrature_point (q_index));
+          for (unsigned int i=0; i<dofs_per_cell; ++i)
+            {
+              for (unsigned int j=0; j<dofs_per_cell; ++j)
+                cell_matrix(i,j) += (current_coefficient *
+                                     fe_values.shape_grad(i,q_index) *
+                                     fe_values.shape_grad(j,q_index) *
+                                     fe_values.JxW(q_index));
 
-            cell_rhs(i) += (fe_values.shape_value(i,q_index) *
-                            1.0 *
-                            fe_values.JxW(q_index));
-          }
+              cell_rhs(i) += (fe_values.shape_value(i,q_index) *
+                              1.0 *
+                              fe_values.JxW(q_index));
+            }
+        }
 
       // Finally, transfer the contributions from @p cell_matrix and
       // @p cell_rhs into the global objects.
@@ -622,9 +580,10 @@ void Step6<dim>::refine_grid ()
 // hack with an explicit assertion at the beginning of the function. If this
 // assertion is triggered, i.e. when <code>cycle</code> is larger than or
 // equal to 10, an exception of type <code>ExcNotImplemented</code> is raised,
-// indicating that some functionality is not implemented for this case (the
+// indicating that some functionality is not implemented for this case -- the
 // functionality that is missing, of course, is the generation of file names
-// for that case):
+// for that case. (A longer discussion of what exactly the @p Assert macro
+// does can be found in the @ref Exceptions "exception documentation module".)
 template <int dim>
 void Step6<dim>::output_results (const unsigned int cycle) const
 {
@@ -678,7 +637,6 @@ void Step6<dim>::run ()
         {
           GridGenerator::hyper_ball (triangulation);
 
-          static const SphericalManifold<dim> boundary;
           triangulation.set_all_manifold_ids_on_boundary(0);
           triangulation.set_manifold (0, boundary);
 

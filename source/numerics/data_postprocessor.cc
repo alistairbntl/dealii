@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2007 - 2015 by the deal.II authors
+// Copyright (C) 2007 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,22 +22,11 @@ DEAL_II_NAMESPACE_OPEN
 // -------------------------- DataPostprocessor ---------------------------
 
 template <int dim>
-DataPostprocessor<dim>::~DataPostprocessor()
-{}
-
-
-
-template <int dim>
 void
 DataPostprocessor<dim>::
-compute_derived_quantities_scalar (const std::vector<double>         &/*uh*/,
-                                   const std::vector<Tensor<1,dim> > &/*duh*/,
-                                   const std::vector<Tensor<2,dim> > &/*dduh*/,
-                                   const std::vector<Point<dim> >    &/*normals*/,
-                                   const std::vector<Point<dim> >    &/*evaluation_points*/,
-                                   std::vector<Vector<double> >      &computed_quantities) const
+evaluate_scalar_field (const DataPostprocessorInputs::Scalar<dim> &,
+                       std::vector<Vector<double> > &) const
 {
-  computed_quantities.clear();
   AssertThrow(false,ExcPureFunctionCalled());
 }
 
@@ -46,14 +35,9 @@ compute_derived_quantities_scalar (const std::vector<double>         &/*uh*/,
 template <int dim>
 void
 DataPostprocessor<dim>::
-compute_derived_quantities_vector (const std::vector<Vector<double> > &/*uh*/,
-                                   const std::vector<std::vector<Tensor<1,dim> > > &/*duh*/,
-                                   const std::vector<std::vector<Tensor<2,dim> > > &/*dduh*/,
-                                   const std::vector<Point<dim> >                  &/*normals*/,
-                                   const std::vector<Point<dim> >                  &/*evaluation_points*/,
-                                   std::vector<Vector<double> >                    &computed_quantities) const
+evaluate_vector_field (const DataPostprocessorInputs::Vector<dim> &,
+                       std::vector<Vector<double> > &) const
 {
-  computed_quantities.clear();
   AssertThrow(false,ExcPureFunctionCalled());
 }
 
@@ -157,6 +141,61 @@ get_needed_update_flags () const
 {
   return update_flags;
 }
+
+
+
+
+// -------------------------- DataPostprocessorTensor ---------------------------
+
+template <int dim>
+DataPostprocessorTensor<dim>::
+DataPostprocessorTensor (const std::string &name,
+                         const UpdateFlags  update_flags)
+  :
+  name (name),
+  update_flags (update_flags)
+{}
+
+
+
+template <int dim>
+std::vector<std::string>
+DataPostprocessorTensor<dim>::
+get_names () const
+{
+  static_assert (dim <= 3,
+                 "The following variable needs to be expanded for dim>3");
+  static const char suffixes[] = { 'x', 'y', 'z' };
+
+  std::vector<std::string> names;
+  for (unsigned int d=0; d<dim; ++d)
+    for (unsigned int e=0; e<dim; ++e)
+      names.push_back (name + '_' + suffixes[d] + suffixes[e]);
+  return names;
+}
+
+
+
+template <int dim>
+std::vector<DataComponentInterpretation::DataComponentInterpretation>
+DataPostprocessorTensor<dim>::
+get_data_component_interpretation () const
+{
+  return
+    std::vector<DataComponentInterpretation::DataComponentInterpretation>
+    (dim*dim, DataComponentInterpretation::component_is_scalar);
+}
+
+
+template <int dim>
+UpdateFlags
+DataPostprocessorTensor<dim>::
+get_needed_update_flags () const
+{
+  return update_flags;
+}
+
+
 
 
 // explicit instantiation

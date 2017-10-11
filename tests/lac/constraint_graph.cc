@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -32,7 +31,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/base/quadrature_lib.h>
 
-#include <fstream>
 
 
 template <int dim>
@@ -70,7 +68,6 @@ int main ()
 {
   initlog();
   deallogfile << std::setprecision(8);
-  deallog.threshold_double(1.e-10);
 
   test<3> ();
 

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 // Check continuity across the face by evaluating the
 // field from both sides.
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/index_set.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -45,7 +44,7 @@
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/lac/sparsity_tools.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/hp/fe_values.h>
 
 #include <deal.II/lac/petsc_parallel_vector.h>
@@ -67,7 +66,6 @@
 
 #include "../tests.h"
 
-#include <fstream>
 #include <iostream>
 
 //#define DEBUG_OUTPUT_VTK
@@ -77,7 +75,7 @@ const double eps = 1e-10;
 
 using namespace dealii;
 
-template<int dim>
+template <int dim>
 void test2cells(const unsigned int p1=2,
                 const unsigned int p2=1)
 {
@@ -128,7 +126,7 @@ void test2cells(const unsigned int p1=2,
 #ifdef DEBUG_OUTPUT_VTK
   // output to check if all is good:
   counter++;
-  std::vector<Vector<double>> shape_functions;
+  std::vector<Vector<double> > shape_functions;
   std::vector<std::string> names;
   for (unsigned int s=0; s < dof_handler.n_dofs(); s++)
     {
@@ -152,7 +150,7 @@ void test2cells(const unsigned int p1=2,
       shape_functions.push_back(shape_function);
     }
 
-  DataOut<dim,hp::DoFHandler<dim>> data_out;
+  DataOut<dim,hp::DoFHandler<dim> > data_out;
   data_out.attach_dof_handler (dof_handler);
 
   // get material ids:
@@ -225,7 +223,6 @@ int main (int argc,char **argv)
   deallog << std::setprecision(4);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
 
   try

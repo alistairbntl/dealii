@@ -18,10 +18,7 @@
 
 #include "../tests.h"
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
-#include <fstream>
-#include <iomanip>
 
 template <typename U, typename V>
 void compare (const U &u, const V &v)
@@ -36,7 +33,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   typedef Tensor<0,1> T;
   T t1(13.), t2(42);

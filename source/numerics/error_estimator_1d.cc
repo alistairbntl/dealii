@@ -18,13 +18,14 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/lac/vector.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/base/geometry_info.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -39,12 +40,12 @@
 #include <deal.II/numerics/error_estimator.h>
 #include <deal.II/distributed/tria.h>
 
-#include <deal.II/base/std_cxx11/bind.h>
 
 #include <numeric>
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include <functional>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -223,7 +224,7 @@ estimate (const Mapping<1,spacedim>                  &mapping,
 #ifdef DEAL_II_WITH_P4EST
   if (dynamic_cast<const parallel::distributed::Triangulation<1,spacedim>*>
       (&dof_handler.get_triangulation())
-      != 0)
+      != nullptr)
     Assert ((subdomain_id_ == numbers::invalid_subdomain_id)
             ||
             (subdomain_id_ ==
@@ -236,7 +237,7 @@ estimate (const Mapping<1,spacedim>                  &mapping,
   const types::subdomain_id subdomain_id
     = ((dynamic_cast<const parallel::distributed::Triangulation<1,spacedim>*>
         (&dof_handler.get_triangulation())
-        != 0)
+        != nullptr)
        ?
        dynamic_cast<const parallel::distributed::Triangulation<1,spacedim>&>
        (dof_handler.get_triangulation()).locally_owned_subdomain()
@@ -247,7 +248,7 @@ estimate (const Mapping<1,spacedim>                  &mapping,
     = subdomain_id_;
 #endif
 
-  const unsigned int n_components       = dof_handler.get_fe().n_components();
+  const unsigned int n_components       = dof_handler.get_fe(0).n_components();
   const unsigned int n_solution_vectors = solutions.size();
 
   // sanity checks
@@ -268,7 +269,7 @@ estimate (const Mapping<1,spacedim>                  &mapping,
   Assert (component_mask.n_selected_components(n_components) > 0,
           ExcInvalidComponentMask());
 
-  Assert ((coefficient == 0) ||
+  Assert ((coefficient == nullptr) ||
           (coefficient->n_components == n_components) ||
           (coefficient->n_components == 1),
           ExcInvalidCoefficient());
@@ -282,7 +283,7 @@ estimate (const Mapping<1,spacedim>                  &mapping,
             ExcDimensionMismatch(solutions[n]->size(),
                                  dof_handler.n_dofs()));
 
-  Assert ((coefficient == 0) ||
+  Assert ((coefficient == nullptr) ||
           (coefficient->n_components == n_components) ||
           (coefficient->n_components == 1),
           ExcInvalidCoefficient());
@@ -314,7 +315,7 @@ estimate (const Mapping<1,spacedim>                  &mapping,
   // coefficient, then we fill it by unity once and for all and don't set it
   // any more
   Vector<double> coefficient_values (n_components);
-  if (coefficient == 0)
+  if (coefficient == nullptr)
     for (unsigned int c=0; c<n_components; ++c)
       coefficient_values(c) = 1;
 
@@ -323,7 +324,7 @@ estimate (const Mapping<1,spacedim>                  &mapping,
   const QGauss<0> face_quadrature(1);
   const hp::QCollection<0> q_face_collection(face_quadrature);
 
-  const hp::FECollection<1,spacedim> fe (dof_handler.get_fe());
+  const hp::FECollection<1,spacedim> &fe = dof_handler.get_fe_collection();
 
   hp::MappingCollection<1,spacedim> mapping_collection;
   mapping_collection.push_back (mapping);
@@ -416,7 +417,7 @@ estimate (const Mapping<1,spacedim>                  &mapping,
 
             // if there is a coefficient, then evaluate it at the present
             // position. if there is none, reuse the preset values.
-            if (coefficient != 0)
+            if (coefficient != nullptr)
               {
                 if (coefficient->n_components == 1)
                   {

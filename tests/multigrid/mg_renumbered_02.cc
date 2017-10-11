@@ -13,9 +13,9 @@
 //
 // ---------------------------------------------------------------------
 
+#include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 
 #include <deal.II/lac/constraint_matrix.h>
@@ -58,9 +58,8 @@
 #include <deal.II/multigrid/mg_smoother.h>
 #include <deal.II/multigrid/mg_matrix.h>
 
-#include <fstream>
+#include <functional>
 #include <sstream>
-#include <deal.II/base/std_cxx11/bind.h>
 
 using namespace dealii;
 
@@ -265,9 +264,9 @@ LaplaceProblem<dim>::output_gpl(const DoFHandler<dim> &dof,
       MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> > (
         dof.begin_mg(l), dof.end_mg(l),
         dof_info, info_box,
-        std_cxx11::bind(&OutputCreator<dim>::cell, &matrix_integrator, std_cxx11::_1, std_cxx11::_2),
-        0,
-        0,
+        std::bind(&OutputCreator<dim>::cell, &matrix_integrator, std::placeholders::_1, std::placeholders::_2),
+        nullptr,
+        nullptr,
         assembler);
     }
 }
@@ -276,7 +275,7 @@ template <int dim>
 void LaplaceProblem<dim>::test_boundary ()
 {
   typename FunctionMap<dim>::type      dirichlet_boundary;
-  ZeroFunction<dim>                    dirichlet_bc(fe.n_components());
+  Functions::ZeroFunction<dim>                    dirichlet_bc(fe.n_components());
   dirichlet_boundary[0] =             &dirichlet_bc;
   MGTools::make_boundary_list (mg_dof_handler_renumbered, dirichlet_boundary,
                                boundary_indices_renumbered);
@@ -357,9 +356,7 @@ void LaplaceProblem<dim>::run ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   LaplaceProblem<2> laplace_problem_2d(1);
   laplace_problem_2d.run ();

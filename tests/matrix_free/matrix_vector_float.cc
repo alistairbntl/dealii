@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2014 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -68,6 +68,5 @@ void test ()
   DoFTools::make_hanging_node_constraints(dof, constraints);
   constraints.close();
 
-  deallog.threshold_double (5e-6);
-  do_test<dim, fe_degree, float> (dof, constraints);
+  do_test<dim, fe_degree, float, fe_degree+1> (dof, constraints);
 }

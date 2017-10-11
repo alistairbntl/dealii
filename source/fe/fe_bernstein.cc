@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------
 // $Id: fe_q.cc 30037 2013-07-18 16:55:40Z maier $
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -26,6 +26,8 @@
 
 #include <vector>
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
+
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -41,6 +43,51 @@ FE_Bernstein<dim,spacedim>::FE_Bernstein (const unsigned int degree)
                            FiniteElementData<dim>::H1),
     std::vector<bool> (1, false))
 {}
+
+
+
+template <int dim, int spacedim>
+void
+FE_Bernstein<dim,spacedim>::
+get_interpolation_matrix (const FiniteElement<dim,spacedim> &,
+                          FullMatrix<double> &) const
+{
+  // no interpolation possible. throw exception, as documentation says
+  typedef FiniteElement<dim,spacedim> FEE;
+  AssertThrow (false,
+               typename FEE::ExcInterpolationNotImplemented());
+}
+
+
+
+template <int dim, int spacedim>
+const FullMatrix<double> &
+FE_Bernstein<dim,spacedim>::get_restriction_matrix (const unsigned int,
+                                                    const RefinementCase<dim> &) const
+{
+  typedef FiniteElement<dim,spacedim> FEE;
+  AssertThrow (false,
+               typename FEE::ExcProjectionVoid());
+  // return dummy, nothing will happen because the base class FE_Q_Base
+  // implements lazy evaluation of those matrices
+  return this->restriction[0][0];
+}
+
+
+
+template <int dim, int spacedim>
+const FullMatrix<double> &
+FE_Bernstein<dim,spacedim>::get_prolongation_matrix (const unsigned int,
+                                                     const RefinementCase<dim> &) const
+{
+  typedef FiniteElement<dim,spacedim> FEE;
+  AssertThrow (false,
+               typename FEE::ExcEmbeddingVoid());
+  // return dummy, nothing will happen because the base class FE_Q_Base
+  // implements lazy evaluation of those matrices
+  return this->prolongation[0][0];
+}
+
 
 
 template <int dim, int spacedim>
@@ -136,7 +183,7 @@ get_subface_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe
           Assert (std::fabs(sum-1) < eps, ExcInternalError());
         }
     }
-  else if (dynamic_cast<const FE_Nothing<dim> *>(&x_source_fe) != 0)
+  else if (dynamic_cast<const FE_Nothing<dim> *>(&x_source_fe) != nullptr)
     {
       // nothing to do here, the FE_Nothing has no degrees of freedom anyway
     }
@@ -163,13 +210,13 @@ FE_Bernstein<dim,spacedim>::hp_vertex_dof_identities (const FiniteElement<dim,sp
   // or if the other one is an FE_Nothing. in the first case, there should be
   // exactly one single DoF of each FE at a vertex, and they should have
   // identical value
-  if (dynamic_cast<const FE_Bernstein<dim,spacedim>*>(&fe_other) != 0)
+  if (dynamic_cast<const FE_Bernstein<dim,spacedim>*>(&fe_other) != nullptr)
     {
       return
         std::vector<std::pair<unsigned int, unsigned int> >
         (1, std::make_pair (0U, 0U));
     }
-  else if (dynamic_cast<const FE_Nothing<dim>*>(&fe_other) != 0)
+  else if (dynamic_cast<const FE_Nothing<dim>*>(&fe_other) != nullptr)
     {
       // the FE_Nothing has no degrees of freedom, so there are no
       // equivalencies to be recorded
@@ -259,7 +306,7 @@ template <int dim, int spacedim>
 std::string
 FE_Bernstein<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
 
@@ -270,10 +317,10 @@ FE_Bernstein<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_Bernstein<dim,spacedim>::clone() const
 {
-  return new FE_Bernstein<dim,spacedim>(*this);
+  return std_cxx14::make_unique<FE_Bernstein<dim,spacedim>>(*this);
 }
 
 

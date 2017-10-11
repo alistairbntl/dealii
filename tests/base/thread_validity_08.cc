@@ -17,15 +17,14 @@
 // see if we can detach from threads
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
+#include <atomic>
 #include <unistd.h>
 
 #include <deal.II/base/thread_management.h>
 
 
 Threads::Mutex mutex;
-volatile int spin_lock = 0;
+static std::atomic<int> spin_lock(0);
 
 
 void worker ()
@@ -43,9 +42,7 @@ void worker ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   mutex.acquire ();
   // start and abandon the

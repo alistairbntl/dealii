@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__trilinos_block_sparse_matrix_h
-#define dealii__trilinos_block_sparse_matrix_h
+#ifndef dealii_trilinos_block_sparse_matrix_h
+#define dealii_trilinos_block_sparse_matrix_h
 
 
 #include <deal.II/base/config.h>
@@ -25,7 +25,7 @@
 #  include <deal.II/base/template_constraints.h>
 #  include <deal.II/lac/block_matrix_base.h>
 #  include <deal.II/lac/trilinos_sparse_matrix.h>
-#  include <deal.II/lac/trilinos_block_vector.h>
+#  include <deal.II/lac/trilinos_parallel_block_vector.h>
 #  include <deal.II/lac/full_matrix.h>
 #  include <deal.II/lac/exceptions.h>
 
@@ -104,7 +104,7 @@ namespace TrilinosWrappers
      * reinit(BlockSparsityPattern). The number of blocks per row and column
      * are then determined by that function.
      */
-    BlockSparseMatrix ();
+    BlockSparseMatrix () = default;
 
     /**
      * Destructor.
@@ -116,7 +116,7 @@ namespace TrilinosWrappers
      * matrices need to be the same.
      */
     BlockSparseMatrix &
-    operator = (const BlockSparseMatrix &);
+    operator = (const BlockSparseMatrix &) = default;
 
     /**
      * This operator assigns a scalar to a matrix. Since this does usually not
@@ -198,7 +198,7 @@ namespace TrilinosWrappers
                  const double                               drop_tolerance=1e-13);
 
     /**
-     * Returns the state of the matrix, i.e., whether compress() needs to be
+     * Return the state of the matrix, i.e., whether compress() needs to be
      * called after an operation requiring data exchange. Does only return
      * non-true values when used in <tt>debug</tt> mode, since it is quite
      * expensive to keep track of all operations that lead to the need for
@@ -219,9 +219,15 @@ namespace TrilinosWrappers
     void collect_sizes ();
 
     /**
-     * Return the number of nonzero elements of this matrix.
+     * Return the total number of nonzero elements of this matrix (summed
+     * over all MPI processes).
      */
     size_type n_nonzero_elements () const;
+
+    /**
+     * Return the MPI communicator object in use with this matrix.
+     */
+    MPI_Comm get_mpi_communicator () const;
 
     /**
      * Return a vector of the underlying Trilinos Epetra_Map that sets the
@@ -245,6 +251,19 @@ namespace TrilinosWrappers
      */
     std::vector<Epetra_Map> range_partitioner () const DEAL_II_DEPRECATED;
 
+    /**
+     * Return the partitioning of the domain space for the individual blocks of
+     * this matrix, i.e., the partitioning of the block vectors this matrix has
+     * to be multiplied with.
+     */
+    std::vector<IndexSet> locally_owned_domain_indices() const;
+
+    /**
+     * Return the partitioning of the range space for the individual blocks of
+     * this matrix, i.e., the partitioning of the block vectors that result
+     * from matrix-vector products.
+     */
+    std::vector<IndexSet> locally_owned_range_indices() const;
 
     /**
      * Matrix-vector multiplication: let $dst = M*src$ with $M$ being this
@@ -273,9 +292,9 @@ namespace TrilinosWrappers
      * Source <i>x</i> and destination <i>dst</i> must not be the same vector.
      *
      * Note that both vectors have to be distributed vectors generated using
-     * the same Map as was used for the matrix in case you work on a
-     * distributed memory architecture, using the interface in the
-     * TrilinosWrappers::MPI::BlockVector class.
+     * the same Map as was used for the matrix.
+     *
+     * This function only applicable if the matrix only has one block row.
      */
     TrilinosScalar residual (MPI::BlockVector       &dst,
                              const MPI::BlockVector &x,
@@ -286,25 +305,7 @@ namespace TrilinosWrappers
      * defined to be <i>r=b-Mx</i>. Write the residual into @p dst. The
      * <i>l<sub>2</sub></i> norm of the residual vector is returned.
      *
-     * Source <i>x</i> and destination <i>dst</i> must not be the same vector.
-     *
-     * Note that both vectors have to be distributed vectors generated using
-     * the same Map as was used for the matrix in case you work on a
-     * distributed memory architecture, using the interface in the
-     * TrilinosWrappers::BlockVector class. Since the block matrix is in
-     * general distributed among processes, this function only works when
-     * running the program on one processor.
-     */
-    TrilinosScalar residual (BlockVector       &dst,
-                             const BlockVector &x,
-                             const BlockVector &b) const;
-
-    /**
-     * Compute the residual of an equation <i>Mx=b</i>, where the residual is
-     * defined to be <i>r=b-Mx</i>. Write the residual into @p dst. The
-     * <i>l<sub>2</sub></i> norm of the residual vector is returned. Just like
-     * the previous function, but only applicable if the matrix only has one
-     * block row.
+     * This function is only applicable if the matrix only has one block row.
      */
     TrilinosScalar residual (MPI::BlockVector       &dst,
                              const MPI::Vector      &x,
@@ -313,20 +314,9 @@ namespace TrilinosWrappers
     /**
      * Compute the residual of an equation <i>Mx=b</i>, where the residual is
      * defined to be <i>r=b-Mx</i>. Write the residual into @p dst. The
-     * <i>l<sub>2</sub></i> norm of the residual vector is returned. Just like
-     * the previous function, but only applicable if the matrix only has one
-     * block row.
-     */
-    TrilinosScalar residual (BlockVector       &dst,
-                             const Vector      &x,
-                             const BlockVector &b) const;
-
-    /**
-     * Compute the residual of an equation <i>Mx=b</i>, where the residual is
-     * defined to be <i>r=b-Mx</i>. Write the residual into @p dst. The
-     * <i>l<sub>2</sub></i> norm of the residual vector is returned. Just like
-     * the previous function, but only applicable if the matrix only has one
-     * block column.
+     * <i>l<sub>2</sub></i> norm of the residual vector is returned.
+     *
+     * This function is only applicable if the matrix only has one block column.
      */
     TrilinosScalar residual (MPI::Vector            &dst,
                              const MPI::BlockVector &x,
@@ -335,24 +325,13 @@ namespace TrilinosWrappers
     /**
      * Compute the residual of an equation <i>Mx=b</i>, where the residual is
      * defined to be <i>r=b-Mx</i>. Write the residual into @p dst. The
-     * <i>l<sub>2</sub></i> norm of the residual vector is returned. Just like
-     * the previous function, but only applicable if the matrix only has one
-     * block column.
+     * <i>l<sub>2</sub></i> norm of the residual vector is returned.
+     *
+     * This function is only applicable if the matrix only has one block.
      */
-    TrilinosScalar residual (Vector            &dst,
-                             const BlockVector &x,
-                             const Vector      &b) const;
-
-    /**
-     * Compute the residual of an equation <i>Mx=b</i>, where the residual is
-     * defined to be <i>r=b-Mx</i>. Write the residual into @p dst. The
-     * <i>l<sub>2</sub></i> norm of the residual vector is returned. Just like
-     * the previous function, but only applicable if the matrix only has one
-     * block.
-     */
-    TrilinosScalar residual (VectorBase       &dst,
-                             const VectorBase &x,
-                             const VectorBase &b) const;
+    TrilinosScalar residual (MPI::Vector       &dst,
+                             const MPI::Vector &x,
+                             const MPI::Vector &b) const;
 
     /**
      * Make the clear() function in the base class visible, though it is
@@ -390,8 +369,8 @@ namespace TrilinosWrappers
     void vmult (VectorType1       &dst,
                 const VectorType2 &src,
                 const bool         transpose,
-                const dealii::internal::bool2type<true>,
-                const dealii::internal::bool2type<true>) const;
+                const std::integral_constant<bool, true>,
+                const std::integral_constant<bool, true>) const;
 
     /**
      * Internal version of (T)vmult where the source vector is a block vector
@@ -401,8 +380,8 @@ namespace TrilinosWrappers
     void vmult (VectorType1       &dst,
                 const VectorType2 &src,
                 const bool         transpose,
-                const dealii::internal::bool2type<false>,
-                const dealii::internal::bool2type<true>) const;
+                const std::integral_constant<bool, false>,
+                const std::integral_constant<bool, true>) const;
 
     /**
      * Internal version of (T)vmult where the source vector is a non-block
@@ -412,8 +391,8 @@ namespace TrilinosWrappers
     void vmult (VectorType1       &dst,
                 const VectorType2 &src,
                 const bool         transpose,
-                const dealii::internal::bool2type<true>,
-                const dealii::internal::bool2type<false>) const;
+                const std::integral_constant<bool, true>,
+                const std::integral_constant<bool, false>) const;
 
     /**
      * Internal version of (T)vmult where both source vector and the
@@ -424,8 +403,8 @@ namespace TrilinosWrappers
     void vmult (VectorType1       &dst,
                 const VectorType2 &src,
                 const bool         transpose,
-                const dealii::internal::bool2type<false>,
-                const dealii::internal::bool2type<false>) const;
+                const std::integral_constant<bool, false>,
+                const std::integral_constant<bool, false>) const;
   };
 
 
@@ -476,8 +455,8 @@ namespace TrilinosWrappers
                             const VectorType2 &src) const
   {
     vmult(dst, src, false,
-          dealii::internal::bool2type<IsBlockVector<VectorType1>::value>(),
-          dealii::internal::bool2type<IsBlockVector<VectorType2>::value>());
+          std::integral_constant<bool, IsBlockVector<VectorType1>::value>(),
+          std::integral_constant<bool, IsBlockVector<VectorType2>::value>());
   }
 
 
@@ -489,8 +468,8 @@ namespace TrilinosWrappers
                              const VectorType2 &src) const
   {
     vmult(dst, src, true,
-          dealii::internal::bool2type<IsBlockVector<VectorType1>::value>(),
-          dealii::internal::bool2type<IsBlockVector<VectorType2>::value>());
+          std::integral_constant<bool, IsBlockVector<VectorType1>::value>(),
+          std::integral_constant<bool, IsBlockVector<VectorType2>::value>());
   }
 
 
@@ -501,8 +480,8 @@ namespace TrilinosWrappers
   BlockSparseMatrix::vmult (VectorType1       &dst,
                             const VectorType2 &src,
                             const bool         transpose,
-                            dealii::internal::bool2type<true>,
-                            dealii::internal::bool2type<true>) const
+                            std::integral_constant<bool, true>,
+                            std::integral_constant<bool, true>) const
   {
     if (transpose == true)
       BaseClass::Tvmult_block_block (dst, src);
@@ -519,8 +498,8 @@ namespace TrilinosWrappers
   BlockSparseMatrix::vmult (VectorType1       &dst,
                             const VectorType2 &src,
                             const bool         transpose,
-                            dealii::internal::bool2type<false>,
-                            dealii::internal::bool2type<true>) const
+                            std::integral_constant<bool, false>,
+                            std::integral_constant<bool, true>) const
   {
     if (transpose == true)
       BaseClass::Tvmult_nonblock_block (dst, src);
@@ -536,8 +515,8 @@ namespace TrilinosWrappers
   BlockSparseMatrix::vmult (VectorType1       &dst,
                             const VectorType2 &src,
                             const bool         transpose,
-                            dealii::internal::bool2type<true>,
-                            dealii::internal::bool2type<false>) const
+                            std::integral_constant<bool, true>,
+                            std::integral_constant<bool, false>) const
   {
     if (transpose == true)
       BaseClass::Tvmult_block_nonblock (dst, src);
@@ -553,8 +532,8 @@ namespace TrilinosWrappers
   BlockSparseMatrix::vmult (VectorType1       &dst,
                             const VectorType2 &src,
                             const bool         transpose,
-                            dealii::internal::bool2type<false>,
-                            dealii::internal::bool2type<false>) const
+                            std::integral_constant<bool, false>,
+                            std::integral_constant<bool, false>) const
   {
     if (transpose == true)
       BaseClass::Tvmult_nonblock_nonblock (dst, src);
@@ -562,10 +541,95 @@ namespace TrilinosWrappers
       BaseClass::vmult_nonblock_nonblock (dst, src);
   }
 
-}
+
+
+  inline
+  std::vector<IndexSet>
+  BlockSparseMatrix::locally_owned_domain_indices () const
+  {
+    Assert (this->n_block_cols() != 0, ExcNotInitialized());
+    Assert (this->n_block_rows() != 0, ExcNotInitialized());
+
+    std::vector<IndexSet> domain_indices;
+    for (size_type c = 0; c < this->n_block_cols(); ++c)
+      domain_indices.push_back(this->sub_objects[0][c]->locally_owned_domain_indices());
+
+    return domain_indices;
+  }
+
+
+
+  inline
+  std::vector<IndexSet>
+  BlockSparseMatrix::locally_owned_range_indices () const
+  {
+    Assert (this->n_block_cols() != 0, ExcNotInitialized());
+    Assert (this->n_block_rows() != 0, ExcNotInitialized());
+
+    std::vector<IndexSet> range_indices;
+    for (size_type r = 0; r < this->n_block_rows(); ++r)
+      range_indices.push_back(this->sub_objects[r][0]->locally_owned_range_indices());
+
+    return range_indices;
+  }
+
+
+
+  namespace internal
+  {
+    namespace BlockLinearOperator
+    {
+
+      /**
+       * This is an extension class to BlockLinearOperators for Trilinos block
+       * sparse matrices.
+       *
+       * @note This class does very little at the moment other than to check
+       * that the correct Payload type for each subblock has been chosen
+       * correctly. Further extensions to the class may be necessary in the
+       * future in order to add further functionality to BlockLinearOperators
+       * while retaining compatability with the Trilinos sparse matrix and
+       * preconditioner classes.
+       *
+       * @author Jean-Paul Pelteret, 2016
+       *
+       * @ingroup TrilinosWrappers
+       */
+      template <typename PayloadBlockType>
+      class TrilinosBlockPayload
+      {
+      public:
+        /**
+         * Type of payload held by each subblock
+         */
+        typedef PayloadBlockType BlockType;
+
+        /**
+         * Default constructor
+         *
+         * This simply checks that the payload for each block has been chosen
+         * correctly (i.e. is of type TrilinosPayload). Apart from this, this
+         * class does not do anything in particular and needs no special
+         * configuration, we have only one generic constructor that can be
+         * called under any conditions.
+         */
+        template <typename... Args>
+        TrilinosBlockPayload (const Args &...)
+        {
+          static_assert(typeid(PayloadBlockType)==typeid(internal::LinearOperator::TrilinosPayload),
+                        "TrilinosBlockPayload can only accept a payload of type TrilinosPayload.");
+        }
+      };
+
+    } /*namespace BlockLinearOperator*/
+  } /* namespace internal */
+
+
+}/* namespace TrilinosWrappers */
+
 
 DEAL_II_NAMESPACE_CLOSE
 
 #endif    // DEAL_II_WITH_TRILINOS
 
-#endif    // dealii__trilinos_block_sparse_matrix_h
+#endif    // dealii_trilinos_block_sparse_matrix_h

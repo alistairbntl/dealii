@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,7 +16,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -29,7 +28,6 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
 #define PRECISION 2
@@ -37,7 +35,7 @@
 
 
 
-template<int dim>
+template <int dim>
 inline void
 check (const unsigned int p)
 {
@@ -82,7 +80,7 @@ check (const unsigned int p)
   std::vector<Vector<double> > shape_values (quadrature.size(),
                                              Vector<double>(dim));
   FEValues<dim> fe(fe_ned, quadrature,
-                   update_values|update_q_points);
+                   update_values|update_quadrature_points);
 
   for (typename DoFHandler<dim>::active_cell_iterator
        c = dof.begin_active();
@@ -115,7 +113,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
   deallog << "Degree 0: " << std::endl;
   check<2> (0);
   check<3> (0);

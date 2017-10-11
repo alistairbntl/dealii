@@ -1,20 +1,18 @@
-//----------------------------  function_manifold_chart ---------------------------
-//    Copyright (C) 2011 - 2015 by the mathLab team.
+//-------------------------------------------------------------------
+//    Copyright (C) 2016 by the deal.II authors.
 //
 //    This file is subject to LGPL and may not be  distributed
 //    without copyright and license information. Please refer
 //    to the file deal.II/doc/license.html for the  text  and
 //    further information on this license.
 //
-//---------------------------- composition_manifold ---------------------------
+//-------------------------------------------------------------------
 
 
-// Stress periodicity in CompositionManifold. Compose SphericalManifold with
+// Stress periodicity in CompositionManifold. Compose PolarManifold with
 // the identity, and make sure periodicity is respected.
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 
 // all include files you need here
@@ -31,7 +29,7 @@ int main ()
 
   Point<spacedim> center;
 
-  SphericalManifold<dim,spacedim> S(center);
+  PolarManifold<dim,spacedim> S(center);
   FunctionManifold<dim,spacedim,spacedim> F("x;y", "x;y");
 
   CompositionManifold<dim> manifold(S,F);
@@ -43,9 +41,12 @@ int main ()
   cp[0][0] = 1.0;
   cp[1][0] = 1.0;
 
+  // Force roundoff errors on one side only
+  double eps=1e-10;
+
   // Last point
   cp[0][1] = -numbers::PI/4;
-  cp[1][1] =  numbers::PI/4;
+  cp[1][1] =  numbers::PI/4-eps;
 
   // Spacedim points
   std::vector<Point<spacedim> > sp(2);
@@ -72,7 +73,8 @@ int main ()
       w[0] = 1.0-(double)i/((double)n_intermediates);
       w[1] = 1.0 - w[0];
 
-      Point<spacedim> ip = manifold.get_new_point(Quadrature<spacedim>(sp, w));
+      Point<spacedim> ip = manifold.get_new_point(make_array_view(sp),
+                                                  make_array_view(w));
       Tensor<1,spacedim> t1 = manifold.get_tangent_vector(ip, sp[0]);
       Tensor<1,spacedim> t2 = manifold.get_tangent_vector(ip, sp[1]);
 
@@ -92,7 +94,8 @@ int main ()
       w[1] = 1.0 - w[0];
 
       Point<spacedim> ip = manifold.
-                           pull_back(manifold.get_new_point(Quadrature<spacedim>(sp, w)));
+                           pull_back(manifold.get_new_point(make_array_view(sp),
+                                                            make_array_view(w)));
 
       ip[0] = w[1];
 

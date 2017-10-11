@@ -29,7 +29,6 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_accessor.h>
 
-#include <fstream>
 
 
 template <int spacedim>
@@ -64,8 +63,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   test<1> ();
   test<2> ();

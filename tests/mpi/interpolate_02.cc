@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,13 +17,11 @@
 
 // Like _01 but with PETSc vectors. this program hangs at the time of writing
 // in much the same way solution_transfer_01 does because one processor has no
-// cells and all the others decide that PETScWrappers::Vector::compress is a
-// no-op when of course the one who does have cells doesn't think so
+// cells and all the others decide that PETScWrappers::MPI::Vector::compress
+// is a no-op when of course the one who does have cells doesn't think so
 
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/function.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -46,11 +44,10 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
 #include <sstream>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -67,7 +64,7 @@ void test()
   PETScWrappers::MPI::Vector x (MPI_COMM_WORLD,dofh.n_dofs(),owned_set.n_elements());
 
   VectorTools::interpolate(dofh,
-                           ConstantFunction<dim,PetscScalar>(1),
+                           Functions::ConstantFunction<dim,PetscScalar>(1),
                            x);
   const double norm = x.l2_norm();
   if (myid == 0)
@@ -87,9 +84,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

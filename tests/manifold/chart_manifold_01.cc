@@ -1,12 +1,12 @@
-//----------------------------  manifold_id_01.cc  ---------------------------
-//    Copyright (C) 2011 - 2016 by the mathLab team.
+//-------------------------------------------------------------------
+//    Copyright (C) 2016 by the deal.II authors.
 //
 //    This file is subject to LGPL and may not be  distributed
 //    without copyright and license information. Please refer
 //    to the file deal.II/doc/license.html for the  text  and
 //    further information on this license.
 //
-//----------------------------  flat_manifold_01.cc  ---------------------------
+//-------------------------------------------------------------------
 
 
 // Test that the flat manifold does what it should, where the
@@ -14,8 +14,6 @@
 // pull-back and push-forward
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 
 // all include files you need here
@@ -93,9 +91,7 @@ void test(unsigned int ref=1)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<1,1>();
   test<1,2>();

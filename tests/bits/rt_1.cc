@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 // January 2005. Check this
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -30,8 +29,6 @@
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/fe/fe_raviart_thomas.h>
 #include <deal.II/fe/fe_values.h>
-#include <iomanip>
-#include <fstream>
 
 
 template <int dim>
@@ -49,8 +46,8 @@ void test (const unsigned int degree,
   FEFaceValues<dim> fe_values (fe, q,
                                update_values |
                                update_gradients |
-                               update_second_derivatives |
-                               update_q_points |
+                               update_hessians |
+                               update_quadrature_points |
                                update_jacobians);
   fe_values.reinit (dof_handler.begin_active(), 0);
 
@@ -60,9 +57,7 @@ void test (const unsigned int degree,
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   for (unsigned int degree=0; degree<3; ++degree)
     for (unsigned int q_order=1; q_order<=3; ++q_order)

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__polynomials_P_h
-#define dealii__polynomials_P_h
+#ifndef dealii_polynomials_P_h
+#define dealii_polynomials_P_h
 
 
 #include <deal.II/base/config.h>
@@ -61,7 +61,7 @@ public:
   PolynomialsP (const unsigned int p);
 
   /**
-   * Returns the degree <tt>p</tt> of the polynomial space <tt>P_p</tt>.
+   * Return the degree <tt>p</tt> of the polynomial space <tt>P_p</tt>.
    *
    * Note, that this number is <tt>PolynomialSpace::degree()-1</tt>, compare
    * definition in PolynomialSpace.

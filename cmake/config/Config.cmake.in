@@ -38,6 +38,7 @@ SET(DEAL_II_VERSION "@DEAL_II_VERSION@")
 SET(DEAL_II_GIT_BRANCH "@DEAL_II_GIT_BRANCH@")
 SET(DEAL_II_GIT_REVISION "@DEAL_II_GIT_REVISION@")
 SET(DEAL_II_GIT_SHORTREV "@DEAL_II_GIT_SHORTREV@")
+SET(DEAL_II_GIT_TAG "@DEAL_II_GIT_TAG@")
 
 SET(DEAL_II_PROJECT_CONFIG_NAME "@DEAL_II_PROJECT_CONFIG_NAME@")
 
@@ -173,7 +174,24 @@ SET(DEAL_II_LIBRARIES "@CONFIG_LIBRARIES@")
 
 
 #
-# Information about library targets
+# Information about CUDA configuration
+#
+
+SET(DEAL_II_CUDA_TOOLKIT_ROOT_DIR "@CUDA_TOOLKIT_ROOT_DIR@")
+SET(DEAL_II_CUDA_COMPILER "@CMAKE_CUDA_COMPILER@")
+
+# used for all cuda targets:
+SET(DEAL_II_CUDA_FLAGS "@DEAL_II_CUDA_FLAGS@")
+
+# _additionally_ used for debug targets:
+SET(DEAL_II_CUDA_FLAGS_DEBUG "@DEAL_II_CUDA_FLAGS_DEBUG@")
+
+# _additionally_ used for release targets:
+SET(DEAL_II_CUDA_FLAGS_RELEASE "@DEAL_II_CUDA_FLAGS_RELEASE@")
+
+
+#
+# Information about library targets and feature configuration
 #
 
 # The library targets file:
@@ -187,3 +205,6 @@ SET(DEAL_II_TARGET_RELEASE "@CONFIG_TARGET_RELEASE@")
 
 # Full list of targets with "debug" and "optimized" keywords for easy use with TARGET_LINK_LIBRARIES:
 SET(DEAL_II_TARGET "@CONFIG_TARGET@")
+
+# The feature configuration file:
+SET(DEAL_II_FEATURE_CONFIG "${DEAL_II_PATH}/${DEAL_II_PROJECT_CONFIG_RELDIR}/${DEAL_II_PROJECT_CONFIG_NAME}FeatureConfig.cmake")

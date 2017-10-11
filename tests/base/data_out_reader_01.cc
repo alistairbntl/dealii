@@ -16,11 +16,8 @@
 
 #include "../tests.h"
 #include <deal.II/base/data_out_base.h>
-#include <deal.II/base/logstream.h>
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 #include <string>
 
 #include "patches.h"
@@ -42,7 +39,7 @@ void check()
   names[2] = "x3";
   names[3] = "x4";
   names[4] = "i";
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> > vectors;
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> > vectors;
 
   std::ostringstream old_data;
   DataOutBase::write_deal_II_intermediate(patches, names, vectors,
@@ -74,8 +71,7 @@ void check()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   check<1,1>();
   check<1,2>();

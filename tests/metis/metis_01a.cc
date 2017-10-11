@@ -36,8 +36,6 @@
 #include <deal.II/lac/sparsity_pattern.h>
 #include <deal.II/lac/sparsity_tools.h>
 #include <metis.h>
-#include <fstream>
-#include <iomanip>
 
 
 void partition (const SparsityPattern     &sparsity_pattern,
@@ -99,8 +97,8 @@ void partition (const SparsityPattern     &sparsity_pattern,
   // create
 
   ierr = METIS_PartGraphRecursive(&n, &ncon, &int_rowstart[0], &int_colnums[0],
-                                  NULL, NULL, NULL,
-                                  &nparts,NULL,NULL,&options[0],
+                                  nullptr, nullptr, nullptr,
+                                  &nparts,nullptr,nullptr,&options[0],
                                   &dummy,&int_partition_indices[0]);
 
   deallog << "METIS outputs:" << std::endl;
@@ -118,19 +116,19 @@ void test ()
   GridGenerator::hyper_cube (triangulation);
   triangulation.refine_global (2);
 
-  SparsityPattern cell_connectivity;
+  DynamicSparsityPattern cell_connectivity;
   GridTools::get_face_connectivity_of_cells (triangulation, cell_connectivity);
 
-  partition (cell_connectivity, 5);
+  SparsityPattern sp_cell_connectivity;
+  sp_cell_connectivity.copy_from (cell_connectivity);
+  partition (sp_cell_connectivity, 5);
 }
 
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

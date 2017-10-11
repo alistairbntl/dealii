@@ -24,9 +24,7 @@
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   FEEvaluationAccess<1,1,double> *test; // didn't compile before
   deallog <<  "OK" << std::endl;

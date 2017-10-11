@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 
 #include <deal.II/lac/constraint_matrix.h>
@@ -64,7 +63,6 @@
 #include <deal.II/multigrid/mg_matrix.h>
 
 // This is C++:
-#include <fstream>
 #include <sstream>
 
 namespace Step50
@@ -95,7 +93,6 @@ namespace Step50
 
     matrix_t system_matrix;
 
-    ConstraintMatrix     hanging_node_constraints;
     ConstraintMatrix     constraints;
 
     vector_t       solution;
@@ -186,20 +183,17 @@ namespace Step50
     system_rhs.reinit(mg_dof_handler.locally_owned_dofs(), MPI_COMM_WORLD);
 
     constraints.clear ();
-    hanging_node_constraints.clear ();
-    DoFTools::make_hanging_node_constraints (mg_dof_handler, hanging_node_constraints);
     DoFTools::make_hanging_node_constraints (mg_dof_handler, constraints);
 
     typename FunctionMap<dim>::type      dirichlet_boundary;
-    ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
+    Functions::ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
     dirichlet_boundary[0] = &homogeneous_dirichlet_bc;
     VectorTools::interpolate_boundary_values (static_cast<const DoFHandler<dim>&>(mg_dof_handler),
                                               dirichlet_boundary,
                                               constraints);
     constraints.close ();
-    hanging_node_constraints.close ();
 
-    CompressedSimpleSparsityPattern csp(mg_dof_handler.n_dofs(), mg_dof_handler.n_dofs());
+    DynamicSparsityPattern csp(mg_dof_handler.n_dofs(), mg_dof_handler.n_dofs());
     DoFTools::make_sparsity_pattern (mg_dof_handler, csp, constraints);
     system_matrix.reinit (mg_dof_handler.locally_owned_dofs(), csp, MPI_COMM_WORLD, true);
 
@@ -209,13 +203,13 @@ namespace Step50
     const unsigned int n_levels = triangulation.n_global_levels();
 
     mg_interface_matrices.resize(0, n_levels-1);
-    mg_interface_matrices.clear ();
+    mg_interface_matrices.clear_elements ();
     mg_matrices.resize(0, n_levels-1);
-    mg_matrices.clear ();
+    mg_matrices.clear_elements ();
 
     for (unsigned int level=0; level<n_levels; ++level)
       {
-        CompressedSparsityPattern csp;
+        DynamicSparsityPattern csp;
         csp.reinit(mg_dof_handler.n_dofs(level),
                    mg_dof_handler.n_dofs(level));
         MGTools::make_sparsity_pattern(mg_dof_handler, csp, level);
@@ -389,7 +383,7 @@ namespace Step50
   template <int dim>
   void LaplaceProblem<dim>::solve ()
   {
-    MGTransferPrebuilt<vector_t> mg_transfer(hanging_node_constraints, mg_constrained_dofs);
+    MGTransferPrebuilt<vector_t> mg_transfer(mg_constrained_dofs);
     mg_transfer.build_matrices(mg_dof_handler);
 
     matrix_t coarse_matrix;

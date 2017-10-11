@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,13 +21,11 @@
 
 #include "../tests.h"
 
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
 #include <deal.II/lac/petsc_parallel_sparse_matrix.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 
-#include <fstream>
 //#include <mpi.h>
 
 
@@ -39,7 +37,7 @@ void test()
   if (myid==0)
     deallog << "Running on " << numprocs << " CPU(s)." << std::endl;
 
-  CompressedSimpleSparsityPattern csp(2);
+  DynamicSparsityPattern csp(2);
   csp.add(0,0);
   csp.add(1,1);
 
@@ -66,9 +64,7 @@ int main(int argc, char *argv[])
 
   if (Utilities::MPI::this_mpi_process (MPI_COMM_WORLD) == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       test();
     }

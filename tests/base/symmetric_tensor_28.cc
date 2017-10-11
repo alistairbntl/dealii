@@ -19,9 +19,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/symmetric_tensor.h>
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <iomanip>
 
 
 template <int dim>
@@ -35,7 +32,7 @@ void test ()
       s[i][j] = (i+1) * (j+1);
 
   Tensor<2,dim> t = s;
-  SymmetricTensor<2,dim> u = t;
+  SymmetricTensor<2,dim> u (t);
 
   for (unsigned int i=0; i<dim; ++i)
     for (unsigned int j=0; j<dim; ++j)
@@ -51,7 +48,6 @@ int main ()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<3> ();
   test<5> ();

@@ -22,12 +22,9 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 void test ()
@@ -73,7 +70,6 @@ int main ()
   deallog << std::setprecision (2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

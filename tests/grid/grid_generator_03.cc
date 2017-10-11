@@ -19,15 +19,12 @@
 // sizes and the table argument for material id
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/table.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 template <int dim> Table<dim,types::material_id> material_ids();
@@ -68,7 +65,7 @@ template <> Table<3,types::material_id> material_ids<3>()
 
 
 
-template<int dim>
+template <int dim>
 void test(std::ostream &out)
 {
   Point<dim> p1;
@@ -129,7 +126,6 @@ int main()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("1d");
   test<1>(logfile);

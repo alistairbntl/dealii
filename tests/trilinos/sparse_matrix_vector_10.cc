@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,15 +20,14 @@
 
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
 
-void test (parallel::distributed::Vector<double> &v,
-           parallel::distributed::Vector<double> &w)
+void test (LinearAlgebra::distributed::Vector<double> &v,
+           LinearAlgebra::distributed::Vector<double> &w)
 {
   TrilinosWrappers::SparseMatrix m(w.size(),v.size(),v.size());
   for (unsigned int i=0; i<m.m(); ++i)
@@ -69,9 +68,7 @@ void test (parallel::distributed::Vector<double> &v,
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 
@@ -79,8 +76,8 @@ int main (int argc, char **argv)
   try
     {
       {
-        parallel::distributed::Vector<double> v (100);
-        parallel::distributed::Vector<double> w (95);
+        LinearAlgebra::distributed::Vector<double> v (100);
+        LinearAlgebra::distributed::Vector<double> w (95);
         test (v,w);
       }
     }

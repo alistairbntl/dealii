@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__integrators_elasticity_h
-#define dealii__integrators_elasticity_h
+#ifndef dealii_integrators_elasticity_h
+#define dealii_integrators_elasticity_h
 
 
 #include <deal.II/base/config.h>
@@ -471,7 +471,7 @@ namespace LocalIntegrators
      * @author Guido Kanschat
      * @date 2013
      */
-    template<int dim, typename number>
+    template <int dim, typename number>
     void
     ip_residual(
       Vector<number> &result1,

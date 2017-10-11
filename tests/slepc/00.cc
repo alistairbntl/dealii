@@ -20,9 +20,7 @@
 
 #include "../tests.h"
 #include <deal.II/lac/slepc_solver.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/numbers.h>
-#include <fstream>
 #include <iostream>
 
 std::ofstream logfile ("output");
@@ -36,7 +34,7 @@ int main (int argc,char **argv)
       logfile << "Initializing SLEPc (PETSc): "
               << std::flush;
 
-      SlepcInitialize (&argc, &argv, 0, 0);
+      SlepcInitialize (&argc, &argv, nullptr, nullptr);
       {
         logfile << "ok"
                 << std::endl;

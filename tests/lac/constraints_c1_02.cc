@@ -19,14 +19,13 @@
  * reduced test case from constraint_c1.cc, causes a hang in close()
  */
 
+#include "../tests.h"
 
 #include <deal.II/base/job_identifier.h>
 #include <deal.II/lac/constraint_matrix.h>
 
 #include <vector>
 #include <iostream>
-#include <iomanip>
-#include <fstream>
 
 using namespace dealii;
 
@@ -77,11 +76,8 @@ run()
 
 int main()
 {
+  initlog();
   deal_II_exceptions::disable_abort_on_exception();
-
-  const std::string logname = "output";
-  std::ofstream logfile(logname.c_str());
-  deallog.attach(logfile);
 
   run();
 }

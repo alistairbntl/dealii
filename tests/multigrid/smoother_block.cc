@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,15 +16,11 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/block_matrix_array.h>
 #include <deal.II/multigrid/mg_block_smoother.h>
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -43,7 +39,7 @@ public:
   /**
   * Apply preconditioner.
   */
-  template<typename VectorType>
+  template <typename VectorType>
   void vmult (VectorType &, const VectorType &) const;
 
   /**
@@ -53,12 +49,12 @@ public:
    * the same as
    * vmult().
    */
-  template<typename VectorType>
+  template <typename VectorType>
   void Tvmult (VectorType &, const VectorType &) const;
   /**
    * Apply preconditioner, adding to the previous value.
    */
-  template<typename VectorType>
+  template <typename VectorType>
   void vmult_add (VectorType &, const VectorType &) const;
 
   /**
@@ -68,7 +64,7 @@ public:
    * the same as
    * vmult_add().
    */
-  template<typename VectorType>
+  template <typename VectorType>
   void Tvmult_add (VectorType &, const VectorType &) const;
 
 private:
@@ -78,31 +74,31 @@ private:
 
 //----------------------------------------------------------------------//
 
-template<typename number>
+template <typename number>
 ScalingMatrix<number>::ScalingMatrix(number factor)
   :
   factor(factor)
 {}
 
 
-template<typename number>
-template<typename VectorType>
+template <typename number>
+template <typename VectorType>
 inline void
 ScalingMatrix<number>::vmult (VectorType &dst, const VectorType &src) const
 {
   dst.equ(factor, src);
 }
 
-template<typename number>
-template<typename VectorType>
+template <typename number>
+template <typename VectorType>
 inline void
 ScalingMatrix<number>::Tvmult (VectorType &dst, const VectorType &src) const
 {
   dst.equ(factor, src);
 }
 
-template<typename number>
-template<typename VectorType>
+template <typename number>
+template <typename VectorType>
 inline void
 ScalingMatrix<number>::vmult_add (VectorType &dst, const VectorType &src) const
 {
@@ -111,8 +107,8 @@ ScalingMatrix<number>::vmult_add (VectorType &dst, const VectorType &src) const
 
 
 
-template<typename number>
-template<typename VectorType>
+template <typename number>
+template <typename VectorType>
 inline void
 ScalingMatrix<number>::Tvmult_add (VectorType &dst, const VectorType &src) const
 {
@@ -121,12 +117,12 @@ ScalingMatrix<number>::Tvmult_add (VectorType &dst, const VectorType &src) const
 
 //----------------------------------------------------------------------//
 
-template<typename MatrixType, class RELAX>
+template <typename MatrixType, class RELAX>
 void check_smoother(const MGLevelObject<MatrixType> &m,
                     const MGLevelObject<RELAX> &r)
 {
   GrowingVectorMemory<BlockVector<double> > mem;
-  MGSmootherBlock<MatrixType, RELAX, double> smoother(mem);
+  MGSmootherBlock<MatrixType, RELAX, double> smoother;
 
   smoother.initialize(m, r);
 
@@ -212,7 +208,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check();
 }

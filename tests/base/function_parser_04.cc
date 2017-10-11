@@ -18,10 +18,7 @@
 // functionparser: TBB
 
 #include "../tests.h"
-#include <fstream>
-#include <iomanip>
 #include <map>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/point.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/base/function_parser.h>
@@ -77,9 +74,9 @@ void test2()
   WorkStream::run(v.begin(),
                   v.end(),
                   &assemble,
-                  std_cxx11::bind(&copy,
-                                  std_cxx11::ref(result),
-                                  std_cxx11::_1),
+                  std::bind(&copy,
+                            std::ref(result),
+                            std::placeholders::_1),
                   scratch_data(), copy_data());
   std::cout << "result: " << result << std::endl;
 

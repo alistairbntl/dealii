@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2013 - 2015 by the deal.II authors
+## Copyright (C) 2013 - 2016 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -59,7 +59,7 @@ MACRO(make_quicktest test_basename build_name mpi_run)
   # this is a hack to make sure the -OK file is deleted
   # even if compilation fails.
   ADD_CUSTOM_TARGET(kill-${_target}-OK
-        COMMAND rm -f ${_target}-OK 
+        COMMAND rm -f ${_target}-OK
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
   ADD_DEPENDENCIES(${_target} kill-${_target}-OK)
@@ -70,7 +70,10 @@ MACRO(make_quicktest test_basename build_name mpi_run)
       -P ${CMAKE_SOURCE_DIR}/cmake/scripts/run_test.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
-  SET_TESTS_PROPERTIES(${_target} PROPERTIES LABEL "sanity checks")
+  SET_TESTS_PROPERTIES(${_target} PROPERTIES
+    LABEL "sanity checks"
+    ENVIRONMENT "OMPI_MCA_rmaps_base_oversubscribe=1")
+  # ^^^ Allow oversubscription for MPI (needed for Openmpi@3.0)
 ENDMACRO()
 
 
@@ -110,6 +113,57 @@ ENDIF()
 IF (DEAL_II_WITH_PETSC AND DEAL_II_WITH_SLEPC)
   make_quicktest("step-slepc" ${_mybuild} "")
 ENDIF()
+
+# Test trilinos
+IF (DEAL_II_WITH_TRILINOS)
+  make_quicktest("step-trilinos" ${_mybuild} "")
+ENDIF()
+
+# Test metis
+IF (DEAL_II_WITH_METIS AND DEAL_II_WITH_MPI)
+  make_quicktest("step-metis" ${_mybuild} 2)
+ENDIF()
+
+# Test LAPACK
+IF (DEAL_II_WITH_LAPACK)
+  make_quicktest("lapack" ${_mybuild} "")
+ENDIF()
+
+# Test Umfpack
+IF (DEAL_II_WITH_UMFPACK)
+  make_quicktest("umfpack" ${_mybuild} "")
+ENDIF()
+
+# Test GSL
+IF (DEAL_II_WITH_GSL)
+  make_quicktest("gsl" ${_mybuild} "")
+ENDIF()
+
+# Test Nanoflann
+IF (DEAL_II_WITH_NANOFLANN)
+  make_quicktest("nanoflann" ${_mybuild} "")
+ENDIF()
+
+# Test Arpack
+IF (DEAL_II_WITH_ARPACK AND DEAL_II_WITH_UMFPACK)
+  make_quicktest("arpack" ${_mybuild} "")
+ENDIF()
+
+# Test Adol-C
+IF (DEAL_II_WITH_ADOLC)
+  make_quicktest("adolc" ${_mybuild} "")
+ENDIF()
+
+# Test SUNDIALS
+IF (DEAL_II_WITH_SUNDIALS)
+  make_quicktest("sundials-ida" ${_mybuild} "")
+ENDIF()
+
+# Test Assimp
+IF (DEAL_II_WITH_ASSIMP)
+  make_quicktest("assimp" ${_mybuild} "")
+ENDIF()
+
 
 # A custom test target:
 ADD_CUSTOM_TARGET(test

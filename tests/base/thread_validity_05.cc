@@ -21,8 +21,6 @@
 // member functions that the correct one is called
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 
 #include <deal.II/base/thread_management.h>
 
@@ -90,9 +88,7 @@ void test2 ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test1 ();
   test2 ();

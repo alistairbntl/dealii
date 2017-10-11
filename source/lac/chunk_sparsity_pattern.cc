@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -35,10 +35,12 @@ ChunkSparsityPattern::ChunkSparsityPattern (const ChunkSparsityPattern &s)
   chunk_size (s.chunk_size),
   sparsity_pattern(s.sparsity_pattern)
 {
-  Assert (s.rows == 0, ExcInvalidConstructorCall());
-  Assert (s.cols == 0, ExcInvalidConstructorCall());
+  Assert (s.rows==0 && s.cols==0,
+          ExcMessage("This constructor can only be called if the provided argument "
+                     "is the sparsity pattern for an empty matrix. This constructor can "
+                     "not be used to copy-construct a non-empty sparsity pattern."));
 
-  reinit (0,0,0,0);
+  reinit (0,0,0,chunk_size);
 }
 
 
@@ -89,16 +91,17 @@ ChunkSparsityPattern::ChunkSparsityPattern (
 
 
 
-ChunkSparsityPattern::~ChunkSparsityPattern ()
-{}
-
-
-
 ChunkSparsityPattern &
 ChunkSparsityPattern::operator = (const ChunkSparsityPattern &s)
 {
-  Assert (s.rows == 0, ExcInvalidConstructorCall());
-  Assert (s.cols == 0, ExcInvalidConstructorCall());
+  Assert (s.rows==0 && s.cols==0,
+          ExcMessage("This operator can only be called if the provided argument "
+                     "is the sparsity pattern for an empty matrix. This operator can "
+                     "not be used to copy a non-empty sparsity pattern."));
+
+  Assert (rows==0 && cols==0,
+          ExcMessage("This operator can only be called if the current object is "
+                     "empty."));
 
   // perform the checks in the underlying object as well
   sparsity_pattern = s.sparsity_pattern;
@@ -469,7 +472,7 @@ ChunkSparsityPattern::n_nonzero_elements () const
 void
 ChunkSparsityPattern::print (std::ostream &out) const
 {
-  Assert ((sparsity_pattern.rowstart!=0) && (sparsity_pattern.colnums!=0),
+  Assert ((sparsity_pattern.rowstart!=nullptr) && (sparsity_pattern.colnums!=nullptr),
           ExcEmptyObject());
 
   AssertThrow (out, ExcIO());
@@ -499,8 +502,8 @@ ChunkSparsityPattern::print (std::ostream &out) const
 void
 ChunkSparsityPattern::print_gnuplot (std::ostream &out) const
 {
-  Assert ((sparsity_pattern.rowstart!=0) &&
-          (sparsity_pattern.colnums!=0), ExcEmptyObject());
+  Assert ((sparsity_pattern.rowstart!=nullptr) &&
+          (sparsity_pattern.colnums!=nullptr), ExcEmptyObject());
 
   AssertThrow (out, ExcIO());
 

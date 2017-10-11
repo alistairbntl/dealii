@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,18 +18,14 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/filtered_iterator.h>
 
-#include <fstream>
-#include <iomanip>
 #include <algorithm>
 #include <numeric>
-#include <cmath>
 
 
 std::ofstream logfile("output");
@@ -139,10 +135,10 @@ void test ()
       bool (*predicate) (const active_cell_iterator, const unsigned int)
         = &level_equal_to<active_cell_iterator>;
       FilteredIterator<active_cell_iterator>
-      begin (std::bind2nd (std::ptr_fun(predicate), 3),
+      begin (std::bind (predicate, std::placeholders::_1, 3),
              tria.begin_active (3)),
-                               end   (std::bind2nd (std::ptr_fun(predicate), 3),
-                                      tria.end());
+                               end  (std::bind(predicate, std::placeholders::_1, 3),
+                                     tria.end());
 
       Assert (std::distance (begin, end) ==
               static_cast<signed int>(tria.n_active_cells (3)),
@@ -163,15 +159,15 @@ void test ()
 
       bool (*predicate) (const active_cell_iterator, const unsigned int)
         = &level_equal_to<active_cell_iterator>;
-      Assert (std::distance (FI(std::bind2nd (std::ptr_fun(predicate), 3))
+      Assert (std::distance (FI(std::bind (predicate, std::placeholders::_1, 3))
                              .set_to_next_positive(tria.begin_active()),
-                             FI(std::bind2nd (std::ptr_fun(predicate), 3), tria.end())) ==
+                             FI(std::bind (predicate, std::placeholders::_1, 3), tria.end())) ==
               static_cast<signed int>(tria.n_active_cells (3)),
               ExcInternalError());
       logfile << "Check 4: "
-              << (std::distance (FI(std::bind2nd (std::ptr_fun(predicate), 3))
+              << (std::distance (FI(std::bind (predicate, std::placeholders::_1, 3))
                                  .set_to_next_positive(tria.begin_active()),
-                                 FI(std::bind2nd (std::ptr_fun(predicate), 3), tria.end())) ==
+                                 FI(std::bind (predicate, std::placeholders::_1, 3), tria.end())) ==
                   static_cast<signed int>(tria.n_active_cells (3))
                   ?
                   "OK" : "Failed")
@@ -223,7 +219,6 @@ int main ()
 {
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

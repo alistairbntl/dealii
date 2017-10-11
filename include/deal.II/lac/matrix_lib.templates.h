@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__matrix_lib_templates_h
-#define dealii__matrix_lib_templates_h
+#ifndef dealii_matrix_lib_templates_h
+#define dealii_matrix_lib_templates_h
 
 #include <deal.II/lac/matrix_lib.h>
 #include <deal.II/lac/vector.h>
@@ -76,8 +76,6 @@ MeanValueFilter::filter(BlockVector<number> &v) const
   for (unsigned int i=0; i<v.n_blocks(); ++i)
     if (i == component)
       vmult(v.block(i), v.block(i));
-    else
-      v.block(i) = v.block(i);
 }
 
 
@@ -117,90 +115,8 @@ MeanValueFilter::vmult_add(BlockVector<number> &dst,
     if (i == component)
       vmult_add(dst.block(i), src.block(i));
     else
-      dst.block(i).add(src.block(i));
+      dst.block(i)+=src.block(i);
 }
-
-
-//----------------------------------------------------------------------//
-
-
-template <typename VectorType>
-InverseMatrixRichardson<VectorType>::InverseMatrixRichardson(
-  SolverControl &c,
-  VectorMemory<VectorType> &m)
-  :
-  mem(m),
-  solver(c,m),
-  matrix(0),
-  precondition(0)
-{}
-
-
-template <typename VectorType>
-InverseMatrixRichardson<VectorType>::~InverseMatrixRichardson()
-{
-  if (matrix != 0) delete matrix;
-  if (precondition != 0) delete precondition;
-}
-
-
-template <typename VectorType>
-void
-InverseMatrixRichardson<VectorType>::vmult(VectorType &dst, const VectorType &src) const
-{
-  Assert (matrix != 0, ExcNotInitialized());
-  Assert (precondition != 0, ExcNotInitialized());
-  dst = 0.;
-  solver.solve(*matrix, dst, src, *precondition);
-}
-
-
-
-template <typename VectorType>
-void
-InverseMatrixRichardson<VectorType>::vmult_add(VectorType &dst, const VectorType &src) const
-{
-  Assert (matrix != 0, ExcNotInitialized());
-  Assert (precondition != 0, ExcNotInitialized());
-  VectorType *aux = mem.alloc();
-  aux->reinit(dst);
-
-  solver.solve(*matrix, *aux, src, *precondition);
-
-  dst += *aux;
-  mem.free(aux);
-}
-
-
-
-template <typename VectorType>
-void
-InverseMatrixRichardson<VectorType>::Tvmult(VectorType &dst, const VectorType &src) const
-{
-  Assert (matrix != 0, ExcNotInitialized());
-  Assert (precondition != 0, ExcNotInitialized());
-  dst = 0.;
-  solver.Tsolve(*matrix, dst, src, *precondition);
-}
-
-
-
-template <typename VectorType>
-void
-InverseMatrixRichardson<VectorType>::Tvmult_add(VectorType &dst, const VectorType &src) const
-{
-  Assert (matrix != 0, ExcNotInitialized());
-  Assert (precondition != 0, ExcNotInitialized());
-  VectorType *aux = mem.alloc();
-  aux->reinit(dst);
-
-  solver.Tsolve(*matrix, *aux, src, *precondition);
-
-  dst += *aux;
-  mem.free(aux);
-}
-
-
 
 
 DEAL_II_NAMESPACE_CLOSE

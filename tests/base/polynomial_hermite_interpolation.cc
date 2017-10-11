@@ -15,11 +15,7 @@
 
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/polynomial.h>
 
 using namespace Polynomials;
@@ -56,7 +52,6 @@ int main()
   std::string logname = "output";
   std::ofstream logfile(logname.c_str());
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-12);
 
   interpolation_conditions(HermiteInterpolation::generate_complete_basis(6));
   plot(HermiteInterpolation::generate_complete_basis(6));

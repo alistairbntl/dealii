@@ -16,10 +16,8 @@
 
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 
 #include <deal.II/meshworker/dof_info.templates.h>
 #include <deal.II/meshworker/integration_info.templates.h>
@@ -31,4 +29,3 @@ DEAL_II_NAMESPACE_OPEN
 
 
 DEAL_II_NAMESPACE_CLOSE
-

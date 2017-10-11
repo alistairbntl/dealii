@@ -1,5 +1,23 @@
 #!/usr/bin/python
 
+## ---------------------------------------------------------------------
+##
+## Copyright (C) 2016 by the deal.II authors
+##
+## This file is part of the deal.II library.
+##
+## The deal.II library is free software; you can use it, redistribute
+## it, and/or modify it under the terms of the GNU Lesser General
+## Public License as published by the Free Software Foundation; either
+## version 2.1 of the License, or (at your option) any later version.
+## The full text of the license can be found in the file LICENSE at
+## the top level of the deal.II distribution.
+##
+## ---------------------------------------------------------------------
+
+#
+# Written by timo.heister@gmail.com
+
 # run this script on all headers of deal.II to fix comment line wrapping for
 # doxygen comments.
 # Example:
@@ -9,7 +27,12 @@
 from __future__ import print_function
 import textwrap
 import sys, re
-wrapper = textwrap.TextWrapper()
+
+# As of python 2.6 we can tell the text wrapper to not break on hyphens. This is
+# usually what we want to do: we don't want to split URLs with hyphens and
+# doxygen will format 'non-primitive' as 'non- primitive' if it is
+# (inadvertantly) split across two lines.
+wrapper = textwrap.TextWrapper(break_on_hyphens=False)
 
 # take an array of lines and wrap them to 78 columns and let each line start
 # with @p startwith

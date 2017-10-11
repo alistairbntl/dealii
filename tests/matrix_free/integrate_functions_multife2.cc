@@ -25,7 +25,6 @@
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
@@ -298,7 +297,7 @@ void test ()
     quad.push_back (QGauss<1>(1));
     quad.push_back (QGauss<1>(fe_degree+1));
     mf_data.reinit (dof, constraints, quad,
-                    typename MatrixFree<dim,number>::AdditionalData(MPI_COMM_SELF,MatrixFree<dim,number>::AdditionalData::none));
+                    typename MatrixFree<dim,number>::AdditionalData(MatrixFree<dim,number>::AdditionalData::none));
   }
 
   MatrixFreeTest<dim,fe_degree,number> mf (mf_data);
@@ -328,7 +327,6 @@ int main ()
   deallog << std::setprecision (3);
 
   {
-    deallog.threshold_double(1.e-11);
     deallog.push("2d");
     test<2,1,double>();
     test<2,2,double>();
@@ -342,7 +340,6 @@ int main ()
 
   {
     deallog << std::endl << "Test with floats" << std::endl << std::endl;
-    deallog.threshold_double(1.e-7);
     deallog.push("2d");
     test<2,1,float>();
     deallog.pop();
@@ -351,4 +348,3 @@ int main ()
     deallog.pop();
   }
 }
-

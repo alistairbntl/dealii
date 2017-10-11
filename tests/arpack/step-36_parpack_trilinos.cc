@@ -1,6 +1,30 @@
+/* ---------------------------------------------------------------------
+ *
+ * Copyright (C) 2009 - 2016 by the deal.II authors
+ *
+ * This file is part of the deal.II library.
+ *
+ * The deal.II library is free software; you can use it, redistribute
+ * it, and/or modify it under the terms of the GNU Lesser General
+ * Public License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * The full text of the license can be found in the file LICENSE at
+ * the top level of the deal.II distribution.
+ *
+ * ---------------------------------------------------------------------
+
+ *
+ * This file tests the PARPACK interface for a symmetric operator taken from step-36
+ * using Trilinos mpi vectors.
+ *
+ * We test that the computed vectors are eigenvectors and mass-orthonormal, i.e.
+ * a) (A*x_i-\lambda*B*x_i).L2() == 0
+ * b) x_j*B*x_i = \delta_{i,j}
+ *
+ */
+
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/index_set.h>
 
@@ -11,9 +35,10 @@
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/lac/sparsity_tools.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
-#include <deal.II/lac/iterative_inverse.h>
+#include <deal.II/lac/linear_operator.h>
+#include <deal.II/lac/solver_cg.h>
 
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/trilinos_precondition.h>
@@ -27,7 +52,6 @@
 
 #include <deal.II/lac/parpack_solver.h>
 
-#include <fstream>
 #include <iostream>
 
 // test Parpack on Step-36 with Trilinos algebra
@@ -89,7 +113,6 @@ locally_owned_dofs_per_subdomain (const DoFHandlerType  &dof_handler)
 
 void test ()
 {
-#ifdef DEAL_II_ARPACK_WITH_PARPACK
   const unsigned int global_mesh_refinement_steps = 5;
   const unsigned int number_of_eigenvalues        = 5;
 
@@ -147,11 +170,11 @@ void test ()
   DoFTools::make_hanging_node_constraints  (dof_handler, constraints);
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim> (),
+                                            Functions::ZeroFunction<dim> (),
                                             constraints);
   constraints.close ();
 
-  CompressedSimpleSparsityPattern csp (locally_relevant_dofs);
+  DynamicSparsityPattern csp (locally_relevant_dofs);
   // Fill in ignoring all cells that are not locally owned
   DoFTools::make_sparsity_pattern (dof_handler, csp,
                                    constraints,
@@ -251,18 +274,20 @@ void test ()
     for (unsigned int i=0; i < eigenvalues.size(); i++)
       eigenfunctions[i] = 0.;
 
-    SolverControl solver_control     (dof_handler.n_dofs(), 1e-9,/*log_history*/false,/*log_results*/false);
-    SolverControl solver_control_lin (dof_handler.n_dofs(), 1e-10,/*log_history*/false,/*log_results*/false);
-
-    PArpackSolver<TrilinosWrappers::MPI::Vector>::Shift<TrilinosWrappers::SparseMatrix> shifted_matrix(stiffness_matrix,mass_matrix,shift);
-    TrilinosWrappers::PreconditionIdentity preconditioner;
-    IterativeInverse<TrilinosWrappers::MPI::Vector > shift_and_invert;
-    shift_and_invert.initialize(shifted_matrix,preconditioner);
-    shift_and_invert.solver.select("cg");
     static ReductionControl inner_control_c(/*maxiter*/stiffness_matrix.m(),
                                                        /*tolerance (global)*/ 0.0,
                                                        /*reduce (w.r.t. initial)*/ 1.e-13);
-    shift_and_invert.solver.set_control(inner_control_c);
+
+    typedef TrilinosWrappers::MPI::Vector VectorType;
+    SolverCG<VectorType> solver_c(inner_control_c);
+    TrilinosWrappers::PreconditionIdentity preconditioner;
+
+    const auto shifted_matrix =
+      linear_operator<VectorType>(stiffness_matrix) -
+      shift * linear_operator<VectorType>(mass_matrix);
+
+    const auto shift_and_invert =
+      inverse_operator(shifted_matrix, solver_c, preconditioner);
 
     const unsigned int num_arnoldi_vectors = 2*eigenvalues.size() + 2;
 
@@ -271,12 +296,16 @@ void test ()
                     PArpackSolver<TrilinosWrappers::MPI::Vector>::largest_magnitude,
                     true);
 
+    SolverControl solver_control(
+      dof_handler.n_dofs(), 1e-9, /*log_history*/ false, /*log_results*/ false);
+
     PArpackSolver<TrilinosWrappers::MPI::Vector> eigensolver (solver_control,
                                                               mpi_communicator,
                                                               additional_data);
     eigensolver.reinit(locally_owned_dofs);
     eigensolver.set_shift(shift);
-
+    eigenfunctions[0] = 1.;
+    eigensolver.set_initial_vector(eigenfunctions[0]);
     // avoid output of iterative solver:
     const unsigned int previous_depth = deallog.depth_file(0);
     eigensolver.solve (stiffness_matrix,
@@ -323,14 +352,6 @@ void test ()
 
 
   dof_handler.clear ();
-#else
-  // just output expected results:
-  deallog <<"4.93877"<<std::endl;
-  deallog <<"12.3707"<<std::endl;
-  deallog <<"12.3707"<<std::endl;
-  deallog <<"19.8027"<<std::endl;
-  deallog <<"24.8370"<<std::endl;
-#endif
   deallog << "Ok"<<std::endl;
 }
 
@@ -339,7 +360,6 @@ int main (int argc,char **argv)
 {
   std::ofstream logfile("output");
   deallog.attach(logfile,/*do not print job id*/false);
-  deallog.threshold_double(eps);
 
   try
     {

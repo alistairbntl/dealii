@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2003 - 2015 by the deal.II authors
+ * Copyright (C) 2003 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -131,7 +131,6 @@ namespace Step50
 
     IndexSet locally_relevant_set;
 
-    ConstraintMatrix     hanging_node_constraints;
     ConstraintMatrix     constraints;
 
     vector_t       solution;
@@ -189,6 +188,7 @@ namespace Step50
                                      std::vector<double>            &values,
                                      const unsigned int              component) const
   {
+    (void)component;
     const unsigned int n_points = points.size();
 
     Assert (values.size() == n_points,
@@ -254,7 +254,7 @@ namespace Step50
   void LaplaceProblem<dim>::setup_system ()
   {
     mg_dof_handler.distribute_dofs (fe);
-    mg_dof_handler.distribute_mg_dofs (fe);
+    mg_dof_handler.distribute_mg_dofs ();
 
     DoFTools::extract_locally_relevant_dofs (mg_dof_handler,
                                              locally_relevant_set);
@@ -283,18 +283,17 @@ namespace Step50
     // right away, without the need for a later
     // clean-up stage:
     constraints.reinit (locally_relevant_set);
-    hanging_node_constraints.reinit (locally_relevant_set);
-    DoFTools::make_hanging_node_constraints (mg_dof_handler, hanging_node_constraints);
     DoFTools::make_hanging_node_constraints (mg_dof_handler, constraints);
 
+    std::set<types::boundary_id>         dirichlet_boundary_ids;
     typename FunctionMap<dim>::type      dirichlet_boundary;
-    ConstantFunction<dim>                    homogeneous_dirichlet_bc (1.0);
+    Functions::ConstantFunction<dim>                    homogeneous_dirichlet_bc (1.0);
+    dirichlet_boundary_ids.insert(0);
     dirichlet_boundary[0] = &homogeneous_dirichlet_bc;
     VectorTools::interpolate_boundary_values (mg_dof_handler,
                                               dirichlet_boundary,
                                               constraints);
     constraints.close ();
-    hanging_node_constraints.close ();
 
     DynamicSparsityPattern dsp(mg_dof_handler.n_dofs(), mg_dof_handler.n_dofs());
     DoFTools::make_sparsity_pattern (mg_dof_handler, dsp, constraints);
@@ -307,7 +306,8 @@ namespace Step50
     // pass the <code>dirichlet_boundary</code>
     // here as well.
     mg_constrained_dofs.clear();
-    mg_constrained_dofs.initialize(mg_dof_handler, dirichlet_boundary);
+    mg_constrained_dofs.initialize(mg_dof_handler);
+    mg_constrained_dofs.make_zero_boundary_constraints(mg_dof_handler, dirichlet_boundary_ids);
 
 
     // Now for the things that concern the
@@ -328,9 +328,9 @@ namespace Step50
     const unsigned int n_levels = triangulation.n_global_levels();
 
     mg_interface_matrices.resize(0, n_levels-1);
-    mg_interface_matrices.clear ();
+    mg_interface_matrices.clear_elements ();
     mg_matrices.resize(0, n_levels-1);
-    mg_matrices.clear ();
+    mg_matrices.clear_elements ();
 
     // Now, we have to provide a matrix on each
     // level. To this end, we first use the
@@ -502,7 +502,7 @@ namespace Step50
     // Our first job is to identify those degrees of freedom on each level
     // that are located on interfaces between adaptively refined levels, and
     // those that lie on the interface but also on the exterior boundary of
-    // the domain. The <code>MGConstraints</code> already computed the
+    // the domain. The <code>MGConstrainedDoFs</code> already computed the
     // information for us when we called initialize in
 
     // <code>setup_system()</code>.
@@ -512,7 +512,7 @@ namespace Step50
     // the assembled value has to be added into on each level.  On the
     // other hand, we also have to impose zero boundary conditions on
     // the external boundary of each level. But this the
-    // <code>MGConstraints</code> knows it. So we simply ask for them
+    // <code>MGConstrainedDoFs</code> knows it. So we simply ask for them
     // by calling <code>get_boundary_indices ()</code>.  The third
     // step is to construct constraints on all those degrees of
     // freedom: their value should be zero after each application of
@@ -543,8 +543,8 @@ namespace Step50
     // need a right hand side, and more significantly (ii) we don't
     // just loop over all active cells, but in fact all cells, active
     // or not. Consequently, the correct iterator to use is
-    // MGDoFHandler::cell_iterator rather than
-    // MGDoFHandler::active_cell_iterator. Let's go about it:
+    // DoFHandler::cell_iterator rather than
+    // DoFHandler::active_cell_iterator. Let's go about it:
     typename DoFHandler<dim>::cell_iterator cell = mg_dof_handler.begin(),
                                             endc = mg_dof_handler.end();
 
@@ -680,7 +680,7 @@ namespace Step50
   // spaces involved and can often be computed in a generic way
   // independent of the problem under consideration. In that case, we
   // can use the MGTransferPrebuilt class that, given the constraints
-  // on the global level and an MGDoFHandler object computes the
+  // on the global level and an DoFHandler object computes the
   // matrices corresponding to these transfer operators.
   //
   // The second part of the following lines deals with the coarse grid
@@ -694,14 +694,9 @@ namespace Step50
   void LaplaceProblem<dim>::solve ()
   {
     // Create the object that deals with the transfer between
-    // different refinement levels. We need to pass it the hanging
-    // node constraints.
-    MGTransferPrebuilt<vector_t> mg_transfer(hanging_node_constraints, mg_constrained_dofs);
-    // Now the prolongation matrix has to be built.  This matrix needs
-    // to take the boundary values on each level into account and
-    // needs to know about the indices at the refinement edges. The
-    // <code>MGConstraints</code> knows about that so pass it as an
-    // argument.
+    // different refinement levels.
+    MGTransferPrebuilt<vector_t> mg_transfer(mg_constrained_dofs);
+    // Now the prolongation matrix has to be built.
     mg_transfer.build_matrices(mg_dof_handler);
 
     matrix_t &coarse_matrix = mg_matrices[0];
@@ -709,9 +704,8 @@ namespace Step50
     SolverControl coarse_solver_control (1000, 1e-10, false, false);
     SolverCG<vector_t> coarse_solver(coarse_solver_control);
     PreconditionIdentity id;
-    MGCoarseGridLACIteration<SolverCG<vector_t>,vector_t> coarse_grid_solver(coarse_solver,
-        coarse_matrix,
-        id);
+    MGCoarseGridIterativeSolver<vector_t, SolverCG<vector_t>, matrix_t, PreconditionIdentity>
+    coarse_grid_solver(coarse_solver, coarse_matrix, id);
 
     // The next component of a multilevel solver or preconditioner is
     // that we need a smoother on each level. A common choice for this
@@ -770,8 +764,7 @@ namespace Step50
     // Now, we are ready to set up the
     // V-cycle operator and the
     // multilevel preconditioner.
-    Multigrid<vector_t > mg(mg_dof_handler,
-                            mg_matrix,
+    Multigrid<vector_t > mg(mg_matrix,
                             coarse_grid_solver,
                             mg_transfer,
                             mg_smoother,
@@ -822,22 +815,14 @@ namespace Step50
 
   // @sect4{Postprocessing}
 
-  // The following two functions postprocess a
-  // solution once it is computed. In
-  // particular, the first one refines the mesh
-  // at the beginning of each cycle while the
-  // second one outputs results at the end of
-  // each such cycle. The functions are almost
-  // unchanged from those in step-6, with the
-  // exception of two minor differences: The
-  // KellyErrorEstimator::estimate function
-  // wants an argument of type DoFHandler, not
-  // MGDoFHandler, and so we have to cast from
-  // derived to base class; and we generate
-  // output in VTK format, to use the more
-  // modern visualization programs available
-  // today compared to those that were
-  // available when step-6 was written.
+  // The following two functions postprocess a solution once it is
+  // computed. In particular, the first one refines the mesh at the beginning
+  // of each cycle while the second one outputs results at the end of each
+  // such cycle. The <code>refine_grid()</code> method is almost unchanged
+  // from step-6: the only substantial difference is that this method uses a
+  // distributed grid refinement function instead of a serial one. The
+  // <code>output_results()</code> method is quite different since each
+  // processor writes only part of the overall graphical output.
   template <int dim>
   void LaplaceProblem<dim>::refine_grid ()
   {
@@ -918,7 +903,7 @@ namespace Step50
                                  Utilities::int_to_string (cycle, 5) +
                                  ".visit");
         std::ofstream visit_master (visit_master_filename.c_str());
-        data_out.write_visit_record (visit_master, filenames);
+        DataOutBase::write_visit_record (visit_master, filenames);
 
         std::cout << "   wrote " << pvtu_master_filename << std::endl;
 
@@ -1003,7 +988,6 @@ int main (int argc, char *argv[])
                 << "Aborting!" << std::endl
                 << "----------------------------------------------------"
                 << std::endl;
-      throw;
     }
   catch (...)
     {

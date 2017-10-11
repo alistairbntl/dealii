@@ -18,8 +18,6 @@
 // task scheduler object is running on each thread we create
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 #include <unistd.h>
 
 #include <deal.II/base/thread_management.h>
@@ -43,7 +41,6 @@ int main()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   {
     Threads::Thread<> t1 = Threads::new_thread (test, 1);

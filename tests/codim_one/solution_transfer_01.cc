@@ -43,15 +43,13 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/solution_transfer.h>
 
-#include <fstream>
 
 using namespace dealii;
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   const unsigned int spacedim = 2;
   const unsigned int dim = spacedim-1;

@@ -40,7 +40,7 @@ namespace internal
                   const unsigned int n_subdivisions,
                   const std::vector<unsigned int> &n_postprocessor_outputs,
                   const Mapping<dim,spacedim> &mapping,
-                  const std::vector<std_cxx11::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
+                  const std::vector<std::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
                   const UpdateFlags update_flags)
       :
       internal::DataOut::
@@ -143,22 +143,11 @@ build_one_patch (const FaceDescriptor *cell_and_face,
           const unsigned int n_components
             = this_fe_patch_values.get_fe().n_components();
           const DataPostprocessor<dim> *postprocessor=this->dof_data[dataset]->postprocessor;
-          if (postprocessor != 0)
+          if (postprocessor != nullptr)
             {
               // we have to postprocess the data, so determine, which fields
               // have to be updated
               const UpdateFlags update_flags=postprocessor->get_needed_update_flags();
-
-              // get normals, if needed. this is a geometrical information and
-              // thus does not depend on the number of components of the data
-              // vector
-              if (update_flags & update_normal_vectors)
-                {
-//TODO: undo this copying when we can change the data type of
-//  data.patch_normals to Tensor<1,spacedim> as well
-                  for (unsigned int q=0; q<this_fe_patch_values.n_quadrature_points; ++q)
-                    data.patch_normals[q] = Point<dim>(this_fe_patch_values.get_all_normal_vectors()[q]);
-                }
 
               if (n_components == 1)
                 {
@@ -166,24 +155,29 @@ build_one_patch (const FaceDescriptor *cell_and_face,
                   // gradient etc.
                   if (update_flags & update_values)
                     this->dof_data[dataset]->get_function_values (this_fe_patch_values,
-                                                                  data.patch_values);
+                                                                  data.patch_values_scalar.solution_values);
                   if (update_flags & update_gradients)
                     this->dof_data[dataset]->get_function_gradients (this_fe_patch_values,
-                                                                     data.patch_gradients);
+                                                                     data.patch_values_scalar.solution_gradients);
                   if (update_flags & update_hessians)
                     this->dof_data[dataset]->get_function_hessians (this_fe_patch_values,
-                                                                    data.patch_hessians);
+                                                                    data.patch_values_scalar.solution_hessians);
 
                   if (update_flags & update_quadrature_points)
-                    data.patch_evaluation_points = this_fe_patch_values.get_quadrature_points();
+                    data.patch_values_scalar.evaluation_points = this_fe_patch_values.get_quadrature_points();
+
+                  if (update_flags & update_normal_vectors)
+                    data.patch_values_scalar.normals = this_fe_patch_values.get_all_normal_vectors();
+
+                  const typename DoFHandlerType::active_cell_iterator dh_cell(&cell_and_face->first->get_triangulation(),
+                                                                              cell_and_face->first->level(),
+                                                                              cell_and_face->first->index(),
+                                                                              this->dof_data[dataset]->dof_handler);
+                  data.patch_values_scalar.template set_cell<DoFHandlerType> (dh_cell);
 
                   postprocessor->
-                  compute_derived_quantities_scalar(data.patch_values,
-                                                    data.patch_gradients,
-                                                    data.patch_hessians,
-                                                    data.patch_normals,
-                                                    data.patch_evaluation_points,
-                                                    data.postprocessed_values[dataset]);
+                  evaluate_scalar_field(data.patch_values_scalar,
+                                        data.postprocessed_values[dataset]);
                 }
               else
                 {
@@ -192,24 +186,29 @@ build_one_patch (const FaceDescriptor *cell_and_face,
                   data.resize_system_vectors(n_components);
                   if (update_flags & update_values)
                     this->dof_data[dataset]->get_function_values (this_fe_patch_values,
-                                                                  data.patch_values_system);
+                                                                  data.patch_values_system.solution_values);
                   if (update_flags & update_gradients)
                     this->dof_data[dataset]->get_function_gradients (this_fe_patch_values,
-                                                                     data.patch_gradients_system);
+                                                                     data.patch_values_system.solution_gradients);
                   if (update_flags & update_hessians)
                     this->dof_data[dataset]->get_function_hessians (this_fe_patch_values,
-                                                                    data.patch_hessians_system);
+                                                                    data.patch_values_system.solution_hessians);
 
                   if (update_flags & update_quadrature_points)
-                    data.patch_evaluation_points = this_fe_patch_values.get_quadrature_points();
+                    data.patch_values_system.evaluation_points = this_fe_patch_values.get_quadrature_points();
+
+                  if (update_flags & update_normal_vectors)
+                    data.patch_values_system.normals = this_fe_patch_values.get_all_normal_vectors();
+
+                  const typename DoFHandlerType::active_cell_iterator dh_cell(&cell_and_face->first->get_triangulation(),
+                                                                              cell_and_face->first->level(),
+                                                                              cell_and_face->first->index(),
+                                                                              this->dof_data[dataset]->dof_handler);
+                  data.patch_values_system.template set_cell<DoFHandlerType> (dh_cell);
 
                   postprocessor->
-                  compute_derived_quantities_vector(data.patch_values_system,
-                                                    data.patch_gradients_system,
-                                                    data.patch_hessians_system,
-                                                    data.patch_normals,
-                                                    data.patch_evaluation_points,
-                                                    data.postprocessed_values[dataset]);
+                  evaluate_vector_field(data.patch_values_system,
+                                        data.postprocessed_values[dataset]);
                 }
 
               for (unsigned int q=0; q<n_q_points; ++q)
@@ -225,23 +224,23 @@ build_one_patch (const FaceDescriptor *cell_and_face,
             if (n_components == 1)
               {
                 this->dof_data[dataset]->get_function_values (this_fe_patch_values,
-                                                              data.patch_values);
+                                                              data.patch_values_scalar.solution_values);
                 for (unsigned int q=0; q<n_q_points; ++q)
-                  patch.data(offset,q) = data.patch_values[q];
+                  patch.data(offset,q) = data.patch_values_scalar.solution_values[q];
               }
             else
               {
                 data.resize_system_vectors(n_components);
                 this->dof_data[dataset]->get_function_values (this_fe_patch_values,
-                                                              data.patch_values_system);
+                                                              data.patch_values_system.solution_values);
                 for (unsigned int component=0; component<n_components;
                      ++component)
                   for (unsigned int q=0; q<n_q_points; ++q)
                     patch.data(offset+component,q) =
-                      data.patch_values_system[q](component);
+                      data.patch_values_system.solution_values[q](component);
               }
           // increment the counter for the actual data record
-          offset+=this->dof_data[dataset]->n_output_variables;
+          offset += this->dof_data[dataset]->n_output_variables;
         }
 
       // then do the cell data
@@ -291,18 +290,24 @@ void DataOutFaces<dim,DoFHandlerType>::build_patches (const Mapping<dimension> &
   Assert (n_subdivisions >= 1,
           Exceptions::DataOut::ExcInvalidNumberOfSubdivisions(n_subdivisions));
 
-  Assert (this->triangulation != 0,
+  Assert (this->triangulation != nullptr,
           Exceptions::DataOut::ExcNoTriangulationSelected());
+
+  this->validate_dataset_names();
 
   unsigned int n_datasets     = this->cell_data.size();
   for (unsigned int i=0; i<this->dof_data.size(); ++i)
     n_datasets += this->dof_data[i]->n_output_variables;
 
-  // first count the cells we want to create patches of and make sure there is
-  // enough memory for that
+  // first collect the cells we want to create patches of; we will
+  // then iterate over them. the end-condition of the loop needs to
+  // test that next_face() returns an end iterator, as well as for the
+  // case that first_face() returns an invalid FaceDescriptor object
   std::vector<FaceDescriptor> all_faces;
   for (FaceDescriptor face=first_face();
-       face.first != this->triangulation->end();
+       ((face.first != this->triangulation->end())
+        &&
+        (face != FaceDescriptor()));
        face = next_face(face))
     all_faces.push_back (face);
 
@@ -330,7 +335,7 @@ void DataOutFaces<dim,DoFHandlerType>::build_patches (const Mapping<dimension> &
                n_subdivisions,
                n_postprocessor_outputs,
                mapping,
-               this->get_finite_elements(),
+               this->get_fes(),
                update_flags);
   DataOutBase::Patch<dimension-1,space_dimension> sample_patch;
   sample_patch.n_subdivisions = n_subdivisions;
@@ -340,11 +345,11 @@ void DataOutFaces<dim,DoFHandlerType>::build_patches (const Mapping<dimension> &
   // now build the patches in parallel
   WorkStream::run (&all_faces[0],
                    &all_faces[0]+all_faces.size(),
-                   std_cxx11::bind(&DataOutFaces<dim,DoFHandlerType>::build_one_patch,
-                                   this, std_cxx11::_1, std_cxx11::_2, std_cxx11::_3),
-                   std_cxx11::bind(&internal::DataOutFaces::
-                                   append_patch_to_list<dim,space_dimension>,
-                                   std_cxx11::_1, std_cxx11::ref(this->patches)),
+                   std::bind(&DataOutFaces<dim,DoFHandlerType>::build_one_patch,
+                             this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+                   std::bind(&internal::DataOutFaces::
+                             append_patch_to_list<dim,space_dimension>,
+                             std::placeholders::_1, std::ref(this->patches)),
                    thread_data,
                    sample_patch);
 }

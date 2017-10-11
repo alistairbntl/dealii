@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__block_sparse_matrix_templates_h
-#define dealii__block_sparse_matrix_templates_h
+#ifndef dealii_block_sparse_matrix_templates_h
+#define dealii_block_sparse_matrix_templates_h
 
 
 #include <deal.II/base/config.h>
@@ -22,13 +22,6 @@
 #include <deal.II/lac/block_sparse_matrix.h>
 
 DEAL_II_NAMESPACE_OPEN
-
-
-template <typename number>
-BlockSparseMatrix<number>::BlockSparseMatrix ()
-{}
-
-
 
 template <typename number>
 BlockSparseMatrix<number>::
@@ -45,7 +38,7 @@ BlockSparseMatrix<number>::~BlockSparseMatrix ()
   // delete previous content of
   // the subobjects array
   clear ();
-  sparsity_pattern = 0;
+  sparsity_pattern = nullptr;
 }
 
 
@@ -78,7 +71,7 @@ void
 BlockSparseMatrix<number>::clear ()
 {
   BlockMatrixBase<SparseMatrix<number> >::clear();
-  sparsity_pattern = 0;
+  sparsity_pattern = nullptr;
 }
 
 

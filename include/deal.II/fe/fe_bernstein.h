@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_bernstein_h
-#define dealii__fe_bernstein_h
+#ifndef dealii_fe_bernstein_h
+#define dealii_fe_bernstein_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/tensor_product_polynomials.h>
@@ -69,6 +69,39 @@ public:
    * Constructor for tensor product polynomials of degree @p p.
    */
   FE_Bernstein (const unsigned int p);
+
+  /**
+   * FE_Bernstein is not interpolatory in the element interior, which prevents
+   * this element from defining an interpolation matrix. An exception will be
+   * thrown.
+   *
+   * Overrides the implementation from FE_Q_Base.
+   */
+  virtual void
+  get_interpolation_matrix (const FiniteElement<dim,spacedim> &source,
+                            FullMatrix<double>       &matrix) const;
+
+  /**
+   * FE_Bernstein is not interpolatory in the element interior, which prevents
+   * this element from defining a restriction matrix. An exception will be
+   * thrown.
+   *
+   * Overrides the implementation from FE_Q_Base.
+   */
+  virtual const FullMatrix<double> &
+  get_restriction_matrix (const unsigned int child,
+                          const RefinementCase<dim> &refinement_case=RefinementCase<dim>::isotropic_refinement) const;
+
+  /**
+   * FE_Bernstein is not interpolatory in the element interior, which prevents
+   * this element from defining a prolongation matrix. An exception will be
+   * thrown.
+   *
+   * Overrides the implementation from FE_Q_Base.
+   */
+  virtual const FullMatrix<double> &
+  get_prolongation_matrix (const unsigned int child,
+                           const RefinementCase<dim> &refinement_case=RefinementCase<dim>::isotropic_refinement) const;
 
   /**
    * Return the matrix interpolating from a face of one element to the face of
@@ -143,8 +176,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -159,14 +192,11 @@ public:
    */
   virtual std::string get_name () const;
 
-protected:
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
-  /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim,spacedim> *clone() const;
+protected:
 
   /**
    * Only for internal use. Its full name is @p get_dofs_per_object_vector

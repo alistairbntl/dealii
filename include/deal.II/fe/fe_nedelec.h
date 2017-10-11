@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_nedelec_h
-#define dealii__fe_nedelec_h
+#ifndef dealii_fe_nedelec_h
+#define dealii_fe_nedelec_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/table.h>
@@ -112,9 +112,12 @@ class FE_Nedelec : public FE_PolyTensor<PolynomialsNedelec<dim>, dim>
 {
 public:
   /**
-   * Constructor for the N&eacute;d&eacute;lec element of degree @p p.
+   * Constructor for the N&eacute;d&eacute;lec element of given @p order.
+   * The maximal polynomial degree of the shape functions is
+   * <code>order+1</code> (in each variable; the total polynomial degree
+   * may be higher).
    */
-  FE_Nedelec (const unsigned int p);
+  FE_Nedelec (const unsigned int order);
 
   /**
    * Return a string that uniquely identifies a finite element. This class
@@ -252,24 +255,23 @@ public:
   get_prolongation_matrix (const unsigned int child,
                            const RefinementCase<dim> &refinement_case=RefinementCase<dim>::isotropic_refinement) const;
 
-  virtual void interpolate (std::vector<double> &local_dofs,
-                            const std::vector<double> &values) const;
-
-  virtual void interpolate (std::vector<double> &local_dofs,
-                            const std::vector<Vector<double> > &values,
-                            unsigned int offset = 0) const;
-  virtual void interpolate (std::vector<double> &local_dofs,
-                            const VectorSlice<const std::vector<std::vector<double> > > &values)
-  const;
+  // documentation inherited from the base class
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
 
   /**
-   * Returns a list of constant modes of the element.
+   * Return a list of constant modes of the element.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
   get_constant_modes () const;
 
   virtual std::size_t memory_consumption () const;
-  virtual FiniteElement<dim> *clone() const;
+
+  virtual
+  std::unique_ptr<FiniteElement<dim,dim> >
+  clone() const;
 
 private:
   /**
@@ -290,7 +292,7 @@ private:
    * class and fill the tables with interpolation weights (#boundary_weights
    * and interior_weights). Called from the constructor.
    */
-  void initialize_support_points (const unsigned int degree);
+  void initialize_support_points (const unsigned int order);
 
   /**
    * Initialize the interpolation from functions on refined mesh cells onto

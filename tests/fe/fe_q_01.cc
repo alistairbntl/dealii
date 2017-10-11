@@ -18,15 +18,12 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_q.h>
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deal_II_exceptions::disable_abort_on_exception();
   try
     {

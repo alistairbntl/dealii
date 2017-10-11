@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2014 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,10 +15,18 @@
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/logstream.h>
+#include <deal.II/base/utilities.h>
+#include <deal.II/base/mpi.h>
+
 #include <string>
+#include <cstring>
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+
+#ifdef DEAL_II_WITH_MPI
+#  include <mpi.h>
+#endif
 
 #ifdef DEAL_II_HAVE_GLIBC_STACKTRACE
 #  include <execinfo.h>
@@ -66,10 +74,15 @@ ExceptionBase::ExceptionBase ()
   function(""),
   cond(""),
   exc(""),
-  stacktrace (NULL),
+  stacktrace (nullptr),
   n_stacktrace_frames (0),
   what_str("")
-{}
+{
+#ifdef DEAL_II_HAVE_GLIBC_STACKTRACE
+  for (unsigned int i=0; i<sizeof(raw_stacktrace)/sizeof(raw_stacktrace[0]); ++i)
+    raw_stacktrace[i] = nullptr;
+#endif
+}
 
 
 
@@ -80,17 +93,22 @@ ExceptionBase::ExceptionBase (const ExceptionBase &exc)
   function(exc.function),
   cond(exc.cond),
   exc(exc.exc),
-  stacktrace (NULL), // don't copy stacktrace to avoid double de-allocation problem
+  stacktrace (nullptr), // don't copy stacktrace to avoid double de-allocation problem
   n_stacktrace_frames (0),
   what_str("") // don't copy the error message, it gets generated dynamically by what()
-{}
+{
+#ifdef DEAL_II_HAVE_GLIBC_STACKTRACE
+  for (unsigned int i=0; i<sizeof(raw_stacktrace)/sizeof(raw_stacktrace[0]); ++i)
+    raw_stacktrace[i] = nullptr;
+#endif
+}
 
 
 
-ExceptionBase::~ExceptionBase () throw ()
+ExceptionBase::~ExceptionBase () noexcept
 {
   free (stacktrace); // free(NULL) is allowed
-  stacktrace = NULL;
+  stacktrace = nullptr;
 }
 
 
@@ -117,7 +135,7 @@ void ExceptionBase::set_fields (const char *f,
 #endif
 }
 
-const char *ExceptionBase::what() const throw()
+const char *ExceptionBase::what() const noexcept
 {
   // If no error c_string was generated so far, do it now:
   if (what_str == "")
@@ -148,22 +166,39 @@ const char *ExceptionBase::get_exc_name () const
 
 void ExceptionBase::print_exc_data (std::ostream &out) const
 {
+  // print a header for the exception
   out << "An error occurred in line <" << line
       << "> of file <" << file
       << "> in function" << std::endl
       << "    " << function << std::endl
       << "The violated condition was: "<< std::endl
-      << "    " << cond << std::endl
-      << "The name and call sequence of the exception was:" << std::endl
-      << "    " << exc  << std::endl
-      << "Additional Information: " << std::endl;
+      << "    " << cond << std::endl;
+
+  // print the way the additional information message was generated.
+  // this is useful if the names of local variables appear in the
+  // generation of the error message, because it allows the identification
+  // of parts of the error text with what variables may have cause this
+  //
+  // On the other hand, this is almost never the case for ExcMessage
+  // exceptions which would simply print the same text twice: once for
+  // the way the message was composed, and once for the additional
+  // information. Furthermore, the former of these two is often spread
+  // between numerous "..."-enclosed strings that the preprocessor
+  // collates into a single string, making it awkward to read. Consequently,
+  // elide this text if the message was generated via an ExcMessage object
+  if (std::strstr(cond, "dealii::ExcMessage") != nullptr)
+    out << "The name and call sequence of the exception was:" << std::endl
+        << "    " << exc  << std::endl;
+
+  // finally print the additional information the exception provides:
+  out << "Additional information: " << std::endl;
 }
 
 
 
 void ExceptionBase::print_info (std::ostream &out) const
 {
-  out << "(none)" << std::endl;
+  out << "    (none)" << std::endl;
 }
 
 
@@ -215,7 +250,7 @@ void ExceptionBase::print_stack_trace (std::ostream &out) const
       // for unknown reasons :-) if we can, demangle the function name
 #ifdef DEAL_II_HAVE_LIBSTDCXX_DEMANGLER
       int         status;
-      char *p = abi::__cxa_demangle(functionname.c_str(), 0, 0, &status);
+      char *p = abi::__cxa_demangle(functionname.c_str(), nullptr, nullptr, &status);
 
       if ((status == 0) && (functionname != "main"))
         {
@@ -308,31 +343,143 @@ void ExceptionBase::generate_message () const
 
 
 
+#ifdef DEAL_II_WITH_MPI
+namespace StandardExceptions
+{
+  ExcMPI::ExcMPI (const int error_code)
+    :
+    error_code (error_code)
+  {}
+
+  void ExcMPI::print_info (std::ostream &out) const
+  {
+    char error_name[MPI_MAX_ERROR_STRING];
+    error_name[0] = '\0';
+    int resulting_length = MPI_MAX_ERROR_STRING;
+
+    bool error_name_known = false;
+    // workaround for Open MPI 1.6.5 not accepting
+    // MPI_ERR_LASTCODE in MPI_Error_class
+    if (error_code < MPI_ERR_LASTCODE)
+      {
+        // get the string name of the error code by first converting it to an
+        // error class.
+        int error_class = 0;
+        int ierr = MPI_Error_class (error_code, &error_class);
+        error_name_known = (ierr == MPI_SUCCESS);
+
+        // Check the output of the error printing functions. If either MPI
+        // function fails we should just print a less descriptive message.
+        if (error_name_known)
+          {
+            ierr = MPI_Error_string (error_class, error_name, &resulting_length);
+            error_name_known = error_name_known && (ierr == MPI_SUCCESS);
+          }
+      }
+
+    out << "deal.II encountered an error while calling an MPI function."
+        << std::endl;
+    if (error_name_known)
+      {
+        out << "The description of the error provided by MPI is \""
+            << error_name
+            << "\"."
+            << std::endl;
+      }
+    else
+      {
+        out << "This error code is not equal to any of the standard MPI error codes."
+            << std::endl;
+      }
+    out << "The numerical value of the original error code is "
+        << error_code
+        << "."
+        << std::endl;
+  }
+}
+#endif // DEAL_II_WITH_MPI
+
+namespace
+{
+  void internal_abort (const ExceptionBase &exc) noexcept
+  {
+    // first print the error
+    std::cerr << exc.what() << std::endl;
+
+    // then bail out. if in MPI mode, bring down the entire
+    // house by asking the MPI system to do a best-effort
+    // operation at also terminating all of the other MPI
+    // processes. this is useful because if only one process
+    // runs into an assertion, then that may lead to deadlocks
+    // if the others don't recognize this, or at the very least
+    // delay their termination until they realize that their
+    // communication with the job that died times out.
+    //
+    // Unlike std::abort(), MPI_Abort() unfortunately doesn't break when
+    // running inside a debugger like GDB, so only use this strategy if
+    // absolutely necessary and inform the user how to use a debugger.
+#ifdef DEAL_II_WITH_MPI
+    int is_initialized;
+    MPI_Initialized(&is_initialized);
+    if (is_initialized)
+      {
+        // do the same as in Utilities::MPI::n_mpi_processes() here,
+        // but without error checking to not throw again.
+        int n_proc=1;
+        MPI_Comm_size (MPI_COMM_WORLD, &n_proc);
+        if (n_proc>1)
+          {
+            std::cerr << "Calling MPI_Abort now.\n"
+            << "To break execution in a GDB session, execute 'break MPI_Abort' before "
+            << "running. You can also put the following into your ~/.gdbinit:\n"
+            << "  set breakpoint pending on\n"
+            << "  break MPI_Abort\n"
+            << "  set breakpoint pending auto" << std::endl;
+
+            MPI_Abort (MPI_COMM_WORLD,
+            /* return code = */ 255);
+          }
+      }
+#endif
+    std::abort();
+  }
+}
+
 namespace deal_II_exceptions
 {
   namespace internals
   {
 
-    void abort (const ExceptionBase &exc, bool nothrow /*= false*/)
+    void issue_error_nothrow (ExceptionHandling,
+                              const char       *file,
+                              int               line,
+                              const char       *function,
+                              const char       *cond,
+                              const char       *exc_name,
+                              ExceptionBase     e) noexcept
     {
+      // Fill the fields of the exception object
+      e.set_fields (file, line, function, cond, exc_name);
       if (dealii::deal_II_exceptions::abort_on_exception)
-        {
-          // Print the error message and bail out:
-          std::cerr << exc.what() << std::endl;
-          std::abort();
-        }
-      else if (nothrow)
-        {
-          // We are not allowed to throw, and not allowed to abort.
-          // Just print the exception name to deallog and continue
-          // normally:
-          deallog << "Exception: " << exc.get_exc_name() << std::endl;
-        }
+        internal_abort(e);
       else
         {
-          // We are not allowed to abort, so just throw the error so just
-          // throw the error so just throw the error so just throw the
-          // error:
+          // We are not allowed to throw, and not allowed to abort.
+          // Just print the exception name to deallog and continue normally:
+          deallog << "Exception: " << e.get_exc_name() << std::endl;
+          deallog << e.what() << std::endl;
+        }
+    }
+
+
+
+    void abort (const ExceptionBase &exc)
+    {
+      if (dealii::deal_II_exceptions::abort_on_exception)
+        internal_abort(exc);
+      else
+        {
+          // We are not allowed to abort, so just throw the error:
           throw exc;
         }
     }

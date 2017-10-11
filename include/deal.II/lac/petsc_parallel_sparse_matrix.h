@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_parallel_sparse_matrix_h
-#define dealii__petsc_parallel_sparse_matrix_h
+#ifndef dealii_petsc_parallel_sparse_matrix_h
+#define dealii_petsc_parallel_sparse_matrix_h
 
 #include <deal.II/base/config.h>
 
@@ -40,7 +40,7 @@ namespace PETScWrappers
 
 
     /**
-     * Implementation of a parallel sparse matrix class based on PETSC, with
+     * Implementation of a parallel sparse matrix class based on PETSc, with
      * rows of the matrix distributed across an MPI network. All the
      * functionality is actually in the base class, except for the calls to
      * generate a parallel sparse matrix. This is possible since PETSc only
@@ -101,7 +101,7 @@ namespace PETScWrappers
      *
      * The only way to avoid this is to tell PETSc where the actual entries of
      * the matrix will be. For this, there are constructors and reinit()
-     * functions of this class that take a CompressedSparsityPattern object
+     * functions of this class that take a DynamicSparsityPattern object
      * containing all this information. While in the general case it is
      * sufficient if the constructors and reinit() functions know the number
      * of local rows and columns, the functions getting a sparsity pattern
@@ -136,7 +136,7 @@ namespace PETScWrappers
         /**
          * It is not safe to elide additions of zeros to individual elements
          * of this matrix. The reason is that additions to the matrix may
-         * trigger collective operations synchronising buffers on multiple
+         * trigger collective operations synchronizing buffers on multiple
          * processes. If an addition is elided on one process, this may lead
          * to other processes hanging in an infinite waiting loop.
          */
@@ -171,6 +171,9 @@ namespace PETScWrappers
        * documentation states that one cannot form an ILU decomposition of a
        * matrix for which this flag has been set to @p true, only an ICC. The
        * default value of this flag is @p false.
+       *
+       * @deprecated This constructor is deprecated: please use the
+       * constructor with a sparsity pattern argument instead.
        */
       SparseMatrix (const MPI_Comm  &communicator,
                     const size_type  m,
@@ -179,7 +182,7 @@ namespace PETScWrappers
                     const size_type  local_columns,
                     const size_type  n_nonzero_per_row,
                     const bool       is_symmetric = false,
-                    const size_type  n_offdiag_nonzero_per_row = 0);
+                    const size_type  n_offdiag_nonzero_per_row = 0) DEAL_II_DEPRECATED;
 
       /**
        * Initialize a rectangular matrix with @p m rows and @p n columns. The
@@ -200,6 +203,9 @@ namespace PETScWrappers
        * documentation states that one cannot form an ILU decomposition of a
        * matrix for which this flag has been set to @p true, only an ICC. The
        * default value of this flag is @p false.
+       *
+       * @deprecated This constructor is deprecated: please use the
+       * constructor with a sparsity pattern argument instead.
        */
       SparseMatrix (const MPI_Comm               &communicator,
                     const size_type               m,
@@ -208,7 +214,7 @@ namespace PETScWrappers
                     const size_type               local_columns,
                     const std::vector<size_type> &row_lengths,
                     const bool                    is_symmetric = false,
-                    const std::vector<size_type> &offdiag_row_lengths = std::vector<size_type>());
+                    const std::vector<size_type> &offdiag_row_lengths = std::vector<size_type>()) DEAL_II_DEPRECATED;
 
       /**
        * Initialize using the given sparsity pattern with communication
@@ -262,6 +268,9 @@ namespace PETScWrappers
        * Throw away the present matrix and generate one that has the same
        * properties as if it were created by the constructor of this class
        * with the same argument list as the present function.
+       *
+       * @deprecated This overload of <code>reinit</code> is deprecated:
+       * please use the overload with a sparsity pattern argument instead.
        */
       void reinit (const MPI_Comm     &communicator,
                    const size_type m,
@@ -270,12 +279,15 @@ namespace PETScWrappers
                    const size_type local_columns,
                    const size_type n_nonzero_per_row,
                    const bool      is_symmetric = false,
-                   const size_type n_offdiag_nonzero_per_row = 0);
+                   const size_type n_offdiag_nonzero_per_row = 0) DEAL_II_DEPRECATED;
 
       /**
        * Throw away the present matrix and generate one that has the same
        * properties as if it were created by the constructor of this class
        * with the same argument list as the present function.
+       *
+       * @deprecated This overload of <code>reinit</code> is deprecated:
+       * please use the overload with a sparsity pattern argument instead.
        */
       void reinit (const MPI_Comm               &communicator,
                    const size_type               m,
@@ -284,7 +296,7 @@ namespace PETScWrappers
                    const size_type               local_columns,
                    const std::vector<size_type> &row_lengths,
                    const bool                    is_symmetric = false,
-                   const std::vector<size_type> &offdiag_row_lengths = std::vector<size_type>());
+                   const std::vector<size_type> &offdiag_row_lengths = std::vector<size_type>()) DEAL_II_DEPRECATED;
 
       /**
        * Initialize using the given sparsity pattern with communication
@@ -317,7 +329,7 @@ namespace PETScWrappers
        * Create a matrix where the size() of the IndexSets determine the
        * global number of rows and columns and the entries of the IndexSet
        * give the rows and columns for the calling processor. Note that only
-       * contiguous IndexSets are supported.
+       * ascending, 1:1 IndexSets are supported.
        */
       template <typename SparsityPatternType>
       void reinit (const IndexSet            &local_rows,
@@ -403,6 +415,9 @@ namespace PETScWrappers
        * Do the actual work for the respective reinit() function and the
        * matching constructor, i.e. create a matrix. Getting rid of the
        * previous matrix is left to the caller.
+       *
+       * @deprecated This overload of <code>do_reinit</code> is deprecated:
+       * please use the overload with a sparsity pattern argument instead.
        */
       void do_reinit (const size_type m,
                       const size_type n,
@@ -410,10 +425,13 @@ namespace PETScWrappers
                       const size_type local_columns,
                       const size_type n_nonzero_per_row,
                       const bool      is_symmetric = false,
-                      const size_type n_offdiag_nonzero_per_row = 0);
+                      const size_type n_offdiag_nonzero_per_row = 0) DEAL_II_DEPRECATED;
 
       /**
        * Same as previous function.
+       *
+       * @deprecated This overload of <code>do_reinit</code> is deprecated:
+       * please use the overload with a sparsity pattern argument instead.
        */
       void do_reinit (const size_type               m,
                       const size_type               n,
@@ -421,7 +439,7 @@ namespace PETScWrappers
                       const size_type               local_columns,
                       const std::vector<size_type> &row_lengths,
                       const bool                    is_symmetric = false,
-                      const std::vector<size_type> &offdiag_row_lengths = std::vector<size_type>());
+                      const std::vector<size_type> &offdiag_row_lengths = std::vector<size_type>()) DEAL_II_DEPRECATED;
 
       /**
        * Same as previous functions.

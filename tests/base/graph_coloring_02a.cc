@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <fstream>
 #include <vector>
 
 #include <deal.II/base/graph_coloring.h>
@@ -71,7 +70,7 @@ void check()
   // Create the coloring
   std::vector<std::vector<typename DoFHandler<dim>::active_cell_iterator> > coloring(
     GraphColoring::make_graph_coloring(dof_handler.begin_active(),dof_handler.end(),
-                                       std_cxx11::function<std::vector<types::global_dof_index> (typename
+                                       std::function<std::vector<types::global_dof_index> (typename
                                            DoFHandler<dim>::active_cell_iterator const &)> (&get_conflict_indices_cfem<dim>)));
 
   // verify that within each color, there is no conflict

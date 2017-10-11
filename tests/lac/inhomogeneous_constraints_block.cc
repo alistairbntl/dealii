@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,7 +24,6 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/full_matrix.h>
@@ -42,7 +41,6 @@
 #include <deal.II/numerics/error_estimator.h>
 #include <deal.II/lac/block_sparsity_pattern.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -136,7 +134,7 @@ void AdvectionProblem<dim>::setup_system ()
     std::map<types::global_dof_index,double> boundary_values;
     VectorTools::interpolate_boundary_values (dof_handler,
                                               0,
-                                              ConstantFunction<dim>(1.,2),
+                                              Functions::ConstantFunction<dim>(1.,2),
                                               boundary_values);
     std::map<types::global_dof_index,double>::const_iterator boundary_value =
       boundary_values.begin();
@@ -154,7 +152,7 @@ void AdvectionProblem<dim>::setup_system ()
   hanging_nodes_only.close ();
   test_all_constraints.close ();
 
-  BlockCompressedSimpleSparsityPattern csp (2,2);
+  BlockDynamicSparsityPattern csp (2,2);
   {
     const unsigned int dofs_per_block = dof_handler.n_dofs() / 2;
     csp.block(0,0).reinit (dofs_per_block, dofs_per_block);
@@ -318,7 +316,7 @@ void AdvectionProblem<dim>::assemble_reference ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ConstantFunction<dim>(1.,2),
+                                            Functions::ConstantFunction<dim>(1.,2),
                                             boundary_values);
   MatrixTools::apply_boundary_values (boundary_values,
                                       reference_matrix,
@@ -521,7 +519,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   {
     AdvectionProblem<2> advection_problem;

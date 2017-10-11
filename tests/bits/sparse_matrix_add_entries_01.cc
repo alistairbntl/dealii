@@ -23,7 +23,6 @@
 
 #include "../tests.h"
 #include <deal.II/lac/sparse_matrix.h>
-#include <fstream>
 
 
 void test ()
@@ -100,9 +99,7 @@ int main ()
 {
   deal_II_exceptions::disable_abort_on_exception();
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

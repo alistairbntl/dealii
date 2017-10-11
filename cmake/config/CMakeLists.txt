@@ -159,6 +159,7 @@ CONFIGURE_FILE(
 INSTALL(FILES
   ${CMAKE_CURRENT_BINARY_DIR}/${DEAL_II_PROJECT_CONFIG_NAME}Config.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/${DEAL_II_PROJECT_CONFIG_NAME}ConfigVersion.cmake
+  ${CMAKE_BINARY_DIR}/${DEAL_II_PROJECT_CONFIG_RELDIR}/${DEAL_II_PROJECT_CONFIG_NAME}FeatureConfig.cmake
   DESTINATION ${DEAL_II_PROJECT_CONFIG_RELDIR}
   COMPONENT library
   )
@@ -173,6 +174,7 @@ SET(_files
   )
 FOREACH(_file ${_files})
   FILE(APPEND ${_file} "\n\n#\n# Feature configuration:\n#\n\n")
+  FILE(APPEND ${_file} "SET(DEAL_II_WITH_CXX11 ON)\n")
 ENDFOREACH()
 
 GET_CMAKE_PROPERTY(_res VARIABLES)
@@ -189,16 +191,22 @@ FOREACH(_name ${_deal_ii_features_sorted})
 
   FOREACH(_file ${_files})
     FILE(APPEND ${_file} "SET(${_var} ${${_var}})\n")
-    IF(${_var} AND NOT "${${_name}_VERSION}" STREQUAL "")
-      FILE(APPEND ${_file}
-        "SET(DEAL_II_${_name}_VERSION \"${${_name}_VERSION}\")\n"
-        )
-    ENDIF()
-    FOREACH(_additional ${_additional_config_variables})
-      IF(_additional MATCHES "DEAL_II_${_name}_WITH")
-        FILE(APPEND ${_file} "SET(${_additional} ${${_additional}})\n")
+    #
+    # Do not pollute deal.IIConfig.cmake with package details of
+    # unconfigured features.
+    #
+    IF(${_var})
+      IF(NOT "${${_name}_VERSION}" STREQUAL "")
+        FILE(APPEND ${_file}
+          "SET(DEAL_II_${_name}_VERSION \"${${_name}_VERSION}\")\n"
+          )
       ENDIF()
-    ENDFOREACH()
+      FOREACH(_additional ${_additional_config_variables})
+        IF(_additional MATCHES "DEAL_II_${_name}_WITH")
+          FILE(APPEND ${_file} "SET(${_additional} ${${_additional}})\n")
+        ENDIF()
+      ENDFOREACH()
+    ENDIF()
   ENDFOREACH()
 ENDFOREACH()
 

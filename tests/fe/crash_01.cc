@@ -44,7 +44,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/fe/fe_values.h>
@@ -55,7 +54,6 @@
 #include <deal.II/base/function.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
 
@@ -69,7 +67,7 @@ void test(FiniteElement<dim> &fe)
   DoFHandler<dim> dof_handler(tria);
   dof_handler.distribute_dofs (fe);
   ConstraintMatrix constraints;
-  ZeroFunction<dim> boundary_values(fe.n_components());
+  Functions::ZeroFunction<dim> boundary_values(fe.n_components());
   VectorTools::project_boundary_values_curl_conforming (dof_handler, 0, boundary_values, 0, constraints);
 }
 
@@ -78,10 +76,8 @@ void test(FiniteElement<dim> &fe)
 int
 main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog << std::setprecision(7);
-  deallog.threshold_double(1.e-10);
 
   FE_Nedelec<3> fe1(0);  // works
   test<3>(fe1);

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__lapack_full_matrix_h
-#define dealii__lapack_full_matrix_h
+#ifndef dealii_lapack_full_matrix_h
+#define dealii_lapack_full_matrix_h
 
 
 #include <deal.II/base/config.h>
@@ -22,18 +22,19 @@
 #include <deal.II/base/table.h>
 #include <deal.II/lac/lapack_support.h>
 #include <deal.II/lac/vector_memory.h>
+#include <deal.II/base/thread_management.h>
 
-#include <deal.II/base/std_cxx11/shared_ptr.h>
+#include <memory>
 #include <vector>
 #include <complex>
 
 DEAL_II_NAMESPACE_OPEN
 
 // forward declarations
-template<typename number> class Vector;
-template<typename number> class BlockVector;
-template<typename number> class FullMatrix;
-template<typename number> class SparseMatrix;
+template <typename number> class Vector;
+template <typename number> class BlockVector;
+template <typename number> class FullMatrix;
+template <typename number> class SparseMatrix;
 
 
 /**
@@ -46,7 +47,7 @@ template<typename number> class SparseMatrix;
  * usually the names chosen for the arguments in the LAPACK documentation.
  *
  * @ingroup Matrix1
- * @author Guido Kanschat, 2005
+ * @author Guido Kanschat, 2005, Denis Davydov, 2017
  */
 template <typename number>
 class LAPACKFullMatrix : public TransposeTable<number>
@@ -122,6 +123,18 @@ public:
   operator = (const double d);
 
   /**
+   * This operator multiplies all entries by a fixed factor.
+   */
+  LAPACKFullMatrix<number> &
+  operator*= (const number factor);
+
+  /**
+   * This operator divides all entries by a fixed factor.
+   */
+  LAPACKFullMatrix<number> &
+  operator/= (const number factor);
+
+  /**
    * Assignment from different matrix classes, performing the usual conversion
    * to the transposed format expected by LAPACK. This assignment operator
    * uses iterators of the typename MatrixType. Therefore, sparse matrices are
@@ -144,6 +157,11 @@ public:
    */
   void reinit (const size_type rows,
                const size_type cols);
+
+  /**
+   * Assign @p property to this matrix.
+   */
+  void set_property(const LAPACKSupport::Property property);
 
   /**
    * Return the dimension of the codomain (or range) space.
@@ -172,7 +190,7 @@ public:
    * The final two arguments allow to enter a multiple of the source or its
    * transpose.
    */
-  template<typename MatrixType>
+  template <typename MatrixType>
   void fill (const MatrixType &src,
              const size_type dst_offset_i = 0,
              const size_type dst_offset_j = 0,
@@ -393,8 +411,63 @@ public:
   void compute_lu_factorization ();
 
   /**
-   * Invert the matrix by first computing an LU factorization with the LAPACK
-   * function Xgetrf and then building the actual inverse using Xgetri.
+   * Compute the Cholesky factorization of the matrix using LAPACK function Xpotrf.
+   *
+   * @note The factorization is stored in the lower-triangular part of the matrix.
+   */
+  void compute_cholesky_factorization ();
+
+  /**
+   * Estimate the reciprocal of the condition number $1/k(A)$ in $L_1$ norm ($1/(||A||_1 ||A^{-1}||_1)$)
+   * of a symmetric positive definite matrix using Cholesky factorization. This function can only
+   * be called if the matrix is already factorized.
+   *
+   * @note The condition number $k(A)$ can be used to estimate the numerical
+   * error related to the matrix inversion or the solution of the
+   * system of linear algebraic equations as
+   * <code>error = std::numeric_limits<Number>::epsilon * k</code>.
+   * Alternatively one can get the number of accurate digits
+   * <code>std::floor(std::log10(k))</code>.
+   *
+   * @note The function computes reciprocal of the condition number to
+   * avoid possible overflow if the matrix is nearly singular.
+   *
+   * @param[in] l1_norm Is the $L_1$ norm of the matrix before calling Cholesky
+   * factorization. It can be obtained by calling l1_norm().
+   */
+  number reciprocal_condition_number(const number l1_norm) const;
+
+  /**
+   * Compute the determinant of a matrix. As it requires the LU factorization of
+   * the matrix, this function can only be called after
+   * compute_lu_factorization() has been called.
+   */
+  number determinant () const;
+
+  /**
+   * Compute $L_1$ norm.
+   */
+  number l1_norm() const;
+
+  /**
+   * Compute $L_\infty$ norm.
+   */
+  number linfty_norm() const;
+
+  /**
+   * Compute Frobenius norm
+   */
+  number frobenius_norm() const;
+
+  /**
+   * Compute trace of the matrix, i.e. the sum of the diagonal values.
+   * Obviously, the matrix needs to be quadratic for this function.
+   */
+  number trace() const;
+
+  /**
+   * Invert the matrix by first computing an LU/Cholesky factorization with the LAPACK
+   * function Xgetrf/Xpotrf and then building the actual inverse using Xgetri/Xpotri.
    */
   void invert ();
 
@@ -580,6 +653,10 @@ public:
    *
    * @arg <tt>threshold</tt>: all entries with absolute value smaller than
    * this are considered zero.
+   *
+   * @note The entries stored resemble a matrix only if the state is either
+   * LAPACKSupport::matrix or LAPACK::inverse_matrix. Otherwise, calling this
+   * function is not allowed.
    */
   void print_formatted (std::ostream       &out,
                         const unsigned int  precision   = 3,
@@ -590,6 +667,10 @@ public:
                         const double        threshold   = 0.) const;
 
 private:
+  /**
+   * Internal function to compute various norms.
+   */
+  number norm(const char type) const;
 
   /**
    * Since LAPACK operations notoriously change the meaning of the matrix
@@ -598,15 +679,20 @@ private:
   LAPACKSupport::State state;
 
   /**
-   * Additional properties of the matrix which may help to select more
+   * Additional property of the matrix which may help to select more
    * efficient LAPACK functions.
    */
-  LAPACKSupport::Properties properties;
+  LAPACKSupport::Property property;
 
   /**
    * The working array used for some LAPACK functions.
    */
   mutable std::vector<number> work;
+
+  /**
+   * Integer working array used for some LAPACK functions.
+   */
+  mutable std::vector<int> iwork;
 
   /**
    * The vector storing the permutations applied for pivoting in the LU-
@@ -646,13 +732,18 @@ private:
    * The matrix <i>U</i> in the singular value decomposition
    * <i>USV<sup>T</sup></i>.
    */
-  std_cxx11::shared_ptr<LAPACKFullMatrix<number> > svd_u;
+  std::shared_ptr<LAPACKFullMatrix<number> > svd_u;
 
   /**
    * The matrix <i>V<sup>T</sup></i> in the singular value decomposition
    * <i>USV<sup>T</sup></i>.
    */
-  std_cxx11::shared_ptr<LAPACKFullMatrix<number> > svd_vt;
+  std::shared_ptr<LAPACKFullMatrix<number> > svd_vt;
+
+  /**
+   * Thread mutex.
+   */
+  mutable Threads::Mutex mutex;
 };
 
 

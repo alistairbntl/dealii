@@ -20,8 +20,6 @@
 #include "../tests.h"
 #include <deal.II/lac/sparsity_pattern.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <fstream>
-#include <iomanip>
 
 
 void test ()
@@ -59,9 +57,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

@@ -14,11 +14,10 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__mesh_worker_loop_h
-#define dealii__mesh_worker_loop_h
+#ifndef dealii_mesh_worker_loop_h
+#define dealii_mesh_worker_loop_h
 
 #include <deal.II/base/config.h>
-#include <deal.II/base/std_cxx11/function.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/base/template_constraints.h>
 #include <deal.II/grid/tria.h>
@@ -27,8 +26,7 @@
 #include <deal.II/meshworker/dof_info.h>
 #include <deal.II/meshworker/integration_info.h>
 
-
-#define DEAL_II_MESHWORKER_PARALLEL 1
+#include <functional>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -57,7 +55,7 @@ namespace internal
     return true;
   }
 
-  template<int dim, class DOFINFO, class A>
+  template <int dim, class DOFINFO, class A>
   void assemble(const MeshWorker::DoFInfoBox<dim, DOFINFO> &dinfo, A *assembler)
   {
     dinfo.assemble(*assembler);
@@ -69,12 +67,11 @@ namespace internal
 namespace MeshWorker
 {
   /**
-   * Collection of parameters for execution of MeshWorker loops.
+   * Collection of parameters to control the execution of MeshWorker loops.
    */
   class LoopControl
   {
   public:
-
     /**
      * Constructor.
      */
@@ -89,41 +86,61 @@ namespace MeshWorker
      * Loop over cells owned by this process. Defaults to <code>true</code>.
      */
     bool own_cells;
+
     /**
      * Loop over cells not owned by this process. Defaults to
      * <code>false</code>.
      */
     bool ghost_cells;
 
+    /**
+     * Enumeration describing when to do assembly on a face: see, e.g.,
+     * MeshWorker::LoopControl::faces_to_ghost for an example of how the value
+     * of this enumeration is interpreted in a particular circumstance.
+     */
     enum FaceOption
     {
+      /**
+       * Do not perform assembly on a face.
+       */
       never,
+      /**
+       * Perform assembly on one face.
+       */
       one,
+      /**
+       * Perform assembly on both faces.
+       */
       both
     };
 
     /**
-     * Loop over faces between a locally owned cell and a ghost cell: - never:
-     * do not assembly these faces - one: only one of the processes will
-     * assemble these faces ( from the finer side or the process with the
-     * lower mpi rank) - both: both processes will assemble these faces Note
-     * that these faces are never assembled from both sides on a single
-     * process. Default is one.
+     * Control for looping over faces between a locally owned cell and a ghost cell:
+     *
+     * - never: Do not assembly these faces.
+     * - one: Only one of the processes will assemble these faces (from the
+     *   finer side or the process with the lower MPI rank).
+     * - both: Both processes will assemble these faces. Note that these faces
+     *   are never assembled from both sides on a single process.
+     *
+     * The default is <code>one</code>.
      */
     FaceOption faces_to_ghost;
 
     /**
-     * Loop over faces between two locally owned cells: - never: do not
-     * assemble face terms - one: assemble once (always coming from the finer
-     * side) - both: assemble each face twice (not implemented for hanging
-     * nodes!) Default is one.
+     * Control for looping over faces between two locally owned cells:
+     *
+     * - never: Do not assemble face terms.
+     * - one: Assemble once (always coming from the finer side).
+     * - both: Assemble each face twice (not implemented for hanging nodes!).
+     *
+     * The default is <code>one</code>.
      */
     FaceOption own_faces;
 
-
     /**
-     * Flag to determine if cells integrals should be done before or after
-     * face integrals. Default is t
+     * A flag to determine if cells integrals should be done before or after
+     * face integrals. The default is <code>true</code>.
      */
     bool cells_first;
   };
@@ -157,16 +174,16 @@ namespace MeshWorker
    * @author Guido Kanschat
    * @date 2010
    */
-  template<class INFOBOX, class DOFINFO, int dim, int spacedim, class ITERATOR>
+  template <class INFOBOX, class DOFINFO, int dim, int spacedim, class ITERATOR>
   void cell_action(
     ITERATOR cell,
     DoFInfoBox<dim, DOFINFO> &dof_info,
     INFOBOX &info,
-    const std_cxx11::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &cell_worker,
-    const std_cxx11::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &boundary_worker,
-    const std_cxx11::function<void (DOFINFO &, DOFINFO &,
-                                    typename INFOBOX::CellInfo &,
-                                    typename INFOBOX::CellInfo &)> &face_worker,
+    const std::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &cell_worker,
+    const std::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &boundary_worker,
+    const std::function<void (DOFINFO &, DOFINFO &,
+                              typename INFOBOX::CellInfo &,
+                              typename INFOBOX::CellInfo &)> &face_worker,
     const LoopControl &loop_control)
   {
     const bool ignore_subdomain = (cell->get_triangulation().locally_owned_subdomain()
@@ -186,9 +203,9 @@ namespace MeshWorker
     dof_info.cell.reinit(cell);
     dof_info.cell_valid = true;
 
-    const bool integrate_cell          = (cell_worker != 0);
-    const bool integrate_boundary      = (boundary_worker != 0);
-    const bool integrate_interior_face = (face_worker != 0);
+    const bool integrate_cell          = (cell_worker != nullptr);
+    const bool integrate_boundary      = (boundary_worker != nullptr);
+    const bool integrate_interior_face = (face_worker != nullptr);
 
     if (integrate_cell)
       info.cell.reinit(dof_info.cell);
@@ -365,16 +382,16 @@ namespace MeshWorker
    * @ingroup MeshWorker
    * @author Guido Kanschat, 2009
    */
-  template<int dim, int spacedim, class DOFINFO, class INFOBOX, class ASSEMBLER, class ITERATOR>
+  template <int dim, int spacedim, class DOFINFO, class INFOBOX, class ASSEMBLER, class ITERATOR>
   void loop(ITERATOR begin,
             typename identity<ITERATOR>::type end,
             DOFINFO &dinfo,
             INFOBOX &info,
-            const std_cxx11::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &cell_worker,
-            const std_cxx11::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &boundary_worker,
-            const std_cxx11::function<void (DOFINFO &, DOFINFO &,
-                                            typename INFOBOX::CellInfo &,
-                                            typename INFOBOX::CellInfo &)> &face_worker,
+            const std::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &cell_worker,
+            const std::function<void (DOFINFO &, typename INFOBOX::CellInfo &)> &boundary_worker,
+            const std::function<void (DOFINFO &, DOFINFO &,
+                                      typename INFOBOX::CellInfo &,
+                                      typename INFOBOX::CellInfo &)> &face_worker,
             ASSEMBLER &assembler,
             const LoopControl &lctrl = LoopControl())
   {
@@ -388,23 +405,12 @@ namespace MeshWorker
       }
 
     // Loop over all cells
-#ifdef DEAL_II_MESHWORKER_PARALLEL
     WorkStream::run(begin, end,
-                    std_cxx11::bind(&cell_action<INFOBOX, DOFINFO, dim, spacedim, ITERATOR>,
-                                    std_cxx11::_1, std_cxx11::_3, std_cxx11::_2,
-                                    cell_worker, boundary_worker, face_worker, lctrl),
-                    std_cxx11::bind(&internal::assemble<dim,DOFINFO,ASSEMBLER>, std_cxx11::_1, &assembler),
+                    std::bind(&cell_action<INFOBOX, DOFINFO, dim, spacedim, ITERATOR>,
+                              std::placeholders::_1, std::placeholders::_3, std::placeholders::_2,
+                              cell_worker, boundary_worker, face_worker, lctrl),
+                    std::bind(&internal::assemble<dim,DOFINFO,ASSEMBLER>, std::placeholders::_1, &assembler),
                     info, dof_info);
-#else
-    for (ITERATOR cell = begin; cell != end; ++cell)
-      {
-        cell_action<INFOBOX,DOFINFO,dim,spacedim>(cell, dof_info,
-                                                  info, cell_worker,
-                                                  boundary_worker, face_worker,
-                                                  lctrl);
-        dof_info.assemble(assembler);
-      }
-#endif
   }
 
 
@@ -415,7 +421,7 @@ namespace MeshWorker
    * @ingroup MeshWorker
    * @author Guido Kanschat, 2009
    */
-  template<int dim, int spacedim, class ITERATOR, class ASSEMBLER>
+  template <int dim, int spacedim, class ITERATOR, class ASSEMBLER>
   void integration_loop(ITERATOR begin,
                         typename identity<ITERATOR>::type end,
                         DoFInfo<dim, spacedim> &dof_info,
@@ -424,17 +430,17 @@ namespace MeshWorker
                         ASSEMBLER &assembler,
                         const LoopControl &lctrl = LoopControl())
   {
-    std_cxx11::function<void (DoFInfo<dim>&, IntegrationInfo<dim, spacedim>&)> cell_worker;
-    std_cxx11::function<void (DoFInfo<dim>&, IntegrationInfo<dim, spacedim>&)> boundary_worker;
-    std_cxx11::function<void (DoFInfo<dim> &, DoFInfo<dim> &,
-                              IntegrationInfo<dim, spacedim> &,
-                              IntegrationInfo<dim, spacedim> &)> face_worker;
+    std::function<void (DoFInfo<dim, spacedim>&, IntegrationInfo<dim, spacedim>&)> cell_worker;
+    std::function<void (DoFInfo<dim, spacedim>&, IntegrationInfo<dim, spacedim>&)> boundary_worker;
+    std::function<void (DoFInfo<dim, spacedim>&, DoFInfo<dim, spacedim> &,
+                        IntegrationInfo<dim, spacedim> &,
+                        IntegrationInfo<dim, spacedim> &)> face_worker;
     if (integrator.use_cell)
-      cell_worker = std_cxx11::bind(&LocalIntegrator<dim, spacedim>::cell, &integrator, std_cxx11::_1, std_cxx11::_2);
+      cell_worker = std::bind(&LocalIntegrator<dim, spacedim>::cell, &integrator, std::placeholders::_1, std::placeholders::_2);
     if (integrator.use_boundary)
-      boundary_worker = std_cxx11::bind(&LocalIntegrator<dim, spacedim>::boundary, &integrator, std_cxx11::_1, std_cxx11::_2);
+      boundary_worker = std::bind(&LocalIntegrator<dim, spacedim>::boundary, &integrator, std::placeholders::_1, std::placeholders::_2);
     if (integrator.use_face)
-      face_worker = std_cxx11::bind(&LocalIntegrator<dim, spacedim>::face, &integrator, std_cxx11::_1, std_cxx11::_2, std_cxx11::_3, std_cxx11::_4);
+      face_worker = std::bind(&LocalIntegrator<dim, spacedim>::face, &integrator, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
 
     loop<dim, spacedim>
     (begin, end,

@@ -18,16 +18,12 @@
 // check PetscScalar
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
 
-#include <fstream>
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   if (typeid(PetscScalar)==typeid(double))
     deallog << "double" << std::endl;

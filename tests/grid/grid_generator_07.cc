@@ -18,18 +18,15 @@
 // Test GridGenerator::create_triangulation_with_removed_cells
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
-#include <iomanip>
 
 
-template<int dim>
+template <int dim>
 void test(std::ostream &out)
 {
   Triangulation<dim> triangulation;
@@ -57,7 +54,6 @@ int main()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<2>(logfile);
   test<3>(logfile);

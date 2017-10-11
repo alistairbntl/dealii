@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2015 by the deal.II authors
+// Copyright (C) 2008 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,26 +24,16 @@ DEAL_II_NAMESPACE_OPEN
 
 namespace TrilinosWrappers
 {
-  BlockSparseMatrix::BlockSparseMatrix ()
-  {}
-
-
-
   BlockSparseMatrix::~BlockSparseMatrix ()
   {
     // delete previous content of
     // the subobjects array
-    clear ();
-  }
-
-
-
-  BlockSparseMatrix &
-  BlockSparseMatrix::operator = (const BlockSparseMatrix &m)
-  {
-    BaseClass::operator = (m);
-
-    return *this;
+    try
+      {
+        clear ();
+      }
+    catch (...)
+      {}
   }
 
 
@@ -71,7 +61,7 @@ namespace TrilinosWrappers
         {
           BlockType *p = new BlockType();
 
-          Assert (this->sub_objects[r][c] == 0,
+          Assert (this->sub_objects[r][c] == nullptr,
                   ExcInternalError());
           this->sub_objects[r][c] = p;
         }
@@ -152,10 +142,10 @@ namespace TrilinosWrappers
   {
     std::vector<Epetra_Map> parallel_partitioning;
     for (size_type i=0; i<block_sparsity_pattern.n_block_rows(); ++i)
-      parallel_partitioning.push_back
-      (Epetra_Map(static_cast<TrilinosWrappers::types::int_type>(block_sparsity_pattern.block(i,0).n_rows()),
-                  0,
-                  Utilities::Trilinos::comm_self()));
+      parallel_partitioning.emplace_back
+      (static_cast<TrilinosWrappers::types::int_type>(block_sparsity_pattern.block(i,0).n_rows()),
+       0,
+       Utilities::Trilinos::comm_self());
 
     reinit (parallel_partitioning, block_sparsity_pattern);
   }
@@ -245,9 +235,10 @@ namespace TrilinosWrappers
 
     std::vector<Epetra_Map> parallel_partitioning;
     for (size_type i=0; i<dealii_block_sparse_matrix.n_block_rows(); ++i)
-      parallel_partitioning.push_back (Epetra_Map(static_cast<TrilinosWrappers::types::int_type>(dealii_block_sparse_matrix.block(i,0).m()),
-                                                  0,
-                                                  trilinos_communicator));
+      parallel_partitioning.emplace_back
+      (static_cast<TrilinosWrappers::types::int_type>(dealii_block_sparse_matrix.block(i,0).m()),
+       0,
+       trilinos_communicator);
 
     reinit (parallel_partitioning, dealii_block_sparse_matrix, drop_tolerance);
   }
@@ -294,40 +285,12 @@ namespace TrilinosWrappers
 
   // TODO: In the following we
   // use the same code as just
-  // above six more times. Use
+  // above three more times. Use
   // templates.
-  TrilinosScalar
-  BlockSparseMatrix::residual (BlockVector       &dst,
-                               const BlockVector &x,
-                               const BlockVector &b) const
-  {
-    vmult (dst, x);
-    dst -= b;
-    dst *= -1.;
-
-    return dst.l2_norm();
-  }
-
-
-
   TrilinosScalar
   BlockSparseMatrix::residual (MPI::BlockVector       &dst,
                                const MPI::Vector      &x,
                                const MPI::BlockVector &b) const
-  {
-    vmult (dst, x);
-    dst -= b;
-    dst *= -1.;
-
-    return dst.l2_norm();
-  }
-
-
-
-  TrilinosScalar
-  BlockSparseMatrix::residual (BlockVector       &dst,
-                               const Vector      &x,
-                               const BlockVector &b) const
   {
     vmult (dst, x);
     dst -= b;
@@ -353,23 +316,9 @@ namespace TrilinosWrappers
 
 
   TrilinosScalar
-  BlockSparseMatrix::residual (Vector            &dst,
-                               const BlockVector &x,
-                               const Vector      &b) const
-  {
-    vmult (dst, x);
-    dst -= b;
-    dst *= -1.;
-
-    return dst.l2_norm();
-  }
-
-
-
-  TrilinosScalar
-  BlockSparseMatrix::residual (VectorBase       &dst,
-                               const VectorBase &x,
-                               const VectorBase &b) const
+  BlockSparseMatrix::residual (MPI::Vector       &dst,
+                               const MPI::Vector &x,
+                               const MPI::Vector &b) const
   {
     vmult (dst, x);
     dst -= b;
@@ -410,7 +359,13 @@ namespace TrilinosWrappers
 
 
 
-
+  MPI_Comm
+  BlockSparseMatrix::get_mpi_communicator () const
+  {
+    Assert (this->n_block_cols() != 0, ExcNotInitialized());
+    Assert (this->n_block_rows() != 0, ExcNotInitialized());
+    return this->sub_objects[0][0]->get_mpi_communicator();
+  }
 
 
 

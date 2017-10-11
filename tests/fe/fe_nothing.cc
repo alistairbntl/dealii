@@ -1,4 +1,3 @@
-#include <deal.II/base/logstream.h>
 #include <deal.II/hp/dof_handler.h>
 #include <deal.II/hp/fe_collection.h>
 #include <deal.II/fe/fe_q.h>
@@ -12,7 +11,6 @@
 
 #include "../tests.h"
 
-#include <fstream>
 #include <iostream>
 
 const double eps = 1e-10;
@@ -20,7 +18,7 @@ const double eps = 1e-10;
 
 using namespace dealii;
 
-template<int dim>
+template <int dim>
 void test2cells(const unsigned int p1=2,
                 const unsigned int p2=1)
 {
@@ -68,7 +66,6 @@ int main (int argc,char **argv)
   deallog << std::fixed;
   deallog.attach(logfile);
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
 
   try

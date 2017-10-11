@@ -17,11 +17,9 @@
 // Tests compute_eigenvalues() and eigenvalue() of TridiagonalMatrix
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/tridiagonal_matrix.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
 #include <iostream>
 
 
@@ -49,7 +47,6 @@ int main()
   const std::string logname = "output";
   std::ofstream logfile(logname.c_str());
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test_laplacian<double>(10);
   test_laplacian<double>(20);

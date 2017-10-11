@@ -19,20 +19,16 @@
 // Note: This is (almost) a clone of the tests/petsc/solver_03.cc
 
 #include "../tests.h"
-#include "../lac/testmatrix.h"
-#include <cmath>
-#include <fstream>
+#include "../testmatrix.h"
 #include <iostream>
-#include <iomanip>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
-#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/lac/petsc_solver.h>
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/lac/vector_memory.h>
 #include <typeinfo>
 
-template<class SOLVER, class MATRIX, class VECTOR, class PRECONDITION>
+template <class SOLVER, class MATRIX, class VECTOR, class PRECONDITION>
 void
 check_solve( SOLVER &solver, const MATRIX &A,
              VECTOR &u, VECTOR &f, const PRECONDITION &P)
@@ -58,11 +54,9 @@ check_solve( SOLVER &solver, const MATRIX &A,
 
 int main(int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog << std::setprecision(4);
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
   {
@@ -78,8 +72,8 @@ int main(int argc, char **argv)
     PETScWrappers::SparseMatrix  A(dim, dim, 5);
     testproblem.five_point(A);
 
-    PETScWrappers::Vector  f(dim);
-    PETScWrappers::Vector  u(dim);
+    PETScWrappers::MPI::Vector  f(MPI_COMM_WORLD, dim, dim);
+    PETScWrappers::MPI::Vector  u(MPI_COMM_WORLD, dim, dim);
     f = 1.;
     A.compress (VectorOperation::insert);
     f.compress (VectorOperation::insert);
@@ -91,4 +85,3 @@ int main(int argc, char **argv)
   }
 
 }
-

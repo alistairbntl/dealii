@@ -1,6 +1,6 @@
 //-----------------------------------------------------------
 //
-//    Copyright (C) 2014 - 2015 by the deal.II authors
+//    Copyright (C) 2014 - 2016 by the deal.II authors
 //
 //    This file is subject to LGPL and may not be distributed
 //    without copyright and license information. Please refer
@@ -13,8 +13,6 @@
 // logfile.
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/opencascade/boundary_lib.h>
 #include <deal.II/opencascade/utilities.h>

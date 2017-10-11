@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparsity_tools_h
-#define dealii__sparsity_tools_h
+#ifndef dealii_sparsity_tools_h
+#define dealii_sparsity_tools_h
 
 
 #include <deal.II/base/config.h>
@@ -136,16 +136,6 @@ namespace SparsityTools
                          const std::vector<DynamicSparsityPattern::size_type> &starting_indices = std::vector<DynamicSparsityPattern::size_type>());
 
   /**
-   * As above, but taking a SparsityPattern object instead.
-   *
-   * @deprecated
-   */
-  void
-  reorder_Cuthill_McKee (const SparsityPattern &sparsity,
-                         std::vector<SparsityPattern::size_type> &new_indices,
-                         const std::vector<SparsityPattern::size_type> &starting_indices = std::vector<SparsityPattern::size_type>()) DEAL_II_DEPRECATED;
-
-  /**
    * For a given sparsity pattern, compute a re-enumeration of row/column
    * indices in a hierarchical way, similar to what
    * DoFRenumbering::hierarchical does for degrees of freedom on
@@ -183,7 +173,7 @@ namespace SparsityTools
    *
    * @param rows_per_cpu A vector containing the number of of rows per CPU for
    * determining ownership. This is typically the value returned by
-   * DoFHandler::locally_owned_dofs_per_processor.
+   * DoFHandler::n_locally_owned_dofs_per_processor.
    *
    * @param mpi_comm The MPI communicator shared between the processors that
    * participate in this operation.
@@ -225,7 +215,10 @@ namespace SparsityTools
   /**
    * Exception
    */
-  DeclException0 (ExcMETISNotInstalled);
+  DeclExceptionMsg (ExcMETISNotInstalled,
+                    "The function you called requires METIS, but you did not "
+                    "configure deal.II with METIS.");
+
   /**
    * Exception
    */

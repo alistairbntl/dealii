@@ -70,7 +70,7 @@ namespace Step22
     triangulation (mpi_communicator/*,
                    Triangulation<dim>::maximum_smoothing*/),
     fe (FE_Q<dim>(degree+1), dim,
-        FE_Q<dim>(degree)  , 1),
+        FE_Q<dim>(degree), 1),
     dof_handler (triangulation)
   {}
 
@@ -159,7 +159,6 @@ int main (int argc, char *argv[])
         {
           std::ofstream logfile("output");
           deallog.attach(logfile, false);
-          deallog.threshold_double(1.e-10);
           {
             StokesProblem<3> flow_problem(1);
             flow_problem.run ();

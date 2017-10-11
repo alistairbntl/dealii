@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2016 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -30,6 +30,7 @@
 
 #include <sstream>
 #include <iostream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 //TODO: implement the adjust_quad_dof_index_for_face_orientation_table and
 //adjust_line_dof_index_for_line_orientation_table fields, and write tests
@@ -59,23 +60,16 @@ FE_RaviartThomas<dim>::FE_RaviartThomas (const unsigned int deg)
   // quadrature weights, since they
   // are required for interpolation.
   initialize_support_points(deg);
-  // Now compute the inverse node
-  //matrix, generating the correct
-  //basis functions from the raw
-  //ones.
 
-  // We use an auxiliary matrix in
-  // this function. Therefore,
-  // inverse_node_matrix is still
-  // empty and shape_value_component
-  // returns the 'raw' shape values.
-  FullMatrix<double> M(n_dofs, n_dofs);
-  FETools::compute_node_matrix(M, *this);
+  // Now compute the inverse node matrix, generating the correct
+  // basis functions from the raw ones. For a discussion of what
+  // exactly happens here, see FETools::compute_node_matrix.
+  const FullMatrix<double> M = FETools::compute_node_matrix(*this);
   this->inverse_node_matrix.reinit(n_dofs, n_dofs);
   this->inverse_node_matrix.invert(M);
-  // From now on, the shape functions
-  // will be the correct ones, not
-  // the raw shape functions anymore.
+  // From now on, the shape functions provided by FiniteElement::shape_value
+  // and similar functions will be the correct ones, not
+  // the raw shape functions from the polynomial space anymore.
 
   // Reinit the vectors of
   // restriction and prolongation
@@ -111,7 +105,7 @@ std::string
 FE_RaviartThomas<dim>::get_name () const
 {
   // note that the
-  // FETools::get_fe_from_name
+  // FETools::get_fe_by_name
   // function depends on the
   // particular format of the string
   // this function returns, so they
@@ -129,10 +123,10 @@ FE_RaviartThomas<dim>::get_name () const
 
 
 template <int dim>
-FiniteElement<dim> *
+std::unique_ptr<FiniteElement<dim,dim> >
 FE_RaviartThomas<dim>::clone() const
 {
-  return new FE_RaviartThomas<dim>(*this);
+  return std_cxx14::make_unique<FE_RaviartThomas<dim>>(*this);
 }
 
 
@@ -276,10 +270,10 @@ FE_RaviartThomas<dim>::initialize_restriction()
       // Store shape values, since the
       // evaluation suffers if not
       // ordered by point
-      Table<2,double> cached_values(this->dofs_per_cell, q_face.size());
+      Table<2,double> cached_values_on_face(this->dofs_per_cell, q_face.size());
       for (unsigned int k=0; k<q_face.size(); ++k)
         for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
-          cached_values(i,k)
+          cached_values_on_face(i,k)
             = this->shape_value_component(i, q_face.point(k),
                                           GeometryInfo<dim>::unit_normal_direction[face]);
 
@@ -319,7 +313,7 @@ FE_RaviartThomas<dim>::initialize_restriction()
                   this->restriction[iso][child](face*this->dofs_per_face+i_face,
                                                 i_child)
                   += Utilities::fixed_power<dim-1>(.5) * q_sub.weight(k)
-                     * cached_values(i_child, k)
+                     * cached_values_on_face(i_child, k)
                      * this->shape_value_component(face*this->dofs_per_face+i_face,
                                                    q_sub.point(k),
                                                    GeometryInfo<dim>::unit_normal_direction[face]);
@@ -350,11 +344,11 @@ FE_RaviartThomas<dim>::initialize_restriction()
   // Store shape values, since the
   // evaluation suffers if not
   // ordered by point
-  Table<3,double> cached_values(this->dofs_per_cell, q_cell.size(), dim);
+  Table<3,double> cached_values_on_cell(this->dofs_per_cell, q_cell.size(), dim);
   for (unsigned int k=0; k<q_cell.size(); ++k)
     for (unsigned int i = 0; i < this->dofs_per_cell; ++i)
       for (unsigned int d=0; d<dim; ++d)
-        cached_values(i,k,d) = this->shape_value_component(i, q_cell.point(k), d);
+        cached_values_on_cell(i,k,d) = this->shape_value_component(i, q_cell.point(k), d);
 
   for (unsigned int child=0; child<GeometryInfo<dim>::max_children_per_cell; ++child)
     {
@@ -368,7 +362,7 @@ FE_RaviartThomas<dim>::initialize_restriction()
                 this->restriction[iso][child](start_cell_dofs+i_weight*dim+d,
                                               i_child)
                 += q_sub.weight(k)
-                   * cached_values(i_child, k, d)
+                   * cached_values_on_cell(i_child, k, d)
                    * polynomials[d]->compute_value(i_weight, q_sub.point(k));
               }
     }
@@ -467,41 +461,29 @@ FE_RaviartThomas<dim>::has_support_on_face (
 }
 
 
-// Since this is a vector valued element, we cannot interpolate a
-// scalar function
-template <int dim>
-void
-FE_RaviartThomas<dim>::interpolate(
-  std::vector<double> &,
-  const std::vector<double> &) const
-{
-  Assert(false, ExcNotImplemented());
-}
-
 
 template <int dim>
 void
-FE_RaviartThomas<dim>::interpolate(
-  std::vector<double>    &local_dofs,
-  const std::vector<Vector<double> > &values,
-  unsigned int offset) const
+FE_RaviartThomas<dim>::
+convert_generalized_support_point_values_to_dof_values(const std::vector<Vector<double> > &support_point_values,
+                                                       std::vector<double>    &nodal_values) const
 {
-  Assert (values.size() == this->generalized_support_points.size(),
-          ExcDimensionMismatch(values.size(), this->generalized_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values[0].size() >= offset+this->n_components(),
-          ExcDimensionMismatch(values[0].size(),offset+this->n_components()));
+  Assert (support_point_values.size() == this->generalized_support_points.size(),
+          ExcDimensionMismatch(support_point_values.size(), this->generalized_support_points.size()));
+  Assert (nodal_values.size() == this->dofs_per_cell,
+          ExcDimensionMismatch(nodal_values.size(),this->dofs_per_cell));
+  Assert (support_point_values[0].size() == this->n_components(),
+          ExcDimensionMismatch(support_point_values[0].size(),this->n_components()));
 
-  std::fill(local_dofs.begin(), local_dofs.end(), 0.);
+  std::fill(nodal_values.begin(), nodal_values.end(), 0.);
 
   const unsigned int n_face_points = boundary_weights.size(0);
   for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
     for (unsigned int k=0; k<n_face_points; ++k)
       for (unsigned int i=0; i<boundary_weights.size(1); ++i)
         {
-          local_dofs[i+face*this->dofs_per_face] += boundary_weights(k,i)
-                                                    * values[face*n_face_points+k](GeometryInfo<dim>::unit_normal_direction[face]+offset);
+          nodal_values[i+face*this->dofs_per_face] += boundary_weights(k,i)
+                                                      * support_point_values[face*n_face_points+k](GeometryInfo<dim>::unit_normal_direction[face]);
         }
 
   const unsigned int start_cell_dofs = GeometryInfo<dim>::faces_per_cell*this->dofs_per_face;
@@ -510,41 +492,7 @@ FE_RaviartThomas<dim>::interpolate(
   for (unsigned int k=0; k<interior_weights.size(0); ++k)
     for (unsigned int i=0; i<interior_weights.size(1); ++i)
       for (unsigned int d=0; d<dim; ++d)
-        local_dofs[start_cell_dofs+i*dim+d] += interior_weights(k,i,d) * values[k+start_cell_points](d+offset);
-}
-
-
-template <int dim>
-void
-FE_RaviartThomas<dim>::interpolate(
-  std::vector<double> &local_dofs,
-  const VectorSlice<const std::vector<std::vector<double> > > &values) const
-{
-  Assert (values.size() == this->n_components(),
-          ExcDimensionMismatch(values.size(), this->n_components()));
-  Assert (values[0].size() == this->generalized_support_points.size(),
-          ExcDimensionMismatch(values[0].size(), this->generalized_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-
-  std::fill(local_dofs.begin(), local_dofs.end(), 0.);
-
-  const unsigned int n_face_points = boundary_weights.size(0);
-  for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-    for (unsigned int k=0; k<n_face_points; ++k)
-      for (unsigned int i=0; i<boundary_weights.size(1); ++i)
-        {
-          local_dofs[i+face*this->dofs_per_face] += boundary_weights(k,i)
-                                                    * values[GeometryInfo<dim>::unit_normal_direction[face]][face*n_face_points+k];
-        }
-
-  const unsigned int start_cell_dofs = GeometryInfo<dim>::faces_per_cell*this->dofs_per_face;
-  const unsigned int start_cell_points = GeometryInfo<dim>::faces_per_cell*n_face_points;
-
-  for (unsigned int k=0; k<interior_weights.size(0); ++k)
-    for (unsigned int i=0; i<interior_weights.size(1); ++i)
-      for (unsigned int d=0; d<dim; ++d)
-        local_dofs[start_cell_dofs+i*dim+d] += interior_weights(k,i,d) * values[d][k+start_cell_points];
+        nodal_values[start_cell_dofs+i*dim+d] += interior_weights(k,i,d) * support_point_values[k+start_cell_points](d);
 }
 
 

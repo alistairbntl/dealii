@@ -17,12 +17,10 @@
 // Tests LAPACKFullMatrix::mmult
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/lapack_full_matrix.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
 #include <iostream>
 
 
@@ -60,7 +58,6 @@ int main()
   std::ofstream logfile(logname.c_str());
   logfile.precision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test();
 }

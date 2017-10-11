@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__mapping_q_eulerian_h
-#define dealii__mapping_q_eulerian_h
+#ifndef dealii_mapping_q_eulerian_h
+#define dealii_mapping_q_eulerian_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/smartpointer.h>
@@ -37,17 +37,17 @@ template <typename> class Vector;
 
 /**
  * This class is an extension of the MappingQ1Eulerian class to higher order
- * Qp mappings.  It is useful when one wants to calculate shape function
+ * $Q_p$ mappings.  It is useful when one wants to calculate shape function
  * information on a domain that is deforming as the computation proceeds.
  *
  * <h3>Usage</h3>
  *
  * The constructor of this class takes three arguments: the polynomial degree
- * of the desire Qp mapping, a reference to the vector that defines the
+ * of the desired Qp mapping, a reference to the vector that defines the
  * mapping from the initial configuration to the current configuration, and a
  * reference to the DoFHandler. The most common case is to use the solution
  * vector for the problem under consideration as the shift vector. The key
- * requirement is that the number of components of the given vector field be
+ * requirement is that the number of components of the given vector field must be
  * equal to (or possibly greater than) the number of space dimensions. If
  * there are more components than space dimensions (for example, if one is
  * working with a coupled problem where there are additional solution
@@ -57,7 +57,7 @@ template <typename> class Vector;
  * the triangulation and associate the desired shift vector to it.
  *
  * Typically, the DoFHandler operates on a finite element that is constructed
- * as a system element (FESystem) from continuous FE_Q() objects. An example
+ * as a system element (FESystem) from continuous FE_Q objects. An example
  * is shown below:
  * @code
  *    FESystem<dim> fe(FE_Q<dim>(2), dim, FE_Q<dim>(1), 1);
@@ -80,12 +80,9 @@ template <typename> class Vector;
  * that whenever you use this object, the given objects still represent valid
  * data.
  *
- * To enable the use of the MappingQ1Eulerian class also in the context of
- * parallel codes using the PETSc wrapper classes, the type of the vector can
- * be specified as template parameter <tt>EulerVectorType</tt> Not specifying
- * this template argument in applications using the PETSc vector classes leads
- * to the construction of a copy of the vector which is not accessible
- * afterwards!
+ * To enable the use of the MappingQEulerian class also in the context of
+ * parallel codes using the PETSc or Trilinos wrapper classes, the type
+ * of the vector can be specified as template parameter <tt>VectorType</tt>.
  *
  * @author Joshua White, 2008
  */
@@ -105,18 +102,14 @@ public:
    * the second argument. The first dim components of this function will be
    * interpreted as the displacement we use in defining the mapping, relative
    * to the location of cells of the underlying triangulation.
+   * @param[in] level. Is the multi-grid level at which the mapping will
+   * be used. It is mainly used to check if the size of the @p euler_vector
+   * is consistent with the @p euler_dof_handler .
    */
   MappingQEulerian (const unsigned int             degree,
                     const DoFHandler<dim,spacedim> &euler_dof_handler,
-                    const VectorType               &euler_vector);
-
-  /**
-   * @deprecated Use the constructor with the reverse order of second and
-   * third argument.
-   */
-  MappingQEulerian (const unsigned int             degree,
                     const VectorType               &euler_vector,
-                    const DoFHandler<dim,spacedim> &euler_dof_handler) DEAL_II_DEPRECATED;
+                    const unsigned int             level = numbers::invalid_unsigned_int);
 
   /**
    * Return the mapped vertices of the cell. For the current class, this
@@ -125,7 +118,7 @@ public:
    * addition to the geometry of the cell.
    */
   virtual
-  std_cxx11::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
+  std::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
   get_vertices (const typename Triangulation<dim,spacedim>::cell_iterator &cell) const;
 
   /**
@@ -136,14 +129,16 @@ public:
   Mapping<dim,spacedim> *clone () const;
 
   /**
-   * Always returns @p false because MappingQ1Eulerian does not in general
+   * Always returns @p false because MappingQEulerian does not in general
    * preserve vertex locations (unless the translation vector happens to
-   * provide for zero displacements at vertex locations).
+   * provide zero displacements at vertex locations).
    */
+  virtual
   bool preserves_vertex_locations () const;
 
   /**
-   * Exception
+   * Exception which is thrown when the mapping is being evaluated at
+   * non-active cell.
    */
   DeclException0 (ExcInactiveCell);
 
@@ -178,6 +173,11 @@ protected:
 private:
 
   /**
+   * Multigrid level at which the mapping is to be used.
+   */
+  const unsigned int level;
+
+  /**
    * A class derived from MappingQGeneric that provides the generic mapping
    * with support points on boundary objects so that the corresponding Q3
    * mapping ends up being C1.
@@ -199,7 +199,7 @@ private:
      * field in addition to the geometry of the cell.
      */
     virtual
-    std_cxx11::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
+    std::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
     get_vertices (const typename Triangulation<dim,spacedim>::cell_iterator &cell) const;
 
     /**
@@ -210,6 +210,14 @@ private:
     virtual
     std::vector<Point<spacedim> >
     compute_mapping_support_points(const typename Triangulation<dim,spacedim>::cell_iterator &cell) const;
+
+    /**
+     * Always returns @p false because MappingQEulerianGeneric does not in general
+     * preserve vertex locations (unless the translation vector happens to
+     * provide for zero displacements at vertex locations).
+     */
+    virtual
+    bool preserves_vertex_locations () const;
 
   private:
     /**
@@ -222,14 +230,12 @@ private:
      * Special quadrature rule used to define the support points in the
      * reference configuration.
      */
-
     class SupportQuadrature : public Quadrature<dim>
     {
     public:
       /**
        * Constructor, with an argument defining the desired polynomial degree.
        */
-
       SupportQuadrature (const unsigned int map_degree);
 
     };
@@ -240,7 +246,7 @@ private:
     const SupportQuadrature support_quadrature;
 
     /**
-     * FEValues object used to query the the given finite element field at the
+     * FEValues object used to query the given finite element field at the
      * support points in the reference configuration.
      *
      * The variable is marked as mutable since we have to call
@@ -278,4 +284,4 @@ MappingQEulerian<dim,VectorType,spacedim>::preserves_vertex_locations () const
 DEAL_II_NAMESPACE_CLOSE
 
 
-#endif // dealii__mapping_q_eulerian_h
+#endif // dealii_mapping_q_eulerian_h

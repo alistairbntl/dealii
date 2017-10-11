@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__distributed__tria_base_h
-#define dealii__distributed__tria_base_h
+#ifndef dealii_distributed_tria_base_h
+#define dealii_distributed_tria_base_h
 
 
 #include <deal.II/base/config.h>
@@ -24,9 +24,8 @@
 #include <deal.II/base/mpi.h>
 #include <deal.II/grid/tria.h>
 
-#include <deal.II/base/std_cxx1x/function.h>
-#include <deal.II/base/std_cxx1x/tuple.h>
-
+#include <functional>
+#include <tuple>
 #include <set>
 #include <vector>
 #include <list>
@@ -113,7 +112,7 @@ namespace parallel
 
 
     /**
-     * Returns the global maximum level. This may be bigger than the number
+     * Return the global maximum level. This may be bigger than the number
      * dealii::Triangulation::n_levels() (a function in this class's base
      * class) returns if the current processor only stores cells in parts of
      * the domain that are not very refined, but if other processors store
@@ -130,17 +129,18 @@ namespace parallel
     types::subdomain_id locally_owned_subdomain () const;
 
     /**
-     * Returns a set of MPI ranks of the processors that have at least one
+     * Return a set of MPI ranks of the processors that have at least one
      * ghost cell adjacent to the cells of the local processor. In other
      * words, this is the set of subdomain_id() for all ghost cells.
      *
      * @note: If @p i is contained in the list of processor @p j, then @p j
      * will also be contained in the list of processor @p i.
      */
-    const std::set<unsigned int> &ghost_owners () const;
+    const std::set<types::subdomain_id> &
+    ghost_owners () const;
 
     /**
-     * Returns a set of MPI ranks of the processors that have at least one
+     * Return a set of MPI ranks of the processors that have at least one
      * level ghost cell adjacent to our cells used in geometric multigrid. In
      * other words, this is the set of level_subdomain_id() for all level
      * ghost cells.
@@ -148,7 +148,15 @@ namespace parallel
      * @note: If @p i is contained in the list of processor @p j, then @p j
      * will also be contained in the list of processor @p i.
      */
-    const std::set<unsigned int> &level_ghost_owners () const;
+    const std::set<types::subdomain_id> &
+    level_ghost_owners () const;
+
+    /**
+     * Return a map that, for each vertex, lists all the processors whose
+     * subdomains are adjacent to that vertex.
+     */
+    virtual std::map<unsigned int, std::set<dealii::types::subdomain_id> >
+    compute_vertices_with_ghost_neighbors () const;
 
   protected:
     /**
@@ -179,28 +187,28 @@ namespace parallel
        * This vector stores the number of locally owned active cells per MPI
        * rank.
        */
-      std::vector<unsigned int> n_locally_owned_active_cells;
+      std::vector<unsigned int>     n_locally_owned_active_cells;
       /**
        * The total number of active cells (sum of @p
        * n_locally_owned_active_cells).
        */
-      types::global_dof_index   n_global_active_cells;
+      types::global_dof_index       n_global_active_cells;
       /**
        * The global number of levels computed as the maximum number of levels
        * taken over all MPI ranks, so <tt>n_levels()<=n_global_levels =
        * max(n_levels() on proc i)</tt>.
        */
-      unsigned int              n_global_levels;
+      unsigned int                  n_global_levels;
       /**
        * A set containing the subdomain_id (MPI rank) of the owners of the
        * ghost cells on this processor.
        */
-      std::set<unsigned int> ghost_owners;
+      std::set<types::subdomain_id> ghost_owners;
       /**
        * A set containing the MPI ranks of the owners of the level ghost cells
        * on this processor (for all levels).
        */
-      std::set<unsigned int> level_ghost_owners;
+      std::set<types::subdomain_id> level_ghost_owners;
 
       NumberCache();
     };
@@ -212,7 +220,10 @@ namespace parallel
      */
     virtual void update_number_cache ();
 
-
+    /**
+     * Store MPI ranks of level ghost owners of this processor on all levels.
+     */
+    void fill_level_ghost_owners ();
   };
 
 } // namespace parallel

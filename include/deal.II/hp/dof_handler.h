@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2016 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__hp_dof_handler_h
-#define dealii__hp_dof_handler_h
+#ifndef dealii_hp_dof_handler_h
+#define dealii_hp_dof_handler_h
 
 
 
@@ -41,6 +41,17 @@ template <int dim, int spacedim> class Triangulation;
 
 namespace internal
 {
+  namespace DoFHandler
+  {
+    struct Implementation;
+
+    namespace Policy
+    {
+      template <int dim, int spacedim> class PolicyBase;
+      struct Implementation;
+    }
+  }
+
   namespace hp
   {
     class DoFLevel;
@@ -103,20 +114,50 @@ namespace hp
    * hp::DoFHandler::distribute_dofs(), and then assemble a linear system and
    * solve a problem on this finite element space. However, one can skip
    * assigning active FE indices upon mesh refinement in certain
-   * circumstances. In particular, the following rules apply: - Upon mesh
-   * refinement, child cells inherit the active FE index of the parent. - On
-   * the other hand, when coarsening cells, the (now active) parent cell will
-   * not have an active FE index set and you will have to set it explicitly
-   * before calling hp::DoFHandler::distribute_dofs(). In particular, to avoid
-   * stale information to be used by accident, this class deletes the active
-   * FE index of cells that are refined after inheriting this index to the
-   * children; this implies that if the children are coarsened away, the old
-   * value is no longer available on the parent cell.
+   * circumstances. In particular, the following rules apply:
+   * - Upon mesh refinement, child cells inherit the active FE index of
+   *   the parent.
+   * - On the other hand, when coarsening cells, the (now active)
+   *   parent cell will not have an active FE index set and you will
+   *   have to set it explicitly before calling
+   *   hp::DoFHandler::distribute_dofs(). In particular, to avoid
+   *   stale information to be used by accident, this class deletes
+   *   the active FE index of cells that are refined after inheriting
+   *   this index to the children; this implies that if the children
+   *   are coarsened away, the old value is no longer available on the
+   *   parent cell.
+   *
+   *
+   * <h3>Active FE indices and parallel meshes</h3>
+   *
+   * When this class is used with either a parallel::shared::Triangulation
+   * or a parallel::distributed::Triangulation, you can only set active
+   * FE indices on cells that are locally owned,
+   * using a call such as <code>cell-@>set_active_fe_index(...)</code>.
+   * On the other hand, setting the active FE index on ghost
+   * or artificial cells is not allowed.
+   *
+   * Ghost cells do acquire the information what element
+   * is active on them, however: whenever
+   * you call hp::DoFHandler::distribute_dofs(), all processors that
+   * participate in the parallel mesh exchange information in such a way
+   * that the active FE index on ghost cells equals the active FE index
+   * that was set on that processor that owned that particular ghost cell.
+   * Consequently, one can <i>query</i> the @p active_fe_index on ghost
+   * cells, just not set it by hand.
+   *
+   * On artificial cells, no information is available about the
+   * @p active_fe_index used there. That's because we don't even know
+   * whether these cells exist at all, and even if they did, the
+   * current processor does not know anything specific about them.
+   * See @ref GlossArtificialCell "the glossary entry on artificial cells"
+   * for more information.
+   *
    *
    * @ingroup dofs
    * @ingroup hp
    *
-   * @author Wolfgang Bangerth, Oliver Kayser-Herold, 2003, 2004
+   * @author Wolfgang Bangerth, Oliver Kayser-Herold, 2003, 2004, 2017
    */
   template <int dim, int spacedim=dim>
   class DoFHandler : public Subscriptor
@@ -137,7 +178,7 @@ namespace hp
     typedef typename ActiveSelector::active_hex_iterator  active_hex_iterator;
 
     /**
-     * A typedef that is used to to identify
+     * A typedef that is used to identify
      * @ref GlossActive "active cell iterators".
      * The concept of iterators is discussed at length in the
      * @ref Iterators "iterators documentation module".
@@ -165,7 +206,7 @@ namespace hp
     typedef typename LevelSelector::cell_iterator         level_cell_iterator;
 
     /**
-     * A typedef that is used to to identify cell iterators. The concept of
+     * A typedef that is used to identify cell iterators. The concept of
      * iterators is discussed at length in the
      * @ref Iterators "iterators documentation module".
      *
@@ -223,8 +264,10 @@ namespace hp
      *
      * Please note that you should not rely on it having a certain value, but
      * rather take its symbolic name.
+     *
+     * @deprecated Use numbers::invalid_dof_index instead.
      */
-    static const types::global_dof_index invalid_dof_index = numbers::invalid_dof_index;
+    static const types::global_dof_index invalid_dof_index DEAL_II_DEPRECATED = numbers::invalid_dof_index;
 
     /**
      * The default index of the finite element to be used on a given cell. For
@@ -245,9 +288,25 @@ namespace hp
     DoFHandler (const Triangulation<dim,spacedim> &tria);
 
     /**
+     * Copy constructor. DoFHandler objects are large and expensive.
+     * They should not be copied, in particular not by accident, but
+     * rather deliberately constructed. As a consequence, this constructor
+     * is explicitly removed from the interface of this class.
+     */
+    DoFHandler (const DoFHandler &) = delete;
+
+    /**
      * Destructor.
      */
     virtual ~DoFHandler ();
+
+    /**
+     * Copy operator. DoFHandler objects are large and expensive.
+     * They should not be copied, in particular not by accident, but
+     * rather deliberately constructed. As a consequence, this operator
+     * is explicitly removed from the interface of this class.
+     */
+    DoFHandler &operator = (const DoFHandler &) = delete;
 
     /**
      * Go through the triangulation and "distribute" the degrees of freedoms
@@ -503,6 +562,13 @@ namespace hp
      * In either case, included in the returned number are those DoFs which
      * are constrained by hanging nodes, see
      * @ref constraints.
+     *
+     * Mathematically speaking, the number returned by this function equals the
+     * dimension of the finite element space (without taking into account
+     * constraints) that corresponds to (i) the mesh on which it is defined,
+     * and (ii) the finite element that is used by the current object. It
+     * also, of course, equals the number of shape functions that span this
+     * space.
      */
     types::global_dof_index n_dofs () const;
 
@@ -522,18 +588,21 @@ namespace hp
      * Return the number of degrees of freedom located on those parts of the
      * boundary which have a boundary indicator listed in the given set. The
      * reason that a @p map rather than a @p set is used is the same as
-     * described in the section on the @p make_boundary_sparsity_pattern
-     * function.
+     * described in the documentation of that variant of
+     * DoFTools::make_boundary_sparsity_pattern() that takes a map.
+     * To this end, the type of the @p boundary_ids argument is the same
+     * as typename FunctionMap<spacedim,number>::type.
      *
-     * The type of @p boundary_ids equals typename FunctionMap<spacedim,number>::type.
+     * There is, however, another overload of this function that takes
+     * a @p set argument (see below).
      */
     template <typename number>
     types::global_dof_index
     n_boundary_dofs (const std::map<types::boundary_id, const Function<spacedim,number>*> &boundary_ids) const;
 
     /**
-     * Same function, but with different data type of the argument, which is
-     * here simply a list of the boundary indicators under consideration.
+     * Return the number of degrees of freedom located on those parts of the
+     * boundary which have a boundary indicator listed in the given set. The
      */
     types::global_dof_index
     n_boundary_dofs (const std::set<types::boundary_id> &boundary_ids) const;
@@ -562,7 +631,7 @@ namespace hp
 
 
     /**
-     * Returns a vector that stores the locally owned DoFs of each processor.
+     * Return a vector that stores the locally owned DoFs of each processor.
      * If you are only interested in the number of elements each processor
      * owns then n_dofs_per_processor() is a better choice.
      *
@@ -590,16 +659,23 @@ namespace hp
     /**
      * Return a constant reference to the set of finite element objects that
      * are used by this @p DoFHandler.
+     *
+     * @deprecated Use get_fe_collection() instead.
      */
-    const hp::FECollection<dim,spacedim> &get_fe () const;
+    const hp::FECollection<dim,spacedim> &get_fe () const DEAL_II_DEPRECATED;
 
     /**
-     * Return a constant reference to the triangulation underlying this
-     * object.
-     *
-     * @deprecated Use get_triangulation() instead.
+     * Return a constant reference to the indexth finite element object that is
+     * used by this @p DoFHandler.
      */
-    const Triangulation<dim,spacedim> &get_tria () const DEAL_II_DEPRECATED;
+    const FiniteElement<dim,spacedim> &
+    get_fe (const unsigned int index) const;
+
+    /**
+     * Return a constant reference to the set of finite element objects that
+     * are used by this @p DoFHandler.
+     */
+    const hp::FECollection<dim,spacedim> &get_fe_collection () const;
 
     /**
      * Return a constant reference to the triangulation underlying this
@@ -697,7 +773,7 @@ namespace hp
                     << "You tried to do something on level " << arg1
                     << ", but this level is empty.");
 
-  protected:
+  private:
 
     /**
      * Address of the triangulation to work on.
@@ -714,43 +790,30 @@ namespace hp
      */
     SmartPointer<const hp::FECollection<dim,spacedim>,hp::DoFHandler<dim,spacedim> > finite_elements;
 
-  private:
-
     /**
-     * Copy constructor. I can see no reason why someone might want to use it,
-     * so I don't provide it. Since this class has pointer members, making it
-     * private prevents the compiler to provide it's own, incorrect one if
-     * anyone chose to copy such an object.
+     * An object that describes how degrees of freedom should be distributed and
+     * renumbered.
      */
-    DoFHandler (const DoFHandler &);
+    std::unique_ptr<dealii::internal::DoFHandler::Policy::PolicyBase<dim,spacedim> > policy;
 
-    /**
-     * Copy operator. I can see no reason why someone might want to use it, so
-     * I don't provide it. Since this class has pointer members, making it
-     * private prevents the compiler to provide it's own, incorrect one if
-     * anyone chose to copy such an object.
-     */
-    DoFHandler &operator = (const DoFHandler &);
-
-    class MGVertexDoFs
-    {
-    public:
-      MGVertexDoFs ();
-      ~MGVertexDoFs ();
-      types::global_dof_index get_index (const unsigned int level, const unsigned int dof_number) const;
-      void set_index (const unsigned int level, const unsigned int dof_number, const types::global_dof_index index);
-    };
 
     /**
      * Free all used memory.
      */
     void clear_space ();
 
-    template<int structdim>
-    types::global_dof_index get_dof_index (const unsigned int obj_level, const unsigned int obj_index, const unsigned int fe_index, const unsigned int local_index) const;
+    template <int structdim>
+    types::global_dof_index get_dof_index (const unsigned int obj_level,
+                                           const unsigned int obj_index,
+                                           const unsigned int fe_index,
+                                           const unsigned int local_index) const;
 
-    template<int structdim>
-    void set_dof_index (const unsigned int obj_level, const unsigned int obj_index, const unsigned int fe_index, const unsigned int local_index, const types::global_dof_index global_index) const;
+    template <int structdim>
+    void set_dof_index (const unsigned int obj_level,
+                        const unsigned int obj_index,
+                        const unsigned int fe_index,
+                        const unsigned int local_index,
+                        const types::global_dof_index global_index) const;
 
     /**
      * Create default tables for the active_fe_indices in the
@@ -765,67 +828,23 @@ namespace hp
      * Functions that will be triggered through signals whenever the
      * triangulation is modified.
      *
-     * Here they are used to administrate the the active_fe_fields during the
+     * Here they are used to administrate the active_fe_fields during the
      * spatial refinement.
      */
     void pre_refinement_action ();
     void post_refinement_action ();
 
     /**
-     * Compute identities between DoFs located on vertices. Called from
-     * distribute_dofs().
-     */
-    void
-    compute_vertex_dof_identities (std::vector<types::global_dof_index> &new_dof_indices) const;
-
-    /**
-     * Compute identities between DoFs located on lines. Called from
-     * distribute_dofs().
-     */
-    void
-    compute_line_dof_identities (std::vector<types::global_dof_index> &new_dof_indices) const;
-
-    /**
-     * Compute identities between DoFs located on quads. Called from
-     * distribute_dofs().
-     */
-    void
-    compute_quad_dof_identities (std::vector<types::global_dof_index> &new_dof_indices) const;
-
-    /**
-     * Renumber the objects with the given and all lower structural
-     * dimensions, i.e. renumber vertices by giving a template argument of
-     * zero to the int2type argument, lines and vertices with one, etc.
-     *
-     * Note that in contrast to the public renumber_dofs() function, these
-     * internal functions do not ensure that the new DoFs are contiguously
-     * numbered. The function may therefore also be used to assign different
-     * DoFs the same number, for example to unify hp DoFs corresponding to
-     * different finite elements but co-located on the same entity.
-     */
-    void renumber_dofs_internal (const std::vector<types::global_dof_index> &new_numbers,
-                                 dealii::internal::int2type<0>);
-
-    void renumber_dofs_internal (const std::vector<types::global_dof_index> &new_numbers,
-                                 dealii::internal::int2type<1>);
-
-    void renumber_dofs_internal (const std::vector<types::global_dof_index> &new_numbers,
-                                 dealii::internal::int2type<2>);
-
-    void renumber_dofs_internal (const std::vector<types::global_dof_index> &new_numbers,
-                                 dealii::internal::int2type<3>);
-
-    /**
      * Space to store the DoF numbers for the different levels. Analogous to
      * the <tt>levels[]</tt> tree of the Triangulation objects.
      */
-    std::vector<dealii::internal::hp::DoFLevel *> levels;
+    std::vector<std::unique_ptr<dealii::internal::hp::DoFLevel> > levels;
 
     /**
      * Space to store the DoF numbers for the faces. Analogous to the
      * <tt>faces</tt> pointer of the Triangulation objects.
      */
-    dealii::internal::hp::DoFIndicesOnFaces<dim> *faces;
+    std::unique_ptr<dealii::internal::hp::DoFIndicesOnFaces<dim> > faces;
 
     /**
      * A structure that contains all sorts of numbers that characterize the
@@ -841,7 +860,7 @@ namespace hp
      *
      * The format used here, in the form of a linked list, is the same as used
      * for the arrays used in the internal::hp::DoFLevel hierarchy. Starting
-     * indices into this array are provided by the vertex_dofs_offsets field.
+     * indices into this array are provided by the vertex_dof_offsets field.
      *
      * Access to this field is generally through the
      * DoFAccessor::get_vertex_dof_index() and
@@ -862,9 +881,7 @@ namespace hp
      * functions, encapsulating the actual data format used to the present
      * class.
      */
-    std::vector<types::global_dof_index>      vertex_dofs_offsets;
-
-    std::vector<MGVertexDoFs> mg_vertex_dofs;  // we should really remove this field!
+    std::vector<unsigned int>      vertex_dof_offsets;
 
     /**
      * Array to store the information if a cell on some level has children or
@@ -872,7 +889,7 @@ namespace hp
      * refinement, i.e. from between when pre_refinement_action is called and
      * when post_refinement_action runs.
      */
-    std::vector<std::vector<bool> *> has_children;
+    std::vector<std::unique_ptr<std::vector<bool> > > has_children;
 
     /**
      * A list of connections with which this object connects to the
@@ -894,6 +911,7 @@ namespace hp
      */
     template <int> friend class dealii::internal::hp::DoFIndicesOnFacesOrEdges;
     friend struct dealii::internal::hp::DoFHandler::Implementation;
+    friend struct dealii::internal::DoFHandler::Policy::Implementation;
   };
 
 
@@ -903,44 +921,78 @@ namespace hp
 
   /* ----------------------- Inline functions ---------------------------------- */
 
+
+  template <int dim, int spacedim>
+  template <typename number>
+  types::global_dof_index
+  DoFHandler<dim,spacedim>::n_boundary_dofs (const std::map<types::boundary_id, const Function<spacedim,number>*> &boundary_ids) const
+  {
+    // extract the set of boundary ids and forget about the function object pointers
+    std::set<types::boundary_id> boundary_ids_only;
+    for (typename std::map<types::boundary_id, const Function<spacedim,number>*>::const_iterator
+         p = boundary_ids.begin();
+         p != boundary_ids.end(); ++p)
+      boundary_ids_only.insert (p->first);
+
+    // then just hand everything over to the other function that does the work
+    return n_boundary_dofs(boundary_ids_only);
+  }
+}
+
+
+namespace internal
+{
+  /**
+   * Return a string representing the dynamic type of the given argument.
+   * This is basically the same what typeid(...).name() does, but it turns out
+   * this is broken on Intel 13+.
+   *
+   * Defined in source/dofs/dof_handler.cc.
+   */
+  template <int dim, int spacedim>
+  std::string policy_to_string(const dealii::internal::DoFHandler::Policy::PolicyBase<dim,spacedim> &policy);
+}
+
+
+namespace hp
+{
   template <int dim, int spacedim>
   template <class Archive>
   void DoFHandler<dim, spacedim>::save(Archive &ar, unsigned int) const
   {
     ar &vertex_dofs;
-    ar &vertex_dofs_offsets;
+    ar &vertex_dof_offsets;
     ar &number_cache;
     ar &levels;
     ar &faces;
     ar &has_children;
 
     // write out the number of triangulation cells and later check during
-    // loading that this number is indeed correct;
+    // loading that this number is indeed correct; same with something that
+    // identifies the policy
     unsigned int n_cells = tria->n_cells();
+    std::string  policy_name = dealii::internal::policy_to_string(*policy);
 
-    ar &n_cells;
+    ar &n_cells &policy_name;
   }
+
+
 
   template <int dim, int spacedim>
   template <class Archive>
   void DoFHandler<dim, spacedim>::load(Archive &ar, unsigned int)
   {
     ar &vertex_dofs;
-    ar &vertex_dofs_offsets;
+    ar &vertex_dof_offsets;
     ar &number_cache;
 
     // boost::serialization can restore pointers just fine, but if the
     // pointer object still points to something useful, that object is not
     // destroyed and we end up with a memory leak. consequently, first delete
     // previous content before re-loading stuff
-    for (unsigned int i = 0; i<levels.size(); ++i)
-      delete levels[i];
-    for (unsigned int i = 0; i<has_children.size(); ++i)
-      delete has_children[i];
-    levels.resize(0);
-    has_children.resize(0);
-    delete faces;
-    faces = 0;
+    levels.clear ();
+    has_children.clear ();
+    faces.reset ();
 
     ar &levels;
     ar &faces;
@@ -949,12 +1001,20 @@ namespace hp
     // these are the checks that correspond to the last block in the save()
     // function
     unsigned int n_cells;
+    std::string  policy_name;
 
-    ar &n_cells;
+    ar &n_cells &policy_name;
 
-    AssertThrow(n_cells == tria->n_cells(),
-                ExcMessage("The object being loaded into does not match the triangulation "
-                           "that has been stored previously."));
+    AssertThrow (n_cells == tria->n_cells(),
+                 ExcMessage ("The object being loaded into does not match the triangulation "
+                             "that has been stored previously."));
+    AssertThrow (policy_name == dealii::internal::policy_to_string(*policy),
+                 ExcMessage ("The policy currently associated with this DoFHandler ("
+                             + dealii::internal::policy_to_string(*policy)
+                             + ") does not match the one that was associated with the "
+                             "DoFHandler previously stored ("
+                             + policy_name
+                             + ")."));
   }
 
   template <int dim, int spacedim>
@@ -966,6 +1026,7 @@ namespace hp
   }
 
 
+
   template <int dim, int spacedim>
   inline
   types::global_dof_index
@@ -973,6 +1034,7 @@ namespace hp
   {
     return numbers::invalid_dof_index;
   }
+
 
 
   template <int dim, int spacedim>
@@ -983,6 +1045,7 @@ namespace hp
   }
 
 
+
   template <int dim, int spacedim>
   const IndexSet &
   DoFHandler<dim, spacedim>::locally_owned_dofs() const
@@ -991,12 +1054,14 @@ namespace hp
   }
 
 
+
   template <int dim, int spacedim>
   const std::vector<types::global_dof_index> &
   DoFHandler<dim, spacedim>::n_locally_owned_dofs_per_processor() const
   {
     return number_cache.n_locally_owned_dofs_per_processor;
   }
+
 
 
   template <int dim, int spacedim>
@@ -1008,12 +1073,12 @@ namespace hp
 
 
 
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   inline
   const hp::FECollection<dim,spacedim> &
   DoFHandler<dim,spacedim>::get_fe () const
   {
-    Assert (finite_elements != 0,
+    Assert (finite_elements != nullptr,
             ExcMessage ("No finite element collection is associated with "
                         "this DoFHandler"));
     return *finite_elements;
@@ -1021,58 +1086,43 @@ namespace hp
 
 
 
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   inline
-  const Triangulation<dim,spacedim> &
-  DoFHandler<dim,spacedim>::get_tria () const
+  const FiniteElement<dim,spacedim> &
+  DoFHandler<dim,spacedim>::get_fe
+  (const unsigned int number) const
   {
-    return *tria;
+    Assert (finite_elements != nullptr,
+            ExcMessage ("No finite element collection is associated with "
+                        "this DoFHandler"));
+    return (*finite_elements)[number];
   }
 
 
 
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
+  inline
+  const hp::FECollection<dim,spacedim> &
+  DoFHandler<dim,spacedim>::get_fe_collection () const
+  {
+    Assert (finite_elements != nullptr,
+            ExcMessage ("No finite element collection is associated with "
+                        "this DoFHandler"));
+    return *finite_elements;
+  }
+
+
+
+  template <int dim, int spacedim>
   inline
   const Triangulation<dim,spacedim> &
   DoFHandler<dim,spacedim>::get_triangulation () const
   {
+    Assert(tria != nullptr,
+           ExcMessage("This DoFHandler object has not been associated "
+                      "with a triangulation."));
     return *tria;
   }
-
-
-
-  template<int dim, int spacedim>
-  inline
-  DoFHandler<dim, spacedim>::MGVertexDoFs::MGVertexDoFs()
-  {
-    Assert (false, ExcNotImplemented ());
-  }
-
-  template<int dim, int spacedim>
-  inline
-  DoFHandler<dim, spacedim>::MGVertexDoFs::~MGVertexDoFs()
-  {
-    Assert (false, ExcNotImplemented ());
-  }
-
-  template<int dim, int spacedim>
-  inline
-  types::global_dof_index DoFHandler<dim, spacedim>::MGVertexDoFs::get_index (const unsigned int,
-      const unsigned int) const
-  {
-    Assert (false, ExcNotImplemented ());
-    return invalid_dof_index;
-  }
-
-  template<int dim, int spacedim>
-  inline
-  void DoFHandler<dim, spacedim>::MGVertexDoFs::set_index (const unsigned int,
-                                                           const unsigned int,
-                                                           types::global_dof_index)
-  {
-    Assert (false, ExcNotImplemented ());
-  }
-
 
 #endif
 

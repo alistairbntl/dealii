@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -34,11 +33,9 @@
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/hp/fe_collection.h>
 
-#include <fstream>
-#include <cstdlib>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   Triangulation<dim> triangulation;
@@ -66,9 +63,7 @@ void test()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   deallog.push("1d");
   test<1>();

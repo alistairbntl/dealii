@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__point_h
-#define dealii__point_h
+#ifndef dealii_point_h
+#define dealii_point_h
 
 
 #include <deal.II/base/config.h>
@@ -63,7 +63,7 @@ DEAL_II_NAMESPACE_OPEN
  * a tensor (because it lacks the transformation properties under rotation of
  * the coordinate system) and should consequently not be represented by either
  * of these classes. Use an array of size 3 in this case, or the
- * <code>std_cxx11::array</code> class. Alternatively, as in the case of
+ * <code>std::array</code> class. Alternatively, as in the case of
  * vector-valued functions, you can use objects of type Vector or
  * <code>std::vector</code>.
  *
@@ -228,6 +228,12 @@ public:
   typename numbers::NumberTraits<Number>::real_type distance (const Point<dim,Number> &p) const;
 
   /**
+   * Return the squared Euclidean distance of <tt>this</tt> point to the point
+   * <tt>p</tt>.
+   */
+  typename numbers::NumberTraits<Number>::real_type distance_square (const Point<dim,Number> &p) const;
+
+  /**
    * @}
    */
 
@@ -243,6 +249,8 @@ public:
 
 #ifndef DOXYGEN
 
+// At least clang-3.7 requires us to have a user-defined constructor
+// and we can't use 'Point<dim,Number>::Point () = default' here.
 template <int dim, typename Number>
 inline
 Point<dim,Number>::Point ()
@@ -263,12 +271,23 @@ template <int dim, typename Number>
 inline
 Point<dim,Number>::Point (const Number x)
 {
+  Assert (dim==1,
+          ExcMessage ("You can only initialize Point<1> objects using the constructor "
+                      "that takes only one argument. Point<dim> objects with dim!=1 "
+                      "require initialization with the constructor that takes 'dim' "
+                      "arguments."));
+
+  // we can only get here if we pass the assertion. use the switch anyway so
+  // as to avoid compiler warnings about uninitialized elements or writing
+  // beyond the end of the 'values' array
   switch (dim)
     {
     case 1:
       this->values[0] = x;
+      break;
+
     default:
-      Assert (dim==1, StandardExceptions::ExcInvalidConstructorCall());
+      ;
     }
 }
 
@@ -276,15 +295,26 @@ Point<dim,Number>::Point (const Number x)
 
 template <int dim, typename Number>
 inline
-Point<dim,Number>::Point (const Number x, const Number y)
+Point<dim,Number>::Point (const Number x,
+                          const Number y)
 {
+  Assert (dim==2,
+          ExcMessage ("You can only initialize Point<2> objects using the constructor "
+                      "that takes two arguments. Point<dim> objects with dim!=2 "
+                      "require initialization with the constructor that takes 'dim' "
+                      "arguments."));
+  // we can only get here if we pass the assertion. use the switch anyway so
+  // as to avoid compiler warnings about uninitialized elements or writing
+  // beyond the end of the 'values' array
   switch (dim)
     {
     case 2:
       this->values[0] = x;
       this->values[1] = y;
+      break;
+
     default:
-      Assert (dim==2, StandardExceptions::ExcInvalidConstructorCall());
+      ;
     }
 }
 
@@ -292,16 +322,29 @@ Point<dim,Number>::Point (const Number x, const Number y)
 
 template <int dim, typename Number>
 inline
-Point<dim,Number>::Point (const Number x, const Number y, const Number z)
+Point<dim,Number>::Point (const Number x,
+                          const Number y,
+                          const Number z)
 {
+  Assert (dim==3,
+          ExcMessage ("You can only initialize Point<3> objects using the constructor "
+                      "that takes three arguments. Point<dim> objects with dim!=3 "
+                      "require initialization with the constructor that takes 'dim' "
+                      "arguments."));
+
+  // we can only get here if we pass the assertion. use the switch anyway so
+  // as to avoid compiler warnings about uninitialized elements or writing
+  // beyond the end of the 'values' array
   switch (dim)
     {
     case 3:
       this->values[0] = x;
       this->values[1] = y;
       this->values[2] = z;
+      break;
+
     default:
-      Assert (dim==3, StandardExceptions::ExcInvalidConstructorCall());
+      ;
     }
 }
 
@@ -387,7 +430,7 @@ Point<dim,Number>::operator - () const
 
 
 template <int dim, typename Number>
-template<typename OtherNumber>
+template <typename OtherNumber>
 inline
 Point<dim,typename ProductType<Number, typename EnableIfScalar<OtherNumber>::type>::type>
 Point<dim,Number>::operator * (const OtherNumber factor) const
@@ -401,7 +444,7 @@ Point<dim,Number>::operator * (const OtherNumber factor) const
 
 
 template <int dim, typename Number>
-template<typename OtherNumber>
+template <typename OtherNumber>
 inline
 Point<dim,typename ProductType<Number, typename EnableIfScalar<OtherNumber>::type>::type>
 Point<dim,Number>::operator / (const OtherNumber factor) const
@@ -441,14 +484,24 @@ inline
 typename numbers::NumberTraits<Number>::real_type
 Point<dim,Number>::distance (const Point<dim,Number> &p) const
 {
-  Number sum = Number();
+  return std::sqrt(distance_square(p));
+}
+
+
+
+template <int dim, typename Number>
+inline
+typename numbers::NumberTraits<Number>::real_type
+Point<dim,Number>::distance_square (const Point<dim,Number> &p) const
+{
+  Number sum = internal::NumberType<Number>::value(0.0);
   for (unsigned int i=0; i<dim; ++i)
     {
-      const Number diff=this->values[i]-p(i);
+      const Number diff=static_cast<Number>(this->values[i])-p(i);
       sum += numbers::NumberTraits<Number>::abs_square (diff);
     }
 
-  return std::sqrt(sum);
+  return sum;
 }
 
 
@@ -507,8 +560,7 @@ std::ostream &operator << (std::ostream            &out,
 
 
 /**
- * Output operator for points. Print the elements consecutively, with a space
- * in between.
+ * Input operator for points. Inputs the elements consecutively.
  * @relates Point
  */
 template <int dim, typename Number>

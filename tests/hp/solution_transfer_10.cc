@@ -16,7 +16,7 @@
 // A test by Krzysztof Bzowski that verifies something in SolutionTransfer
 // that didn't work for a few days
 
-#include <deal.II/base/logstream.h>
+#include "../tests.h"
 
 #include <deal.II/grid/tria.h>
 
@@ -34,15 +34,12 @@
 #include <deal.II/numerics/solution_transfer.h>
 
 #include <iostream>
-#include <fstream>
 
 using namespace dealii;
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<2> triangulation(Triangulation<2>::none);
   GridGenerator::hyper_cube (triangulation);

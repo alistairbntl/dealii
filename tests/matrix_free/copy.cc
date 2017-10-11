@@ -68,7 +68,7 @@ void sub_test()
       dof.distribute_dofs(fe);
       ConstraintMatrix constraints;
       DoFTools::make_hanging_node_constraints(dof, constraints);
-      VectorTools::interpolate_boundary_values (dof, 0, ZeroFunction<dim>(),
+      VectorTools::interpolate_boundary_values (dof, 0, Functions::ZeroFunction<dim>(),
                                                 constraints);
       constraints.close();
 
@@ -80,7 +80,7 @@ void sub_test()
       {
         const QGauss<1> quad (fe_degree+1);
         mf_data.reinit (dof, constraints, quad,
-                        typename MatrixFree<dim,number>::AdditionalData(MPI_COMM_SELF,MatrixFree<dim,number>::AdditionalData::none));
+                        typename MatrixFree<dim,number>::AdditionalData(MatrixFree<dim,number>::AdditionalData::none));
       }
 
       MatrixFreeTest<dim,fe_degree,number> mf_ref (mf_data);
@@ -116,7 +116,6 @@ void test ()
 {
   deallog << "Test doubles" << std::endl;
   sub_test<dim,fe_degree,double>();
-  deallog.threshold_double(1.e-6);
   deallog << "Test floats" << std::endl;
   sub_test<dim,fe_degree,float>();
 }

@@ -61,7 +61,7 @@ public:
 
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   const HyperBallBoundary<dim> boundary_description;
@@ -126,8 +126,7 @@ void test()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   test<2>();
 

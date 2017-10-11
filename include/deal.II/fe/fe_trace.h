@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_trace_h
-#define dealii__fe_trace_h
+#ifndef dealii_fe_trace_h
+#define dealii_fe_trace_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/tensor_product_polynomials.h>
@@ -27,8 +27,9 @@ DEAL_II_NAMESPACE_OPEN
 /**
  * A finite element, which is the trace of FE_Q elements, that is a tensor
  * product of polynomials on the faces, undefined in the interior of the cells
- * and continuous. The basis functions on the faces are from
- * Polynomials::LagrangeEquidistant
+ * and continuous. The basis functions on the faces are formed by a tensor
+ * product of 1D Lagrange polynomials with equidistant points up to degree 2
+ * and Gauss-Lobatto points starting from degree 3.
  *
  * This finite element is the trace space of FE_Q on the faces.
  *
@@ -37,9 +38,6 @@ DEAL_II_NAMESPACE_OPEN
  * polynomial. In order to make the use of FESystem simpler, FEValues objects
  * will not fail using this finite element space, but all shape function
  * values extracted will equal to zero.
- *
- * @todo Polynomials::LagrangeEquidistant should be and will be replaced by
- * Polynomials::LagrangeGaussLobatto as soon as such a polynomial set exists.
  */
 
 template <int dim, int spacedim=dim>
@@ -54,18 +52,15 @@ public:
   FE_TraceQ(unsigned int p);
 
   /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim,spacedim> *clone() const;
-
-  /**
    * Return a string that uniquely identifies a finite element. This class
    * returns <tt>FE_DGQ<dim>(degree)</tt>, with <tt>dim</tt> and
    * <tt>degree</tt> replaced by appropriate values.
    */
   virtual std::string get_name () const;
+
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
   /**
    * This function returns @p true, if the shape function @p shape_index has
@@ -75,7 +70,7 @@ public:
                                     const unsigned int face_index) const;
 
   /**
-   * Returns a list of constant modes of the element. For this element, it
+   * Return a list of constant modes of the element. For this element, it
    * simply returns one row with all entries set to true.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
@@ -117,8 +112,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -152,7 +147,7 @@ public:
   FE_TraceQ (const unsigned int p);
 
   /**
-   * Returns the name of the element
+   * Return the name of the element
    */
   std::string get_name() const;
 };

@@ -91,10 +91,10 @@ namespace internal
       // already have an object for
       // this particular combination
       // of indices
-      if (fe_values_table(present_fe_values_index).get() == 0)
+      if (fe_values_table(present_fe_values_index).get() == nullptr)
         fe_values_table(present_fe_values_index)
           =
-            std_cxx11::shared_ptr<FEValuesType>
+            std::shared_ptr<FEValuesType>
             (new FEValuesType ((*mapping_collection)[mapping_index],
                                (*fe_collection)[fe_index],
                                q_collection[q_index],

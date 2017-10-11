@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -36,6 +36,53 @@ const unsigned int DoFAccessor<structdim,DoFHandlerType,level_dof_access>::space
 
 
 
+/*------------------------ Functions: DoFInvalidAccessor ---------------------------*/
+
+template <int structdim, int dim, int spacedim>
+DoFInvalidAccessor<structdim, dim, spacedim>::
+DoFInvalidAccessor (const Triangulation<dim,spacedim> *,
+                    const int,
+                    const int,
+                    const AccessorData *)
+{
+  Assert (false,
+          ExcMessage ("You are attempting an illegal conversion between "
+                      "iterator/accessor types. The constructor you call "
+                      "only exists to make certain template constructs "
+                      "easier to write as dimension independent code but "
+                      "the conversion is not valid in the current context."));
+}
+
+
+
+template <int structdim, int dim, int spacedim>
+DoFInvalidAccessor<structdim, dim, spacedim>::
+DoFInvalidAccessor (const DoFInvalidAccessor &i)
+  :
+  InvalidAccessor<structdim,dim,spacedim> (static_cast<const InvalidAccessor<structdim,dim,spacedim>&>(i))
+{
+  Assert (false,
+          ExcMessage ("You are attempting an illegal conversion between "
+                      "iterator/accessor types. The constructor you call "
+                      "only exists to make certain template constructs "
+                      "easier to write as dimension independent code but "
+                      "the conversion is not valid in the current context."));
+}
+
+
+
+template <int structdim, int dim, int spacedim>
+void
+DoFInvalidAccessor<structdim, dim, spacedim>::
+set_dof_index (const unsigned int,
+               const types::global_dof_index,
+               const unsigned int) const
+{
+  Assert (false, ExcInternalError());
+}
+
+
+
 /*------------------------- Functions: DoFCellAccessor -----------------------*/
 
 
@@ -48,7 +95,7 @@ DoFCellAccessor<DoFHandlerType,lda>::update_cell_dof_indices_cache () const
   Assert (static_cast<unsigned int>(this->present_level) < this->dof_handler->levels.size(),
           ExcMessage ("DoFHandler not initialized"));
 
-  Assert (this->dof_handler != 0, typename BaseClass::ExcInvalidObject());
+  Assert (this->dof_handler != nullptr, typename BaseClass::ExcInvalidObject());
 
   internal::DoFCellAccessor::Implementation::
   update_cell_dof_indices_cache (*this);
@@ -63,7 +110,7 @@ DoFCellAccessor<DoFHandlerType,lda>::set_dof_indices (const std::vector<types::g
   Assert (static_cast<unsigned int>(this->present_level) < this->dof_handler->levels.size(),
           ExcMessage ("DoFHandler not initialized"));
 
-  Assert (this->dof_handler != 0, typename BaseClass::ExcInvalidObject());
+  Assert (this->dof_handler != nullptr, typename BaseClass::ExcInvalidObject());
 
   internal::DoFCellAccessor::Implementation::
   set_dof_indices (*this, local_dof_indices);

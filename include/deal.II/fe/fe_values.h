@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_values_h
-#define dealii__fe_values_h
+#ifndef dealii_fe_values_h
+#define dealii_fe_values_h
 
 
 #include <deal.II/base/config.h>
@@ -26,7 +26,6 @@
 #include <deal.II/base/vector_slice.h>
 #include <deal.II/base/quadrature.h>
 #include <deal.II/base/table.h>
-#include <deal.II/base/std_cxx11/unique_ptr.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -38,6 +37,9 @@
 #include <deal.II/fe/mapping.h>
 
 #include <algorithm>
+#include <memory>
+#include <type_traits>
+
 
 // dummy include in order to have the
 // definition of PetscScalar available
@@ -56,7 +58,7 @@ namespace internal
    * A class whose specialization is used to define what type the curl of a
    * vector valued function corresponds to.
    */
-  template <int dim>
+  template <int dim, class NumberType=double>
   struct CurlType;
 
   /**
@@ -65,10 +67,10 @@ namespace internal
    *
    * In 1d, the curl is a scalar.
    */
-  template <>
-  struct CurlType<1>
+  template <class NumberType>
+  struct CurlType<1, NumberType>
   {
-    typedef Tensor<1,1>     type;
+    typedef Tensor<1,1,NumberType>     type;
   };
 
   /**
@@ -77,10 +79,10 @@ namespace internal
    *
    * In 2d, the curl is a scalar.
    */
-  template <>
-  struct CurlType<2>
+  template <class NumberType>
+  struct CurlType<2,NumberType>
   {
-    typedef Tensor<1,1>     type;
+    typedef Tensor<1,1,NumberType>     type;
   };
 
   /**
@@ -89,10 +91,10 @@ namespace internal
    *
    * In 3d, the curl is a vector.
    */
-  template <>
-  struct CurlType<3>
+  template <class NumberType>
+  struct CurlType<3,NumberType>
   {
-    typedef Tensor<1,3>     type;
+    typedef Tensor<1,3,NumberType>     type;
   };
 }
 
@@ -164,6 +166,44 @@ namespace FEValuesViews
      * Third derivative is a <code>Tensor@<3,dim@></code>.
      */
     typedef dealii::Tensor<3,spacedim> third_derivative_type;
+
+    /**
+     * A struct that provides the output type for the product of the value
+     * and derivatives of basis functions of the Scalar view and any @p Number type.
+     */
+    template <typename Number>
+    struct OutputType
+    {
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * values of the view the Scalar class.
+       */
+      typedef typename ProductType<Number, typename Scalar<dim,spacedim>::value_type>::type value_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * gradients of the view the Scalar class.
+       */
+      typedef typename ProductType<Number, typename Scalar<dim,spacedim>::gradient_type>::type gradient_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * laplacians of the view the Scalar class.
+       */
+      typedef typename ProductType<Number, typename Scalar<dim,spacedim>::value_type>::type laplacian_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * hessians of the view the Scalar class.
+       */
+      typedef typename ProductType<Number, typename Scalar<dim,spacedim>::hessian_type>::type hessian_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * third derivatives of the view the Scalar class.
+       */
+      typedef typename ProductType<Number, typename Scalar<dim,spacedim>::third_derivative_type>::type third_derivative_type;
+    };
 
     /**
      * A structure where for each shape function we pre-compute a bunch of
@@ -292,6 +332,30 @@ namespace FEValuesViews
                               std::vector<typename ProductType<value_type,typename InputVector::value_type>::type> &values) const;
 
     /**
+     * Same as above, but using a vector of local degree-of-freedom values.
+     *
+     * The @p dof_values vector must have a length equal to number of DoFs on
+     * a cell, and  each entry @p dof_values[i] is the value of the local DoF
+     * @p i. The fundamental prerequisite for the @p InputVector is that it must
+     * be possible to create an ArrayView from it; this is satisfied by the
+     * @p std::vector class.
+     *
+     * The DoF values typically would be obtained in the following way:
+     * @code
+     * Vector<double> local_dof_values(cell->get_fe().dofs_per_cell);
+     * cell->get_dof_values(solution, local_dof_values);
+     * @endcode
+     * or, for a generic @p Number type,
+     * @code
+     * std::vector<Number> local_dof_values(cell->get_fe().dofs_per_cell);
+     * cell->get_dof_values(solution, local_dof_values.begin(), local_dof_values.end());
+     * @endcode
+     */
+    template <class InputVector>
+    void get_function_values_from_local_dof_values (const InputVector &dof_values,
+                                                    std::vector<typename OutputType<typename InputVector::value_type>::value_type> &values) const;
+
+    /**
      * Return the gradients of the selected scalar component of the finite
      * element function characterized by <tt>fe_function</tt> at the
      * quadrature points of the cell, face or subface selected the last time
@@ -313,6 +377,13 @@ namespace FEValuesViews
                                  std::vector<typename ProductType<gradient_type,typename InputVector::value_type>::type> &gradients) const;
 
     /**
+     * @copydoc FEValuesViews::Scalar::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_gradients_from_local_dof_values (const InputVector &dof_values,
+                                                       std::vector<typename OutputType<typename InputVector::value_type>::gradient_type> &gradients) const;
+
+    /**
      * Return the Hessians of the selected scalar component of the finite
      * element function characterized by <tt>fe_function</tt> at the
      * quadrature points of the cell, face or subface selected the last time
@@ -332,6 +403,14 @@ namespace FEValuesViews
     template <class InputVector>
     void get_function_hessians (const InputVector &fe_function,
                                 std::vector<typename ProductType<hessian_type,typename InputVector::value_type>::type> &hessians) const;
+
+    /**
+     * @copydoc FEValuesViews::Scalar::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_hessians_from_local_dof_values (const InputVector &dof_values,
+                                                      std::vector<typename OutputType<typename InputVector::value_type>::hessian_type> &hessians) const;
+
 
     /**
      * Return the Laplacians of the selected scalar component of the finite
@@ -356,6 +435,14 @@ namespace FEValuesViews
                                   std::vector<typename ProductType<value_type,typename InputVector::value_type>::type> &laplacians) const;
 
     /**
+     * @copydoc FEValuesViews::Scalar::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_laplacians_from_local_dof_values (const InputVector &dof_values,
+                                                        std::vector<typename OutputType<typename InputVector::value_type>::laplacian_type> &laplacians) const;
+
+
+    /**
      * Return the third derivatives of the selected scalar component of the
      * finite element function characterized by <tt>fe_function</tt> at the
      * quadrature points of the cell, face or subface selected the last time
@@ -378,11 +465,19 @@ namespace FEValuesViews
                                          std::vector<typename ProductType<third_derivative_type,
                                          typename InputVector::value_type>::type> &third_derivatives) const;
 
+    /**
+     * @copydoc FEValuesViews::Scalar::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_third_derivatives_from_local_dof_values (const InputVector &dof_values,
+                                                               std::vector<typename OutputType<typename InputVector::value_type>::third_derivative_type> &third_derivatives) const;
+
+
   private:
     /**
-     * A reference to the FEValuesBase object we operate on.
+     * A pointer to the FEValuesBase object we operate on.
      */
-    const FEValuesBase<dim,spacedim> &fe_values;
+    const SmartPointer<const FEValuesBase<dim,spacedim> > fe_values;
 
     /**
      * The single scalar component this view represents of the FEValuesBase
@@ -488,6 +583,62 @@ namespace FEValuesViews
      * finite element, the third derivative is a <code>Tensor@<4,dim@></code>.
      */
     typedef dealii::Tensor<4,spacedim>          third_derivative_type;
+
+    /**
+     * A struct that provides the output type for the product of the value
+     * and derivatives of basis functions of the Vector view and any @p Number type.
+     */
+    template <typename Number>
+    struct OutputType
+    {
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * values of the view the Vector class.
+       */
+      typedef typename ProductType<Number, typename Vector<dim,spacedim>::value_type>::type value_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * gradients of the view the Vector class.
+       */
+      typedef typename ProductType<Number, typename Vector<dim,spacedim>::gradient_type>::type gradient_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * symmetric gradients of the view the Vector class.
+       */
+      typedef typename ProductType<Number, typename Vector<dim,spacedim>::symmetric_gradient_type>::type symmetric_gradient_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * divergences of the view the Vector class.
+       */
+      typedef typename ProductType<Number, typename Vector<dim,spacedim>::divergence_type>::type divergence_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * laplacians of the view the Vector class.
+       */
+      typedef typename ProductType<Number, typename Vector<dim,spacedim>::value_type>::type laplacian_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * curls of the view the Vector class.
+       */
+      typedef typename ProductType<Number, typename Vector<dim,spacedim>::curl_type>::type curl_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * hessians of the view the Vector class.
+       */
+      typedef typename ProductType<Number, typename Vector<dim,spacedim>::hessian_type>::type hessian_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * third derivatives of the view the Vector class.
+       */
+      typedef typename ProductType<Number, typename Vector<dim,spacedim>::third_derivative_type>::type third_derivative_type;
+    };
 
     /**
      * A structure where for each shape function we pre-compute a bunch of
@@ -694,6 +845,30 @@ namespace FEValuesViews
                               std::vector<typename ProductType<value_type,typename InputVector::value_type>::type> &values) const;
 
     /**
+     * Same as above, but using a vector of local degree-of-freedom values.
+     *
+     * The @p dof_values vector must have a length equal to number of DoFs on
+     * a cell, and  each entry @p dof_values[i] is the value of the local DoF
+     * @p i. The fundamental prerequisite for the @p InputVector is that it must
+     * be possible to create an ArrayView from it; this is satisfied by the
+     * @p std::vector class.
+     *
+     * The DoF values typically would be obtained in the following way:
+     * @code
+     * Vector<double> local_dof_values(cell->get_fe().dofs_per_cell);
+     * cell->get_dof_values(solution, local_dof_values);
+     * @endcode
+     * or, for a generic @p Number type,
+     * @code
+     * std::vector<Number> local_dof_values(cell->get_fe().dofs_per_cell);
+     * cell->get_dof_values(solution, local_dof_values.begin(), local_dof_values.end());
+     * @endcode
+     */
+    template <class InputVector>
+    void get_function_values_from_local_dof_values (const InputVector &dof_values,
+                                                    std::vector<typename OutputType<typename InputVector::value_type>::value_type> &values) const;
+
+    /**
      * Return the gradients of the selected vector components of the finite
      * element function characterized by <tt>fe_function</tt> at the
      * quadrature points of the cell, face or subface selected the last time
@@ -713,6 +888,13 @@ namespace FEValuesViews
     template <class InputVector>
     void get_function_gradients (const InputVector &fe_function,
                                  std::vector<typename ProductType<gradient_type,typename InputVector::value_type>::type> &gradients) const;
+
+    /**
+     * @copydoc FEValuesViews::Vector::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_gradients_from_local_dof_values (const InputVector &dof_values,
+                                                       std::vector<typename OutputType<typename InputVector::value_type>::gradient_type> &gradients) const;
 
     /**
      * Return the symmetrized gradients of the selected vector components of
@@ -743,6 +925,14 @@ namespace FEValuesViews
                                       std::vector<typename ProductType<symmetric_gradient_type,typename InputVector::value_type>::type> &symmetric_gradients) const;
 
     /**
+     * @copydoc FEValuesViews::Vector::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void
+    get_function_symmetric_gradients_from_local_dof_values (const InputVector &dof_values,
+                                                            std::vector<typename OutputType<typename InputVector::value_type>::symmetric_gradient_type> &symmetric_gradients) const;
+
+    /**
      * Return the divergence of the selected vector components of the finite
      * element function characterized by <tt>fe_function</tt> at the
      * quadrature points of the cell, face or subface selected the last time
@@ -763,6 +953,13 @@ namespace FEValuesViews
     template <class InputVector>
     void get_function_divergences (const InputVector &fe_function,
                                    std::vector<typename ProductType<divergence_type,typename InputVector::value_type>::type> &divergences) const;
+
+    /**
+     * @copydoc FEValuesViews::Vector::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_divergences_from_local_dof_values (const InputVector &dof_values,
+                                                         std::vector<typename OutputType<typename InputVector::value_type>::divergence_type> &divergences) const;
 
     /**
      * Return the curl of the selected vector components of the finite element
@@ -787,6 +984,13 @@ namespace FEValuesViews
                              std::vector<typename ProductType<curl_type,typename InputVector::value_type>::type> &curls) const;
 
     /**
+     * @copydoc FEValuesViews::Vector::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_curls_from_local_dof_values (const InputVector &dof_values,
+                                                   std::vector<typename OutputType<typename InputVector::value_type>::curl_type> &curls) const;
+
+    /**
      * Return the Hessians of the selected vector components of the finite
      * element function characterized by <tt>fe_function</tt> at the
      * quadrature points of the cell, face or subface selected the last time
@@ -806,6 +1010,13 @@ namespace FEValuesViews
     template <class InputVector>
     void get_function_hessians (const InputVector &fe_function,
                                 std::vector<typename ProductType<hessian_type,typename InputVector::value_type>::type> &hessians) const;
+
+    /**
+     * @copydoc FEValuesViews::Vector::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_hessians_from_local_dof_values (const InputVector &dof_values,
+                                                      std::vector<typename OutputType<typename InputVector::value_type>::hessian_type> &hessians) const;
 
     /**
      * Return the Laplacians of the selected vector components of the finite
@@ -830,6 +1041,13 @@ namespace FEValuesViews
                                   std::vector<typename ProductType<value_type,typename InputVector::value_type>::type> &laplacians) const;
 
     /**
+     * @copydoc FEValuesViews::Vector::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_laplacians_from_local_dof_values (const InputVector &dof_values,
+                                                        std::vector<typename OutputType<typename InputVector::value_type>::laplacian_type> &laplacians) const;
+
+    /**
      * Return the third derivatives of the selected scalar component of the
      * finite element function characterized by <tt>fe_function</tt> at the
      * quadrature points of the cell, face or subface selected the last time
@@ -852,11 +1070,18 @@ namespace FEValuesViews
                                          std::vector<typename ProductType<third_derivative_type,
                                          typename InputVector::value_type>::type> &third_derivatives) const;
 
+    /**
+     * @copydoc FEValuesViews::Vector::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_third_derivatives_from_local_dof_values (const InputVector &dof_values,
+                                                               std::vector<typename OutputType<typename InputVector::value_type>::third_derivative_type> &third_derivatives) const;
+
   private:
     /**
-     * A reference to the FEValuesBase object we operate on.
+     * A pointer to the FEValuesBase object we operate on.
      */
-    const FEValuesBase<dim,spacedim> &fe_values;
+    const SmartPointer<const FEValuesBase<dim,spacedim> > fe_values;
 
     /**
      * The first component of the vector this view represents of the
@@ -920,6 +1145,26 @@ namespace FEValuesViews
      * divergence.
      */
     typedef dealii::Tensor<1, spacedim> divergence_type;
+
+    /**
+     * A struct that provides the output type for the product of the value
+     * and derivatives of basis functions of the SymmetricTensor view and any @p Number type.
+     */
+    template <typename Number>
+    struct OutputType
+    {
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * values of the view the SymmetricTensor class.
+       */
+      typedef typename ProductType<Number, typename SymmetricTensor<2,dim,spacedim>::value_type>::type value_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * divergences of the view the SymmetricTensor class.
+       */
+      typedef typename ProductType<Number, typename SymmetricTensor<2,dim,spacedim>::divergence_type>::type divergence_type;
+    };
 
     /**
      * A structure where for each shape function we pre-compute a bunch of
@@ -1044,6 +1289,31 @@ namespace FEValuesViews
                               std::vector<typename ProductType<value_type,typename InputVector::value_type>::type> &values) const;
 
     /**
+     * Same as above, but using a vector of local degree-of-freedom values.
+     *
+     * The @p dof_values vector must have a length equal to number of DoFs on
+     * a cell, and  each entry @p dof_values[i] is the value of the local DoF
+     * @p i. The fundamental prerequisite for the @p InputVector is that it must
+     * be possible to create an ArrayView from it; this is satisfied by the
+     * @p std::vector class.
+     *
+     * The DoF values typically would be obtained in the following way:
+     * @code
+     * Vector<double> local_dof_values(cell->get_fe().dofs_per_cell);
+     * cell->get_dof_values(solution, local_dof_values);
+     * @endcode
+     * or, for a generic @p Number type,
+     * @code
+     * std::vector<Number> local_dof_values(cell->get_fe().dofs_per_cell);
+     * cell->get_dof_values(solution, local_dof_values.begin(), local_dof_values.end());
+     * @endcode
+     */
+    template <class InputVector>
+    void get_function_values_from_local_dof_values (const InputVector &dof_values,
+                                                    std::vector<typename OutputType<typename InputVector::value_type>::value_type> &values) const;
+
+
+    /**
      * Return the divergence of the selected vector components of the finite
      * element function characterized by <tt>fe_function</tt> at the
      * quadrature points of the cell, face or subface selected the last time
@@ -1068,11 +1338,18 @@ namespace FEValuesViews
     void get_function_divergences (const InputVector &fe_function,
                                    std::vector<typename ProductType<divergence_type,typename InputVector::value_type>::type> &divergences) const;
 
+    /**
+     * @copydoc FEValuesViews::SymmetricTensor<2,dim,spacedim>::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_divergences_from_local_dof_values (const InputVector &dof_values,
+                                                         std::vector<typename OutputType<typename InputVector::value_type>::divergence_type> &divergences) const;
+
   private:
     /**
-     * A reference to the FEValuesBase object we operate on.
+     * A pointer to the FEValuesBase object we operate on.
      */
-    const FEValuesBase<dim, spacedim> &fe_values;
+    const SmartPointer<const FEValuesBase<dim, spacedim> > fe_values;
 
     /**
      * The first component of the vector this view represents of the
@@ -1124,6 +1401,26 @@ namespace FEValuesViews
      * Data type for taking the divergence of a tensor: a vector.
      */
     typedef dealii::Tensor<1, spacedim> divergence_type;
+
+    /**
+     * A struct that provides the output type for the product of the value
+     * and derivatives of basis functions of the Tensor view and any @p Number type.
+     */
+    template <typename Number>
+    struct OutputType
+    {
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * values of the view the Tensor class.
+       */
+      typedef typename ProductType<Number, typename Tensor<2,dim,spacedim>::value_type>::type value_type;
+
+      /**
+       * A typedef for the data type of the product of a @p Number and the
+       * divergences of the view the Tensor class.
+       */
+      typedef typename ProductType<Number, typename Tensor<2,dim,spacedim>::divergence_type>::type divergence_type;
+    };
 
     /**
      * A structure where for each shape function we pre-compute a bunch of
@@ -1247,6 +1544,30 @@ namespace FEValuesViews
     void get_function_values (const InputVector &fe_function,
                               std::vector<typename ProductType<value_type,typename InputVector::value_type>::type> &values) const;
 
+    /**
+     * Same as above, but using a vector of local degree-of-freedom values.
+     *
+     * The @p dof_values vector must have a length equal to number of DoFs on
+     * a cell, and  each entry @p dof_values[i] is the value of the local DoF
+     * @p i. The fundamental prerequisite for the @p InputVector is that it must
+     * be possible to create an ArrayView from it; this is satisfied by the
+     * @p std::vector class.
+     *
+     * The DoF values typically would be obtained in the following way:
+     * @code
+     * Vector<double> local_dof_values(cell->get_fe().dofs_per_cell);
+     * cell->get_dof_values(solution, local_dof_values);
+     * @endcode
+     * or, for a generic @p Number type,
+     * @code
+     * std::vector<Number> local_dof_values(cell->get_fe().dofs_per_cell);
+     * cell->get_dof_values(solution, local_dof_values.begin(), local_dof_values.end());
+     * @endcode
+     */
+    template <class InputVector>
+    void get_function_values_from_local_dof_values (const InputVector &dof_values,
+                                                    std::vector<typename OutputType<typename InputVector::value_type>::value_type> &values) const;
+
 
     /**
      * Return the divergence of the selected vector components of the finite
@@ -1273,11 +1594,19 @@ namespace FEValuesViews
     void get_function_divergences (const InputVector &fe_function,
                                    std::vector<typename ProductType<divergence_type,typename InputVector::value_type>::type> &divergences) const;
 
+    /**
+     * @copydoc FEValuesViews::Tensor<2,dim,spacedim>::get_function_values_from_local_dof_values()
+     */
+    template <class InputVector>
+    void get_function_divergences_from_local_dof_values (const InputVector &dof_values,
+                                                         std::vector<typename OutputType<typename InputVector::value_type>::divergence_type> &values) const;
+
+
   private:
     /**
-     * A reference to the FEValuesBase object we operate on.
+     * A pointer to the FEValuesBase object we operate on.
      */
-    const FEValuesBase<dim, spacedim> &fe_values;
+    const SmartPointer<const FEValuesBase<dim, spacedim> > fe_values;
 
     /**
      * The first component of the vector this view represents of the
@@ -1603,7 +1932,7 @@ public:
                  const unsigned int point_no) const;
 
   /**
-   * Return one vector component of the gradient of a shape function at a
+   * Return one vector component of the hessian of a shape function at a
    * quadrature point. If the finite element is scalar, then only component
    * zero is allowed and the return value equals that of the shape_hessian()
    * function. If the finite element is vector valued but all shape functions
@@ -1672,7 +2001,7 @@ public:
   //@{
 
   /**
-   * Returns the values of a finite element function restricted to the current
+   * Return the values of a finite element function restricted to the current
    * cell, face or subface selected the last time the <tt>reinit</tt> function
    * of the derived class was called, at the quadrature points.
    *
@@ -1700,12 +2029,12 @@ public:
    * described by fe_function at the $q$th quadrature point.
    *
    * @note The actual data type of the input vector may be either a
-   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the sequential PETSc or
-   * Trilinos vector wrapper classes. It represents a global vector of DoF
-   * values associated with the DofHandler object with which this FEValues
-   * object was last initialized. Alternatively, if the vector argument is of
-   * type IndexSet, then the function is represented as one that is either
-   * zero or one, depending on whether a DoF index is in the set or not.
+   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the PETSc or Trilinos
+   * vector wrapper classes. It represents a global vector of DoF values
+   * associated with the DoFHandler object with which this FEValues object was
+   * last initialized. Alternatively, if the vector argument is of type
+   * IndexSet, then the function is represented as one that is either zero or
+   * one, depending on whether a DoF index is in the set or not.
    *
    * @dealiiRequiresUpdateFlags{update_values}
    */
@@ -1849,12 +2178,12 @@ public:
    * direction $d$ at quadrature point $q$.
    *
    * @note The actual data type of the input vector may be either a
-   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the sequential PETSc or
-   * Trilinos vector wrapper classes. It represents a global vector of DoF
-   * values associated with the DoFHandler object with which this FEValues
-   * object was last initialized. Alternatively, if the vector argument is of
-   * type IndexSet, then the function is represented as one that is either
-   * zero or one, depending on whether a DoF index is in the set or not.
+   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the PETSc or Trilinos
+   * vector wrapper classes. It represents a global vector of DoF values
+   * associated with the DoFHandler object with which this FEValues object was
+   * last initialized. Alternatively, if the vector argument is of type
+   * IndexSet, then the function is represented as one that is either zero or
+   * one, depending on whether a DoF index is in the set or not.
    *
    * @dealiiRequiresUpdateFlags{update_gradients}
    */
@@ -1939,12 +2268,12 @@ public:
    * matrix of second derivatives at quadrature point $q$.
    *
    * @note The actual data type of the input vector may be either a
-   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the sequential PETSc or
-   * Trilinos vector wrapper classes. It represents a global vector of DoF
-   * values associated with the DofHandler object with which this FEValues
-   * object was last initialized. Alternatively, if the vector argument is of
-   * type IndexSet, then the function is represented as one that is either
-   * zero or one, depending on whether a DoF index is in the set or not.
+   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the PETSc or Trilinos
+   * vector wrapper classes. It represents a global vector of DoF values
+   * associated with the DoFHandler object with which this FEValues object was
+   * last initialized. Alternatively, if the vector argument is of type
+   * IndexSet, then the function is represented as one that is either zero or
+   * one, depending on whether a DoF index is in the set or not.
    *
    * @dealiiRequiresUpdateFlags{update_hessians}
    */
@@ -2026,20 +2355,18 @@ public:
    *
    * @post <code>laplacians[q]</code> will contain the Laplacian of the field
    * described by fe_function at the $q$th quadrature point.
-   * <code>gradients[q][i][j]</code> represents the $(i,j)$th component of the
-   * matrix of second derivatives at quadrature point $q$.
    *
    * @post For each component of the output vector, there holds
    * <code>laplacians[q]=trace(hessians[q])</code>, where <tt>hessians</tt>
    * would be the output of the get_function_hessians() function.
    *
    * @note The actual data type of the input vector may be either a
-   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the sequential PETSc or
-   * Trilinos vector wrapper classes. It represents a global vector of DoF
-   * values associated with the DofHandler object with which this FEValues
-   * object was last initialized. Alternatively, if the vector argument is of
-   * type IndexSet, then the function is represented as one that is either
-   * zero or one, depending on whether a DoF index is in the set or not.
+   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the PETSc or Trilinos
+   * vector wrapper classes. It represents a global vector of DoF values
+   * associated with the DoFHandler object with which this FEValues object was
+   * last initialized. Alternatively, if the vector argument is of type
+   * IndexSet, then the function is represented as one that is either zero or
+   * one, depending on whether a DoF index is in the set or not.
    *
    * @dealiiRequiresUpdateFlags{update_hessians}
    */
@@ -2144,12 +2471,12 @@ public:
    * quadrature point $q$.
    *
    * @note The actual data type of the input vector may be either a
-   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the sequential PETSc or
-   * Trilinos vector wrapper classes. It represents a global vector of DoF
-   * values associated with the DofHandler object with which this FEValues
-   * object was last initialized. Alternatively, if the vector argument is of
-   * type IndexSet, then the function is represented as one that is either
-   * zero or one, depending on whether a DoF index is in the set or not.
+   * Vector&lt;T&gt;, BlockVector&lt;T&gt;, or one of the PETSc or Trilinos
+   * vector wrapper classes. It represents a global vector of DoF values
+   * associated with the DoFHandler object with which this FEValues object was
+   * last initialized. Alternatively, if the vector argument is of type
+   * IndexSet, then the function is represented as one that is either zero or
+   * one, depending on whether a DoF index is in the set or not.
    *
    * @dealiiRequiresUpdateFlags{update_3rd_derivatives}
    */
@@ -2408,37 +2735,19 @@ public:
    *
    * @dealiiRequiresUpdateFlags{update_normal_vectors}
    *
-   * @note This function should really be named get_normal_vectors(), but this
-   * function already exists with a different return type that returns a
-   * vector of Point objects, rather than a vector of Tensor objects. This is
-   * a historical accident, but can not be fixed in a backward compatible
-   * style. That said, the get_normal_vectors() function is now deprecated,
-   * will be removed in the next version, and the current function will then
-   * be renamed.
+   * @deprecated Use get_normal_vectors() instead, which returns the exact
+   * same thing.
    */
-  const std::vector<Tensor<1,spacedim> > &get_all_normal_vectors () const;
+  const std::vector<Tensor<1,spacedim> > &get_all_normal_vectors () const DEAL_II_DEPRECATED;
 
   /**
-   * Return the normal vectors at the quadrature points as a vector of Point
-   * objects. This function is deprecated because normal vectors are correctly
-   * represented by rank-1 Tensor objects, not Point objects. Use
-   * get_all_normal_vectors() instead.
+   * Return the normal vectors at the quadrature points. For a face, these are
+   * the outward normal vectors to the cell. For a cell of codimension one,
+   * the orientation is given by the numbering of vertices.
    *
    * @dealiiRequiresUpdateFlags{update_normal_vectors}
-   *
-   * @deprecated
    */
-  std::vector<Point<spacedim> > get_normal_vectors () const DEAL_II_DEPRECATED;
-
-  /**
-   * Transform a set of vectors, one for each quadrature point. The
-   * <tt>mapping</tt> can be any of the ones defined in MappingType.
-   *
-   * @deprecated Use the various Mapping::transform() functions instead.
-   */
-  void transform (std::vector<Tensor<1,spacedim> > &transformed,
-                  const std::vector<Tensor<1,dim> > &original,
-                  MappingType mapping) const DEAL_II_DEPRECATED;
+  const std::vector<Tensor<1,spacedim> > &get_normal_vectors () const;
 
   //@}
 
@@ -2539,13 +2848,12 @@ public:
    */
   DeclException1 (ExcAccessToUninitializedField,
                   char *,
-                  << ("You are requesting information from an FEValues/FEFaceValues/FESubfaceValues "
-                      "object for which this kind of information has not been computed. What "
-                      "information these objects compute is determined by the update_* flags you "
-                      "pass to the constructor. Here, the operation you are attempting requires "
-                      "the <")
-                  << arg1
-                  << "> flag to be set, but it was apparently not specified upon construction.");
+                  << "You are requesting information from an FEValues/FEFaceValues/FESubfaceValues "
+                  << "object for which this kind of information has not been computed. What "
+                  << "information these objects compute is determined by the update_* flags you "
+                  << "pass to the constructor. Here, the operation you are attempting requires "
+                  << "the <" << arg1 << "> flag to be set, but it was apparently not specified "
+                  << "upon construction.");
   /**
    * @todo Document this
    *
@@ -2627,16 +2935,25 @@ protected:
    * is necessary for the <tt>get_function_*</tt> functions as well as the
    * functions of same name in the extractor classes.
    */
-  std_cxx11::unique_ptr<const CellIteratorBase> present_cell;
+  std::unique_ptr<const CellIteratorBase> present_cell;
 
   /**
    * A signal connection we use to ensure we get informed whenever the
-   * triangulation changes. We need to know about that because it invalidates
-   * all cell iterators and, as part of that, the 'present_cell' iterator we
-   * keep around between subsequent calls to reinit() in order to compute the
-   * cell similarity.
+   * triangulation changes by refinement. We need to know about that because
+   * it invalidates all cell iterators and, as part of that, the
+   * 'present_cell' iterator we keep around between subsequent calls to
+   * reinit() in order to compute the cell similarity.
    */
-  boost::signals2::connection tria_listener;
+  boost::signals2::connection tria_listener_refinement;
+
+  /**
+   * A signal connection we use to ensure we get informed whenever the
+   * triangulation changes by mesh transformations. We need to know about that
+   * because it invalidates all cell iterators and, as part of that, the
+   * 'present_cell' iterator we keep around between subsequent calls to
+   * reinit() in order to compute the cell similarity.
+   */
+  boost::signals2::connection tria_listener_mesh_transform;
 
   /**
    * A function that is connected to the triangulation in order to reset the
@@ -2667,7 +2984,7 @@ protected:
    * Mapping::get_data(), Mapping::get_face_data(), or
    * Mapping::get_subface_data().
    */
-  std_cxx11::unique_ptr<typename Mapping<dim,spacedim>::InternalDataBase> mapping_data;
+  std::unique_ptr<typename Mapping<dim,spacedim>::InternalDataBase> mapping_data;
 
   /**
    * An object into which the Mapping::fill_fe_values() and similar functions
@@ -2687,7 +3004,7 @@ protected:
    * FiniteElement::get_data(), Mapping::get_face_data(), or
    * FiniteElement::get_subface_data().
    */
-  std_cxx11::unique_ptr<typename FiniteElement<dim,spacedim>::InternalDataBase> fe_data;
+  std::unique_ptr<typename FiniteElement<dim,spacedim>::InternalDataBase> fe_data;
 
   /**
    * An object into which the FiniteElement::fill_fe_values() and similar
@@ -2834,14 +3151,15 @@ public:
    * Return a reference to this very object.
    *
    * Though it seems that it is not very useful, this function is there to
-   * provide capability to the hpFEValues class, in which case it provides the
-   * FEValues object for the present cell (remember that for hp finite
+   * provide capability to the hp::FEValues class, in which case it provides
+   * the FEValues object for the present cell (remember that for hp finite
    * elements, the actual FE object used may change from cell to cell, so we
    * also need different FEValues objects for different cells; once you
-   * reinitialize the hpFEValues object for a specific cell, it retrieves the
-   * FEValues object for the FE on that cell and returns it through a function
-   * of the same name as this one; this function here therefore only provides
-   * the same interface so that one can templatize on FEValues/hpFEValues).
+   * reinitialize the hp::FEValues object for a specific cell, it retrieves
+   * the FEValues object for the FE on that cell and returns it through a
+   * function of the same name as this one; this function here therefore only
+   * provides the same interface so that one can templatize on FEValues and
+   * hp::FEValues).
    */
   const FEValues<dim,spacedim> &get_present_fe_values () const;
 
@@ -3033,14 +3351,15 @@ public:
    * Return a reference to this very object.
    *
    * Though it seems that it is not very useful, this function is there to
-   * provide capability to the hpFEValues class, in which case it provides the
-   * FEValues object for the present cell (remember that for hp finite
+   * provide capability to the hp::FEValues class, in which case it provides
+   * the FEValues object for the present cell (remember that for hp finite
    * elements, the actual FE object used may change from cell to cell, so we
    * also need different FEValues objects for different cells; once you
-   * reinitialize the hpFEValues object for a specific cell, it retrieves the
-   * FEValues object for the FE on that cell and returns it through a function
-   * of the same name as this one; this function here therefore only provides
-   * the same interface so that one can templatize on FEValues/hpFEValues).
+   * reinitialize the hp::FEValues object for a specific cell, it retrieves
+   * the FEValues object for the FE on that cell and returns it through a
+   * function of the same name as this one; this function here therefore only
+   * provides the same interface so that one can templatize on FEValues and
+   * hp::FEValues).
    */
   const FEFaceValues<dim,spacedim> &get_present_fe_values () const;
 private:
@@ -3147,14 +3466,15 @@ public:
    * Return a reference to this very object.
    *
    * Though it seems that it is not very useful, this function is there to
-   * provide capability to the hpFEValues class, in which case it provides the
-   * FEValues object for the present cell (remember that for hp finite
+   * provide capability to the hp::FEValues class, in which case it provides
+   * the FEValues object for the present cell (remember that for hp finite
    * elements, the actual FE object used may change from cell to cell, so we
    * also need different FEValues objects for different cells; once you
-   * reinitialize the hpFEValues object for a specific cell, it retrieves the
-   * FEValues object for the FE on that cell and returns it through a function
-   * of the same name as this one; this function here therefore only provides
-   * the same interface so that one can templatize on FEValues/hpFEValues).
+   * reinitialize the hp::FEValues object for a specific cell, it retrieves
+   * the FEValues object for the FE on that cell and returns it through a
+   * function of the same name as this one; this function here therefore only
+   * provides the same interface so that one can templatize on FEValues and
+   * hp::FEValues).
    */
   const FESubfaceValues<dim,spacedim> &get_present_fe_values () const;
 
@@ -3203,19 +3523,18 @@ namespace FEValuesViews
   Scalar<dim,spacedim>::value (const unsigned int shape_function,
                                const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_values,
-            typename FVB::ExcAccessToUninitializedField("update_values"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_values,
+            ((typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_values"))));
 
     // an adaptation of the FEValuesBase::shape_value_component function
     // except that here we know the component as fixed and we have
     // pre-computed and cached a bunch of information. See the comments there.
     if (shape_function_data[shape_function].is_nonzero_shape_function_component)
-      return fe_values.finite_element_output.shape_values(shape_function_data[shape_function]
-                                                          .row_index,
-                                                          q_point);
+      return fe_values->finite_element_output.shape_values(shape_function_data[shape_function]
+                                                           .row_index,
+                                                           q_point);
     else
       return 0;
   }
@@ -3229,11 +3548,10 @@ namespace FEValuesViews
   Scalar<dim,spacedim>::gradient (const unsigned int shape_function,
                                   const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_gradients,
-            typename FVB::ExcAccessToUninitializedField("update_gradients"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_gradients,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_gradients")));
 
     // an adaptation of the
     // FEValuesBase::shape_grad_component
@@ -3242,8 +3560,8 @@ namespace FEValuesViews
     // pre-computed and cached a bunch of
     // information. See the comments there.
     if (shape_function_data[shape_function].is_nonzero_shape_function_component)
-      return fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function]
-                                                             .row_index][q_point];
+      return fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function]
+                                                              .row_index][q_point];
     else
       return gradient_type();
   }
@@ -3256,11 +3574,10 @@ namespace FEValuesViews
   Scalar<dim,spacedim>::hessian (const unsigned int shape_function,
                                  const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_hessians,
-            typename FVB::ExcAccessToUninitializedField("update_hessians"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_hessians,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_hessians")));
 
     // an adaptation of the
     // FEValuesBase::shape_hessian_component
@@ -3269,7 +3586,7 @@ namespace FEValuesViews
     // pre-computed and cached a bunch of
     // information. See the comments there.
     if (shape_function_data[shape_function].is_nonzero_shape_function_component)
-      return fe_values.finite_element_output.shape_hessians[shape_function_data[shape_function].row_index][q_point];
+      return fe_values->finite_element_output.shape_hessians[shape_function_data[shape_function].row_index][q_point];
     else
       return hessian_type();
   }
@@ -3282,11 +3599,10 @@ namespace FEValuesViews
   Scalar<dim,spacedim>::third_derivative (const unsigned int shape_function,
                                           const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_3rd_derivatives,
-            typename FVB::ExcAccessToUninitializedField("update_3rd_derivatives"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_3rd_derivatives,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_3rd_derivatives")));
 
     // an adaptation of the
     // FEValuesBase::shape_3rdderivative_component
@@ -3295,7 +3611,7 @@ namespace FEValuesViews
     // pre-computed and cached a bunch of
     // information. See the comments there.
     if (shape_function_data[shape_function].is_nonzero_shape_function_component)
-      return fe_values.finite_element_output.shape_3rd_derivatives[shape_function_data[shape_function].row_index][q_point];
+      return fe_values->finite_element_output.shape_3rd_derivatives[shape_function_data[shape_function].row_index][q_point];
     else
       return third_derivative_type();
   }
@@ -3308,11 +3624,10 @@ namespace FEValuesViews
   Vector<dim,spacedim>::value (const unsigned int shape_function,
                                const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_values,
-            typename FVB::ExcAccessToUninitializedField("update_values"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_values,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_values")));
 
     // same as for the scalar case except
     // that we have one more index
@@ -3323,7 +3638,7 @@ namespace FEValuesViews
       {
         value_type return_value;
         return_value[shape_function_data[shape_function].single_nonzero_component_index]
-          = fe_values.finite_element_output.shape_values(snc,q_point);
+          = fe_values->finite_element_output.shape_values(snc,q_point);
         return return_value;
       }
     else
@@ -3332,7 +3647,7 @@ namespace FEValuesViews
         for (unsigned int d=0; d<dim; ++d)
           if (shape_function_data[shape_function].is_nonzero_shape_function_component[d])
             return_value[d]
-              = fe_values.finite_element_output.shape_values(shape_function_data[shape_function].row_index[d],q_point);
+              = fe_values->finite_element_output.shape_values(shape_function_data[shape_function].row_index[d],q_point);
 
         return return_value;
       }
@@ -3346,11 +3661,10 @@ namespace FEValuesViews
   Vector<dim,spacedim>::gradient (const unsigned int shape_function,
                                   const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_gradients,
-            typename FVB::ExcAccessToUninitializedField("update_gradients"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_gradients,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_gradients")));
 
     // same as for the scalar case except
     // that we have one more index
@@ -3361,7 +3675,7 @@ namespace FEValuesViews
       {
         gradient_type return_value;
         return_value[shape_function_data[shape_function].single_nonzero_component_index]
-          = fe_values.finite_element_output.shape_gradients[snc][q_point];
+          = fe_values->finite_element_output.shape_gradients[snc][q_point];
         return return_value;
       }
     else
@@ -3370,7 +3684,7 @@ namespace FEValuesViews
         for (unsigned int d=0; d<dim; ++d)
           if (shape_function_data[shape_function].is_nonzero_shape_function_component[d])
             return_value[d]
-              = fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[d]][q_point];
+              = fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[d]][q_point];
 
         return return_value;
       }
@@ -3386,11 +3700,10 @@ namespace FEValuesViews
   {
     // this function works like in
     // the case above
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_gradients,
-            typename FVB::ExcAccessToUninitializedField("update_gradients"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_gradients,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_gradients")));
 
     // same as for the scalar case except
     // that we have one more index
@@ -3399,14 +3712,14 @@ namespace FEValuesViews
       return divergence_type();
     else if (snc != -1)
       return
-        fe_values.finite_element_output.shape_gradients[snc][q_point][shape_function_data[shape_function].single_nonzero_component_index];
+        fe_values->finite_element_output.shape_gradients[snc][q_point][shape_function_data[shape_function].single_nonzero_component_index];
     else
       {
         divergence_type return_value = 0;
         for (unsigned int d=0; d<dim; ++d)
           if (shape_function_data[shape_function].is_nonzero_shape_function_component[d])
             return_value
-            += fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[d]][q_point][d];
+            += fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[d]][q_point][d];
 
         return return_value;
       }
@@ -3420,12 +3733,11 @@ namespace FEValuesViews
   Vector<dim,spacedim>::curl (const unsigned int shape_function, const unsigned int q_point) const
   {
     // this function works like in the case above
-    typedef FEValuesBase<dim,spacedim> FVB;
 
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_gradients,
-            typename FVB::ExcAccessToUninitializedField("update_gradients"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_gradients,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_gradients")));
     // same as for the scalar case except that we have one more index
     const int snc = shape_function_data[shape_function].single_nonzero_component;
 
@@ -3452,9 +3764,9 @@ namespace FEValuesViews
               // can only be zero
               // or one in 2d
               if (shape_function_data[shape_function].single_nonzero_component_index == 0)
-                return_value[0] = -1.0 * fe_values.finite_element_output.shape_gradients[snc][q_point][1];
+                return_value[0] = -1.0 * fe_values->finite_element_output.shape_gradients[snc][q_point][1];
               else
-                return_value[0] = fe_values.finite_element_output.shape_gradients[snc][q_point][0];
+                return_value[0] = fe_values->finite_element_output.shape_gradients[snc][q_point][0];
 
               return return_value;
             }
@@ -3467,11 +3779,11 @@ namespace FEValuesViews
 
               if (shape_function_data[shape_function].is_nonzero_shape_function_component[0])
                 return_value[0]
-                -= fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[0]][q_point][1];
+                -= fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[0]][q_point][1];
 
               if (shape_function_data[shape_function].is_nonzero_shape_function_component[1])
                 return_value[0]
-                += fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[1]][q_point][0];
+                += fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[1]][q_point][0];
 
               return return_value;
             }
@@ -3488,23 +3800,23 @@ namespace FEValuesViews
                 case 0:
                 {
                   return_value[0] = 0;
-                  return_value[1] = fe_values.finite_element_output.shape_gradients[snc][q_point][2];
-                  return_value[2] = -1.0 * fe_values.finite_element_output.shape_gradients[snc][q_point][1];
+                  return_value[1] = fe_values->finite_element_output.shape_gradients[snc][q_point][2];
+                  return_value[2] = -1.0 * fe_values->finite_element_output.shape_gradients[snc][q_point][1];
                   return return_value;
                 }
 
                 case 1:
                 {
-                  return_value[0] = -1.0 * fe_values.finite_element_output.shape_gradients[snc][q_point][2];
+                  return_value[0] = -1.0 * fe_values->finite_element_output.shape_gradients[snc][q_point][2];
                   return_value[1] = 0;
-                  return_value[2] = fe_values.finite_element_output.shape_gradients[snc][q_point][0];
+                  return_value[2] = fe_values->finite_element_output.shape_gradients[snc][q_point][0];
                   return return_value;
                 }
 
                 default:
                 {
-                  return_value[0] = fe_values.finite_element_output.shape_gradients[snc][q_point][1];
-                  return_value[1] = -1.0 * fe_values.finite_element_output.shape_gradients[snc][q_point][0];
+                  return_value[0] = fe_values->finite_element_output.shape_gradients[snc][q_point][1];
+                  return_value[1] = -1.0 * fe_values->finite_element_output.shape_gradients[snc][q_point][0];
                   return_value[2] = 0;
                   return return_value;
                 }
@@ -3521,25 +3833,25 @@ namespace FEValuesViews
               if (shape_function_data[shape_function].is_nonzero_shape_function_component[0])
                 {
                   return_value[1]
-                  += fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[0]][q_point][2];
+                  += fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[0]][q_point][2];
                   return_value[2]
-                  -= fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[0]][q_point][1];
+                  -= fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[0]][q_point][1];
                 }
 
               if (shape_function_data[shape_function].is_nonzero_shape_function_component[1])
                 {
                   return_value[0]
-                  -= fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[1]][q_point][2];
+                  -= fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[1]][q_point][2];
                   return_value[2]
-                  += fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[1]][q_point][0];
+                  += fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[1]][q_point][0];
                 }
 
               if (shape_function_data[shape_function].is_nonzero_shape_function_component[2])
                 {
                   return_value[0]
-                  += fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[2]][q_point][1];
+                  += fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[2]][q_point][1];
                   return_value[1]
-                  -= fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[2]][q_point][0];
+                  -= fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[2]][q_point][0];
                 }
 
               return return_value;
@@ -3559,11 +3871,10 @@ namespace FEValuesViews
   {
     // this function works like in
     // the case above
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_hessians,
-            typename FVB::ExcAccessToUninitializedField("update_hessians"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_hessians,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_hessians")));
 
     // same as for the scalar case except
     // that we have one more index
@@ -3574,7 +3885,7 @@ namespace FEValuesViews
       {
         hessian_type return_value;
         return_value[shape_function_data[shape_function].single_nonzero_component_index]
-          = fe_values.finite_element_output.shape_hessians[snc][q_point];
+          = fe_values->finite_element_output.shape_hessians[snc][q_point];
         return return_value;
       }
     else
@@ -3583,7 +3894,7 @@ namespace FEValuesViews
         for (unsigned int d=0; d<dim; ++d)
           if (shape_function_data[shape_function].is_nonzero_shape_function_component[d])
             return_value[d]
-              = fe_values.finite_element_output.shape_hessians[shape_function_data[shape_function].row_index[d]][q_point];
+              = fe_values->finite_element_output.shape_hessians[shape_function_data[shape_function].row_index[d]][q_point];
 
         return return_value;
       }
@@ -3597,11 +3908,10 @@ namespace FEValuesViews
   {
     // this function works like in
     // the case above
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_3rd_derivatives,
-            typename FVB::ExcAccessToUninitializedField("update_3rd_derivatives"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_3rd_derivatives,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_3rd_derivatives")));
 
     // same as for the scalar case except
     // that we have one more index
@@ -3612,7 +3922,7 @@ namespace FEValuesViews
       {
         third_derivative_type return_value;
         return_value[shape_function_data[shape_function].single_nonzero_component_index]
-          = fe_values.finite_element_output.shape_3rd_derivatives[snc][q_point];
+          = fe_values->finite_element_output.shape_3rd_derivatives[snc][q_point];
         return return_value;
       }
     else
@@ -3621,7 +3931,7 @@ namespace FEValuesViews
         for (unsigned int d=0; d<dim; ++d)
           if (shape_function_data[shape_function].is_nonzero_shape_function_component[d])
             return_value[d]
-              = fe_values.finite_element_output.shape_3rd_derivatives[shape_function_data[shape_function].row_index[d]][q_point];
+              = fe_values->finite_element_output.shape_3rd_derivatives[shape_function_data[shape_function].row_index[d]][q_point];
 
         return return_value;
       }
@@ -3711,11 +4021,10 @@ namespace FEValuesViews
   Vector<dim,spacedim>::symmetric_gradient (const unsigned int shape_function,
                                             const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_gradients,
-            typename FVB::ExcAccessToUninitializedField("update_gradients"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_gradients,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_gradients")));
 
     // same as for the scalar case except
     // that we have one more index
@@ -3724,14 +4033,14 @@ namespace FEValuesViews
       return symmetric_gradient_type();
     else if (snc != -1)
       return symmetrize_single_row (shape_function_data[shape_function].single_nonzero_component_index,
-                                    fe_values.finite_element_output.shape_gradients[snc][q_point]);
+                                    fe_values->finite_element_output.shape_gradients[snc][q_point]);
     else
       {
         gradient_type return_value;
         for (unsigned int d=0; d<dim; ++d)
           if (shape_function_data[shape_function].is_nonzero_shape_function_component[d])
             return_value[d]
-              = fe_values.finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[d]][q_point];
+              = fe_values->finite_element_output.shape_gradients[shape_function_data[shape_function].row_index[d]][q_point];
 
         return symmetrize(return_value);
       }
@@ -3745,11 +4054,10 @@ namespace FEValuesViews
   SymmetricTensor<2, dim, spacedim>::value (const unsigned int shape_function,
                                             const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_values,
-            typename FVB::ExcAccessToUninitializedField("update_values"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_values,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_values")));
 
     // similar to the vector case where we
     // have more then one index and we need
@@ -3771,7 +4079,7 @@ namespace FEValuesViews
         const unsigned int comp =
           shape_function_data[shape_function].single_nonzero_component_index;
         return_value[value_type::unrolled_to_component_indices(comp)]
-          = fe_values.finite_element_output.shape_values(snc,q_point);
+          = fe_values->finite_element_output.shape_values(snc,q_point);
         return return_value;
       }
     else
@@ -3780,7 +4088,7 @@ namespace FEValuesViews
         for (unsigned int d = 0; d < value_type::n_independent_components; ++d)
           if (shape_function_data[shape_function].is_nonzero_shape_function_component[d])
             return_value[value_type::unrolled_to_component_indices(d)]
-              = fe_values.finite_element_output.shape_values(shape_function_data[shape_function].row_index[d],q_point);
+              = fe_values->finite_element_output.shape_values(shape_function_data[shape_function].row_index[d],q_point);
         return return_value;
       }
   }
@@ -3792,11 +4100,10 @@ namespace FEValuesViews
   SymmetricTensor<2, dim, spacedim>::divergence(const unsigned int shape_function,
                                                 const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_gradients,
-            typename FVB::ExcAccessToUninitializedField("update_gradients"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_gradients,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_gradients")));
 
     const int snc = shape_function_data[shape_function].single_nonzero_component;
 
@@ -3857,7 +4164,7 @@ namespace FEValuesViews
         // b_jj := \dfrac{\partial phi_{ii,jj}}{\partial x_jj}.
         // again, all other entries of 'b' are
         // zero
-        const dealii::Tensor<1, spacedim> phi_grad = fe_values.finite_element_output.shape_gradients[snc][q_point];
+        const dealii::Tensor<1, spacedim> phi_grad = fe_values->finite_element_output.shape_gradients[snc][q_point];
 
         divergence_type return_value;
         return_value[ii] = phi_grad[jj];
@@ -3882,11 +4189,10 @@ namespace FEValuesViews
   Tensor<2, dim, spacedim>::value (const unsigned int shape_function,
                                    const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_values,
-            typename FVB::ExcAccessToUninitializedField("update_values"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_values,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_values")));
 
     // similar to the vector case where we
     // have more then one index and we need
@@ -3908,7 +4214,7 @@ namespace FEValuesViews
         const unsigned int comp =
           shape_function_data[shape_function].single_nonzero_component_index;
         const TableIndices<2> indices = dealii::Tensor<2,spacedim>::unrolled_to_component_indices(comp);
-        return_value[indices] = fe_values.finite_element_output.shape_values(snc,q_point);
+        return_value[indices] = fe_values->finite_element_output.shape_values(snc,q_point);
         return return_value;
       }
     else
@@ -3919,7 +4225,7 @@ namespace FEValuesViews
             {
               const TableIndices<2> indices = dealii::Tensor<2,spacedim>::unrolled_to_component_indices(d);
               return_value[indices]
-                = fe_values.finite_element_output.shape_values(shape_function_data[shape_function].row_index[d],q_point);
+                = fe_values->finite_element_output.shape_values(shape_function_data[shape_function].row_index[d],q_point);
             }
         return return_value;
       }
@@ -3932,11 +4238,10 @@ namespace FEValuesViews
   Tensor<2, dim, spacedim>::divergence(const unsigned int shape_function,
                                        const unsigned int q_point) const
   {
-    typedef FEValuesBase<dim,spacedim> FVB;
-    Assert (shape_function < fe_values.fe->dofs_per_cell,
-            ExcIndexRange (shape_function, 0, fe_values.fe->dofs_per_cell));
-    Assert (fe_values.update_flags & update_gradients,
-            typename FVB::ExcAccessToUninitializedField("update_gradients"));
+    Assert (shape_function < fe_values->fe->dofs_per_cell,
+            ExcIndexRange (shape_function, 0, fe_values->fe->dofs_per_cell));
+    Assert (fe_values->update_flags & update_gradients,
+            (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_gradients")));
 
     const int snc = shape_function_data[shape_function].single_nonzero_component;
 
@@ -3970,7 +4275,7 @@ namespace FEValuesViews
         const unsigned int ii = indices[0];
         const unsigned int jj = indices[1];
 
-        const dealii::Tensor<1, spacedim> phi_grad = fe_values.finite_element_output.shape_gradients[snc][q_point];
+        const dealii::Tensor<1, spacedim> phi_grad = fe_values->finite_element_output.shape_gradients[snc][q_point];
 
         divergence_type return_value;
         return_value[jj] = phi_grad[ii];
@@ -4601,9 +4906,8 @@ inline
 const Tensor<1,spacedim> &
 FEValuesBase<dim,spacedim>::normal_vector (const unsigned int i) const
 {
-  typedef FEValuesBase<dim,spacedim> FVB;
   Assert (this->update_flags & update_normal_vectors,
-          typename FVB::ExcAccessToUninitializedField("update_normal_vectors"));
+          (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_normal_vectors")));
   Assert (i<this->mapping_output.normal_vectors.size(),
           ExcIndexRange(i, 0, this->mapping_output.normal_vectors.size()));
 
@@ -4683,11 +4987,10 @@ inline
 const Tensor<1,spacedim> &
 FEFaceValuesBase<dim,spacedim>::boundary_form (const unsigned int i) const
 {
-  typedef FEValuesBase<dim,spacedim> FVB;
   Assert (i<this->mapping_output.boundary_forms.size(),
           ExcIndexRange(i, 0, this->mapping_output.boundary_forms.size()));
   Assert (this->update_flags & update_boundary_forms,
-          typename FVB::ExcAccessToUninitializedField("update_boundary_forms"));
+          (typename FEValuesBase<dim,spacedim>::ExcAccessToUninitializedField("update_boundary_forms")));
 
   return this->mapping_output.boundary_forms[i];
 }

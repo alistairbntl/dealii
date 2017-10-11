@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2008 - 2015 by the deal.II authors
+ * Copyright (C) 2008 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -163,7 +163,7 @@ void generate_grid(parallel::distributed::Triangulation<3> &triangulation, int o
   triangulation.create_triangulation(vertices, cells, SubCellData());
 }
 
-template<int dim>
+template <int dim>
 void check
 (const unsigned int  orientation,
  bool                reverse)
@@ -288,7 +288,6 @@ int main (int argc, char *argv[])
 
       MPILogInitAll log;
 
-      deallog.threshold_double(1.e-10);
       {
         deallog << "Test for 2D" << std::endl << std::endl;
         for (int i = 0; i < 2; ++i)

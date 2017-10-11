@@ -23,13 +23,11 @@
 #include <deal.II/grid/tria_iterator.h>
 
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
 #include <string>
 
 
-template<int dim>
+template <int dim>
 void check()
 {
   Triangulation<dim> tr;
@@ -75,9 +73,7 @@ int main()
 {
   deal_II_exceptions::disable_abort_on_exception();
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   check<2>();
   check<3>();

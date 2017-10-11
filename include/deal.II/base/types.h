@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__types_h
-#define dealii__types_h
+#ifndef dealii_types_h
+#define dealii_types_h
 
 
 #include <deal.II/base/config.h>
@@ -107,7 +107,7 @@ namespace types
    * @see
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
    */
-  typedef unsigned char boundary_id;
+  typedef unsigned int boundary_id;
 
   /**
    * The type used to denote manifold indicators associated with every object
@@ -126,8 +126,11 @@ namespace types
    *
    * There is a special value, numbers::invalid_material_id that is used to
    * indicate an invalid value of this type.
+   *
+   * @see
+   * @ref GlossMaterialId "Glossary entry on material indicators"
    */
-  typedef unsigned char material_id;
+  typedef unsigned int material_id;
 }
 
 /**

@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__petsc_precondition_h
-#define dealii__petsc_precondition_h
+#ifndef dealii_petsc_precondition_h
+#define dealii_petsc_precondition_h
 
 
 #include <deal.II/base/config.h>
@@ -64,6 +64,12 @@ namespace PETScWrappers
      * Destructor.
      */
     virtual ~PreconditionerBase ();
+
+    /**
+     * Destroys the preconditioner, leaving an object like just after having
+     * called the constructor.
+     */
+    void clear ();
 
     /**
      * Apply the preconditioner once to the given src vector.
@@ -135,7 +141,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionJacobi ();
+    PreconditionJacobi () = default;
 
 
     /**
@@ -209,7 +215,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionBlockJacobi ();
+    PreconditionBlockJacobi () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -256,9 +262,7 @@ namespace PETScWrappers
    * A class that implements the interface to use the PETSc SOR
    * preconditioner.
    *
-   * See the comment in the base class
-   * @ref PreconditionerBase
-   * for when this preconditioner may or may not work.
+   * @note Only works in serial with a PETScWrappers::SparseMatrix.
    *
    * @ingroup PETScWrappers
    * @author Wolfgang Bangerth, Timo Heister, 2004, 2011
@@ -287,7 +291,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionSOR ();
+    PreconditionSOR () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -318,9 +322,7 @@ namespace PETScWrappers
    * A class that implements the interface to use the PETSc SSOR
    * preconditioner.
    *
-   * See the comment in the base class
-   * @ref PreconditionerBase
-   * for when this preconditioner may or may not work.
+   * @note Only works in serial with a PETScWrappers::SparseMatrix.
    *
    * @ingroup PETScWrappers
    * @author Wolfgang Bangerth, Timo Heister, 2004, 2011
@@ -349,7 +351,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionSSOR ();
+    PreconditionSSOR () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -378,7 +380,8 @@ namespace PETScWrappers
 
   /**
    * A class that implements the interface to use the PETSc Eisenstat
-   * preconditioner.
+   * preconditioner, which implements SSOR on the diagonal block owned by
+   * each processor.
    *
    * See the comment in the base class
    * @ref PreconditionerBase
@@ -411,7 +414,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionEisenstat ();
+    PreconditionEisenstat () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -442,9 +445,7 @@ namespace PETScWrappers
    * A class that implements the interface to use the PETSc Incomplete
    * Cholesky preconditioner.
    *
-   * See the comment in the base class
-   * @ref PreconditionerBase
-   * for when this preconditioner may or may not work.
+   * @note Only works in serial with a PETScWrappers::SparseMatrix.
    *
    * @ingroup PETScWrappers
    * @author Wolfgang Bangerth, Timo Heister, 2004, 2011
@@ -473,7 +474,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionICC ();
+    PreconditionICC () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -504,9 +505,7 @@ namespace PETScWrappers
    * A class that implements the interface to use the PETSc ILU
    * preconditioner.
    *
-   * See the comment in the base class
-   * @ref PreconditionerBase
-   * for when this preconditioner may or may not work.
+   * @note Only works in serial with a PETScWrappers::SparseMatrix.
    *
    * @ingroup PETScWrappers
    * @author Wolfgang Bangerth, Timo Heister, 2004, 2011
@@ -535,7 +534,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionILU ();
+    PreconditionILU () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -567,9 +566,7 @@ namespace PETScWrappers
    * The LU decomposition is only implemented for single processor machines.
    * It should provide a convenient interface to another direct solver.
    *
-   * See the comment in the base class
-   * @ref PreconditionerBase
-   * for when this preconditioner may or may not work.
+   * @note Only works in serial with a PETScWrappers::SparseMatrix.
    *
    * @ingroup PETScWrappers
    * @author Oliver Kayser-Herold, 2004
@@ -585,7 +582,7 @@ namespace PETScWrappers
     {
       /**
        * Constructor. (Default values taken from function PCCreate_LU of the
-       * PetSC lib.)
+       * PETSc lib.)
        */
       AdditionalData (const double pivoting = 1.e-6,
                       const double zero_pivot = 1.e-12,
@@ -593,20 +590,20 @@ namespace PETScWrappers
 
       /**
        * Determines, when Pivoting is done during LU decomposition. 0.0
-       * indicates no pivoting, and 1.0 complete pivoting. Confer PetSC manual
+       * indicates no pivoting, and 1.0 complete pivoting. Confer PETSc manual
        * for more details.
        */
       double pivoting;
 
       /**
-       * Size at which smaller pivots are declared to be zero. Confer PetSC
+       * Size at which smaller pivots are declared to be zero. Confer PETSc
        * manual for more details.
        */
       double zero_pivot;
 
       /**
        * This quantity is added to the diagonal of the matrix during
-       * factorisation.
+       * factorization.
        */
       double damping;
     };
@@ -615,7 +612,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionLU ();
+    PreconditionLU () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -721,7 +718,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionBoomerAMG ();
+    PreconditionBoomerAMG () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -862,7 +859,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionParaSails ();
+    PreconditionParaSails () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,
@@ -909,7 +906,7 @@ namespace PETScWrappers
      * Empty Constructor. You need to call initialize() before using this
      * object.
      */
-    PreconditionNone ();
+    PreconditionNone () = default;
 
     /**
      * Constructor. Take the matrix which is used to form the preconditioner,

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,13 +13,12 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mg_level_object_h
-#define dealii__mg_level_object_h
+#ifndef dealii_mg_level_object_h
+#define dealii_mg_level_object_h
 
 #include <deal.II/base/subscriptor.h>
 #include <vector>
-
-#include <deal.II/base/std_cxx11/shared_ptr.h>
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -44,7 +43,7 @@ DEAL_II_NAMESPACE_OPEN
  * @ingroup data
  * @author Wolfgang Bangerth, Guido Kanschat, 1999, 2005, 2010
  */
-template<class Object>
+template <class Object>
 class MGLevelObject : public Subscriptor
 {
 public:
@@ -106,11 +105,26 @@ public:
   MGLevelObject<Object> &operator = (const double d);
 
   /**
-   * Call @p clear on all objects stored by this object. This function is only
-   * implemented for some @p Object classes, e.g. the PreconditionBlockSOR and
-   * similar classes.
+   * Call @p clear on all objects stored by this object. This function
+   * is only implemented for some @p Object classes, e.g., matrix
+   * types or the PreconditionBlockSOR and similar classes. Using this
+   * function will fail with a compiler error if the @p Object
+   * template type to this class does not provide a
+   * <code>clear()</code> member function.
+   *
+   * @deprecated Use clear_elements () instead
    */
-  void clear();
+  void clear() DEAL_II_DEPRECATED;
+
+  /**
+   * Call @p clear on all objects stored by this object. This function
+   * is only implemented for some @p Object classes, e.g., matrix
+   * types or the PreconditionBlockSOR and similar classes. Using this
+   * function will fail with a compiler error if the @p Object
+   * template type to this class does not provide a
+   * <code>clear()</code> member function.
+   */
+  void clear_elements();
 
   /**
    * The coarsest level for which this class stores a level object.
@@ -121,6 +135,19 @@ public:
    * The highest level for which this class stores a level object.
    */
   unsigned int max_level () const;
+
+  /**
+   * Apply the action @p action to every object stored in here. The
+   * parameter @p action is expected to be a function object that accepts
+   * the syntax
+   * <code>
+   *   action(const unsigned int level, Object &object);
+   * </code>
+   * This means this function can accept a lambda, a std::function, or a plain
+   * function pointer.
+   */
+  template <typename ActionFunctionObjectType>
+  void apply (ActionFunctionObjectType action);
 
   /**
    * Memory used by this object.
@@ -136,14 +163,14 @@ private:
   /**
    * Array of the objects to be held.
    */
-  std::vector<std_cxx11::shared_ptr<Object> > objects;
+  std::vector<std::shared_ptr<Object> > objects;
 };
 
 
 /* ------------------------------------------------------------------- */
 
 
-template<class Object>
+template <class Object>
 MGLevelObject<Object>::MGLevelObject(const unsigned int min,
                                      const unsigned int max)
   :
@@ -153,7 +180,7 @@ MGLevelObject<Object>::MGLevelObject(const unsigned int min,
 }
 
 
-template<class Object>
+template <class Object>
 Object &
 MGLevelObject<Object>::operator[] (const unsigned int i)
 {
@@ -163,7 +190,7 @@ MGLevelObject<Object>::operator[] (const unsigned int i)
 }
 
 
-template<class Object>
+template <class Object>
 const Object &
 MGLevelObject<Object>::operator[] (const unsigned int i) const
 {
@@ -173,7 +200,7 @@ MGLevelObject<Object>::operator[] (const unsigned int i) const
 }
 
 
-template<class Object>
+template <class Object>
 void
 MGLevelObject<Object>::resize (const unsigned int new_minlevel,
                                const unsigned int new_maxlevel)
@@ -187,32 +214,41 @@ MGLevelObject<Object>::resize (const unsigned int new_minlevel,
 
   minlevel = new_minlevel;
   for (unsigned int i=0; i<new_maxlevel-new_minlevel+1; ++i)
-    objects.push_back(std_cxx11::shared_ptr<Object> (new Object));
+    objects.push_back(std::shared_ptr<Object> (new Object));
 }
 
 
-template<class Object>
+template <class Object>
 MGLevelObject<Object> &
 MGLevelObject<Object>::operator = (const double d)
 {
-  typename std::vector<std_cxx11::shared_ptr<Object> >::iterator v;
+  typename std::vector<std::shared_ptr<Object> >::iterator v;
   for (v = objects.begin(); v != objects.end(); ++v)
     **v=d;
   return *this;
 }
 
 
-template<class Object>
+template <class Object>
 void
-MGLevelObject<Object>::clear ()
+MGLevelObject<Object>::clear () // DEPRECATED
 {
-  typename std::vector<std_cxx11::shared_ptr<Object> >::iterator v;
+  // Avoid code duplication in deprecated call by calling replacing function
+  clear_elements();
+}
+
+
+template <class Object>
+void
+MGLevelObject<Object>::clear_elements ()
+{
+  typename std::vector<std::shared_ptr<Object> >::iterator v;
   for (v = objects.begin(); v != objects.end(); ++v)
     (*v)->clear();
 }
 
 
-template<class Object>
+template <class Object>
 unsigned int
 MGLevelObject<Object>::min_level () const
 {
@@ -220,20 +256,31 @@ MGLevelObject<Object>::min_level () const
 }
 
 
-template<class Object>
+template <class Object>
 unsigned int
 MGLevelObject<Object>::max_level () const
 {
   return minlevel + objects.size() - 1;
 }
 
+template <class Object>
+template <typename ActionFunctionObjectType>
+void
+MGLevelObject<Object>::apply (ActionFunctionObjectType action)
+{
+  for (unsigned int lvl = min_level(); lvl <= max_level(); ++lvl)
+    {
+      action (lvl, (*this)[lvl]);
+    }
+}
 
-template<class Object>
+
+template <class Object>
 std::size_t
 MGLevelObject<Object>::memory_consumption () const
 {
   std::size_t result = sizeof(*this);
-  typedef typename std::vector<std_cxx11::shared_ptr<Object> >::const_iterator Iter;
+  typedef typename std::vector<std::shared_ptr<Object> >::const_iterator Iter;
   const Iter end = objects.end();
   for (Iter o=objects.begin(); o!=end; ++o)
     result += (*o)->memory_consumption();

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,7 +23,6 @@
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/grid_generator.h>
 
-#include <fstream>
 
 
 void test ()
@@ -32,13 +31,13 @@ void test ()
   GridGenerator::hyper_cube (tria);
   tria.refine_global (2);
 
-  for (typename Triangulation<2>::vertex_iterator
+  for (Triangulation<2>::vertex_iterator
        vertex_it = tria.begin_vertex(); vertex_it != tria.end_vertex();
        ++vertex_it)
     deallog << vertex_it->center() <<std::endl;
   deallog << std::endl;
 
-  for (typename Triangulation<2>::active_cell_iterator
+  for (Triangulation<2>::active_cell_iterator
        cell = tria.begin_active(); cell != tria.end(); ++cell)
     {
       for (unsigned int i=0; i<4; ++i)
@@ -46,7 +45,7 @@ void test ()
       deallog << std::endl;
     }
 
-  for (typename Triangulation<2>::active_cell_iterator
+  for (Triangulation<2>::active_cell_iterator
        cell = tria.begin_active(); cell != tria.end(); ++cell)
     for (unsigned int i=0; i<4; ++i)
       {
@@ -60,8 +59,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   test ();
 

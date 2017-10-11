@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__number_cache_h
-#define dealii__number_cache_h
+#ifndef dealii_number_cache_h
+#define dealii_number_cache_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/index_set.h>
@@ -38,6 +38,54 @@ namespace internal
        * Default constructor.
        */
       NumberCache ();
+
+      /**
+       * Copy constructor. Simply copy all members of the referenced
+       * object to the current object.
+       */
+      NumberCache (const NumberCache &) = default;
+
+      /**
+       * Move constructor. Simply move all members of the referenced
+       * object to the current object.
+       */
+      NumberCache (NumberCache &&) = default;
+
+      /**
+       * Create a NumberCache object that corresponds to a sequential
+       * DoFHandler object in which a single processor stores all
+       * degrees of freedom.
+       */
+      NumberCache (const types::global_dof_index n_global_dofs);
+
+
+      /**
+       * Create a NumberCache object that corresponds to a parallel
+       * DoFHandler object with as many processors as the size of the
+       * given argument, in which each processor stores the degrees
+       * of freedom indicated in the corresponding element of the
+       * vector passed as first argument. The second argument indicates
+       * the rank among all participating processors the current
+       * processor has, so that we can set the @p locally_owned_dofs
+       * and @p n_locally_owned_dofs fields.
+       *
+       * All other fields stored by the current object can be and are computed
+       * from the argument.
+       */
+      NumberCache (const std::vector<IndexSet> &locally_owned_dofs_per_processor,
+                   const unsigned int           my_rank);
+
+      /**
+       * Copy operator. Simply copy all members of the referenced
+       * object to the current object.
+       */
+      NumberCache &operator= (const NumberCache &) = default;
+
+      /**
+       * Move assignment operator. Simply move all members of the referenced
+       * object to the current object.
+       */
+      NumberCache &operator= (NumberCache &&) = default;
 
       /**
        * Determine an estimate for the memory consumption (in bytes) of this
@@ -110,4 +158,4 @@ namespace internal
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif // dealii__dof_iterator_selector_h
+#endif // dealii_dof_iterator_selector_h

@@ -15,7 +15,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria.h>
@@ -70,7 +69,6 @@ int main ()
 {
   deallog << std::setprecision (2);
   deallog.attach (logfile);
-  deallog.threshold_double (1e-12);
 
   FE_Nedelec<2> fe_2 (1);
 

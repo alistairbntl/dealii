@@ -29,7 +29,6 @@
 // one thread.
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/multithread_info.h>
@@ -40,10 +39,9 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_q.h>
 
-#include <fstream>
 
 
-template<int dim>
+template <int dim>
 void test (const Triangulation<dim> &tr)
 {
   FE_Q<dim> fe(2);
@@ -128,7 +126,6 @@ int main()
   MultithreadInfo::set_thread_limit(1);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test();
 }

@@ -19,7 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -27,12 +26,11 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 
-#include <fstream>
 
 
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   Triangulation<dim> triangulation (Triangulation<dim>::limit_level_difference_at_vertices);
@@ -62,7 +60,7 @@ void test()
       std::sort(coarse_cells.begin(), coarse_cells.end());
 
       for (unsigned int i=0; i<patch_cells.size(); ++i)
-        Assert (patch_cells[i]==coarse_cells[i] ,ExcInternalError());
+        Assert (patch_cells[i]==coarse_cells[i],ExcInternalError());
 
       deallog << "coarse_ cells " << cell << ": ";
       for (unsigned int i=0; i<coarse_cells.size(); ++i)
@@ -79,7 +77,6 @@ void test()
 int main()
 {
   initlog();
-  deallog.threshold_double(1.e-10);
 
   deallog.push("1d");
   test<1>();

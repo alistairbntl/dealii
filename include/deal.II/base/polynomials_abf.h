@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__polynomials_abf_h
-#define dealii__polynomials_abf_h
+#ifndef dealii_polynomials_abf_h
+#define dealii_polynomials_abf_h
 
 
 #include <deal.II/base/config.h>
@@ -27,6 +27,7 @@
 #include <deal.II/base/table.h>
 #include <deal.II/base/thread_management.h>
 
+#include <memory>
 #include <vector>
 
 DEAL_II_NAMESPACE_OPEN
@@ -64,12 +65,7 @@ public:
   PolynomialsABF (const unsigned int k);
 
   /**
-   * Destructor deleting the polynomials.
-   */
-  ~PolynomialsABF ();
-
-  /**
-   * Computes the value and the first and second derivatives of each Raviart-
+   * Compute the value and the first and second derivatives of each Raviart-
    * Thomas polynomial at @p unit_point.
    *
    * The size of the vectors must either be zero or equal <tt>n()</tt>.  In
@@ -88,12 +84,12 @@ public:
                 std::vector<Tensor<5,dim> > &fourth_derivatives) const;
 
   /**
-   * Returns the number of ABF polynomials.
+   * Return the number of ABF polynomials.
    */
   unsigned int n () const;
 
   /**
-   * Returns the degree of the ABF space, which is two less than the highest
+   * Return the degree of the ABF space, which is two less than the highest
    * polynomial degree.
    */
   unsigned int degree () const;
@@ -118,9 +114,10 @@ private:
 
   /**
    * An object representing the polynomial space for a single component. We
-   * can re-use it by rotating the coordinates of the evaluation point.
+   * can re-use it for the other vector components by rotating the
+   * coordinates of the evaluation point.
    */
-  AnisotropicPolynomials<dim> *polynomial_space;
+  const AnisotropicPolynomials<dim> polynomial_space;
 
   /**
    * Number of Raviart-Thomas polynomials.

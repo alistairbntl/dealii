@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------
-// $Id$
 //
-// Copyright (C) 2012 - 2016 by the deal.II authors
+// Copyright (C) 2012 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__fe_q_bubbles_h
-#define dealii__fe_q_bubbles_h
+#ifndef dealii_fe_q_bubbles_h
+#define dealii_fe_q_bubbles_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/tensor_product_polynomials_bubbles.h>
@@ -105,33 +104,11 @@ public:
    */
   virtual std::string get_name () const;
 
-  /**
-   * Interpolate a set of scalar values, computed in the generalized support
-   * points.
-   */
-  virtual void interpolate(std::vector<double>       &local_dofs,
-                           const std::vector<double> &values) const;
-
-  /**
-   * Interpolate a set of vector values, computed in the generalized support
-   * points.
-   *
-   * Since a finite element often only interpolates part of a vector,
-   * <tt>offset</tt> is used to determine the first component of the vector to
-   * be interpolated. Maybe consider changing your data structures to use the
-   * next function.
-   */
-  virtual void interpolate(std::vector<double>                &local_dofs,
-                           const std::vector<Vector<double> > &values,
-                           unsigned int offset = 0) const;
-
-  /**
-   * Interpolate a set of vector values, computed in the generalized support
-   * points.
-   */
-  virtual void interpolate(
-    std::vector<double>          &local_dofs,
-    const VectorSlice<const std::vector<std::vector<double> > > &values) const;
+  // documentation inherited from the base class
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
 
   /**
    * Return the matrix interpolating from the given finite element to the
@@ -165,18 +142,14 @@ public:
   virtual bool has_support_on_face (const unsigned int shape_index,
                                     const unsigned int face_index) const;
 
-protected:
-  /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim,spacedim> *clone() const;
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
 private:
 
   /**
-   * Returns the restriction_is_additive flags. Only the last components for
+   * Return the restriction_is_additive flags. Only the last components for
    * the bubble enrichments are true.
    */
   static std::vector<bool> get_riaf_vector(const unsigned int degree);

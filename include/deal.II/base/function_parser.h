@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__function_parser_h
-#define dealii__function_parser_h
+#ifndef dealii_function_parser_h
+#define dealii_function_parser_h
 
 
 #include <deal.II/base/config.h>
@@ -25,6 +25,7 @@
 #include <deal.II/base/thread_local_storage.h>
 #include <vector>
 #include <map>
+#include <memory>
 
 namespace mu
 {
@@ -45,6 +46,20 @@ template <typename> class Vector;
  * refer to the muparser documentation for more information.  This class is
  * used in the step-33 and step-36 tutorial programs (the latter being much
  * simpler to understand).
+ *
+ * In addition to the built-in functions of muparser, namely
+ * @code
+ * sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh,
+ * atan2, log2, log10, log, ln, exp, sqrt, sign, rint, abs, min, max, sum, avg
+ * @endcode
+ * this class also supports:
+ * - <tt>if(condition, then-value, else-value)</tt>
+ * - <tt>|</tt> and <tt>&</tt> (logic or and and)
+ * - <tt>int(x)</tt>, <tt>ceil(x)</tt>, <tt>floor(x)</tt> (rounding)
+ * - <tt>cot(x)</tt>, <tt>csc(x)</tt>, <tt>sec(x)</tt>
+ * - <tt>pow(x,n)</tt>, <tt>log(x)</tt>
+ * - <tt>erfc(x)</tt>
+ * - <tt>rand()</tt>, <tt>rand_seed(seed)</tt>
  *
  * The following examples shows how to use this class:
  * @code
@@ -130,7 +145,7 @@ template <typename> class Vector;
  * An example of time dependent scalar function is the following:
  * @code
  *    // Empty constants object
- *    std::map<std::string> constants;
+ *    std::map<std::string,double> constants;
  *
  *    // Variables that will be used inside the expressions
  *    std::string variables = "x,y,t";
@@ -155,7 +170,7 @@ template <typename> class Vector;
  * function by using a single string:
  * @code
  *    // Empty constants object
- *    std::map<std::string> constants;
+ *    std::map<std::string,double> constants;
  *
  *    // Variables that will be used inside the expressions
  *    std::string variables = "x,y";
@@ -312,9 +327,18 @@ private:
   mutable Threads::ThreadLocalStorage<std::vector<double> > vars;
 
   /**
-   * The muParser objects for each thread (and one for each component)
+   * The muParser objects for each thread (and one for each component). We are
+   * storing a unique_ptr so that we don't need to include the definition of
+   * mu::Parser in this header.
    */
-  mutable Threads::ThreadLocalStorage<std::vector<mu::Parser> > fp;
+#if TBB_VERSION_MAJOR >= 4
+  mutable Threads::ThreadLocalStorage<std::vector<std::unique_ptr<mu::Parser> > > fp;
+#else
+  // older TBBs have a bug in which they want to return thread-local
+  // objects by value. this doesn't work for std::unique_ptr, so use a
+  // std::shared_ptr
+  mutable Threads::ThreadLocalStorage<std::vector<std::shared_ptr<mu::Parser> > > fp;
+#endif
 
   /**
    * An array to keep track of all the constants, required to initialize fp in

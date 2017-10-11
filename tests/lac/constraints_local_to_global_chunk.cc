@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,7 +24,6 @@
 #include "../tests.h"
 
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/chunk_sparse_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -37,9 +36,8 @@
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/numerics/vector_tools.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -61,14 +59,14 @@ void test (unsigned int chunk_size)
 
   ConstraintMatrix constraints;
   DoFTools::make_hanging_node_constraints (dof, constraints);
-  VectorTools::interpolate_boundary_values (dof, 1, ZeroFunction<dim>(),
+  VectorTools::interpolate_boundary_values (dof, 1, Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close();
 
   SparsityPattern sparsity;
   ChunkSparsityPattern chunk_sparsity;
   {
-    CompressedSimpleSparsityPattern csp (dof.n_dofs(), dof.n_dofs());
+    DynamicSparsityPattern csp (dof.n_dofs(), dof.n_dofs());
     DoFTools::make_sparsity_pattern (dof, csp, constraints, false);
     sparsity.copy_from (csp);
     chunk_sparsity.copy_from (csp, chunk_size);
@@ -118,7 +116,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-14);
 
   test<2>(1);
   test<2>(2);

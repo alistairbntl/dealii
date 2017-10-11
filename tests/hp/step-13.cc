@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,14 +19,11 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/table_handler.h>
 #include <deal.II/base/thread_management.h>
 #include <deal.II/lac/vector.h>
@@ -51,7 +48,6 @@ std::ofstream logfile("output");
 #include <deal.II/numerics/error_estimator.h>
 
 #include <iostream>
-#include <fstream>
 #include <list>
 #include <sstream>
 
@@ -524,7 +520,7 @@ namespace LaplaceSolver
   assemble_rhs (Vector<double> &rhs) const
   {
     hp::FEValues<dim> fe_values (*this->fe, *this->quadrature,
-                                 update_values | update_q_points  |
+                                 update_values | update_quadrature_points  |
                                  update_JxW_values);
 
     const unsigned int   dofs_per_cell = (*this->fe)[0].dofs_per_cell;
@@ -762,7 +758,7 @@ void solve_problem (const std::string &solver_name)
   const RightHandSide<dim> rhs_function;
   const Solution<dim>      boundary_values;
 
-  LaplaceSolver::Base<dim> *solver = 0;
+  LaplaceSolver::Base<dim> *solver = nullptr;
   if (solver_name == "global")
     solver = new LaplaceSolver::RefinementGlobal<dim> (triangulation, fe,
                                                        quadrature,
@@ -806,7 +802,6 @@ int main ()
       deallog << std::setprecision(2);
 
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       solve_problem<2> ("global");
       solve_problem<2> ("kelly");

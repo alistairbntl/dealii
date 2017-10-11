@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -38,7 +38,6 @@ const bool errors = false;
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/fe/fe_values.h>
 #include <vector>
-#include <fstream>
 #include <string>
 
 
@@ -65,7 +64,7 @@ check (const unsigned int level,
 
   FEValues<dim> fe (mapping, element, quadrature,
                     update_values
-                    | update_q_points | update_JxW_values);
+                    | update_quadrature_points | update_JxW_values);
 
   std::vector <types::global_dof_index> global_dofs (element.dofs_per_cell);
   std::vector <double> function (quadrature.size());
@@ -118,8 +117,8 @@ check (const unsigned int level,
 
   FEValues<dim> fe2 (mapping, element, quadrature,
                      update_values | update_gradients
-                     | update_second_derivatives
-                     | update_q_points | update_JxW_values);
+                     | update_hessians
+                     | update_quadrature_points | update_JxW_values);
 
   double l2 = 0.;
   double h1 = 0.;
@@ -200,6 +199,12 @@ void loop ()
         check (1, *maps[m], *elements[e], gauss);
 //      check (2, *maps[m], *elements[e], gauss);
       }
+
+  for (unsigned int m=0; m<maps.size(); ++m)
+    delete maps[m];
+
+  for (unsigned int e=0; e<elements.size(); ++e)
+    delete elements[e];
 }
 
 
@@ -209,7 +214,6 @@ int main ()
   deallog << std::setprecision (2);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push ("1d");
   loop<1> ();

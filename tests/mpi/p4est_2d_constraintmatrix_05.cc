@@ -20,7 +20,6 @@
 // correctly
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/numerics/vector_tools.h>
 
@@ -33,7 +32,7 @@
 #include <deal.II/fe/fe_q.h>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   parallel::distributed::Triangulation<dim> tr(MPI_COMM_WORLD);
@@ -58,7 +57,7 @@ void test()
   TrilinosWrappers::MPI::Vector x_ref;
   x_ref.reinit(owned_set, MPI_COMM_WORLD);
   VectorTools::interpolate(dofh,
-                           ConstantFunction<dim> (1.),
+                           Functions::ConstantFunction<dim> (1.),
                            x_ref);
 
   TrilinosWrappers::MPI::Vector x1 (x_ref);
@@ -106,9 +105,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

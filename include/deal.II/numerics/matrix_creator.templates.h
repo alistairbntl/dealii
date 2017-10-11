@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2016 by the deal.II authors
+// Copyright (C) 2016 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__matrix_creator_templates_h
-#define dealii__matrix_creator_templates_h
+#ifndef dealii_matrix_creator_templates_h
+#define dealii_matrix_creator_templates_h
 
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature.h>
@@ -41,7 +41,7 @@
 #  include <deal.II/lac/petsc_parallel_sparse_matrix.h>
 #  include <deal.II/lac/petsc_sparse_matrix.h>
 #  include <deal.II/lac/petsc_parallel_vector.h>
-#  include <deal.II/lac/petsc_vector.h>
+#  include <deal.II/lac/petsc_parallel_vector.h>
 #  include <deal.II/lac/petsc_parallel_block_sparse_matrix.h>
 #endif
 
@@ -49,10 +49,8 @@
 #  include <deal.II/lac/trilinos_sparse_matrix.h>
 #  include <deal.II/lac/trilinos_vector.h>
 #  include <deal.II/lac/trilinos_block_sparse_matrix.h>
-#  include <deal.II/lac/trilinos_block_vector.h>
+#  include <deal.II/lac/trilinos_parallel_block_vector.h>
 #endif
-
-#include <algorithm>
 
 
 #include <algorithm>
@@ -185,6 +183,13 @@ namespace MatrixCreator
           update_flags (data.update_flags)
         {}
 
+        Scratch &operator = (const Scratch &)
+        {
+          Assert (false, ExcNotImplemented());
+          return *this;
+        }
+
+
         const ::dealii::hp::FECollection<dim,spacedim>      &fe_collection;
         const ::dealii::hp::QCollection<dim>                &quadrature_collection;
         const ::dealii::hp::MappingCollection<dim,spacedim> &mapping_collection;
@@ -230,11 +235,11 @@ namespace MatrixCreator
       const FiniteElement<dim,spacedim> &fe  = fe_values.get_fe();
       const unsigned int n_components  = fe.n_components();
 
-      Assert(data.rhs_function == 0 ||
+      Assert(data.rhs_function == nullptr ||
              data.rhs_function->n_components==1 ||
              data.rhs_function->n_components==n_components,
              ::dealii::MatrixCreator::ExcComponentMismatch());
-      Assert(data.coefficient == 0 ||
+      Assert(data.coefficient == nullptr ||
              data.coefficient->n_components==1 ||
              data.coefficient->n_components==n_components,
              ::dealii::MatrixCreator::ExcComponentMismatch());
@@ -245,7 +250,7 @@ namespace MatrixCreator
       copy_data.dof_indices.resize (dofs_per_cell);
       cell->get_dof_indices (copy_data.dof_indices);
 
-      const bool use_rhs_function = data.rhs_function != 0;
+      const bool use_rhs_function = data.rhs_function != nullptr;
       if (use_rhs_function)
         {
           if (data.rhs_function->n_components==1)
@@ -263,7 +268,7 @@ namespace MatrixCreator
             }
         }
 
-      const bool use_coefficient = data.coefficient != 0;
+      const bool use_coefficient = data.coefficient != nullptr;
       if (use_coefficient)
         {
           if (data.coefficient->n_components==1)
@@ -413,11 +418,11 @@ namespace MatrixCreator
       const FiniteElement<dim,spacedim>    &fe  = fe_values.get_fe();
       const unsigned int n_components  = fe.n_components();
 
-      Assert(data.rhs_function == 0 ||
+      Assert(data.rhs_function == nullptr ||
              data.rhs_function->n_components==1 ||
              data.rhs_function->n_components==n_components,
              ::dealii::MatrixCreator::ExcComponentMismatch());
-      Assert(data.coefficient == 0 ||
+      Assert(data.coefficient == nullptr ||
              data.coefficient->n_components==1 ||
              data.coefficient->n_components==n_components,
              ::dealii::MatrixCreator::ExcComponentMismatch());
@@ -428,7 +433,7 @@ namespace MatrixCreator
       cell->get_dof_indices (copy_data.dof_indices);
 
 
-      const bool use_rhs_function = data.rhs_function != 0;
+      const bool use_rhs_function = data.rhs_function != nullptr;
       if (use_rhs_function)
         {
           if (data.rhs_function->n_components==1)
@@ -446,7 +451,7 @@ namespace MatrixCreator
             }
         }
 
-      const bool use_coefficient = data.coefficient != 0;
+      const bool use_coefficient = data.coefficient != nullptr;
       if (use_coefficient)
         {
           if (data.coefficient->n_components==1)
@@ -593,12 +598,12 @@ namespace MatrixCreator
               ExcInternalError());
       Assert (data.cell_matrix.n() == dofs_per_cell,
               ExcInternalError());
-      Assert ((right_hand_side == 0)
+      Assert ((right_hand_side == nullptr)
               ||
               (data.cell_rhs.size() == dofs_per_cell),
               ExcInternalError());
 
-      if (right_hand_side != 0)
+      if (right_hand_side != nullptr)
         data.constraints->distribute_local_to_global(data.cell_matrix,
                                                      data.cell_rhs,
                                                      data.dof_indices,
@@ -615,13 +620,13 @@ namespace MatrixCreator
     {
       struct Scratch
       {
-        Scratch() {}
+        Scratch() = default;
       };
 
       template <typename DoFHandlerType, typename number>
       struct CopyData
       {
-        CopyData() {};
+        CopyData();
 
         CopyData(CopyData const &data);
 
@@ -633,8 +638,17 @@ namespace MatrixCreator
         std::vector<Vector<number> > cell_vector;
       };
 
+
       template <typename DoFHandlerType, typename number>
-      CopyData<DoFHandlerType,number>::CopyData(CopyData const &data) :
+      CopyData<DoFHandlerType,number>::CopyData()
+        :
+        dofs_per_cell(numbers::invalid_unsigned_int)
+      {}
+
+
+      template <typename DoFHandlerType, typename number>
+      CopyData<DoFHandlerType,number>::CopyData(CopyData const &data)
+        :
         dofs_per_cell(data.dofs_per_cell),
         dofs(data.dofs),
         dof_is_on_face(data.dof_is_on_face),
@@ -669,8 +683,8 @@ namespace MatrixCreator
     MatrixCreator::internal::AssemblerData::Scratch<dim, spacedim,number>
     assembler_data (fe_collection,
                     update_values | update_JxW_values |
-                    (coefficient != 0 ? update_quadrature_points : UpdateFlags(0)),
-                    coefficient, /*rhs_function=*/0,
+                    (coefficient != nullptr ? update_quadrature_points : UpdateFlags(0)),
+                    coefficient, /*rhs_function=*/nullptr,
                     q_collection, mapping_collection);
 
     MatrixCreator::internal::AssemblerData::CopyData<number> copy_data;
@@ -683,9 +697,9 @@ namespace MatrixCreator
     WorkStream::run (dof.begin_active(),
                      static_cast<typename DoFHandler<dim,spacedim>::active_cell_iterator>(dof.end()),
                      &MatrixCreator::internal::mass_assembler<dim, spacedim, typename DoFHandler<dim,spacedim>::active_cell_iterator,number>,
-                     std_cxx11::bind (&MatrixCreator::internal::
-                                      copy_local_to_global<number,SparseMatrix<number>, Vector<number> >,
-                                      std_cxx11::_1, &matrix, (Vector<number> *)0),
+                     std::bind (&MatrixCreator::internal::
+                                copy_local_to_global<number,SparseMatrix<number>, Vector<number> >,
+                                std::placeholders::_1, &matrix, (Vector<number> *)nullptr),
                      assembler_data,
                      copy_data);
   }
@@ -739,9 +753,9 @@ namespace MatrixCreator
     WorkStream::run (dof.begin_active(),
                      static_cast<typename DoFHandler<dim,spacedim>::active_cell_iterator>(dof.end()),
                      &MatrixCreator::internal::mass_assembler<dim, spacedim, typename DoFHandler<dim,spacedim>::active_cell_iterator,number>,
-                     std_cxx11::bind(&MatrixCreator::internal::
-                                     copy_local_to_global<number,SparseMatrix<number>, Vector<number> >,
-                                     std_cxx11::_1, &matrix, &rhs_vector),
+                     std::bind(&MatrixCreator::internal::
+                               copy_local_to_global<number,SparseMatrix<number>, Vector<number> >,
+                               std::placeholders::_1, &matrix, &rhs_vector),
                      assembler_data,
                      copy_data);
   }
@@ -778,10 +792,10 @@ namespace MatrixCreator
             ExcDimensionMismatch (matrix.n(), dof.n_dofs()));
 
     MatrixCreator::internal::AssemblerData::Scratch<dim, spacedim,number>
-    assembler_data (dof.get_fe(),
+    assembler_data (dof.get_fe_collection(),
                     update_values | update_JxW_values |
-                    (coefficient != 0 ? update_quadrature_points : UpdateFlags(0)),
-                    coefficient, /*rhs_function=*/0,
+                    (coefficient != nullptr ? update_quadrature_points : UpdateFlags(0)),
+                    coefficient, /*rhs_function=*/nullptr,
                     q, mapping);
     MatrixCreator::internal::AssemblerData::CopyData<number> copy_data;
     copy_data.cell_matrix.reinit (assembler_data.fe_collection.max_dofs_per_cell(),
@@ -793,9 +807,9 @@ namespace MatrixCreator
     WorkStream::run (dof.begin_active(),
                      static_cast<typename hp::DoFHandler<dim,spacedim>::active_cell_iterator>(dof.end()),
                      &MatrixCreator::internal::mass_assembler<dim, spacedim, typename hp::DoFHandler<dim,spacedim>::active_cell_iterator,number>,
-                     std_cxx11::bind (&MatrixCreator::internal::
-                                      copy_local_to_global<number,SparseMatrix<number>, Vector<number> >,
-                                      std_cxx11::_1, &matrix, (Vector<number> *)0),
+                     std::bind (&MatrixCreator::internal::
+                                copy_local_to_global<number,SparseMatrix<number>, Vector<number> >,
+                                std::placeholders::_1, &matrix, (Vector<number> *)nullptr),
                      assembler_data,
                      copy_data);
   }
@@ -831,7 +845,7 @@ namespace MatrixCreator
             ExcDimensionMismatch (matrix.n(), dof.n_dofs()));
 
     MatrixCreator::internal::AssemblerData::Scratch<dim, spacedim,number>
-    assembler_data (dof.get_fe(),
+    assembler_data (dof.get_fe_collection(),
                     update_values |
                     update_JxW_values | update_quadrature_points,
                     coefficient, &rhs,
@@ -846,9 +860,9 @@ namespace MatrixCreator
     WorkStream::run (dof.begin_active(),
                      static_cast<typename hp::DoFHandler<dim,spacedim>::active_cell_iterator>(dof.end()),
                      &MatrixCreator::internal::mass_assembler<dim, spacedim, typename hp::DoFHandler<dim,spacedim>::active_cell_iterator,number>,
-                     std_cxx11::bind (&MatrixCreator::internal::
-                                      copy_local_to_global<number,SparseMatrix<number>, Vector<number> >,
-                                      std_cxx11::_1, &matrix, &rhs_vector),
+                     std::bind (&MatrixCreator::internal::
+                                copy_local_to_global<number,SparseMatrix<number>, Vector<number> >,
+                                std::placeholders::_1, &matrix, &rhs_vector),
                      assembler_data,
                      copy_data);
   }
@@ -887,8 +901,7 @@ namespace MatrixCreator
                                    std::vector<unsigned int> const &component_mapping)
 
     {
-      // All assertions for this function
-      // are in the calling function
+      // Most assertions for this function are in the calling function
       // before creating threads.
       const unsigned int n_components = fe.n_components();
       const unsigned int n_function_components = boundary_functions.begin()->second->n_components;
@@ -906,14 +919,12 @@ namespace MatrixCreator
                                               update_quadrature_points);
       FEFaceValues<dim,spacedim> fe_values (mapping, fe, q, update_flags);
 
-      // two variables for the coefficient,
-      // one for the two cases indicated in
-      // the name
+      // two variables for the coefficient, one for the two cases
+      // indicated in the name
       std::vector<number>          coefficient_values (fe_values.n_quadrature_points, 1.);
       std::vector<Vector<number> > coefficient_vector_values (fe_values.n_quadrature_points,
                                                               Vector<number>(n_components));
-      const bool coefficient_is_vector = (coefficient != 0 && coefficient->n_components != 1)
-                                         ? true : false;
+      const bool coefficient_is_vector = (coefficient != nullptr && coefficient->n_components != 1);
 
       std::vector<number>          rhs_values_scalar (fe_values.n_quadrature_points);
       std::vector<Vector<number> > rhs_values_system (fe_values.n_quadrature_points,
@@ -924,22 +935,22 @@ namespace MatrixCreator
 
       std::vector<types::global_dof_index> dofs_on_face_vector (dofs_per_face);
 
-      // Because CopyData objects are reused and that push_back is used,
-      // dof_is_on_face, cell_matrix, and cell_vector must be cleared before
-      // they are reused
+      // Because CopyData objects are reused and emplace_back is
+      // used, dof_is_on_face, cell_matrix, and cell_vector must be
+      // cleared before they are reused
       copy_data.dof_is_on_face.clear();
       copy_data.cell_matrix.clear();
       copy_data.cell_vector.clear();
 
       for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-        // check if this face is on that part of
-        // the boundary we are interested in
+        // check if this face is on that part of the boundary we are
+        // interested in
         if (boundary_functions.find(cell->face(face)->boundary_id()) !=
             boundary_functions.end())
           {
-            copy_data.cell_matrix.push_back(FullMatrix<number> (copy_data.dofs_per_cell,
-                                                                copy_data.dofs_per_cell));
-            copy_data.cell_vector.push_back(Vector<number> (copy_data.dofs_per_cell));
+            copy_data.cell_matrix.emplace_back(copy_data.dofs_per_cell,
+                                               copy_data.dofs_per_cell);
+            copy_data.cell_vector.emplace_back(copy_data.dofs_per_cell);
             fe_values.reinit (cell, face);
 
             if (fe_is_system)
@@ -950,36 +961,30 @@ namespace MatrixCreator
                                              rhs_values_system);
 
                 if (coefficient_is_vector)
-                  // If coefficient is
-                  // vector valued, fill
-                  // all components
+                  // If coefficient is vector valued, fill all
+                  // components
                   coefficient->vector_value_list (fe_values.get_quadrature_points(),
                                                   coefficient_vector_values);
                 else
                   {
-                    // If a scalar
-                    // function is
-                    // given, update
-                    // the values, if
-                    // not, use the
-                    // default one set
-                    // in the
+                    // If a scalar function is given, update the
+                    // values, if not, use the default one set in the
                     // constructor above
-                    if (coefficient != 0)
+                    if (coefficient != nullptr)
                       coefficient->value_list (fe_values.get_quadrature_points(),
                                                coefficient_values);
-                    // Copy scalar
-                    // values into vector
+                    // Copy scalar values into vector
                     for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
                       coefficient_vector_values[point] = coefficient_values[point];
                   }
 
-                // Special treatment
-                // for Hdiv and Hcurl
-                // elements, where only
-                // the normal or
-                // tangential component
-                // should be projected.
+                // Special treatment for Hdiv elements,
+                // where only normal components should be projected.
+                // For Hdiv we need to compute (u dot n, v dot n) which
+                // can be done as sum over dim components of
+                // u[c] * n[c] * v[c] * n[c] = u[c] * v[c] * normal_adjustment[c]
+                // Same approach does not work for Hcurl, so we throw an exception.
+                // Default value 1.0 allows for use with non Hdiv elements
                 std::vector<std::vector<double> > normal_adjustment(fe_values.n_quadrature_points,
                                                                     std::vector<double>(n_components, 1.));
 
@@ -987,6 +992,15 @@ namespace MatrixCreator
                   {
                     const FiniteElement<dim,spacedim> &base = fe.base_element(fe.component_to_base_index(comp).first);
                     const unsigned int bcomp = fe.component_to_base_index(comp).second;
+
+                    if (!base.conforms(FiniteElementData<dim>::H1) &&
+                        base.conforms(FiniteElementData<dim>::Hdiv) &&
+                        fe_is_primitive)
+                      Assert(false, ExcNotImplemented());
+
+                    if (!base.conforms(FiniteElementData<dim>::H1) &&
+                        base.conforms(FiniteElementData<dim>::Hcurl))
+                      Assert(false, ExcNotImplemented());
 
                     if (!base.conforms(FiniteElementData<dim>::H1) &&
                         base.conforms(FiniteElementData<dim>::Hdiv))
@@ -1042,7 +1056,7 @@ namespace MatrixCreator
                 boundary_functions.find(cell->face(face)->boundary_id())
                 ->second->value_list (fe_values.get_quadrature_points(), rhs_values_scalar);
 
-                if (coefficient != 0)
+                if (coefficient != nullptr)
                   coefficient->value_list (fe_values.get_quadrature_points(),
                                            coefficient_values);
                 for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
@@ -1063,11 +1077,11 @@ namespace MatrixCreator
 
 
             cell->face(face)->get_dof_indices (dofs_on_face_vector);
-            // for each dof on the cell, have a
-            // flag whether it is on the face
-            copy_data.dof_is_on_face.push_back(std::vector<bool> (copy_data.dofs_per_cell));
-            // check for each of the dofs on this cell
-            // whether it is on the face
+            // for each dof on the cell, have a flag whether it is on
+            // the face
+            copy_data.dof_is_on_face.emplace_back(copy_data.dofs_per_cell);
+            // check for each of the dofs on this cell whether it is
+            // on the face
             for (unsigned int i=0; i<copy_data.dofs_per_cell; ++i)
               copy_data.dof_is_on_face.back()[i] = (std::find(dofs_on_face_vector.begin(),
                                                               dofs_on_face_vector.end(),
@@ -1177,23 +1191,6 @@ namespace MatrixCreator
       Assert(false,ExcNotImplemented());
     }
 
-    template <>
-    void
-    inline
-    create_boundary_mass_matrix_1<1,3,long double> (DoFHandler<1,3>::active_cell_iterator const &/*cell*/,
-                                                    MatrixCreator::internal::AssemblerBoundary::Scratch const &,
-                                                    MatrixCreator::internal::AssemblerBoundary::CopyData<DoFHandler<1,
-                                                    3>,long double > &/*copy_data*/,
-                                                    Mapping<1,3> const &,
-                                                    FiniteElement<1,3> const &,
-                                                    Quadrature<0> const &,
-                                                    std::map<types::boundary_id, const Function<3,long double>*> const &/*boundary_functions*/,
-                                                    Function<3,long double> const *const /*coefficient*/,
-                                                    std::vector<unsigned int> const &/*component_mapping*/)
-    {
-      Assert(false,ExcNotImplemented());
-    }
-
   }
 
 
@@ -1233,7 +1230,7 @@ namespace MatrixCreator
     Assert (boundary_functions.size() != 0, ExcInternalError());
     Assert (dof_to_boundary_mapping.size() == dof.n_dofs(),
             ExcInternalError());
-    Assert (coefficient ==0 ||
+    Assert (coefficient == nullptr ||
             coefficient->n_components==1 ||
             coefficient->n_components==n_components, ExcComponentMismatch());
 
@@ -1250,22 +1247,22 @@ namespace MatrixCreator
     MatrixCreator::internal::AssemblerBoundary::CopyData<DoFHandler<dim,spacedim>,number > copy_data;
 
     WorkStream::run(dof.begin_active(),dof.end(),
-                    static_cast<std_cxx11::function<void (typename DoFHandler<dim,spacedim>::active_cell_iterator
-                                                          const &,MatrixCreator::internal::AssemblerBoundary::Scratch const &,
-                                                          MatrixCreator::internal::AssemblerBoundary::CopyData<DoFHandler<dim,spacedim>,number > &)> >
-                    (std_cxx11::bind(&internal::create_boundary_mass_matrix_1<dim,spacedim,number>,std_cxx11::_1,std_cxx11::_2,
-                                     std_cxx11::_3,
-                                     std_cxx11::cref(mapping),std_cxx11::cref(fe),std_cxx11::cref(q),
-                                     std_cxx11::cref(boundary_functions),coefficient,
-                                     std_cxx11::cref(component_mapping))),
-                    static_cast<std_cxx11::function<void (MatrixCreator::internal::AssemblerBoundary
-                                                          ::CopyData<DoFHandler<dim,spacedim>,number> const &)> > (std_cxx11::bind(
-                                                                &internal::copy_boundary_mass_matrix_1<dim,spacedim,number>,
-                                                                std_cxx11::_1,
-                                                                std_cxx11::cref(boundary_functions),
-                                                                std_cxx11::cref(dof_to_boundary_mapping),
-                                                                std_cxx11::ref(matrix),
-                                                                std_cxx11::ref(rhs_vector))),
+                    static_cast<std::function<void (typename DoFHandler<dim,spacedim>::active_cell_iterator
+                                                    const &,MatrixCreator::internal::AssemblerBoundary::Scratch const &,
+                                                    MatrixCreator::internal::AssemblerBoundary::CopyData<DoFHandler<dim,spacedim>,number > &)> >
+                    (std::bind(&internal::create_boundary_mass_matrix_1<dim,spacedim,number>,std::placeholders::_1,std::placeholders::_2,
+                               std::placeholders::_3,
+                               std::cref(mapping),std::cref(fe),std::cref(q),
+                               std::cref(boundary_functions),coefficient,
+                               std::cref(component_mapping))),
+                    static_cast<std::function<void (MatrixCreator::internal::AssemblerBoundary
+                                                    ::CopyData<DoFHandler<dim,spacedim>,number> const &)> > (std::bind(
+                                                          &internal::copy_boundary_mass_matrix_1<dim,spacedim,number>,
+                                                          std::placeholders::_1,
+                                                          std::cref(boundary_functions),
+                                                          std::cref(dof_to_boundary_mapping),
+                                                          std::ref(matrix),
+                                                          std::ref(rhs_vector))),
                     scratch,
                     copy_data);
   }
@@ -1291,8 +1288,9 @@ namespace MatrixCreator
     {
       const unsigned int n_components  = fe_collection.n_components();
       const unsigned int n_function_components = boundary_functions.begin()->second->n_components;
-      const bool         fe_is_system  = (n_components != 1);
       const FiniteElement<dim,spacedim> &fe = cell->get_fe();
+      const bool         fe_is_system  = (n_components != 1);
+      const bool         fe_is_primitive = fe.is_primitive();
       const unsigned int dofs_per_face = fe.dofs_per_face;
 
       copy_data.cell = cell;
@@ -1303,6 +1301,7 @@ namespace MatrixCreator
 
       UpdateFlags update_flags = UpdateFlags (update_values     |
                                               update_JxW_values |
+                                              update_normal_vectors |
                                               update_quadrature_points);
       hp::FEFaceValues<dim,spacedim> x_fe_values (mapping, fe_collection, q, update_flags);
 
@@ -1311,6 +1310,8 @@ namespace MatrixCreator
       // the name
       std::vector<number>          coefficient_values;
       std::vector<Vector<number> > coefficient_vector_values;
+
+      const bool coefficient_is_vector = (coefficient != nullptr && coefficient->n_components != 1);
 
       std::vector<number>          rhs_values_scalar;
       std::vector<Vector<number> > rhs_values_system;
@@ -1338,148 +1339,148 @@ namespace MatrixCreator
 
             const FEFaceValues<dim,spacedim> &fe_values = x_fe_values.get_present_fe_values ();
 
-            copy_data.cell_matrix.push_back(FullMatrix<number> (copy_data.dofs_per_cell,
-                                                                copy_data.dofs_per_cell));
-            copy_data.cell_vector.push_back(Vector<number> (copy_data.dofs_per_cell));
+            copy_data.cell_matrix.emplace_back(copy_data.dofs_per_cell,
+                                               copy_data.dofs_per_cell);
+            copy_data.cell_vector.emplace_back(copy_data.dofs_per_cell);
 
             if (fe_is_system)
               // FE has several components
               {
+                coefficient_vector_values.resize (fe_values.n_quadrature_points,
+                                                  Vector<number>(n_components));
+                coefficient_values.resize (fe_values.n_quadrature_points, 1.);
+
                 rhs_values_system.resize (fe_values.n_quadrature_points,
                                           Vector<number>(n_function_components));
                 boundary_functions.find(cell->face(face)->boundary_id())
                 ->second->vector_value_list (fe_values.get_quadrature_points(),
                                              rhs_values_system);
-
-                if (coefficient != 0)
+                if (coefficient_is_vector)
+                  // In case coefficient is vector-valued, fill
+                  // all components
+                  coefficient->vector_value_list (fe_values.get_quadrature_points(),
+                                                  coefficient_vector_values);
+                else
+                  // In case the scalar function is given, update the
+                  // values, if not - use the default (1.0)
                   {
-                    if (coefficient->n_components==1)
-                      {
-                        coefficient_values.resize (fe_values.n_quadrature_points);
-                        coefficient->value_list (fe_values.get_quadrature_points(),
-                                                 coefficient_values);
-                        for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
-                          {
-                            const double weight = fe_values.JxW(point);
-                            for (unsigned int i=0; i<fe_values.dofs_per_cell; ++i)
-                              {
-                                const double v = fe_values.shape_value(i,point);
-                                for (unsigned int j=0; j<fe_values.dofs_per_cell; ++j)
-                                  if (fe.system_to_component_index(i).first ==
-                                      fe.system_to_component_index(j).first)
-                                    {
-                                      const double u = fe_values.shape_value(j,point);
-                                      copy_data.cell_matrix.back()(i,j)
-                                      += (coefficient_values[point] * u * v * weight);
-                                    }
+                    if (coefficient != nullptr)
+                      coefficient->value_list (fe_values.get_quadrature_points(),
+                                               coefficient_values);
 
-                                copy_data.cell_vector.back()(i) += rhs_values_system[point](
-                                                                     component_mapping[fe.system_to_component_index(i).first])
-                                                                   * weight
-                                                                   * v;
-                              }
-                          }
-                      }
-                    else
-                      {
-                        coefficient_vector_values.resize (fe_values.n_quadrature_points,
-                                                          Vector<number>(n_components));
-                        coefficient->vector_value_list (fe_values.get_quadrature_points(),
-                                                        coefficient_vector_values);
-                        for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
-                          {
-                            const double weight = fe_values.JxW(point);
-                            for (unsigned int i=0; i<fe_values.dofs_per_cell; ++i)
-                              {
-                                const double v = fe_values.shape_value(i,point);
-                                const unsigned int component_i=
-                                  fe.system_to_component_index(i).first;
-                                for (unsigned int j=0; j<fe_values.dofs_per_cell; ++j)
-                                  if (fe.system_to_component_index(j).first ==
-                                      component_i)
-                                    {
-                                      const double u = fe_values.shape_value(j,point);
-                                      copy_data.cell_matrix.back()(i,j) +=
-                                        (coefficient_vector_values[point](component_i) * u * v * weight);
-                                    }
-                                copy_data.cell_vector.back()(i) += rhs_values_system[point](component_mapping[component_i])
-                                                                   * v
-                                                                   * weight;
-                              }
-                          }
-                      }
+                    for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
+                      coefficient_vector_values[point] = coefficient_values[point];
                   }
-                else  //      if (coefficient == 0)
-                  for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
-                    {
-                      const double weight = fe_values.JxW(point);
-                      for (unsigned int i=0; i<fe_values.dofs_per_cell; ++i)
+
+                // Special treatment for Hdiv elements,
+                // where only normal components should be projected.
+                // For Hdiv we need to compute (u dot n, v dot n) which
+                // can be done as sum over dim components of
+                // u[c] * n[c] * v[c] * n[c] = u[c] * v[c] * normal_adjustment[c]
+                // Same approach does not work for Hcurl, so we throw an exception.
+                // Default value 1.0 allows for use with non Hdiv elements
+                std::vector<std::vector<double> > normal_adjustment(fe_values.n_quadrature_points,
+                                                                    std::vector<double>(n_components, 1.));
+
+                for (unsigned int comp = 0; comp<n_components; ++comp)
+                  {
+                    const FiniteElement<dim,spacedim> &base = fe.base_element(fe.component_to_base_index(comp).first);
+                    const unsigned int bcomp = fe.component_to_base_index(comp).second;
+
+                    if (!base.conforms(FiniteElementData<dim>::H1) &&
+                        base.conforms(FiniteElementData<dim>::Hdiv) &&
+                        fe_is_primitive)
+                      Assert(false, ExcNotImplemented());
+
+                    if (!base.conforms(FiniteElementData<dim>::H1) &&
+                        base.conforms(FiniteElementData<dim>::Hcurl))
+                      Assert(false, ExcNotImplemented());
+
+                    if (!base.conforms(FiniteElementData<dim>::H1) &&
+                        base.conforms(FiniteElementData<dim>::Hdiv))
+                      for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
+                        normal_adjustment[point][comp] = fe_values.normal_vector(point)[bcomp]
+                                                         * fe_values.normal_vector(point)[bcomp];
+                  }
+
+                for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
+                  {
+                    const double weight = fe_values.JxW(point);
+                    for (unsigned int i=0; i<fe_values.dofs_per_cell; ++i)
+                      if (fe_is_primitive)
                         {
-                          const double v = fe_values.shape_value(i,point);
                           for (unsigned int j=0; j<fe_values.dofs_per_cell; ++j)
-                            if (fe.system_to_component_index(i).first ==
-                                fe.system_to_component_index(j).first)
-                              {
-                                const double u = fe_values.shape_value(j,point);
-                                copy_data.cell_matrix.back()(i,j) += (u * v * weight);
-                              }
+                            {
+                              if (fe.system_to_component_index(i).first
+                                  == fe.system_to_component_index(j).first)
+                                {
+                                  copy_data.cell_matrix.back()(i,j)
+                                  += coefficient_vector_values[point](fe.system_to_component_index(i).first)
+                                     * fe_values.shape_value(i,point)
+                                     * fe_values.shape_value(j,point)
+                                     * weight;
+                                }
+                            }
+
                           copy_data.cell_vector.back()(i) += rhs_values_system[point](
-                                                               fe.system_to_component_index(i).first) *
-                                                             v *
-                                                             weight;
+                                                               component_mapping[fe.system_to_component_index(i).first])
+                                                             * fe_values.shape_value(i,point)
+                                                             * weight;
                         }
-                    }
+                      else
+                        {
+                          for (unsigned int comp=0; comp<n_components; ++comp)
+                            {
+                              for (unsigned int j=0; j<fe_values.dofs_per_cell; ++j)
+                                copy_data.cell_matrix.back()(i,j)
+                                += coefficient_vector_values[point](comp)
+                                   * fe_values.shape_value_component(i,point,comp)
+                                   * fe_values.shape_value_component(j,point,comp)
+                                   * normal_adjustment[point][comp]
+                                   * weight;
+                              copy_data.cell_vector.back()(i) += rhs_values_system[point](component_mapping[comp])
+                                                                 * fe_values.shape_value_component(i,point,comp)
+                                                                 * normal_adjustment[point][comp]
+                                                                 * weight;
+                            }
+                        }
+                  }
               }
             else
-              // FE is a scalar one
+              // FE is scalar
               {
+                coefficient_values.resize (fe_values.n_quadrature_points, 1.);
                 rhs_values_scalar.resize (fe_values.n_quadrature_points);
                 boundary_functions.find(cell->face(face)->boundary_id())
                 ->second->value_list (fe_values.get_quadrature_points(), rhs_values_scalar);
 
-                if (coefficient != 0)
+                if (coefficient != nullptr)
                   {
                     coefficient_values.resize (fe_values.n_quadrature_points);
                     coefficient->value_list (fe_values.get_quadrature_points(),
                                              coefficient_values);
-                    for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
+                  }
+
+                for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
+                  {
+                    const double weight = fe_values.JxW(point);
+                    for (unsigned int i=0; i<fe_values.dofs_per_cell; ++i)
                       {
-                        const double weight = fe_values.JxW(point);
-                        for (unsigned int i=0; i<fe_values.dofs_per_cell; ++i)
+                        const double v = fe_values.shape_value(i,point);
+                        for (unsigned int j=0; j<fe_values.dofs_per_cell; ++j)
                           {
-                            const double v = fe_values.shape_value(i,point);
-                            for (unsigned int j=0; j<fe_values.dofs_per_cell; ++j)
-                              {
-                                const double u = fe_values.shape_value(j,point);
-                                copy_data.cell_matrix.back()(i,j) += (coefficient_values[point] *
-                                                                      u * v * weight);
-                              }
-                            copy_data.cell_vector.back()(i) += rhs_values_scalar[point] * v * weight;
+                            const double u = fe_values.shape_value(j,point);
+                            copy_data.cell_matrix.back()(i,j) += (coefficient_values[point] * v * u * weight);
                           }
+                        copy_data.cell_vector.back()(i) += rhs_values_scalar[point] * v * weight;
                       }
                   }
-                else
-                  for (unsigned int point=0; point<fe_values.n_quadrature_points; ++point)
-                    {
-                      const double weight = fe_values.JxW(point);
-                      for (unsigned int i=0; i<fe_values.dofs_per_cell; ++i)
-                        {
-                          const double v = fe_values.shape_value(i,point);
-                          for (unsigned int j=0; j<fe_values.dofs_per_cell; ++j)
-                            {
-                              const double u = fe_values.shape_value(j,point);
-                              copy_data.cell_matrix.back()(i,j) += (u * v * weight);
-                            }
-                          copy_data.cell_vector.back()(i) += rhs_values_scalar[point] * v * weight;
-                        }
-                    }
               }
 
-            cell->face(face)->get_dof_indices (dofs_on_face_vector,
-                                               cell->active_fe_index());
+            cell->face(face)->get_dof_indices (dofs_on_face_vector,cell->active_fe_index());
             // for each dof on the cell, have a
             // flag whether it is on the face
-            copy_data.dof_is_on_face.push_back(std::vector<bool> (copy_data.dofs_per_cell));
+            copy_data.dof_is_on_face.emplace_back(copy_data.dofs_per_cell);
             // check for each of the dofs on this cell
             // whether it is on the face
             for (unsigned int i=0; i<copy_data.dofs_per_cell; ++i)
@@ -1490,7 +1491,6 @@ namespace MatrixCreator
                                                     dofs_on_face_vector.end());
           }
     }
-
 
 
     template <int dim, int spacedim, typename number>
@@ -1551,7 +1551,7 @@ namespace MatrixCreator
               types::global_dof_index max_element = static_cast<types::global_dof_index>(0);
               for (std::vector<types::global_dof_index>::const_iterator i=dof_to_boundary_mapping.begin();
                    i!=dof_to_boundary_mapping.end(); ++i)
-                if ((*i != hp::DoFHandler<dim,spacedim>::invalid_dof_index) &&
+                if ((*i != numbers::invalid_dof_index) &&
                     (*i > max_element))
                   max_element = *i;
               Assert (max_element  == matrix.n()-1, ExcInternalError());
@@ -1563,38 +1563,23 @@ namespace MatrixCreator
 #endif
 
               for (unsigned int i=0; i<copy_data.dofs_per_cell; ++i)
-                for (unsigned int j=0; j<copy_data.dofs_per_cell; ++j)
-                  {
-                    if (copy_data.dof_is_on_face[pos][i] && copy_data.dof_is_on_face[pos][j])
-                      matrix.add(dof_to_boundary_mapping[copy_data.dofs[i]],
-                                 dof_to_boundary_mapping[copy_data.dofs[j]],
-                                 copy_data.cell_matrix[pos](i,j));
-                    else
-                      {
-                        // assume that all shape functions that are nonzero on the boundary
-                        // are also listed in the @p{dof_to_boundary} mapping. if that
-                        // is not the case, then the boundary mass matrix does not
-                        // make that much sense anyway, as it only contains entries for
-                        // parts of the functions living on the boundary
-                        //
-                        // these, we may compare here for relative smallness of all
-                        // entries in the local matrix which are not taken over to
-                        // the global one
-                        Assert (std::abs(copy_data.cell_matrix[pos](i,j)) <= 1e-10 * max_diag_entry,
-                                ExcInternalError ());
-                      }
-                  }
-
-              for (unsigned int j=0; j<copy_data.dofs_per_cell; ++j)
-                if (copy_data.dof_is_on_face[pos][j])
-                  rhs_vector(dof_to_boundary_mapping[copy_data.dofs[j]]) += copy_data.cell_vector[pos](j);
-                else
-                  {
-                    // compare here for relative
-                    // smallness
-                    Assert (std::abs(copy_data.cell_vector[pos](j)) <= 1e-10 * max_diag_entry,
-                            ExcInternalError());
-                  }
+                {
+                  if (copy_data.dof_is_on_face[pos][i] &&
+                      dof_to_boundary_mapping[copy_data.dofs[i]] != numbers::invalid_dof_index)
+                    {
+                      for (unsigned int j=0; j<copy_data.dofs_per_cell; ++j)
+                        if (copy_data.dof_is_on_face[pos][j] &&
+                            dof_to_boundary_mapping[copy_data.dofs[j]] != numbers::invalid_dof_index)
+                          {
+                            AssertIsFinite(copy_data.cell_matrix[pos](i,j));
+                            matrix.add(dof_to_boundary_mapping[copy_data.dofs[i]],
+                                       dof_to_boundary_mapping[copy_data.dofs[j]],
+                                       copy_data.cell_matrix[pos](i,j));
+                          }
+                      AssertIsFinite(copy_data.cell_vector[pos](i));
+                      rhs_vector(dof_to_boundary_mapping[copy_data.dofs[i]]) += copy_data.cell_vector[pos](i);
+                    }
+                }
               ++pos;
             }
         }
@@ -1640,7 +1625,7 @@ namespace MatrixCreator
         return;
       }
 
-    const hp::FECollection<dim,spacedim> &fe_collection = dof.get_fe();
+    const hp::FECollection<dim,spacedim> &fe_collection = dof.get_fe_collection();
     const unsigned int n_components  = fe_collection.n_components();
 
     Assert (matrix.n() == dof.n_boundary_dofs (boundary_functions),
@@ -1650,7 +1635,7 @@ namespace MatrixCreator
     Assert (boundary_functions.size() != 0, ExcInternalError());
     Assert (dof_to_boundary_mapping.size() == dof.n_dofs(),
             ExcInternalError());
-    Assert (coefficient ==0 ||
+    Assert (coefficient == nullptr ||
             coefficient->n_components==1 ||
             coefficient->n_components==n_components, ExcComponentMismatch());
 
@@ -1667,22 +1652,22 @@ namespace MatrixCreator
     MatrixCreator::internal::AssemblerBoundary::CopyData<hp::DoFHandler<dim,spacedim>,number > copy_data;
 
     WorkStream::run(dof.begin_active(),dof.end(),
-                    static_cast<std_cxx11::function<void (typename hp::DoFHandler<dim,spacedim>::active_cell_iterator
-                                                          const &,MatrixCreator::internal::AssemblerBoundary::Scratch const &,
-                                                          MatrixCreator::internal::AssemblerBoundary::CopyData<hp::DoFHandler<dim,spacedim>,number > &)> >
-                    (std_cxx11::bind( &create_hp_boundary_mass_matrix_1<dim,spacedim,number>,std_cxx11::_1,std_cxx11::_2,
-                                      std_cxx11::_3,
-                                      std_cxx11::cref(mapping),std_cxx11::cref(fe_collection),std_cxx11::cref(q),
-                                      std_cxx11::cref(boundary_functions),coefficient,
-                                      std_cxx11::cref(component_mapping))),
-                    static_cast<std_cxx11::function<void (MatrixCreator::internal::AssemblerBoundary
-                                                          ::CopyData<hp::DoFHandler<dim,spacedim>,number > const &)> > (
-                      std_cxx11::bind( &copy_hp_boundary_mass_matrix_1<dim,spacedim,number>,
-                                       std_cxx11::_1,
-                                       std_cxx11::cref(boundary_functions),
-                                       std_cxx11::cref(dof_to_boundary_mapping),
-                                       std_cxx11::ref(matrix),
-                                       std_cxx11::ref(rhs_vector))),
+                    static_cast<std::function<void (typename hp::DoFHandler<dim,spacedim>::active_cell_iterator
+                                                    const &,MatrixCreator::internal::AssemblerBoundary::Scratch const &,
+                                                    MatrixCreator::internal::AssemblerBoundary::CopyData<hp::DoFHandler<dim,spacedim>,number > &)> >
+                    (std::bind( &create_hp_boundary_mass_matrix_1<dim,spacedim,number>,std::placeholders::_1,std::placeholders::_2,
+                                std::placeholders::_3,
+                                std::cref(mapping),std::cref(fe_collection),std::cref(q),
+                                std::cref(boundary_functions),coefficient,
+                                std::cref(component_mapping))),
+                    static_cast<std::function<void (MatrixCreator::internal::AssemblerBoundary
+                                                    ::CopyData<hp::DoFHandler<dim,spacedim>,number > const &)> > (
+                      std::bind( &copy_hp_boundary_mass_matrix_1<dim,spacedim,number>,
+                                 std::placeholders::_1,
+                                 std::cref(boundary_functions),
+                                 std::cref(dof_to_boundary_mapping),
+                                 std::ref(matrix),
+                                 std::ref(rhs_vector))),
                     scratch,
                     copy_data);
   }
@@ -1725,8 +1710,8 @@ namespace MatrixCreator
     MatrixCreator::internal::AssemblerData::Scratch<dim, spacedim,double>
     assembler_data (fe_collection,
                     update_gradients  | update_JxW_values |
-                    (coefficient != 0 ? update_quadrature_points : UpdateFlags(0)),
-                    coefficient, /*rhs_function=*/0,
+                    (coefficient != nullptr ? update_quadrature_points : UpdateFlags(0)),
+                    coefficient, /*rhs_function=*/nullptr,
                     q_collection, mapping_collection);
     MatrixCreator::internal::AssemblerData::CopyData<double> copy_data;
     copy_data.cell_matrix.reinit (assembler_data.fe_collection.max_dofs_per_cell(),
@@ -1738,11 +1723,11 @@ namespace MatrixCreator
     WorkStream::run (dof.begin_active(),
                      static_cast<typename DoFHandler<dim,spacedim>::active_cell_iterator>(dof.end()),
                      &MatrixCreator::internal::laplace_assembler<dim, spacedim, typename DoFHandler<dim,spacedim>::active_cell_iterator>,
-                     std_cxx11::bind (&MatrixCreator::internal::
-                                      copy_local_to_global<double,SparseMatrix<double>, Vector<double> >,
-                                      std_cxx11::_1,
-                                      &matrix,
-                                      (Vector<double> *)NULL),
+                     std::bind (&MatrixCreator::internal::
+                                copy_local_to_global<double,SparseMatrix<double>, Vector<double> >,
+                                std::placeholders::_1,
+                                &matrix,
+                                (Vector<double> *)(nullptr)),
                      assembler_data,
                      copy_data);
   }
@@ -1796,11 +1781,11 @@ namespace MatrixCreator
     WorkStream::run (dof.begin_active(),
                      static_cast<typename DoFHandler<dim,spacedim>::active_cell_iterator>(dof.end()),
                      &MatrixCreator::internal::laplace_assembler<dim, spacedim, typename DoFHandler<dim,spacedim>::active_cell_iterator>,
-                     std_cxx11::bind (&MatrixCreator::internal::
-                                      copy_local_to_global<double,SparseMatrix<double>, Vector<double> >,
-                                      std_cxx11::_1,
-                                      &matrix,
-                                      &rhs_vector),
+                     std::bind (&MatrixCreator::internal::
+                                copy_local_to_global<double,SparseMatrix<double>, Vector<double> >,
+                                std::placeholders::_1,
+                                &matrix,
+                                &rhs_vector),
                      assembler_data,
                      copy_data);
   }
@@ -1836,10 +1821,10 @@ namespace MatrixCreator
             ExcDimensionMismatch (matrix.n(), dof.n_dofs()));
 
     MatrixCreator::internal::AssemblerData::Scratch<dim, spacedim,double>
-    assembler_data (dof.get_fe(),
+    assembler_data (dof.get_fe_collection(),
                     update_gradients  | update_JxW_values |
-                    (coefficient != 0 ? update_quadrature_points : UpdateFlags(0)),
-                    coefficient, /*rhs_function=*/0,
+                    (coefficient != nullptr ? update_quadrature_points : UpdateFlags(0)),
+                    coefficient, /*rhs_function=*/nullptr,
                     q, mapping);
     MatrixCreator::internal::AssemblerData::CopyData<double> copy_data;
     copy_data.cell_matrix.reinit (assembler_data.fe_collection.max_dofs_per_cell(),
@@ -1851,11 +1836,11 @@ namespace MatrixCreator
     WorkStream::run (dof.begin_active(),
                      static_cast<typename hp::DoFHandler<dim,spacedim>::active_cell_iterator>(dof.end()),
                      &MatrixCreator::internal::laplace_assembler<dim, spacedim, typename hp::DoFHandler<dim,spacedim>::active_cell_iterator>,
-                     std_cxx11::bind (&MatrixCreator::internal::
-                                      copy_local_to_global<double,SparseMatrix<double>, Vector<double> >,
-                                      std_cxx11::_1,
-                                      &matrix,
-                                      (Vector<double> *)0),
+                     std::bind (&MatrixCreator::internal::
+                                copy_local_to_global<double,SparseMatrix<double>, Vector<double> >,
+                                std::placeholders::_1,
+                                &matrix,
+                                (Vector<double> *)nullptr),
                      assembler_data,
                      copy_data);
   }
@@ -1891,7 +1876,7 @@ namespace MatrixCreator
             ExcDimensionMismatch (matrix.n(), dof.n_dofs()));
 
     MatrixCreator::internal::AssemblerData::Scratch<dim, spacedim,double>
-    assembler_data (dof.get_fe(),
+    assembler_data (dof.get_fe_collection(),
                     update_gradients  | update_values |
                     update_JxW_values | update_quadrature_points,
                     coefficient, &rhs,
@@ -1906,11 +1891,11 @@ namespace MatrixCreator
     WorkStream::run (dof.begin_active(),
                      static_cast<typename hp::DoFHandler<dim,spacedim>::active_cell_iterator>(dof.end()),
                      &MatrixCreator::internal::laplace_assembler<dim, spacedim, typename hp::DoFHandler<dim,spacedim>::active_cell_iterator>,
-                     std_cxx11::bind (&MatrixCreator::internal::
-                                      copy_local_to_global<double,SparseMatrix<double>, Vector<double> >,
-                                      std_cxx11::_1,
-                                      &matrix,
-                                      &rhs_vector),
+                     std::bind (&MatrixCreator::internal::
+                                copy_local_to_global<double,SparseMatrix<double>, Vector<double> >,
+                                std::placeholders::_1,
+                                &matrix,
+                                &rhs_vector),
                      assembler_data,
                      copy_data);
   }

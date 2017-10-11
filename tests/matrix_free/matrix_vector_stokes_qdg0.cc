@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -27,7 +27,6 @@ std::ofstream logfile("output");
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/grid/tria.h>
@@ -47,7 +46,6 @@ std::ofstream logfile("output");
 
 #include "create_mesh.h"
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -72,7 +70,7 @@ public:
   {
     typedef VectorizedArray<Number> vector_t;
     FEEvaluation<dim,degree_p+1,degree_p+2,dim,Number> velocity (data, 0);
-    FEEvaluation<dim,degree_p  ,degree_p+2,1,  Number> pressure (data, 1);
+    FEEvaluation<dim,degree_p,degree_p+2,1,  Number> pressure (data, 1);
 
     for (unsigned int cell=cell_range.first; cell<cell_range.second; ++cell)
       {
@@ -169,7 +167,7 @@ void test ()
   //          << std::endl;
 
   {
-    BlockCompressedSimpleSparsityPattern csp (dim+1,dim+1);
+    BlockDynamicSparsityPattern csp (dim+1,dim+1);
 
     for (unsigned int d=0; d<dim+1; ++d)
       for (unsigned int e=0; e<dim+1; ++e)
@@ -286,8 +284,7 @@ void test ()
     QGauss<1> quad(fe_degree+2);
     mf_data.reinit (dofs, constraints, quad,
                     typename MatrixFree<dim>::AdditionalData
-                    (MPI_COMM_WORLD,
-                     MatrixFree<dim>::AdditionalData::none));
+                    (MatrixFree<dim>::AdditionalData::none));
   }
 
   system_matrix.vmult (solution, system_rhs);
@@ -316,7 +313,6 @@ int main ()
 
   {
     deallog << std::endl << "Test with doubles" << std::endl << std::endl;
-    deallog.threshold_double(1.e-12);
     deallog.push("2d");
     test<2,1>();
     test<2,2>();
@@ -328,4 +324,3 @@ int main ()
     deallog.pop();
   }
 }
-

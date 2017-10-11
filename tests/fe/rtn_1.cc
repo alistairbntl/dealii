@@ -18,7 +18,6 @@
 // Show the shape functions in support points
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/qprojector.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/fe/fe_raviart_thomas.h>
@@ -26,10 +25,8 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
-#include <cmath>
 
 
 template <int dim>
@@ -139,7 +136,6 @@ main()
 {
   std::ofstream logfile ("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   FE_RaviartThomasNodal<2> e20(0);
   check_support_points(e20);

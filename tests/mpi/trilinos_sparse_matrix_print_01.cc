@@ -22,7 +22,6 @@
 #include <deal.II/base/index_set.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/trilinos_sparsity_pattern.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -93,10 +92,8 @@ int main (int argc, char **argv)
   // in parallel
   if ((n_procs == 1) || (myid == 1))
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
+      initlog();
       deallog << std::setprecision(4);
-      deallog.threshold_double(1.e-10);
 
       test();
     }

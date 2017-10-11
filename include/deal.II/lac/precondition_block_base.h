@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__precondition_block_base_h
-#define dealii__precondition_block_base_h
+#ifndef dealii_precondition_block_base_h
+#define dealii_precondition_block_base_h
 
 
 #include <deal.II/base/config.h>
@@ -89,7 +89,7 @@ public:
   /**
    * The virtual destructor
    */
-  ~PreconditionBlockBase();
+  ~PreconditionBlockBase() = default;
 
   /**
    * Deletes the inverse diagonal block matrices if existent hence leaves the
@@ -135,7 +135,7 @@ public:
   bool inverses_ready () const;
 
   /**
-   * Checks whether the object is empty.
+   * Check whether the object is empty.
    */
   bool empty () const;
 

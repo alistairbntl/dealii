@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -56,7 +56,6 @@
 #include <deal.II/numerics/data_out.h>
 
 #include <iostream>
-#include <fstream>
 
 namespace Step39
 {
@@ -415,11 +414,11 @@ namespace Step39
 
     const unsigned int n_levels = triangulation.n_global_levels();
     mg_matrix.resize(0, n_levels-1);
-    mg_matrix.clear();
+    mg_matrix.clear_elements();
     mg_matrix_dg_up.resize(0, n_levels-1);
-    mg_matrix_dg_up.clear();
+    mg_matrix_dg_up.clear_elements();
     mg_matrix_dg_down.resize(0, n_levels-1);
-    mg_matrix_dg_down.clear();
+    mg_matrix_dg_down.clear_elements();
 
     for (unsigned int level=mg_matrix.min_level();
          level<=mg_matrix.max_level(); ++level)

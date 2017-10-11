@@ -24,7 +24,6 @@
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/grid_generator.h>
 
-#include <fstream>
 
 
 template <int spacedim>
@@ -34,8 +33,8 @@ void test ()
   GridGenerator::hyper_cube (tria);
 
   deallog << "Coarse mesh:" << std::endl;
-  deallog << "Left vertex=" << (int)tria.begin_active()->face(0)->boundary_id() << std::endl;
-  deallog << "Right vertex=" << (int)tria.begin_active()->face(1)->boundary_id() << std::endl;
+  deallog << "Left vertex=" << tria.begin_active()->face(0)->boundary_id() << std::endl;
+  deallog << "Right vertex=" << tria.begin_active()->face(1)->boundary_id() << std::endl;
 
   tria.refine_global (2);
 
@@ -44,8 +43,8 @@ void test ()
        cell != tria.end(); ++cell)
     {
       deallog << "Cell: " << cell << std::endl;
-      deallog << "Left vertex=" << (int)cell->face(0)->boundary_id() << std::endl;
-      deallog << "Right vertex=" << (int)cell->face(1)->boundary_id() << std::endl;
+      deallog << "Left vertex=" << cell->face(0)->boundary_id() << std::endl;
+      deallog << "Right vertex=" << cell->face(1)->boundary_id() << std::endl;
     }
 }
 
@@ -53,8 +52,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   test<1> ();
   test<2> ();

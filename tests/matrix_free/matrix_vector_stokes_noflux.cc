@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -28,11 +28,11 @@ std::ofstream logfile("output");
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/grid/tria_boundary_lib.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -46,7 +46,6 @@ std::ofstream logfile("output");
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -122,12 +121,16 @@ private:
 template <int dim, int fe_degree>
 void test ()
 {
+  SphericalManifold<dim> manifold;
+  HyperShellBoundary<dim> boundary;
   Triangulation<dim>   triangulation;
   GridGenerator::hyper_shell (triangulation, Point<dim>(),
                               0.5, 1., 96, true);
-  static HyperShellBoundary<dim> boundary;
-  triangulation.set_boundary (0, boundary);
-  triangulation.set_boundary (1, boundary);
+  triangulation.set_all_manifold_ids(0);
+  triangulation.set_all_manifold_ids_on_boundary(1);
+  triangulation.set_manifold (0, manifold);
+  triangulation.set_manifold (1, boundary);
+
   triangulation.begin_active()->set_refine_flag();
   triangulation.last()->set_refine_flag();
   triangulation.execute_coarsening_and_refinement();
@@ -162,7 +165,7 @@ void test ()
   stokes_sub_blocks[dim] = 1;
   DoFRenumbering::component_wise (dof_handler, stokes_sub_blocks);
 
-  std::set<unsigned char> no_normal_flux_boundaries;
+  std::set<types::boundary_id> no_normal_flux_boundaries;
   no_normal_flux_boundaries.insert (0);
   no_normal_flux_boundaries.insert (1);
   DoFTools::make_hanging_node_constraints (dof_handler,
@@ -194,7 +197,7 @@ void test ()
   //          << std::endl;
 
   {
-    BlockCompressedSimpleSparsityPattern csp (2,2);
+    BlockDynamicSparsityPattern csp (2,2);
 
     for (unsigned int d=0; d<2; ++d)
       for (unsigned int e=0; e<2; ++e)
@@ -305,8 +308,7 @@ void test ()
     // no parallelism
     mf_data.reinit (mapping, dofs, constraints, quad,
                     typename MatrixFree<dim>::AdditionalData
-                    (MPI_COMM_WORLD,
-                     MatrixFree<dim>::AdditionalData::none));
+                    (MatrixFree<dim>::AdditionalData::none));
   }
 
   system_matrix.vmult (solution, system_rhs);
@@ -332,7 +334,6 @@ int main ()
 
   {
     deallog << std::endl << "Test with doubles" << std::endl << std::endl;
-    deallog.threshold_double(1.e-12);
     deallog.push("2d");
     test<2,1>();
     test<2,2>();
@@ -343,4 +344,3 @@ int main ()
     deallog.pop();
   }
 }
-

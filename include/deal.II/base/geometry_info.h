@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__geometry_info_h
-#define dealii__geometry_info_h
+#ifndef dealii_geometry_info_h
+#define dealii_geometry_info_h
 
 
 #include <deal.II/base/config.h>
@@ -52,9 +52,21 @@ public:
    */
   enum Object
   {
+    /**
+     * A vertex.
+     */
     vertex = 0,
+    /**
+     * A line.
+     */
     line   = 1,
+    /**
+     * A quadrilateral.
+     */
     quad   = 2,
+    /**
+     * A hexahedron.
+     */
     hex    = 3
   };
 
@@ -139,8 +151,14 @@ struct RefinementPossibilities
    */
   enum Possibilities
   {
-    no_refinement= 0,
+    /**
+     * Do not perform refinement.
+     */
+    no_refinement = 0,
 
+    /**
+     * Perform isotropic refinement.
+     */
     isotropic_refinement = static_cast<unsigned char>(-1)
   };
 };
@@ -196,9 +214,17 @@ struct RefinementPossibilities<1>
    */
   enum Possibilities
   {
-    no_refinement= 0,
+    /**
+     * Do not refine.
+     */
+    no_refinement = 0,
+    /**
+     * Perform a cut in the x-direction.
+     */
     cut_x        = 1,
-
+    /**
+     * Perform isotropic refinement.
+     */
     isotropic_refinement = cut_x
   };
 };
@@ -255,11 +281,26 @@ struct RefinementPossibilities<2>
    */
   enum Possibilities
   {
-    no_refinement= 0,
-    cut_x        = 1,
-    cut_y        = 2,
-    cut_xy       = cut_x | cut_y,
+    /**
+     * Do not refine.
+     */
+    no_refinement = 0,
+    /**
+     * Perform a cut in the x-direction.
+     */
+    cut_x         = 1,
+    /**
+     * Perform a cut in the y-direction.
+     */
+    cut_y         = 2,
+    /**
+     * Perform cuts in the x- and y-directions.
+     */
+    cut_xy        = cut_x | cut_y,
 
+    /**
+     * Perform isotropic refinement.
+     */
     isotropic_refinement = cut_xy
   };
 };
@@ -316,15 +357,42 @@ struct RefinementPossibilities<3>
    */
   enum Possibilities
   {
-    no_refinement= 0,
-    cut_x        = 1,
-    cut_y        = 2,
-    cut_xy       = cut_x | cut_y,
-    cut_z        = 4,
-    cut_xz       = cut_x | cut_z,
-    cut_yz       = cut_y | cut_z,
-    cut_xyz      = cut_x | cut_y | cut_z,
+    /**
+     * Do not refine.
+     */
+    no_refinement = 0,
+    /**
+     * Perform a cut in the x-direction.
+     */
+    cut_x         = 1,
+    /**
+     * Perform a cut in the y-direction.
+     */
+    cut_y         = 2,
+    /**
+     * Perform a cut in the x and y-directions.
+     */
+    cut_xy        = cut_x | cut_y,
+    /**
+     * Perform a cut in the z-direction.
+     */
+    cut_z         = 4,
+    /**
+     * Perform a cuts in the x- and y-directions.
+     */
+    cut_xz        = cut_x | cut_z,
+    /**
+     * Perform a cuts in the x- and y-directions.
+     */
+    cut_yz        = cut_y | cut_z,
+    /**
+     * Perform a cuts in the x-, y-, and z-directions.
+     */
+    cut_xyz       = cut_x | cut_y | cut_z,
 
+    /**
+     * Perform isotropic refinement.
+     */
     isotropic_refinement = cut_xyz
   };
 };
@@ -470,8 +538,14 @@ namespace internal
      */
     enum Possibilities
     {
+      /**
+       * Do not refine.
+       */
       case_none = 0,
 
+      /**
+       * Refine isotropically.
+       */
       case_isotropic = static_cast<unsigned char>(-1)
     };
   };
@@ -496,8 +570,14 @@ namespace internal
      */
     enum Possibilities
     {
+      /**
+       * Do not refine.
+       */
       case_none = 0,
 
+      /**
+       * Refine isotropically.
+       */
       case_isotropic = case_none
     };
   };
@@ -524,8 +604,14 @@ namespace internal
      */
     enum Possibilities
     {
+      /**
+       * Do not refine.
+       */
       case_none = 0,
 
+      /**
+       * Refine isotropically.
+       */
       case_isotropic = case_none
     };
   };
@@ -554,9 +640,17 @@ namespace internal
      */
     enum Possibilities
     {
+      /**
+       * Do not refine.
+       */
       case_none = 0,
+      /**
+       * Cut in the x-direction.
+       */
       case_x    = 1,
-
+      /**
+       * Refine isotropically.
+       */
       case_isotropic = case_x
     };
   };
@@ -834,6 +928,40 @@ struct GeometryInfo<0>
    * Number of hexahedra of a cell.
    */
   static const unsigned int hexes_per_cell    = 0;
+
+  /**
+   * Rearrange vertices for UCD output.  For a cell being written in UCD
+   * format, each entry in this field contains the number of a vertex in
+   * <tt>deal.II</tt> that corresponds to the UCD numbering at this location.
+   *
+   * Typical example: write a cell and arrange the vertices, such that UCD
+   * understands them.
+   *
+   * @code
+   * for (i=0; i< n_vertices; ++i)
+   *   out << cell->vertex(ucd_to_deal[i]);
+   * @endcode
+   *
+   * As the vertex numbering in deal.II versions <= 5.1 happened to coincide
+   * with the UCD numbering, this field can also be used like a
+   * old_to_lexicographic mapping.
+   */
+  static const unsigned int ucd_to_deal[vertices_per_cell];
+
+  /**
+   * Rearrange vertices for OpenDX output.  For a cell being written in OpenDX
+   * format, each entry in this field contains the number of a vertex in
+   * <tt>deal.II</tt> that corresponds to the DX numbering at this location.
+   *
+   * Typical example: write a cell and arrange the vertices, such that OpenDX
+   * understands them.
+   *
+   * @code
+   * for (i=0; i< n_vertices; ++i)
+   *   out << cell->vertex(dx_to_deal[i]);
+   * @endcode
+   */
+  static const unsigned int dx_to_deal[vertices_per_cell];
 };
 
 
@@ -1808,11 +1936,11 @@ struct GeometryInfo
 
   /**
    * Return true if the given point is inside the unit cell of the present
-   * space dimension. This * function accepts an additional * parameter which
-   * specifies how * much the point position may * actually be outside the
-   * true * unit cell. This is useful because in practice we may often not be
-   * able to compute the coordinates of a point in reference coordinates
-   * exactly, but only up to numerical roundoff.
+   * space dimension. This function accepts an additional parameter which
+   * specifies how much the point position may actually be outside the true
+   * unit cell. This is useful because in practice we may often not be able to
+   * compute the coordinates of a point in reference coordinates exactly, but
+   * only up to numerical roundoff.
    *
    * The tolerance parameter may be less than zero, indicating that the point
    * should be safely inside the cell.
@@ -1831,7 +1959,7 @@ struct GeometryInfo
   project_to_unit_cell (const Point<dim> &p);
 
   /**
-   * Returns the infinity norm of the vector between a given point @p p
+   * Return the infinity norm of the vector between a given point @p p
    * outside the unit cell to the closest unit cell boundary. For points
    * inside the cell, this is defined as zero.
    */
@@ -2709,6 +2837,70 @@ GeometryInfo<3>::is_inside_unit_cell (const Point<3> &p,
          (p[2] >= l) && (p[2] <= u);
 }
 
+
+
+template <>
+inline
+unsigned int
+GeometryInfo<1>::line_to_cell_vertices (const unsigned int line,
+                                        const unsigned int vertex)
+{
+  (void)line;
+  Assert (line<lines_per_cell, ExcIndexRange(line, 0, lines_per_cell));
+  Assert (vertex<2, ExcIndexRange(vertex, 0, 2));
+
+  return vertex;
+}
+
+
+template <>
+inline
+unsigned int
+GeometryInfo<2>::line_to_cell_vertices (const unsigned int line,
+                                        const unsigned int vertex)
+{
+  static const unsigned int cell_vertices[4][2] = {{0,2},{1,3},{0,1},{2,3}};
+  return cell_vertices[line][vertex];
+}
+
+
+
+template <>
+inline
+unsigned int
+GeometryInfo<3>::line_to_cell_vertices (const unsigned int line,
+                                        const unsigned int vertex)
+{
+  Assert (line<lines_per_cell, ExcIndexRange(line, 0, lines_per_cell));
+  Assert (vertex<2, ExcIndexRange(vertex, 0, 2));
+
+  static const unsigned
+  vertices[lines_per_cell][2] = {{0, 2},  // bottom face
+    {1, 3},
+    {0, 1},
+    {2, 3},
+    {4, 6},  // top face
+    {5, 7},
+    {4, 5},
+    {6, 7},
+    {0, 4},  // connects of bottom
+    {1, 5},  //   top face
+    {2, 6},
+    {3, 7}
+  };
+  return vertices[line][vertex];
+}
+
+
+template <>
+inline
+unsigned int
+GeometryInfo<4>::line_to_cell_vertices (const unsigned int,
+                                        const unsigned int)
+{
+  Assert(false, ExcNotImplemented());
+  return numbers::invalid_unsigned_int;
+}
 
 #endif // DOXYGEN
 DEAL_II_NAMESPACE_CLOSE

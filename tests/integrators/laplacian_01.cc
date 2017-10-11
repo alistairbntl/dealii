@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 #include "../tests.h"
 #include "../test_grids.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/integrators/laplace.h>
 
 #include <deal.II/fe/fe_dgq.h>
@@ -36,8 +35,8 @@ void test_cell(const FEValuesBase<dim> &fev)
   FullMatrix<double> M(n,n);
   cell_matrix(M,fev);
   {
-    LogStream::Prefix pre("cell");
-    M.print(deallog,8);
+    deallog << "cell" << std::endl;
+    M.print_formatted(deallog.get_file_stream(), 3, true, 0, "0.");
   }
 
   Vector<double> u(n), v(n), w(n);
@@ -49,7 +48,7 @@ void test_cell(const FEValuesBase<dim> &fev)
     indices[i] = i;
 
   {
-    LogStream::Prefix pre("Residuals");
+    deallog << "Residuals" << std::endl;
     for (unsigned int i=0; i<n; ++i)
       {
         u = 0.;
@@ -65,7 +64,7 @@ void test_cell(const FEValuesBase<dim> &fev)
             cell_residual(w, fev, ugrad[0]);
             M.vmult(v,u);
             w.add(-1., v);
-            deallog << " e" << w.l2_norm();
+            deallog << " e " << w.l2_norm();
           }
       }
     deallog << std::endl;
@@ -81,8 +80,8 @@ void test_boundary(const FEValuesBase<dim> &fev)
   FullMatrix<double> M(n,n);
   nitsche_matrix(M, fev, 17);
   {
-    LogStream::Prefix pre("bdry");
-    M.print(deallog,8);
+    deallog << "bdry" << std::endl;
+    M.print_formatted(deallog.get_file_stream(), 3, true, 0, "0.");
   }
 
   Vector<double> u(n), v(n), w(n);
@@ -97,7 +96,7 @@ void test_boundary(const FEValuesBase<dim> &fev)
     indices[i] = i;
 
   {
-    LogStream::Prefix pre("Residuals");
+    deallog << "Residuals" << std::endl;
     for (unsigned int i=0; i<n; ++i)
       {
         u = 0.;
@@ -114,7 +113,7 @@ void test_boundary(const FEValuesBase<dim> &fev)
             nitsche_residual(w, fev, uval[0], ugrad[0], null_val[0], 17);
             M.vmult(v,u);
             w.add(-1., v);
-            deallog << " e" << w.l2_norm();
+            deallog << " e " << w.l2_norm();
           }
       }
     deallog << std::endl;
@@ -137,20 +136,20 @@ void test_face(const FEValuesBase<dim> &fev1,
   ip_matrix(M11, M12, M21, M22, fev1, fev2, 17);
 
   {
-    LogStream::Prefix pre("M11");
-    M11.print(deallog,8);
+    deallog << "M11" << std::endl;
+    M11.print_formatted(deallog.get_file_stream(), 3, true, 0, "0.");
   }
   {
-    LogStream::Prefix pre("M12");
-    M12.print(deallog,8);
+    deallog << "M12" << std::endl;
+    M12.print_formatted(deallog.get_file_stream(), 3, true, 0, "0.");
   }
   {
-    LogStream::Prefix pre("M21");
-    M21.print(deallog,8);
+    deallog << "M21" << std::endl;
+    M21.print_formatted(deallog.get_file_stream(), 3, true, 0, "0.");
   }
   {
-    LogStream::Prefix pre("M22");
-    M22.print(deallog,8);
+    deallog << "M22" << std::endl;
+    M22.print_formatted(deallog.get_file_stream(), 3, true, 0, "0.");
   }
 
   Vector<double> u1(n1), v1(n1), w1(n1);
@@ -167,7 +166,7 @@ void test_face(const FEValuesBase<dim> &fev1,
   for (unsigned int i=0; i<n2; ++i) indices2[i] = i;
 
   {
-    LogStream::Prefix pre("Residuals");
+    deallog << "Residuals" << std::endl;
     for (unsigned int i1=0; i1<n1; ++i1)
       {
         u1 = 0.;
@@ -195,7 +194,7 @@ void test_face(const FEValuesBase<dim> &fev1,
             w1.add(-1., v1);
             M21.vmult(v2,u1);
             w2.add(-1., v2);
-            deallog << " e" << w1.l2_norm() + w2.l2_norm();
+            deallog << " e " << w1.l2_norm() + w2.l2_norm();
           }
 
         w1 = 0.;
@@ -221,7 +220,7 @@ void test_face(const FEValuesBase<dim> &fev1,
             w1.add(-1., v1);
             M22.vmult(v2,u1);
             w2.add(-1., v2);
-            deallog << " e" << w1.l2_norm() + w2.l2_norm();
+            deallog << " e " << w1.l2_norm() + w2.l2_norm();
           }
       }
     deallog << std::endl;
@@ -235,14 +234,14 @@ test_fe(Triangulation<dim> &tr, FiniteElement<dim> &fe)
 {
   deallog << fe.get_name() << std::endl << "cell matrix" << std::endl;
   QGauss<dim> quadrature(fe.tensor_degree());
-  FEValues<dim> fev(fe, quadrature, update_gradients);
+  FEValues<dim> fev(fe, quadrature, update_gradients | update_JxW_values);
 
   typename Triangulation<dim>::cell_iterator cell1 = tr.begin(1);
   fev.reinit(cell1);
   test_cell(fev);
 
   QGauss<dim-1> face_quadrature(fe.tensor_degree()+1);
-  FEFaceValues<dim> fef1(fe, face_quadrature, update_values | update_gradients | update_normal_vectors);
+  FEFaceValues<dim> fef1(fe, face_quadrature, update_values | update_gradients | update_normal_vectors | update_JxW_values);
   for (unsigned int i=0; i<GeometryInfo<dim>::faces_per_cell; ++i)
     {
       deallog << "boundary_matrix " << i << std::endl;
@@ -250,7 +249,7 @@ test_fe(Triangulation<dim> &tr, FiniteElement<dim> &fe)
       test_boundary(fef1);
     }
 
-  FEFaceValues<dim> fef2(fe, face_quadrature, update_values | update_gradients);
+  FEFaceValues<dim> fef2(fe, face_quadrature, update_values | update_gradients | update_JxW_values);
   typename Triangulation<dim>::cell_iterator cell2 = cell1->neighbor(1);
 
   deallog << "face_matrix " << 0 << std::endl;
@@ -279,7 +278,6 @@ test(Triangulation<dim> &tr)
 int main()
 {
   initlog();
-  deallog.threshold_double(1.e-10);
 
   Triangulation<2> tr2;
   TestGrids::hypercube(tr2, 1);

@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__dof_faces_h
-#define dealii__dof_faces_h
+#ifndef dealii_dof_faces_h
+#define dealii_dof_faces_h
 
 
 #include <deal.II/base/config.h>
@@ -64,15 +64,15 @@ namespace internal
      *
      * @author Tobias Leicht, 2006
      */
-    template<int dim>
+    template <int dim>
     class DoFFaces
     {
+    public:
       /**
-       * Make the constructor private to prevent the use of this template,
-       * only the specializations should be used
+       * Constructor. This constructor is deleted to prevent the use of this template,
+       * as only the specializations should be used
        */
-    private:
-      DoFFaces();
+      DoFFaces() = delete;
     };
 
     /**
@@ -81,7 +81,7 @@ namespace internal
      *
      * @author Tobias Leicht, 2006
      */
-    template<>
+    template <>
     class DoFFaces<1>
     {
     public:
@@ -106,7 +106,7 @@ namespace internal
      *
      * @author Tobias Leicht, 2006
      */
-    template<>
+    template <>
     class DoFFaces<2>
     {
     public:
@@ -136,7 +136,7 @@ namespace internal
      *
      * @author Tobias Leicht, 2006
      */
-    template<>
+    template <>
     class DoFFaces<3>
     {
     public:

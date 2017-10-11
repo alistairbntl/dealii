@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__function_derivative_h
-#define dealii__function_derivative_h
+#ifndef dealii_function_derivative_h
+#define dealii_function_derivative_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
@@ -101,16 +101,6 @@ public:
    */
   std::size_t memory_consumption () const;
 
-  /**
-   * @addtogroup Exceptions
-   * @{
-   */
-
-  /**
-   * Exception.
-   */
-  DeclException0(ExcInvalidFormula);
-  //@}
 private:
   /**
    * Function for differentiation.

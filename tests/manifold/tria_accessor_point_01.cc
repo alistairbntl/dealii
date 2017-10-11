@@ -1,5 +1,5 @@
 //----------------------------  spherical_manifold_01.cc  ---------------------------
-//    Copyright (C) 2011 - 2015 by the mathLab team.
+//    Copyright (C) 2011 - 2016 by the mathLab team.
 //
 //    This file is subject to LGPL and may not be  distributed
 //    without copyright and license information. Please refer
@@ -12,8 +12,6 @@
 // Test spherical manifold on hyper shells.
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 
 // all include files you need here
@@ -32,7 +30,7 @@ void test(unsigned int ref=1)
   deallog << "Testing dim " << dim
           << ", spacedim " << spacedim << std::endl;
 
-  SphericalManifold<dim,spacedim> manifold;
+  PolarManifold<dim,spacedim> manifold;
 
   Triangulation<dim,spacedim> tria;
   GridGenerator::hyper_shell (tria, Point<spacedim>(), .3, .6, 12);
@@ -57,9 +55,7 @@ void test(unsigned int ref=1)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<2,2>();
   test<3,3>();

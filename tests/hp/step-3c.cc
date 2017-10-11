@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
@@ -48,10 +47,7 @@
 #include <deal.II/lac/precondition.h>
 
 #include <deal.II/numerics/data_out.h>
-#include <fstream>
 #include <iostream>
-
-std::ofstream logfile("output");
 
 
 
@@ -210,7 +206,7 @@ void LaplaceProblem::assemble_system ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<2>(),
+                                            Functions::ZeroFunction<2>(),
                                             boundary_values);
   MatrixTools::apply_boundary_values (boundary_values,
                                       system_matrix,
@@ -227,9 +223,9 @@ void LaplaceProblem::solve ()
 
   check_solver_within_range(
     cg.solve(system_matrix, solution, system_rhs, PreconditionIdentity()),
-    solver_control.last_step(), 629, 630);
+    solver_control.last_step(), 625, 635);
 
-  solution.print (deallog.get_file_stream());
+  solution.print (deallog.get_file_stream(), 7);
 
   hanging_node_constraints.distribute (solution);
 }
@@ -274,13 +270,14 @@ void LaplaceProblem::run ()
 
 int main ()
 {
-  logfile.precision(6);
-
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
+  auto old_precision = deallog.get_file_stream().precision();
+  deallog.get_file_stream() << std::setprecision(8);
 
   LaplaceProblem laplace_problem;
   laplace_problem.run ();
+
+  deallog.get_file_stream() << std::setprecision(old_precision);
 
   return 0;
 }

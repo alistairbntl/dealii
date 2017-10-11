@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2016 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -29,6 +29,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -57,27 +58,16 @@ FE_BDM<dim>::FE_BDM (const unsigned int deg)
   // Set up the generalized support
   // points
   initialize_support_points (deg);
-  //Now compute the inverse node
-  //matrix, generating the correct
-  //basis functions from the raw
-  //ones.
 
-  // We use an auxiliary matrix in
-  // this function. Therefore,
-  // inverse_node_matrix is still
-  // empty and shape_value_component
-  // returns the 'raw' shape values.
-  FullMatrix<double> M(n_dofs, n_dofs);
-  FETools::compute_node_matrix(M, *this);
-
-//   std::cout << std::endl;
-//   M.print_formatted(std::cout, 2, true);
-
+  // Now compute the inverse node matrix, generating the correct
+  // basis functions from the raw ones. For a discussion of what
+  // exactly happens here, see FETools::compute_node_matrix.
+  const FullMatrix<double> M = FETools::compute_node_matrix(*this);
   this->inverse_node_matrix.reinit(n_dofs, n_dofs);
   this->inverse_node_matrix.invert(M);
-  // From now on, the shape functions
-  // will be the correct ones, not
-  // the raw shape functions anymore.
+  // From now on, the shape functions provided by FiniteElement::shape_value
+  // and similar functions will be the correct ones, not
+  // the raw shape functions from the polynomial space anymore.
 
   // Embedding errors become pretty large, so we just replace the
   // regular threshold in both "computing_..." functions by 1.
@@ -107,7 +97,7 @@ std::string
 FE_BDM<dim>::get_name () const
 {
   // note that the
-  // FETools::get_fe_from_name
+  // FETools::get_fe_by_name
   // function depends on the
   // particular format of the string
   // this function returns, so they
@@ -125,47 +115,25 @@ FE_BDM<dim>::get_name () const
 
 
 template <int dim>
-FiniteElement<dim> *
+std::unique_ptr<FiniteElement<dim,dim> >
 FE_BDM<dim>::clone() const
 {
-  return new FE_BDM<dim>(*this);
+  return std_cxx14::make_unique<FE_BDM<dim>>(*this);
 }
 
 
 
 template <int dim>
 void
-FE_BDM<dim>::interpolate(
-  std::vector<double> &,
-  const std::vector<double> &) const
+FE_BDM<dim>::
+convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                        std::vector<double> &nodal_values) const
 {
-  Assert(false, ExcNotImplemented());
-}
-
-
-template <int dim>
-void
-FE_BDM<dim>::interpolate(
-  std::vector<double> &,
-  const std::vector<Vector<double> > &,
-  unsigned int) const
-{
-  Assert(false, ExcNotImplemented());
-}
-
-
-
-template <int dim>
-void
-FE_BDM<dim>::interpolate(
-  std::vector<double> &local_dofs,
-  const VectorSlice<const std::vector<std::vector<double> > > &values) const
-{
-  AssertDimension (values.size(), dim);
-  Assert (values[0].size() == this->generalized_support_points.size(),
-          ExcDimensionMismatch(values.size(), this->generalized_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
+  Assert (support_point_values.size() == this->generalized_support_points.size(),
+          ExcDimensionMismatch(support_point_values.size(), this->generalized_support_points.size()));
+  AssertDimension (support_point_values[0].size(), dim);
+  Assert (nodal_values.size() == this->dofs_per_cell,
+          ExcDimensionMismatch(nodal_values.size(),this->dofs_per_cell));
 
   // First do interpolation on faces. There, the component evaluated
   // depends on the face direction and orientation.
@@ -181,7 +149,7 @@ FE_BDM<dim>::interpolate(
       if (test_values_face.size() == 0)
         {
           for (unsigned int i=0; i<this->dofs_per_face; ++i)
-            local_dofs[dbase+i] = values[GeometryInfo<dim>::unit_normal_direction[f]][pbase+i];
+            nodal_values[dbase+i] = support_point_values[pbase+i][GeometryInfo<dim>::unit_normal_direction[f]];
           pbase += this->dofs_per_face;
         }
       else
@@ -190,8 +158,8 @@ FE_BDM<dim>::interpolate(
             {
               double s = 0.;
               for (unsigned int k=0; k<test_values_face.size(); ++k)
-                s += values[GeometryInfo<dim>::unit_normal_direction[f]][pbase+k] * test_values_face[k][i];
-              local_dofs[dbase+i] = s;
+                s += support_point_values[pbase+k][GeometryInfo<dim>::unit_normal_direction[f]] * test_values_face[k][i];
+              nodal_values[dbase+i] = s;
             }
           pbase += test_values_face.size();
         }
@@ -216,8 +184,8 @@ FE_BDM<dim>::interpolate(
         {
           double s = 0.;
           for (unsigned int k=0; k<test_values_cell.size(); ++k)
-            s += values[d][pbase+k] * test_values_cell[k][i];
-          local_dofs[dbase+i] = s;
+            s += support_point_values[pbase+k][d] * test_values_cell[k][i];
+          nodal_values[dbase+i] = s;
         }
     }
 
@@ -226,26 +194,25 @@ FE_BDM<dim>::interpolate(
 
 
 
-
 template <int dim>
 std::vector<unsigned int>
 FE_BDM<dim>::get_dpo_vector (const unsigned int deg)
 {
+  // compute the number of unknowns per cell interior/face/edge
+  //
+  // for the number of interior dofs, this is the number of
+  // polynomials up to degree deg-2 in dim dimensions.
+  //
   // the element is face-based and we have as many degrees of freedom
   // on the faces as there are polynomials of degree up to
   // deg. Observe the odd convention of
   // PolynomialSpace::compute_n_pols()!
-  unsigned int dofs_per_face = PolynomialSpace<dim-1>::compute_n_pols(deg+1);
 
-  // and then there are interior dofs, namely the number of
-  // polynomials up to degree deg-2 in dim dimensions.
-  unsigned int interior_dofs = 0;
-  if (deg>1)
-    interior_dofs = dim * PolynomialSpace<dim>::compute_n_pols(deg-1);
-
-  std::vector<unsigned int> dpo(dim+1);
-  dpo[dim-1] = dofs_per_face;
-  dpo[dim]   = interior_dofs;
+  std::vector<unsigned int> dpo(dim+1, 0u);
+  dpo[dim]   = (deg > 1 ?
+                dim * PolynomialSpace<dim>::compute_n_pols(deg-1) :
+                0u);
+  dpo[dim-1] = PolynomialSpace<dim-1>::compute_n_pols(deg+1);
 
   return dpo;
 }
@@ -263,9 +230,9 @@ FE_BDM<dim>::get_ria_vector (const unsigned int deg)
     }
 
   const unsigned int dofs_per_cell = PolynomialsBDM<dim>::compute_n_pols(deg);
-  const unsigned int dofs_per_face = PolynomialSpace<dim-1>::compute_n_pols(deg);
+  const unsigned int dofs_per_face = PolynomialSpace<dim-1>::compute_n_pols(deg+1);
 
-  Assert(GeometryInfo<dim>::faces_per_cell*dofs_per_face < dofs_per_cell,
+  Assert(GeometryInfo<dim>::faces_per_cell*dofs_per_face <= dofs_per_cell,
          ExcInternalError());
 
   // all dofs need to be
@@ -282,48 +249,54 @@ FE_BDM<dim>::get_ria_vector (const unsigned int deg)
 }
 
 
-namespace
+namespace internal
 {
-  // This function sets up the values of the polynomials we want to
-  // take moments with in the quadrature points. In fact, we multiply
-  // thos by the weights, such that the sum of function values and
-  // test_values over quadrature points yields the interpolated degree
-  // of freedom.
-  template <int dim>
-  void
-  initialize_test_values (std::vector<std::vector<double> > &test_values,
-                          const Quadrature<dim> &quadrature,
-                          const unsigned int deg)
+  namespace FE_BDM
   {
-    PolynomialsP<dim> poly(deg);
-    std::vector<Tensor<1,dim> > dummy1;
-    std::vector<Tensor<2,dim> > dummy2;
-    std::vector<Tensor<3,dim> > dummy3;
-    std::vector<Tensor<4,dim> > dummy4;
-
-    test_values.resize(quadrature.size());
-
-    for (unsigned int k=0; k<quadrature.size(); ++k)
+    namespace
+    {
+      // This function sets up the values of the polynomials we want to
+      // take moments with in the quadrature points. In fact, we multiply
+      // thos by the weights, such that the sum of function values and
+      // test_values over quadrature points yields the interpolated degree
+      // of freedom.
+      template <int dim>
+      void
+      initialize_test_values (std::vector<std::vector<double> > &test_values,
+                              const Quadrature<dim> &quadrature,
+                              const unsigned int deg)
       {
-        test_values[k].resize(poly.n());
-        poly.compute(quadrature.point(k), test_values[k], dummy1, dummy2,
-                     dummy3, dummy4);
-        for (unsigned int i=0; i < poly.n(); ++i)
+        PolynomialsP<dim> poly(deg);
+        std::vector<Tensor<1,dim> > dummy1;
+        std::vector<Tensor<2,dim> > dummy2;
+        std::vector<Tensor<3,dim> > dummy3;
+        std::vector<Tensor<4,dim> > dummy4;
+
+        test_values.resize(quadrature.size());
+
+        for (unsigned int k=0; k<quadrature.size(); ++k)
           {
-            test_values[k][i] *= quadrature.weight(k);
+            test_values[k].resize(poly.n());
+            poly.compute(quadrature.point(k), test_values[k], dummy1, dummy2,
+                         dummy3, dummy4);
+            for (unsigned int i=0; i < poly.n(); ++i)
+              {
+                test_values[k][i] *= quadrature.weight(k);
+              }
           }
       }
-  }
 
-  // This specialization only serves to avoid error messages. Nothing
-  // useful can be computed in dimension zero and thus the vector
-  // length stays zero.
-  template <>
-  void
-  initialize_test_values (std::vector<std::vector<double> > &,
-                          const Quadrature<0> &,
-                          const unsigned int)
-  {}
+      // This specialization only serves to avoid error messages. Nothing
+      // useful can be computed in dimension zero and thus the vector
+      // length stays zero.
+      template <>
+      void
+      initialize_test_values (std::vector<std::vector<double> > &,
+                              const Quadrature<0> &,
+                              const unsigned int)
+      {}
+    }
+  }
 }
 
 
@@ -366,7 +339,7 @@ FE_BDM<dim>::initialize_support_points (const unsigned int deg)
   // point values on faces in 2D. In 3D, this is impossible, since the
   // moments are only taken with respect to PolynomialsP.
   if (dim>2)
-    initialize_test_values(test_values_face, face_points, deg);
+    internal::FE_BDM::initialize_test_values(test_values_face, face_points, deg);
 
   if (deg<=1) return;
 
@@ -380,7 +353,7 @@ FE_BDM<dim>::initialize_support_points (const unsigned int deg)
   // the test functions in the
   // interior quadrature points
 
-  initialize_test_values(test_values_cell, cell_points, deg-2);
+  internal::FE_BDM::initialize_test_values(test_values_cell, cell_points, deg-2);
 }
 
 
@@ -389,4 +362,3 @@ FE_BDM<dim>::initialize_support_points (const unsigned int deg)
 #include "fe_bdm.inst"
 
 DEAL_II_NAMESPACE_CLOSE
-

@@ -17,7 +17,6 @@
 #include "../tests.h"
 #include "shapes.h"
 #include <deal.II/fe/mapping_q1.h>
-#include <fstream>
 #include <string>
 
 #include <deal.II/fe/fe_bernstein.h>
@@ -26,7 +25,7 @@
 #define PRECISION 8
 
 
-template<int dim>
+template <int dim>
 void plot_FE_Bernstein_shape_functions()
 {
   MappingQGeneric<dim> m(1);
@@ -64,7 +63,6 @@ int main()
   std::ofstream logfile ("output");
   deallog << std::setprecision(PRECISION) << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   plot_FE_Bernstein_shape_functions<1>();
   plot_FE_Bernstein_shape_functions<2>();

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,6 +16,8 @@
 #include <deal.II/base/table_handler.h>
 #include <deal.II/base/table.h>
 
+#include <boost/io/ios_state.hpp>
+
 #include <sstream>
 #include <iostream>
 #include <iomanip>
@@ -29,10 +31,6 @@ DEAL_II_NAMESPACE_OPEN
 // inline and template functions
 namespace internal
 {
-  TableEntry::TableEntry ()
-  {}
-
-
   double TableEntry::get_numeric_value () const
   {
     // we don't quite know the data type in 'value', but
@@ -187,6 +185,42 @@ TableHandler::TableHandler()
 
 
 
+void TableHandler::declare_column (const std::string &key)
+{
+  // see if the column already exists; insert it if not
+  Assert (columns.find(key) == columns.end(),
+          ExcMessage ("You are trying to declare a column with key <" + key +
+                      "> but such a column already exists."));
+
+  columns.insert(std::make_pair(key, Column(key)));
+  column_order.push_back(key);
+}
+
+
+
+void TableHandler::start_new_row ()
+{
+  // figure out the longest current column
+  unsigned int max_col_length = 0;
+  for (std::map< std::string, Column >::iterator p = columns.begin(); p != columns.end(); ++p)
+    max_col_length = std::max(max_col_length,
+                              static_cast<unsigned int>(p->second.entries.size()));
+
+
+  // then pad all columns to that length with empty strings
+  for (std::map<std::string,Column>::iterator col=columns.begin(); col!=columns.end(); ++col)
+    while (col->second.entries.size() < max_col_length)
+      {
+        col->second.entries.emplace_back("");
+        internal::TableEntry &entry = col->second.entries.back();
+        entry.cache_string(col->second.scientific, col->second.precision);
+        col->second.max_length = std::max(col->second.max_length,
+                                          static_cast<unsigned int>(entry.get_cached_string().length()));
+      }
+}
+
+
+
 void
 TableHandler::set_auto_fill_mode (const bool state)
 {
@@ -322,6 +356,7 @@ void TableHandler::write_text(std::ostream &out,
                               const TextOutputFormat format) const
 {
   AssertThrow (out, ExcIO());
+  boost::io::ios_flags_saver restore_flags(out);
 
   // first pad the table from below if necessary
   if (auto_fill_mode == true)

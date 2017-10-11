@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -18,7 +18,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/grid_generator.h>
@@ -33,13 +32,9 @@
 #include <deal.II/fe/fe_raviart_thomas.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <string>
 
 
-std::string output_file_name = "output";
 
 
 
@@ -144,11 +139,10 @@ check ()
 
 int main()
 {
-  std::ofstream logfile(output_file_name.c_str());
+  std::ofstream logfile("output");
   logfile << std::setprecision (2);
   deallog << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check<1> ();
   check<2> ();

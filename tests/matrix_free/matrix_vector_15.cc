@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,12 +24,12 @@
 #include <deal.II/matrix_free/fe_evaluation.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/tria_boundary_lib.h>
+#include <deal.II/grid/manifold_lib.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -119,7 +119,7 @@ void do_test (const DoFHandler<dim> &dof,
   // assemble sparse matrix with (\nabla v, \nabla u) + (v, 10 * u)
   SparsityPattern sparsity;
   {
-    CompressedSimpleSparsityPattern csp(dof.n_dofs(), dof.n_dofs());
+    DynamicSparsityPattern csp(dof.n_dofs(), dof.n_dofs());
     DoFTools::make_sparsity_pattern (dof, csp, constraints, true);
     sparsity.copy_from(csp);
   }
@@ -177,18 +177,24 @@ void do_test (const DoFHandler<dim> &dof,
 template <int dim, int fe_degree>
 void test ()
 {
+  const SphericalManifold<dim> manifold;
   Triangulation<dim> tria;
   GridGenerator::hyper_ball (tria);
-  static const HyperBallBoundary<dim> boundary;
-  tria.set_boundary (0, boundary);
+  typename Triangulation<dim>::active_cell_iterator
+  cell = tria.begin_active (),
+  endc = tria.end();
+  for (; cell!=endc; ++cell)
+    for (unsigned int f=0; f<GeometryInfo<dim>::faces_per_cell; ++f)
+      if (cell->at_boundary(f))
+        cell->face(f)->set_all_manifold_ids(0);
+  tria.set_manifold (0, manifold);
+
   if (dim < 3 || fe_degree < 2)
     tria.refine_global(1);
   tria.begin(tria.n_levels()-1)->set_refine_flag();
   tria.last()->set_refine_flag();
   tria.execute_coarsening_and_refinement();
-  typename Triangulation<dim>::active_cell_iterator
-  cell = tria.begin_active (),
-  endc = tria.end();
+  cell = tria.begin_active ();
   for (; cell!=endc; ++cell)
     if (cell->center().norm()<1e-8)
       cell->set_refine_flag();
@@ -199,7 +205,7 @@ void test ()
   dof.distribute_dofs(fe);
   ConstraintMatrix constraints;
   DoFTools::make_hanging_node_constraints(dof, constraints);
-  VectorTools::interpolate_boundary_values (dof, 0, ZeroFunction<dim>(),
+  VectorTools::interpolate_boundary_values (dof, 0, Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close();
 
@@ -208,9 +214,7 @@ void test ()
   if (dim == 2)
     {
       deallog.push("float");
-      deallog.threshold_double(1.e-6);
       do_test<dim, fe_degree, float> (dof, constraints);
-      deallog.threshold_double(5.e-11);
       deallog.pop();
     }
 }
@@ -224,7 +228,6 @@ int main ()
   deallog << std::setprecision (3);
 
   {
-    deallog.threshold_double(5.e-11);
     deallog.push("2d");
     test<2,1>();
     test<2,2>();

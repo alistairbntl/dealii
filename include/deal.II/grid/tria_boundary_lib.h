@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tria_boundary_lib_h
-#define dealii__tria_boundary_lib_h
+#ifndef dealii_tria_boundary_lib_h
+#define dealii_tria_boundary_lib_h
 
 
 #include <deal.II/base/config.h>
@@ -40,6 +40,9 @@ DEAL_II_NAMESPACE_OPEN
  * This class is derived from StraightBoundary rather than from Boundary,
  * which would seem natural, since this way we can use the
  * StraightBoundary::in_between() function.
+ *
+ * @deprecated The boundary classes have been deprecated in favor of the more
+ * general Manifold classes.
  *
  * @ingroup boundary
  *
@@ -155,7 +158,7 @@ private:
    * Given a number for the axis, return a vector that denotes this direction.
    */
   static Point<spacedim> get_axis_vector (const unsigned int axis);
-};
+} DEAL_II_DEPRECATED;
 
 
 
@@ -188,6 +191,9 @@ private:
  *
  * @image html cone_2d.png
  * @image html cone_3d.png
+ *
+ * @deprecated The boundary classes have been deprecated in favor of the more
+ * general Manifold classes.
  *
  * @author Markus B&uuml;rg, 2009
  */
@@ -262,6 +268,18 @@ public:
   get_normals_at_vertices (const typename Triangulation<dim>::face_iterator &face,
                            typename Boundary<dim>::FaceVertexNormals &face_vertex_normals) const;
 
+  /**
+   * Implementation of the function declared in the base class.
+   *
+   * Refer to the general documentation of this class and the documentation of
+   * the base class.
+   */
+  virtual
+  Tensor<1,dim>
+  normal_vector (const typename Triangulation<dim>::face_iterator &face,
+                 const Point<dim> &p) const;
+
+
 protected:
   /**
    * First radius of the (truncated) cone.
@@ -295,7 +313,7 @@ private:
   get_intermediate_points_between_points (const Point<dim> &p0,
                                           const Point<dim> &p1,
                                           std::vector<Point<dim> > &points) const;
-};
+} DEAL_II_DEPRECATED;
 
 
 
@@ -313,6 +331,9 @@ private:
  * StraightBoundary::in_between() function.
  *
  * @ingroup boundary
+ *
+ * @deprecated The boundary classes have been deprecated in favor of the more
+ * general Manifold classes.
  *
  * @author Wolfgang Bangerth, 1998, Ralf Hartmann, 2001
  */
@@ -438,7 +459,7 @@ private:
    */
   void get_intermediate_points_between_points (const Point<spacedim> &p0, const Point<spacedim> &p1,
                                                std::vector<Point<spacedim> > &points) const;
-};
+} DEAL_II_DEPRECATED;
 
 
 
@@ -451,6 +472,9 @@ private:
  * of rotation.
  *
  * @ingroup boundary
+ *
+ * @deprecated The boundary classes have been deprecated in favor of the more
+ * general Manifold classes.
  *
  * @author Wolfgang Bangerth, 1999, 2001
  */
@@ -505,7 +529,7 @@ public:
   virtual void
   get_normals_at_vertices (const typename Triangulation<dim>::face_iterator &face,
                            typename Boundary<dim>::FaceVertexNormals &face_vertex_normals) const;
-};
+} DEAL_II_DEPRECATED;
 
 
 
@@ -516,6 +540,9 @@ public:
  *
  * @ingroup boundary
  *
+ * @deprecated The boundary classes have been deprecated in favor of the more
+ * general Manifold classes.
+ *
  * @author Wolfgang Bangerth, 1999
  */
 template <int dim>
@@ -525,11 +552,11 @@ public:
   /**
    * Constructor. The center of the spheres defaults to the origin.
    *
-   * Calls the constructor of its base @p HyperBallBoundary class with a dummy
+   * Call the constructor of its base @p HyperBallBoundary class with a dummy
    * radius as argument. This radius will be ignored
    */
   HyperShellBoundary (const Point<dim> &center = Point<dim>());
-};
+} DEAL_II_DEPRECATED;
 
 
 
@@ -542,6 +569,9 @@ public:
  * rotation.
  *
  * @ingroup boundary
+ *
+ * @deprecated The boundary classes have been deprecated in favor of the more
+ * general Manifold classes.
  *
  * @author Wolfgang Bangerth, 2000, 2009
  */
@@ -608,7 +638,7 @@ private:
    */
   const double inner_radius;
   const double outer_radius;
-};
+} DEAL_II_DEPRECATED;
 
 
 /**
@@ -618,6 +648,9 @@ private:
  *
  * This class is only implemented for <tt>dim=2</tt>,<tt>spacedim=3</tt>, that
  * is, just the surface.
+ *
+ * @deprecated This class has been deprecated in favor of the more general
+ * Manifold class.
  */
 template <int dim, int spacedim>
 class TorusBoundary : public Boundary<dim,spacedim>
@@ -702,7 +735,7 @@ private:
    */
   const double R;
   const double r;
-};
+} DEAL_II_DEPRECATED;
 
 
 

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -58,7 +58,7 @@ namespace
     const unsigned int n_selected
       = std::accumulate(selected.begin(),
                         selected.end(),
-                        0U);
+                        0u);
 
     if (ndofs.size() == 0)
       {
@@ -137,16 +137,12 @@ MGTransferBlockSelect<number>::copy_to_mg (
   // multilevel block is always the
   // first, since only one block is
   // selected.
-  bool first = true;
   for (unsigned int level=mg_dof_handler.get_triangulation().n_levels(); level != 0;)
     {
       --level;
       for (IT i= copy_indices[selected_block][level].begin();
            i != copy_indices[selected_block][level].end(); ++i)
         dst[level](i->second) = src.block(selected_block)(i->first);
-      if (!first)
-        restrict_and_add (level+1, dst[level], dst[level+1]);
-      first = false;
     }
 }
 
@@ -164,16 +160,12 @@ MGTransferBlockSelect<number>::copy_to_mg (
   // For MGTransferBlockSelect, the
   // multilevel block is always the
   // first, since only one block is selected.
-  bool first = true;
   for (unsigned int level=mg_dof_handler.get_triangulation().n_levels(); level != 0;)
     {
       --level;
       for (IT i= copy_indices[selected_block][level].begin();
            i != copy_indices[selected_block][level].end(); ++i)
         dst[level](i->second) = src(i->first);
-      if (!first)
-        restrict_and_add (level+1, dst[level], dst[level+1]);
-      first = false;
     }
 }
 
@@ -188,7 +180,6 @@ MGTransferBlock<number>::copy_to_mg (
   const BlockVector<number2> &src) const
 {
   reinit_vector_by_blocks(mg_dof_handler, dst, selected, sizes);
-  bool first = true;
   for (unsigned int level=mg_dof_handler.get_triangulation().n_levels(); level != 0;)
     {
       --level;
@@ -197,9 +188,6 @@ MGTransferBlock<number>::copy_to_mg (
           for (IT i= copy_indices[block][level].begin();
                i != copy_indices[block][level].end(); ++i)
             dst[level].block(mg_block[block])(i->second) = src.block(block)(i->first);
-      if (!first)
-        restrict_and_add (level+1, dst[level], dst[level+1]);
-      first = false;
     }
 }
 
@@ -285,13 +273,13 @@ void MGTransferBlockBase::build_matrices (
   // by itself
   prolongation_matrices.resize (0);
   prolongation_sparsities.resize (0);
+  prolongation_matrices.reserve (n_levels - 1);
+  prolongation_sparsities.reserve (n_levels - 1);
 
   for (unsigned int i=0; i<n_levels-1; ++i)
     {
-      prolongation_sparsities
-      .push_back (std_cxx11::shared_ptr<BlockSparsityPattern> (new BlockSparsityPattern));
-      prolongation_matrices
-      .push_back (std_cxx11::shared_ptr<BlockSparseMatrix<double> > (new BlockSparseMatrix<double>));
+      prolongation_sparsities.emplace_back (new BlockSparsityPattern);
+      prolongation_matrices.emplace_back (new BlockSparseMatrix<double>);
     }
 
   // two fields which will store the
@@ -410,7 +398,7 @@ void MGTransferBlockBase::build_matrices (
   // impose boundary conditions
   // but only in the column of
   // the prolongation matrix
-  if (mg_constrained_dofs != 0 && mg_constrained_dofs->have_boundary_indices())
+  if (mg_constrained_dofs != nullptr && mg_constrained_dofs->have_boundary_indices())
     {
       std::vector<types::global_dof_index> constrain_indices;
       std::vector<std::vector<bool> > constraints_per_block (n_blocks);
@@ -506,7 +494,7 @@ void MGTransferBlockSelect<number>::build_matrices (
               const unsigned int block = fe.system_to_block_index(i).first;
               if (selected[block])
                 {
-                  if (mg_constrained_dofs != 0)
+                  if (mg_constrained_dofs != nullptr)
                     {
                       if (!mg_constrained_dofs->at_refinement_edge(level,level_dof_indices[i]))
                         temp_copy_indices[level_dof_indices[i] - mg_block_start[level][block]]
@@ -527,8 +515,9 @@ void MGTransferBlockSelect<number>::build_matrices (
       // copy_indices.
       const types::global_dof_index n_active_dofs =
         std::count_if (temp_copy_indices.begin(), temp_copy_indices.end(),
-                       std::bind2nd(std::not_equal_to<types::global_dof_index>(),
-                                    numbers::invalid_dof_index));
+                       std::bind (std::not_equal_to<types::global_dof_index>(),
+                                  std::placeholders::_1,
+                                  numbers::invalid_dof_index));
       copy_indices[selected_block][level].resize (n_active_dofs);
       types::global_dof_index counter = 0;
       for (types::global_dof_index i=0; i<temp_copy_indices.size(); ++i)
@@ -607,8 +596,9 @@ void MGTransferBlock<number>::build_matrices (
             const types::global_dof_index n_active_dofs =
               std::count_if (temp_copy_indices[block].begin(),
                              temp_copy_indices[block].end(),
-                             std::bind2nd(std::not_equal_to<types::global_dof_index>(),
-                                          numbers::invalid_dof_index));
+                             std::bind (std::not_equal_to<types::global_dof_index>(),
+                                        std::placeholders::_1,
+                                        numbers::invalid_dof_index));
             copy_indices[block][level].resize (n_active_dofs);
             types::global_dof_index counter = 0;
             for (types::global_dof_index i=0; i<temp_copy_indices[block].size(); ++i)

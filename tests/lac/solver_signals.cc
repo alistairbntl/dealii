@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,13 +19,9 @@
 
 
 #include "../tests.h"
-#include "testmatrix.h"
-#include <cmath>
+#include "../testmatrix.h"
 #include <complex>
-#include <fstream>
-#include <iomanip>
 #include <string>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_memory.h>
@@ -45,7 +41,7 @@ void output_coefficients(double alpha,double beta)
   deallog<<"alpha: "<< alpha << " beta: "<< beta << std::endl;
 }
 
-template<class NUMBER>
+template <class NUMBER>
 void output_eigenvalues(const std::vector<NUMBER> &eigenvalues,const std::string &text)
 {
   deallog<< text;
@@ -56,7 +52,7 @@ void output_eigenvalues(const std::vector<NUMBER> &eigenvalues,const std::string
   deallog << std::endl;
 }
 
-template<class NUMBER>
+template <class NUMBER>
 void output_hessenberg_matrix(const FullMatrix<NUMBER> &H,const std::string &text)
 {
   deallog << text << std::endl;
@@ -68,7 +64,7 @@ void output_hessenberg_matrix(const FullMatrix<NUMBER> &H,const std::string &tex
     }
 }
 
-template<class NUMBER>
+template <class NUMBER>
 void output_arnoldi_vectors_norms(const internal::SolverGMRES::TmpVectors<Vector<NUMBER> > &tmp_vector,const std::string &text)
 {
   deallog << text << std::endl;
@@ -76,7 +72,7 @@ void output_arnoldi_vectors_norms(const internal::SolverGMRES::TmpVectors<Vector
     deallog << tmp_vector[i].l2_norm() << std::endl;
 }
 
-template<typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
+template <typename SolverType, typename MatrixType, typename VectorType, class PRECONDITION>
 void
 check_solve(SolverType         &solver,
             const MatrixType   &A,
@@ -103,7 +99,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   SolverControl solver_control(100, 1.e-3);
 
@@ -128,30 +123,30 @@ int main()
       //Attach all possible slots.
       solver_cg.connect_coefficients_slot(&output_coefficients);
       solver_cg.connect_condition_number_slot(
-        std_cxx11::bind(output_double_number,std_cxx11::_1,"Condition number: "),true);
+        std::bind(output_double_number,std::placeholders::_1,"Condition number: "),true);
       solver_cg.connect_condition_number_slot(
-        std_cxx11::bind(output_double_number,std_cxx11::_1,"Final condition number: "));
+        std::bind(output_double_number,std::placeholders::_1,"Final condition number: "));
       solver_cg.connect_eigenvalues_slot(
-        std_cxx11::bind(output_eigenvalues<double>,std_cxx11::_1,"Eigenvalues: "),true);
+        std::bind(output_eigenvalues<double>,std::placeholders::_1,"Eigenvalues: "),true);
       solver_cg.connect_eigenvalues_slot(
-        std_cxx11::bind(output_eigenvalues<double>,std_cxx11::_1,"Final Eigenvalues: "));
+        std::bind(output_eigenvalues<double>,std::placeholders::_1,"Final Eigenvalues: "));
       solver_cg.solve(A,u,f,PreconditionIdentity());
 
       u=0;
       SolverGMRES<> solver_gmres(solver_control);
       //Attach all possible slots.
       solver_gmres.connect_condition_number_slot(
-        std_cxx11::bind(output_double_number,std_cxx11::_1,"Condition number: "),true);
+        std::bind(output_double_number,std::placeholders::_1,"Condition number: "),true);
       solver_gmres.connect_condition_number_slot(
-        std_cxx11::bind(output_double_number,std_cxx11::_1,"Final condition number: "));
+        std::bind(output_double_number,std::placeholders::_1,"Final condition number: "));
       solver_gmres.connect_eigenvalues_slot(
-        std_cxx11::bind(output_eigenvalues<std::complex<double> >,std_cxx11::_1,"Eigenvalues: "),true);
+        std::bind(output_eigenvalues<std::complex<double> >,std::placeholders::_1,"Eigenvalues: "),true);
       solver_gmres.connect_eigenvalues_slot(
-        std_cxx11::bind(output_eigenvalues<std::complex<double> >,std_cxx11::_1,"Final Eigenvalues: "));
+        std::bind(output_eigenvalues<std::complex<double> >,std::placeholders::_1,"Final Eigenvalues: "));
       solver_gmres.connect_hessenberg_slot(
-        std_cxx11::bind(output_hessenberg_matrix<double>,std_cxx11::_1,"Hessenberg matrix: "),false);
+        std::bind(output_hessenberg_matrix<double>,std::placeholders::_1,"Hessenberg matrix: "),false);
       solver_gmres.connect_krylov_space_slot(
-        std_cxx11::bind(output_arnoldi_vectors_norms<double>,std_cxx11::_1,"Arnoldi vectors norms: "));
+        std::bind(output_arnoldi_vectors_norms<double>,std::placeholders::_1,"Arnoldi vectors norms: "));
       solver_gmres.solve(A,u,f,PreconditionIdentity());
     }
   catch (std::exception &e)

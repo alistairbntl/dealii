@@ -26,7 +26,6 @@
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/petsc_parallel_sparse_matrix.h>
 #include <deal.II/lac/petsc_parallel_vector.h>
-#include <fstream>
 #include <iostream>
 
 
@@ -83,8 +82,7 @@ void test ()
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   try
     {

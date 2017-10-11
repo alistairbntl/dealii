@@ -20,7 +20,7 @@
 #                                                                      #
 ########################################################################
 
-DEAL_II_QUERY_GIT_INFORMATION()
+DEAL_II_QUERY_GIT_INFORMATION("DEAL_II")
 
 FILE(WRITE ${CMAKE_BINARY_DIR}/revision.log
 "###
@@ -41,20 +41,28 @@ FILE(WRITE ${CMAKE_BINARY_DIR}/revision.log
 
 SET(_log_detailed "${CMAKE_BINARY_DIR}/detailed.log")
 SET(_log_summary  "${CMAKE_BINARY_DIR}/summary.log")
-FILE(REMOVE ${_log_detailed} ${_log_summary})
+SET(_log_feature "${CMAKE_BINARY_DIR}/${DEAL_II_PROJECT_CONFIG_RELDIR}/${DEAL_II_PROJECT_CONFIG_NAME}FeatureConfig.cmake")
+FILE(REMOVE ${_log_detailed} ${_log_summary} ${_log_feature})
 
 MACRO(_both)
   # Write to both log files:
   FILE(APPEND ${_log_detailed} "${ARGN}")
   FILE(APPEND ${_log_summary} "${ARGN}")
 ENDMACRO()
+
 MACRO(_detailed)
   # Only write to detailed.log:
   FILE(APPEND ${_log_detailed} "${ARGN}")
 ENDMACRO()
+
 MACRO(_summary)
   # Only write to summary.log:
   FILE(APPEND ${_log_summary} "${ARGN}")
+ENDMACRO()
+
+MACRO(_featurelog)
+  # Only write to deal.IIFeatureConfig.cmake:
+  FILE(APPEND ${_log_feature} "${ARGN}")
 ENDMACRO()
 
 _both(
@@ -201,12 +209,21 @@ FOREACH(_feature ${_deal_ii_features_sorted})
     IF(_feature MATCHES "MPI" AND DEFINED OMPI_VERSION)
       _detailed("#            OMPI_VERSION = ${OMPI_VERSION}\n")
     ENDIF()
+    IF(_feature MATCHES "CUDA" AND DEFINED CUDA_COMPUTE_CAPABILITY)
+      _detailed("#            CMAKE_CUDA_COMPILER = ${CMAKE_CUDA_COMPILER}\n")
+      _detailed("#            CUDA_COMPUTE_CAPABILITY = ${CUDA_COMPUTE_CAPABILITY_MAJOR}.${CUDA_COMPUTE_CAPABILITY_MINOR}\n")
+      _detailed("#            DEAL_II_CUDA_FLAGS = ${DEAL_II_CUDA_FLAGS}\n")
+      _detailed("#            DEAL_II_CUDA_FLAGS_RELEASE = ${DEAL_II_CUDA_FLAGS_RELEASE}\n")
+      _detailed("#            DEAL_II_CUDA_FLAGS_DEBUG = ${DEAL_II_CUDA_FLAGS_DEBUG}\n")
+    ENDIF()
+
 
     #
     # Print out ${_feature}_DIR:
     #
     IF(NOT "${${_feature}_DIR}" STREQUAL "")
       _detailed("#            ${_feature}_DIR = ${${_feature}_DIR}\n")
+      _featurelog("SET(DEAL_II_${_feature}_DIR \"${${_feature}_DIR}\")\n")
     ENDIF()
 
     #
@@ -218,6 +235,7 @@ FOREACH(_feature ${_deal_ii_features_sorted})
       )
       IF(DEFINED ${_feature}_${_var2})
         _detailed("#            ${_feature}_${_var2} = ${${_feature}_${_var2}}\n")
+        _featurelog("SET(DEAL_II_${_feature}_${_var2} \"${${_feature}_${_var2}}\")\n")
       ENDIF()
     ENDFOREACH()
   ELSE()

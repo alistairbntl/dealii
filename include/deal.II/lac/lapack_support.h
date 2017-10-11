@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__lapack_support_h
-#define dealii__lapack_support_h
+#ifndef dealii_lapack_support_h
+#define dealii_lapack_support_h
 
 
 #include <deal.II/base/config.h>
@@ -23,12 +23,19 @@
 DEAL_II_NAMESPACE_OPEN
 
 
+/**
+ * A namespace containing constants, exceptions, enumerations, and other
+ * utilities used by the deal.II LAPACK bindings.
+ */
 namespace LAPACKSupport
 {
   /**
-   * Most LAPACK functions change the contents of the matrix applied to to
-   * something which is not a matrix anymore. Therefore, LAPACK matrix classes
-   * in <tt>deal.II</tt> have a state flag indicating what happened to them.
+   * Most of the LAPACK functions one can apply to a matrix (e.g., by calling
+   * the member functions of this class) change its content in some ways. For
+   * example, they may invert the matrix, or may replace it by a matrix whose
+   * columns represent the eigenvectors of the original content of the matrix.
+   * The elements of this enumeration are therefore used to track what is
+   * currently being stored by this object.
    *
    * @author Guido Kanschat, 2005
    */
@@ -40,6 +47,8 @@ namespace LAPACKSupport
     inverse_matrix,
     /// Contents is an LU decomposition.
     lu,
+    /// Contents is a Cholesky decomposition.
+    cholesky,
     /// Eigenvalue vector is filled
     eigenvalues,
     /// Matrix contains singular value decomposition,
@@ -80,21 +89,46 @@ namespace LAPACKSupport
    * A matrix can have certain features allowing for optimization, but hard to
    * test. These are listed here.
    */
-  enum Properties
+  enum Property
   {
     /// No special properties
     general = 0,
     /// Matrix is symmetric
     symmetric = 1,
     /// Matrix is upper triangular
-    upper_triangle = 2,
+    upper_triangular = 2,
     /// Matrix is lower triangular
-    lower_triangle = 4,
+    lower_triangular = 4,
     /// Matrix is diagonal
     diagonal = 6,
     /// Matrix is in upper Hessenberg form
     hessenberg = 8
   };
+
+  /**
+   * Function printing the name of a Property.
+   */
+  inline const char *property_name(const Property s)
+  {
+    switch (s)
+      {
+      case general:
+        return "general";
+      case symmetric:
+        return "symmetric";
+      case upper_triangular:
+        return "upper triangular";
+      case lower_triangular:
+        return "lower triangular";
+      case diagonal:
+        return "diagonal";
+      case hessenberg:
+        return "Hessenberg";
+      }
+
+    Assert (false, ExcNotImplemented());
+    return "invalid";
+  }
 
   /**
    * Character constant.
@@ -112,6 +146,10 @@ namespace LAPACKSupport
    * Character constant.
    */
   static const char U = 'U';
+  /**
+   * Character constant.
+   */
+  static const char L = 'L';
   /**
    * Character constant.
    */
@@ -139,6 +177,15 @@ namespace LAPACKSupport
   DeclException1(ExcState, State,
                  << "The function cannot be called while the matrix is in state "
                  << state_name(arg1));
+
+  /**
+   * Exception thrown when a matrix does not have suitable properties for an
+   * operation.
+   */
+  DeclException1(ExcProperty, Property,
+                 << "The function cannot be called with a "
+                 << property_name(arg1)
+                 << " matrix.");
 
   /**
    * This exception is thrown if a certain LAPACK function is not available

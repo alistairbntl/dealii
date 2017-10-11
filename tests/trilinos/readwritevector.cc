@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,12 +17,10 @@
 
 #include "../tests.h"
 #include <deal.II/base/index_set.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/read_write_vector.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/trilinos_vector.h>
 
-#include <fstream>
 #include <vector>
 
 void test()
@@ -110,9 +108,7 @@ void test()
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
   test();

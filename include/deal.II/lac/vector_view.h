@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__vector_view_h
-#define dealii__vector_view_h
+#ifndef dealii_vector_view_h
+#define dealii_vector_view_h
 
 
 #include <deal.II/base/config.h>
@@ -120,15 +120,14 @@ DEAL_II_NAMESPACE_OPEN
  *
  *
  * @note Instantiations for this template are provided for <tt>@<float@>,
- * @<double@>, @<long double@>, @<std::complex@<float@>@>,
- * @<std::complex@<double@>@>, @<std::complex@<long double@>@></tt>; others
- * can be generated in application programs (see the section on
+ * @<double@>, @<std::complex@<float@>@>, @<std::complex@<double@>@></tt>;
+ * others can be generated in application programs (see the section on
  * @ref Instantiations
  * in the manual).
  *
  * @author Luca Heltai, 2009
  */
-template<typename Number>
+template <typename Number>
 class VectorView : public Vector<Number>
 {
 public:
@@ -233,7 +232,7 @@ public:
 
 #ifndef DOXYGEN
 
-template<typename Number>
+template <typename Number>
 inline
 VectorView<Number>::VectorView(const size_type new_size, Number *ptr)
 {
@@ -244,7 +243,7 @@ VectorView<Number>::VectorView(const size_type new_size, Number *ptr)
 
 
 
-template<typename Number>
+template <typename Number>
 inline
 VectorView<Number>::VectorView(const size_type new_size, const Number *ptr)
 {
@@ -255,7 +254,7 @@ VectorView<Number>::VectorView(const size_type new_size, const Number *ptr)
 
 
 
-template<typename Number>
+template <typename Number>
 inline
 VectorView<Number>::~VectorView()
 {
@@ -263,11 +262,11 @@ VectorView<Number>::~VectorView()
   // memory it doesn't own
   this->vec_size = 0;
   this->max_vec_size = 0;
-  this->val = 0;
+  this->val = nullptr;
 }
 
 
-template<typename Number>
+template <typename Number>
 inline
 void VectorView<Number>::reinit(const size_type N,
                                 const bool omit_zeroing_entries)
@@ -279,7 +278,7 @@ void VectorView<Number>::reinit(const size_type N,
 }
 
 
-template<typename Number>
+template <typename Number>
 inline
 void VectorView<Number>::reinit(const size_type new_size, Number *ptr)
 {
@@ -289,7 +288,7 @@ void VectorView<Number>::reinit(const size_type new_size, Number *ptr)
 }
 
 
-template<typename Number>
+template <typename Number>
 inline
 void VectorView<Number>::reinit(const size_type new_size, const Number *ptr)
 {
@@ -299,7 +298,7 @@ void VectorView<Number>::reinit(const size_type new_size, const Number *ptr)
 }
 
 
-template<typename Number>
+template <typename Number>
 inline
 void VectorView<Number>::swap(Vector<Number> &)
 {

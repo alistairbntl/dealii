@@ -26,7 +26,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -37,7 +36,6 @@
 #include <deal.II/fe/fe_q.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
 #define PRECISION 2
@@ -103,7 +101,6 @@ main()
   logfile.precision (PRECISION);
   logfile.setf(std::ios::fixed);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1>();
   test<2>();

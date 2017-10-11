@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,10 +13,10 @@
 //
 // ---------------------------------------------------------------------
 
+#include "../tests.h"
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 
 #include <deal.II/lac/constraint_matrix.h>
@@ -56,7 +56,6 @@
 #include <deal.II/multigrid/mg_smoother.h>
 #include <deal.II/multigrid/mg_matrix.h>
 
-#include <fstream>
 #include <sstream>
 
 using namespace dealii;
@@ -237,9 +236,9 @@ void LaplaceProblem<dim>::setup_system ()
     }
 
   mg_matrices.resize(0, nlevels-1);
-  mg_matrices.clear ();
+  mg_matrices.clear_elements ();
   mg_matrices_renumbered.resize(0, nlevels-1);
-  mg_matrices_renumbered.clear ();
+  mg_matrices_renumbered.clear_elements ();
   mg_sparsity.resize(0, nlevels-1);
   mg_sparsity_renumbered.resize(0, nlevels-1);
 
@@ -324,7 +323,7 @@ template <int dim>
 void LaplaceProblem<dim>::test ()
 {
   typename FunctionMap<dim>::type      dirichlet_boundary;
-  ZeroFunction<dim>                    dirichlet_bc(fe.n_components());
+  Functions::ZeroFunction<dim>                    dirichlet_bc(fe.n_components());
   dirichlet_boundary[0] =             &dirichlet_bc;
 
   const unsigned int min_l = mg_matrices.min_level();
@@ -340,12 +339,9 @@ void LaplaceProblem<dim>::test ()
   MGConstrainedDoFs mg_constrained_dofs_renumbered;
   mg_constrained_dofs_renumbered.initialize(mg_dof_handler_renumbered, dirichlet_boundary);
 
-  ConstraintMatrix constraints;
-  constraints.close();
-
-  MGTransferPrebuilt<Vector<double> > mg_transfer (constraints, mg_constrained_dofs);
+  MGTransferPrebuilt<Vector<double> > mg_transfer (mg_constrained_dofs);
   mg_transfer.build_matrices(mg_dof_handler);
-  MGTransferPrebuilt<Vector<double> > mg_transfer_renumbered (constraints, mg_constrained_dofs_renumbered);
+  MGTransferPrebuilt<Vector<double> > mg_transfer_renumbered (mg_constrained_dofs_renumbered);
   mg_transfer_renumbered.build_matrices(mg_dof_handler_renumbered);
 
   FullMatrix<double> coarse_matrix;
@@ -479,10 +475,8 @@ void LaplaceProblem<dim>::run ()
 
 int main ()
 {
-  std::ofstream logfile("output");
+  initlog();
   deallog << std::setprecision(4);
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   LaplaceProblem<2> laplace_problem_2d(1);
   laplace_problem_2d.run ();

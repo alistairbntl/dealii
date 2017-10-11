@@ -38,8 +38,6 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/fe/fe_q.h>
-#include <fstream>
-#include <iomanip>
 
 
 template <int dim>
@@ -95,7 +93,7 @@ void test ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             1,
-                                            ConstantFunction<dim>(1.),
+                                            Functions::ConstantFunction<dim>(1.),
                                             boundary_values);
   ConstraintMatrix constraints;
   constraints.clear();
@@ -153,9 +151,7 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   try
     {

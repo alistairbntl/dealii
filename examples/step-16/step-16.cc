@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2003 - 2015 by the deal.II authors
+ * Copyright (C) 2003 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -195,11 +195,6 @@ namespace Step16
     SparsityPattern      sparsity_pattern;
     SparseMatrix<double> system_matrix;
 
-    // We need an additional object for the hanging nodes constraints. They
-    // are handed to the transfer object in the multigrid. Since we call a
-    // compress inside the multigrid these constraints are not allowed to be
-    // inhomogeneous so we store them in different ConstraintMatrix objects.
-    ConstraintMatrix     hanging_node_constraints;
     ConstraintMatrix     constraints;
 
     Vector<double>       solution;
@@ -266,7 +261,7 @@ namespace Step16
   void LaplaceProblem<dim>::setup_system ()
   {
     dof_handler.distribute_dofs (fe);
-    dof_handler.distribute_mg_dofs (fe);
+    dof_handler.distribute_mg_dofs ();
 
     deallog << "   Number of degrees of freedom: "
             << dof_handler.n_dofs()
@@ -284,18 +279,17 @@ namespace Step16
     system_rhs.reinit (dof_handler.n_dofs());
 
     constraints.clear ();
-    hanging_node_constraints.clear ();
-    DoFTools::make_hanging_node_constraints (dof_handler, hanging_node_constraints);
     DoFTools::make_hanging_node_constraints (dof_handler, constraints);
 
+    std::set<types::boundary_id>         dirichlet_boundary_ids;
     typename FunctionMap<dim>::type      dirichlet_boundary_functions;
-    ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
+    Functions::ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
+    dirichlet_boundary_ids.insert(0);
     dirichlet_boundary_functions[0] = &homogeneous_dirichlet_bc;
     VectorTools::interpolate_boundary_values (static_cast<const DoFHandler<dim>&>(dof_handler),
                                               dirichlet_boundary_functions,
                                               constraints);
     constraints.close ();
-    hanging_node_constraints.close ();
     constraints.condense (dsp);
     sparsity_pattern.copy_from (dsp);
     system_matrix.reinit (sparsity_pattern);
@@ -304,7 +298,8 @@ namespace Step16
     // about the boundary values as well, so we pass the
     // <code>dirichlet_boundary</code> here as well.
     mg_constrained_dofs.clear();
-    mg_constrained_dofs.initialize(dof_handler, dirichlet_boundary_functions);
+    mg_constrained_dofs.initialize(dof_handler);
+    mg_constrained_dofs.make_zero_boundary_constraints(dof_handler, dirichlet_boundary_ids);
 
 
     // Now for the things that concern the multigrid data structures. First,
@@ -319,11 +314,11 @@ namespace Step16
     const unsigned int n_levels = triangulation.n_levels();
 
     mg_interface_in.resize(0, n_levels-1);
-    mg_interface_in.clear ();
+    mg_interface_in.clear_elements ();
     mg_interface_out.resize(0, n_levels-1);
-    mg_interface_out.clear ();
+    mg_interface_out.clear_elements ();
     mg_matrices.resize(0, n_levels-1);
-    mg_matrices.clear ();
+    mg_matrices.clear_elements ();
     mg_sparsity_patterns.resize(0, n_levels-1);
 
     // Now, we have to provide a matrix on each level. To this end, we first
@@ -484,7 +479,7 @@ namespace Step16
   template <int dim>
   void LaplaceProblem<dim>::solve ()
   {
-    MGTransferPrebuilt<Vector<double> > mg_transfer(hanging_node_constraints, mg_constrained_dofs);
+    MGTransferPrebuilt<Vector<double> > mg_transfer(mg_constrained_dofs);
     mg_transfer.build_matrices(dof_handler);
 
     FullMatrix<double> coarse_matrix;
@@ -537,8 +532,7 @@ namespace Step16
 
     // Now, we are ready to set up the V-cycle operator and the multilevel
     // preconditioner.
-    Multigrid<Vector<double> > mg(dof_handler,
-                                  mg_matrix,
+    Multigrid<Vector<double> > mg(mg_matrix,
                                   coarse_grid_solver,
                                   mg_transfer,
                                   mg_smoother,

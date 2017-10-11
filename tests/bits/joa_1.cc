@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,10 +20,8 @@
 // testcase is a simple modification of step-6, only a few lines are added
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -42,8 +40,6 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <fstream>
-#include <iomanip>
 
 // From the following include file we
 // will import the declaration of
@@ -303,7 +299,7 @@ LaplaceProblem<dim>::LaplaceProblem () :
 // is wrong, namely that some other
 // object is still using the object
 // that is presently being
-// destructed, but most of the time
+// destroyed, but most of the time
 // not who this user is. It is
 // therefore often rather
 // time-consuming to find out where
@@ -329,17 +325,17 @@ LaplaceProblem<dim>::LaplaceProblem () :
 // above. The reason is that member
 // variables of the
 // <code>LaplaceProblem</code> class are
-// destructed bottom-up (i.e. in
+// destroyed bottom-up (i.e. in
 // reverse order of their declaration
 // in the class), as always in
 // C++. Thus, the finite element
-// object will be destructed before
+// object will be destroyed before
 // the DoF handler object, since its
 // declaration is below the one of
 // the DoF handler. This triggers the
 // situation above, and an exception
 // will be raised when the <code>fe</code>
-// object is destructed. What needs
+// object is destroyed. What needs
 // to be done is to tell the
 // <code>dof_handler</code> object to release
 // its lock to the finite element. Of
@@ -555,7 +551,7 @@ void LaplaceProblem<dim>::assemble_system ()
 
   FEValues<dim> fe_values (fe, quadrature_formula,
                            update_values    |  update_gradients |
-                           update_q_points  |  update_JxW_values);
+                           update_quadrature_points  |  update_JxW_values);
 
   const unsigned int   dofs_per_cell = fe.dofs_per_cell;
   const unsigned int   n_q_points    = quadrature_formula.size();
@@ -651,7 +647,7 @@ void LaplaceProblem<dim>::assemble_system ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim>(),
+                                            Functions::ZeroFunction<dim>(),
                                             boundary_values);
   MatrixTools::apply_boundary_values (boundary_values,
                                       system_matrix,
@@ -1129,7 +1125,6 @@ int main ()
   deallog << std::setprecision (3);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // The general idea behind the
   // layout of this function is as

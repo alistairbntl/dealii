@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,16 +15,7 @@
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/job_identifier.h>
-#include <deal.II/base/memory_consumption.h>
 #include <deal.II/base/thread_management.h>
-
-#ifdef DEAL_II_HAVE_SYS_RESOURCE_H
-#  include <sys/resource.h>
-#endif
-
-#ifdef DEAL_II_HAVE_UNISTD_H
-#  include <unistd.h>
-#endif
 
 #include <iostream>
 #include <iomanip>
@@ -45,28 +36,56 @@ namespace
 LogStream deallog;
 
 
+
+
+LogStream::Prefix::Prefix(const std::string &text)
+  :
+  stream(&deallog)
+{
+  stream->push(text);
+}
+
+
+
+LogStream::Prefix::Prefix(const std::string &text,
+                          LogStream &s)
+  :
+  stream(&s)
+{
+  stream->push(text);
+}
+
+
+
+LogStream::Prefix::~Prefix()
+{
+  // destructors may not throw exceptions. if the pop() function
+  // actually does throw one, then ignore it
+  try
+    {
+      stream->pop();
+    }
+  catch (...)
+    {
+      AssertNothrow (false,
+                     ExcMessage("An exception occurred in LogStream::Prefix::~Prefix."));
+    }
+}
+
+
+
 LogStream::LogStream()
   :
-  std_out(&std::cerr),
-  file(0),
+  std_out(&std::cout),
+  file(nullptr),
   std_depth(0),
   file_depth(10000),
-  print_utime(false),
-  diff_utime(false),
-  last_time (0.),
-  double_threshold(0.),
-  float_threshold(0.),
-  offset(0),
-  old_cerr(0),
+  print_thread_id(false),
   at_newline(true)
 {
   get_prefixes().push("DEAL:");
-
-#if defined(DEAL_II_HAVE_UNISTD_H) && defined(DEAL_II_HAVE_TIMES)
-  reference_time_val = 1./sysconf(_SC_CLK_TCK) * times(&reference_tms);
-#endif
-
 }
+
 
 
 LogStream::~LogStream()
@@ -91,39 +110,17 @@ LogStream::~LogStream()
         // may want to write to 'deallog' itself, and AssertThrow will
         // throw an exception that can't be caught)
         if ((this == &deallog) && file)
-          std::cerr << ("You still have content that was written to 'deallog' "
-                        "but not flushed to the screen or a file while the "
-                        "program is being terminated. This would lead to a "
-                        "segmentation fault. Make sure you flush the "
-                        "content of the 'deallog' object using 'std::endl' "
-                        "before the end of the program.")
-                    << std::endl;
+          *std_out << ("You still have content that was written to 'deallog' "
+                       "but not flushed to the screen or a file while the "
+                       "program is being terminated. This would lead to a "
+                       "segmentation fault. Make sure you flush the "
+                       "content of the 'deallog' object using 'std::endl' "
+                       "before the end of the program.")
+                   << std::endl;
         else
           *this << std::endl;
       }
   }
-
-  if (old_cerr)
-    std::cerr.rdbuf(old_cerr);
-}
-
-
-void
-LogStream::test_mode(bool on)
-{
-  Threads::Mutex::ScopedLock lock(log_lock);
-  if (on)
-    {
-      double_threshold = 1.e-10;
-      float_threshold = 1.e-7f;
-      offset = 1.e-7;
-    }
-  else
-    {
-      double_threshold = 0.;
-      float_threshold = 0.;
-      offset = 0.;
-    }
 }
 
 
@@ -231,22 +228,7 @@ LogStream::attach(std::ostream &o,
 void LogStream::detach ()
 {
   Threads::Mutex::ScopedLock lock(log_lock);
-  file = 0;
-}
-
-
-void LogStream::log_cerr ()
-{
-  Threads::Mutex::ScopedLock lock(log_lock);
-  if (old_cerr == 0)
-    {
-      old_cerr = std::cerr.rdbuf(file->rdbuf());
-    }
-  else
-    {
-      std::cerr.rdbuf(old_cerr);
-      old_cerr = 0;
-    }
+  file = nullptr;
 }
 
 
@@ -257,19 +239,47 @@ LogStream::get_console()
 }
 
 
+
+std::ostringstream &
+LogStream::get_stream()
+{
+  // see if we have already created this stream. if not, do so and
+  // set the default flags (why we set these flags is lost to
+  // history, but this is what we need to keep several hundred tests
+  // from producing different output)
+  //
+  // note that in all of this we need not worry about thread-safety
+  // because we operate on a thread-local object and by definition
+  // there can only be one access at a time
+  if (outstreams.get().get() == nullptr)
+    {
+      outstreams.get().reset (new std::ostringstream);
+      outstreams.get()->setf(std::ios::showpoint | std::ios::left);
+    }
+
+  // then return the stream
+  return *outstreams.get();
+}
+
+
+
 std::ostream &
 LogStream::get_file_stream()
 {
-  Assert(file, ExcNoFileStreamGiven());
+  Assert(file,
+         ExcMessage("You can't ask for the std::ostream object for the output "
+                    "file if none had been set before."));
   return *file;
 }
+
 
 
 bool
 LogStream::has_file() const
 {
-  return (file != 0);
+  return (file != nullptr);
 }
+
 
 
 const std::string &
@@ -282,6 +292,7 @@ LogStream::get_prefix() const
   else
     return empty_string;
 }
+
 
 
 void
@@ -297,11 +308,13 @@ LogStream::push (const std::string &text)
 }
 
 
+
 void LogStream::pop ()
 {
   if (get_prefixes().size() > 0)
     get_prefixes().pop();
 }
+
 
 
 std::ios::fmtflags
@@ -311,6 +324,7 @@ LogStream::flags(const std::ios::fmtflags f)
 }
 
 
+
 std::streamsize
 LogStream::precision (const std::streamsize prec)
 {
@@ -318,11 +332,13 @@ LogStream::precision (const std::streamsize prec)
 }
 
 
+
 std::streamsize
 LogStream::width (const std::streamsize wide)
 {
   return get_stream().width (wide);
 }
+
 
 
 unsigned int
@@ -335,6 +351,7 @@ LogStream::depth_console (const unsigned int n)
 }
 
 
+
 unsigned int
 LogStream::depth_file (const unsigned int n)
 {
@@ -345,41 +362,6 @@ LogStream::depth_file (const unsigned int n)
 }
 
 
-void
-LogStream::threshold_double (const double t)
-{
-  Threads::Mutex::ScopedLock lock(log_lock);
-  double_threshold = t;
-}
-
-
-void
-LogStream::threshold_float (const float t)
-{
-  Threads::Mutex::ScopedLock lock(log_lock);
-  float_threshold = t;
-}
-
-
-bool
-LogStream::log_execution_time (const bool flag)
-{
-  Threads::Mutex::ScopedLock lock(log_lock);
-  const bool h = print_utime;
-  print_utime = flag;
-  return h;
-}
-
-
-bool
-LogStream::log_time_differences (const bool flag)
-{
-  Threads::Mutex::ScopedLock lock(log_lock);
-  const bool h = diff_utime;
-  diff_utime = flag;
-  return h;
-}
-
 
 bool
 LogStream::log_thread_id (const bool flag)
@@ -389,6 +371,8 @@ LogStream::log_thread_id (const bool flag)
   print_thread_id = flag;
   return h;
 }
+
+
 
 std::stack<std::string> &
 LogStream::get_prefixes() const
@@ -423,39 +407,15 @@ LogStream::get_prefixes() const
 }
 
 
+
 void
 LogStream::print_line_head()
 {
-#ifdef DEAL_II_HAVE_SYS_RESOURCE_H
-  rusage usage;
-  double utime = 0.;
-  if (print_utime)
-    {
-      getrusage(RUSAGE_SELF, &usage);
-      utime = usage.ru_utime.tv_sec + 1.e-6 * usage.ru_utime.tv_usec;
-      if (diff_utime)
-        {
-          double diff = utime - last_time;
-          last_time = utime;
-          utime = diff;
-        }
-    }
-#else
-//TODO[BG]: Do something useful here
-  double utime = 0.;
-#endif
-
   const std::string &head = get_prefix();
   const unsigned int thread = Threads::this_thread_id();
 
   if (get_prefixes().size() <= std_depth)
     {
-      if (print_utime)
-        {
-          int p = std_out->width(5);
-          *std_out << utime << ':';
-          std_out->width(p);
-        }
       if (print_thread_id)
         *std_out << '[' << thread << ']';
 
@@ -465,64 +425,12 @@ LogStream::print_line_head()
 
   if (file && (get_prefixes().size() <= file_depth))
     {
-      if (print_utime)
-        {
-          int p = file->width(6);
-          *file << utime << ':';
-          file->width(p);
-        }
       if (print_thread_id)
         *file << '[' << thread << ']';
 
       if (head.size() > 0)
         *file << head << ':';
     }
-}
-
-
-void
-LogStream::timestamp ()
-{
-  struct tms current_tms;
-#if defined(DEAL_II_HAVE_UNISTD_H) && defined(DEAL_II_HAVE_TIMES)
-  const clock_t tick = sysconf(_SC_CLK_TCK);
-  const double time = 1./tick * times(&current_tms);
-#else
-  const double time = 0.;
-  const unsigned int tick = 100;
-  current_tms.tms_utime = 0;
-  current_tms.tms_stime = 0;
-  current_tms.tms_cutime = 0;
-  current_tms.tms_cstime = 0;
-#endif
-  (*this) << "Wall: " << time - reference_time_val
-          << " User: " << 1./tick * (current_tms.tms_utime - reference_tms.tms_utime)
-          << " System: " << 1./tick * (current_tms.tms_stime - reference_tms.tms_stime)
-          << " Child-User: " << 1./tick * (current_tms.tms_cutime - reference_tms.tms_cutime)
-          << " Child-System: " << 1./tick * (current_tms.tms_cstime - reference_tms.tms_cstime)
-          << std::endl;
-}
-
-
-std::size_t
-LogStream::memory_consumption () const
-{
-  // TODO
-  Assert(false, ExcNotImplemented());
-
-  std::size_t mem = sizeof(*this);
-  // to determine size of stack
-  // elements, we have to copy the
-  // stack since we can't access
-  // elements from further below
-//   std::stack<std::string> tmp = prefixes;
-//   while (tmp.empty() == false)
-//     {
-//       mem += MemoryConsumption::memory_consumption (tmp.top());
-//       tmp.pop ();
-//     }
-
-  return mem;
 }
 
 DEAL_II_NAMESPACE_CLOSE

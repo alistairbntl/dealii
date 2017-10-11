@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__histogram_h
-#define dealii__histogram_h
+#ifndef dealii_histogram_h
+#define dealii_histogram_h
 
 
 #include <deal.II/base/config.h>
@@ -74,7 +74,14 @@ public:
    */
   enum IntervalSpacing
   {
-    linear, logarithmic
+    /**
+     * Space intervals linearly.
+     */
+    linear,
+    /**
+     * Space intervals logarithmically.
+     */
+    logarithmic
   };
 
 

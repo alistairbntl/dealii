@@ -253,7 +253,7 @@ namespace Step29
   {
     declare_parameters();
 
-    prm.read_input (parameter_file);
+    prm.parse_input (parameter_file);
   }
 
 
@@ -273,8 +273,8 @@ namespace Step29
   // version of this function that in addition to the data vector has an
   // additional argument of type DataPostprocessor. What happens when this
   // function is used for output is that at each point where output data is to
-  // be generated, the DataPostprocessor::compute_derived_quantities_scalar or
-  // DataPostprocessor::compute_derived_quantities_vector function of the
+  // be generated, the DataPostprocessor::evaluate_scalar_field() or
+  // DataPostprocessor::evaluate_vector_field() function of the
   // specified DataPostprocessor object is invoked to compute the output
   // quantities from the values, the gradients and the second derivatives of
   // the finite element function represented by the data vector (in the case
@@ -300,12 +300,9 @@ namespace Step29
 
     virtual
     void
-    compute_derived_quantities_vector (const std::vector<Vector<double> >               &uh,
-                                       const std::vector<std::vector<Tensor<1, dim> > > &duh,
-                                       const std::vector<std::vector<Tensor<2, dim> > > &dduh,
-                                       const std::vector<Point<dim> >                   &normals,
-                                       const std::vector<Point<dim> >                   &evaluation_points,
-                                       std::vector<Vector<double> >                     &computed_quantities) const;
+    evaluate_vector_field
+    (const DataPostprocessorInputs::Vector<dim> &inputs,
+     std::vector<Vector<double> >               &computed_quantities) const;
   };
 
   // In the constructor, we need to call the constructor of the base class
@@ -330,33 +327,26 @@ namespace Step29
   {}
 
 
-  // The actual postprocessing happens in the following function.  Its inputs
-  // are a vector representing values of the function (which is here
-  // vector-valued) representing the data vector given to
-  // DataOut::add_data_vector, evaluated at all evaluation points where we
-  // generate output, and some tensor objects representing derivatives (that
-  // we don't use here since $|u|$ is computed from just $v$ and $w$, and for
-  // which we assign no name to the corresponding function argument).  The
-  // derived quantities are returned in the <code>computed_quantities</code>
-  // vector.  Remember that this function may only use data for which the
-  // respective update flag is specified by
+  // The actual postprocessing happens in the following function. Its input is
+  // an object that stores values of the function (which is here vector-valued)
+  // representing the data vector given to DataOut::add_data_vector, evaluated
+  // at all evaluation points where we generate output, and some tensor objects
+  // representing derivatives (that we don't use here since $|u|$ is computed
+  // from just $v$ and $w$). The derived quantities are returned in the
+  // <code>computed_quantities</code> vector. Remember that this function may
+  // only use data for which the respective update flag is specified by
   // <code>get_needed_update_flags</code>. For example, we may not use the
   // derivatives here, since our implementation of
   // <code>get_needed_update_flags</code> requests that only function values
   // are provided.
   template <int dim>
   void
-  ComputeIntensity<dim>::compute_derived_quantities_vector (
-    const std::vector<Vector<double> >                 &uh,
-    const std::vector<std::vector<Tensor<1, dim> > >   & /*duh*/,
-    const std::vector<std::vector<Tensor<2, dim> > >   & /*dduh*/,
-    const std::vector<Point<dim> >                     & /*normals*/,
-    const std::vector<Point<dim> >                     & /*evaluation_points*/,
-    std::vector<Vector<double> >                       &computed_quantities
-  ) const
+  ComputeIntensity<dim>::evaluate_vector_field
+  (const DataPostprocessorInputs::Vector<dim> &inputs,
+   std::vector<Vector<double> >               &computed_quantities) const
   {
-    Assert(computed_quantities.size() == uh.size(),
-           ExcDimensionMismatch (computed_quantities.size(), uh.size()));
+    Assert(computed_quantities.size() == inputs.solution_values.size(),
+           ExcDimensionMismatch (computed_quantities.size(), inputs.solution_values.size()));
 
     // The computation itself is straightforward: We iterate over each entry
     // in the output vector and compute $|u|$ from the corresponding values of
@@ -365,9 +355,12 @@ namespace Step29
       {
         Assert(computed_quantities[i].size() == 1,
                ExcDimensionMismatch (computed_quantities[i].size(), 1));
-        Assert(uh[i].size() == 2, ExcDimensionMismatch (uh[i].size(), 2));
+        Assert(inputs.solution_values[i].size() == 2,
+               ExcDimensionMismatch (inputs.solution_values[i].size(), 2));
 
-        computed_quantities[i](0) = std::sqrt(uh[i](0)*uh[i](0) + uh[i](1)*uh[i](1));
+        computed_quantities[i](0)
+          = std::sqrt(inputs.solution_values[i](0)*inputs.solution_values[i](0)
+                      + inputs.solution_values[i](1)*inputs.solution_values[i](1));
       }
   }
 
@@ -440,7 +433,6 @@ namespace Step29
     // compute execution time when this function is done:
     deallog << "Generating grid... ";
     Timer timer;
-    timer.start ();
 
     // Then we query the values for the focal distance of the transducer lens
     // and the number of mesh refinement steps from our ParameterHandler
@@ -511,7 +503,7 @@ namespace Step29
     // function:
     timer.stop ();
     deallog << "done ("
-            << timer()
+            << timer.cpu_time()
             << "s)"
             << std::endl;
 
@@ -532,7 +524,6 @@ namespace Step29
   {
     deallog << "Setting up system... ";
     Timer timer;
-    timer.start();
 
     dof_handler.distribute_dofs (fe);
 
@@ -546,7 +537,7 @@ namespace Step29
 
     timer.stop ();
     deallog << "done ("
-            << timer()
+            << timer.cpu_time()
             << "s)"
             << std::endl;
 
@@ -565,7 +556,6 @@ namespace Step29
   {
     deallog << "Assembling system matrix... ";
     Timer timer;
-    timer.start ();
 
     // First we query wavespeed and frequency from the ParameterHandler object
     // and store them in local variables, as they will be used frequently
@@ -786,7 +776,7 @@ namespace Step29
 
     timer.stop ();
     deallog << "done ("
-            << timer()
+            << timer.cpu_time()
             << "s)"
             << std::endl;
   }
@@ -812,7 +802,6 @@ namespace Step29
   {
     deallog << "Solving linear system... ";
     Timer timer;
-    timer.start ();
 
     // The code to solve the linear system is short: First, we allocate an
     // object of the right type. The following <code>initialize</code> call
@@ -830,7 +819,7 @@ namespace Step29
 
     timer.stop ();
     deallog << "done ("
-            << timer ()
+            << timer.cpu_time()
             << "s)"
             << std::endl;
   }
@@ -850,7 +839,6 @@ namespace Step29
   {
     deallog << "Generating output... ";
     Timer timer;
-    timer.start ();
 
     // Define objects of our <code>ComputeIntensity</code> class and a DataOut
     // object:
@@ -902,7 +890,7 @@ namespace Step29
 
     timer.stop ();
     deallog << "done ("
-            << timer()
+            << timer.cpu_time()
             << "s)"
             << std::endl;
   }

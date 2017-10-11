@@ -1,12 +1,12 @@
-//----------------------------  manifold_id_01.cc  ---------------------------
-//    Copyright (C) 2011 - 2016 by the mathLab team.
+//-------------------------------------------------------------------
+//    Copyright (C) 2016 by the deal.II authors.
 //
 //    This file is subject to LGPL and may not be  distributed
 //    without copyright and license information. Please refer
 //    to the file deal.II/doc/license.html for the  text  and
 //    further information on this license.
 //
-//----------------------------  flat_manifold_01.cc  ---------------------------
+//-------------------------------------------------------------------
 
 
 // Test interior mapping of flat manifold, where the
@@ -14,8 +14,6 @@
 // pull-back and push-forward
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_values.h>
 
@@ -120,9 +118,7 @@ void test(unsigned int ref, const MappingQ<dim> &mapping)
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<2,2>(2, MappingQ<2>(4, false));
   test<2,2>(2, MappingQ<2>(4, true));

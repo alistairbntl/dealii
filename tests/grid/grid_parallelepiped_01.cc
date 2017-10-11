@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,13 +24,8 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/logstream.h>
-#include <cmath>
-#include <cstdlib>
 
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 
 // Output
 std::ofstream logfile ("output");
@@ -71,8 +66,8 @@ void check_2d_parallelepiped_by_comparison (bool log)
   // build corners for this particular dim that are known to give the
   // same output order as parallelogram:
   Point<2> (corners) [2];
-  corners[0] = Point<2> (0.0, 0.5);
-  corners[1] = Point<2> (0.5, 0.0);
+  corners[0] = Point<2> (0.5, 0.0);
+  corners[1] = Point<2> (0.0, 0.5);
 
   Triangulation<2> triangulation_parallelepiped;
   GridGenerator::parallelepiped (triangulation_parallelepiped, corners, false);

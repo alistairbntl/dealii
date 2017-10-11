@@ -24,20 +24,15 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/grid_generator.h>
-#include <fstream>
-#include <iomanip>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
   deallog << std::setprecision (2);
 
   // generate a hyperball in 3d
@@ -56,7 +51,7 @@ int main ()
        face!=tria.end_face(); ++face)
     {
       deallog << face << "   "
-              << (int)face->boundary_id() << "  "
+              << face->boundary_id() << "  "
               << face->vertex_index(0)
               << " <" << face->vertex(0) << '>'
               << std::endl

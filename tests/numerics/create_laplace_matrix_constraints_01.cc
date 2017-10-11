@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,10 +22,9 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/lac/sparse_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -40,7 +39,6 @@
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <fstream>
 
 
 
@@ -76,7 +74,7 @@ check ()
   ConstraintMatrix constraints;
   DoFTools::make_hanging_node_constraints (dof, constraints);
   VectorTools::interpolate_boundary_values(dof, 0,
-                                           ConstantFunction<dim>(1,1.),
+                                           Functions::ConstantFunction<dim>(1,1.),
                                            constraints);
   constraints.close ();
 
@@ -85,7 +83,7 @@ check ()
   // not couple, so use pattern
   SparsityPattern sparsity;
   {
-    CompressedSparsityPattern csp(dof.n_dofs(), dof.n_dofs());
+    DynamicSparsityPattern csp(dof.n_dofs(), dof.n_dofs());
     DoFTools::make_sparsity_pattern (dof, csp, constraints);
     sparsity.copy_from(csp);
   }
@@ -104,7 +102,7 @@ check ()
                          rhs_function, rhs_ref);
   constraints.condense(matrix_ref, rhs_ref);
 
-  const Function<dim> *const dummy = 0;
+  const Function<dim> *const dummy = nullptr;
   MatrixTools::create_laplace_matrix (mapping, dof, quadrature, matrix,
                                       rhs_function, rhs, dummy, constraints);
 
@@ -127,7 +125,6 @@ int main ()
   std::ofstream logfile ("output");
   deallog << std::setprecision (3);
   deallog.attach(logfile);
-  deallog.threshold_double(1e-10);
 
   deallog.push ("1d");
   check<1> ();

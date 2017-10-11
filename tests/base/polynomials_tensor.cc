@@ -20,17 +20,14 @@
 // classes: PolynomialsBDM, PolynomialsRaviartThomas
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/polynomials_bdm.h>
 #include <deal.II/base/polynomials_raviart_thomas.h>
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 
 using namespace std;
 
-template<int dim, class PolynomialType>
+template <int dim, class PolynomialType>
 void check_point (const Point<dim>     &x,
                   const PolynomialType &p)
 {
@@ -58,7 +55,7 @@ void check_point (const Point<dim>     &x,
 }
 
 
-template<int dim>
+template <int dim>
 void check_bdm ()
 {
   Point<dim> x;
@@ -79,7 +76,7 @@ void check_bdm ()
   check_point(x, p4);
 }
 
-template<int dim>
+template <int dim>
 void check_rt ()
 {
   Point<dim> x;
@@ -105,7 +102,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(0);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("BDM");
   check_bdm<2>();

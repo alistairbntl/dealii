@@ -18,12 +18,9 @@
 
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
 
 #include <deal.II/lac/sparse_matrix_ez.h>
 
-#include <iomanip>
-#include <fstream>
 
 int main()
 {
@@ -31,7 +28,6 @@ int main()
   logfile.setf(std::ios::fixed);
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   SparseMatrixEZ<double> ez(5,4);
   ez.set(0,0,2.);

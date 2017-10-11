@@ -22,16 +22,11 @@
 
 #include "../tests.h"
 #include <deal.II/base/timer.h>
-#include <deal.II/base/logstream.h>
-#include <fstream>
-#include <cmath>
-#include <iomanip>
 
 int main ()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-1);
 
   {
 

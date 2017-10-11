@@ -22,7 +22,6 @@
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/trilinos_block_sparse_matrix.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -84,9 +83,7 @@ void test (const unsigned int size_1, const unsigned int size_2)
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 

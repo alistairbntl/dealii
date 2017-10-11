@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_raviart_thomas_h
-#define dealii__fe_raviart_thomas_h
+#ifndef dealii_fe_raviart_thomas_h
+#define dealii_fe_raviart_thomas_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/table.h>
@@ -117,6 +117,10 @@ public:
    */
   virtual std::string get_name () const;
 
+  // documentation inherited from the base class
+  virtual
+  std::unique_ptr<FiniteElement<dim,dim> >
+  clone() const;
 
   /**
    * This function returns @p true, if the shape function @p shape_index has
@@ -128,24 +132,20 @@ public:
   virtual bool has_support_on_face (const unsigned int shape_index,
                                     const unsigned int face_index) const;
 
-  virtual void interpolate(std::vector<double>                &local_dofs,
-                           const std::vector<double> &values) const;
-  virtual void interpolate(std::vector<double>                &local_dofs,
-                           const std::vector<Vector<double> > &values,
-                           unsigned int offset = 0) const;
-  virtual void interpolate(
-    std::vector<double> &local_dofs,
-    const VectorSlice<const std::vector<std::vector<double> > > &values) const;
+  // documentation inherited from the base class
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
 
   /**
-   * Returns a list of constant modes of the element. This method is currently
+   * Return a list of constant modes of the element. This method is currently
    * not correctly implemented because it returns ones for all components.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
   get_constant_modes () const;
 
   virtual std::size_t memory_consumption () const;
-  virtual FiniteElement<dim> *clone() const;
 
 private:
   /**
@@ -257,17 +257,15 @@ public:
    */
   virtual std::string get_name () const;
 
-  virtual FiniteElement<dim> *clone () const;
+  // documentation inherited from the base class
+  virtual
+  std::unique_ptr<FiniteElement<dim,dim> >
+  clone() const;
 
-  virtual void interpolate(std::vector<double>                &local_dofs,
-                           const std::vector<double> &values) const;
-  virtual void interpolate(std::vector<double>                &local_dofs,
-                           const std::vector<Vector<double> > &values,
-                           unsigned int offset = 0) const;
-  virtual void interpolate(
-    std::vector<double> &local_dofs,
-    const VectorSlice<const std::vector<std::vector<double> > > &values) const;
-
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
 
   virtual void get_face_interpolation_matrix (const FiniteElement<dim> &source,
                                               FullMatrix<double>       &matrix) const;

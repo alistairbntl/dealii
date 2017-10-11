@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,8 +23,6 @@
 #include <deal.II/meshworker/assembler.h>
 #include <deal.II/meshworker/loop.h>
 
-#include <deal.II/base/std_cxx11/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/sparsity_pattern.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
@@ -37,8 +35,7 @@
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
-#include <iomanip>
+#include <functional>
 
 using namespace dealii;
 
@@ -131,7 +128,7 @@ test_simple(DoFHandler<dim> &dofs, bool faces)
   TrilinosWrappers::SparseMatrix matrix;
 
   const FiniteElement<dim> &fe = dofs.get_fe();
-  CompressedSimpleSparsityPattern csp(dofs.n_dofs(), dofs.n_dofs());
+  DynamicSparsityPattern csp(dofs.n_dofs(), dofs.n_dofs());
   DoFTools::make_flux_sparsity_pattern (dofs, csp);
   matrix.reinit (dofs.locally_owned_dofs(), csp, MPI_COMM_WORLD, true);
 
@@ -162,9 +159,9 @@ test_simple(DoFHandler<dim> &dofs, bool faces)
   MeshWorker::loop<dim, dim, MeshWorker::DoFInfo<dim>, MeshWorker::IntegrationInfoBox<dim> >
   (cell, end,
    dof_info, info_box,
-   std_cxx11::bind (&Local<dim>::cell, local, std_cxx11::_1, std_cxx11::_2),
-   std_cxx11::bind (&Local<dim>::bdry, local, std_cxx11::_1, std_cxx11::_2),
-   std_cxx11::bind (&Local<dim>::face, local, std_cxx11::_1, std_cxx11::_2, std_cxx11::_3, std_cxx11::_4),
+   std::bind (&Local<dim>::cell, local, std::placeholders::_1, std::placeholders::_2),
+   std::bind (&Local<dim>::bdry, local, std::placeholders::_1, std::placeholders::_2),
+   std::bind (&Local<dim>::face, local, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4),
    assembler, lctrl);
 
   matrix.compress(VectorOperation::add);
@@ -172,7 +169,7 @@ test_simple(DoFHandler<dim> &dofs, bool faces)
 }
 
 
-template<int dim>
+template <int dim>
 void
 test(const FiniteElement<dim> &fe)
 {

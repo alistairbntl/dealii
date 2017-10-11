@@ -1,6 +1,6 @@
 //-----------------------------------------------------------
 //
-//    Copyright (C) 2014 - 2015 by the deal.II authors
+//    Copyright (C) 2014 - 2017 by the deal.II authors
 //
 //    This file is subject to LGPL and may not be distributed
 //    without copyright and license information. Please refer
@@ -16,7 +16,6 @@
 
 #include <deal.II/opencascade/utilities.h>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/grid_out.h>
@@ -36,8 +35,7 @@ using namespace OpenCASCADE;
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   // A unit circle
   gp_Dir z_axis(0.,0.,1.);
@@ -45,9 +43,9 @@ int main ()
   gp_Ax2 axis(center, z_axis);
   Standard_Real radius(1.);
 
-  Handle(Geom_Curve) circle = GC_MakeCircle(axis, radius);
+  GC_MakeCircle make_circle(axis, radius);
+  Handle(Geom_Circle) circle = make_circle.Value();
   TopoDS_Edge edge = BRepBuilderAPI_MakeEdge(circle);
-
 
   // Now get a few points and project
   // them on the circle
@@ -69,13 +67,13 @@ int main ()
   TopoDS_Shape sh;
   for (unsigned int i=0; i<points.size(); ++i)
     {
-      std_cxx11::tuple<Point<3>, TopoDS_Shape, double, double> ref =
+      std::tuple<Point<3>, TopoDS_Shape, double, double> ref =
         project_point_and_pull_back(edge, points[i]);
 
-      Point<3> pp = std_cxx11::get<0>(ref);
-      sh = std_cxx11::get<1>(ref);
-      u = std_cxx11::get<2>(ref);
-      v = std_cxx11::get<3>(ref);
+      Point<3> pp = std::get<0>(ref);
+      sh = std::get<1>(ref);
+      u = std::get<2>(ref);
+      v = std::get<3>(ref);
 
       deallog << "Origin: " << points[i]
               << ", on unit circle: " << pp

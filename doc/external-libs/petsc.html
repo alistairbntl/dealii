@@ -4,7 +4,7 @@
   <head>
     <title>The deal.II Readme on interfacing to PETSc</title>
     <link href="../screen.css" rel="StyleSheet">
-    <meta name="copyright" content="Copyright (C) 2008 - 2015 by the deal.II authors">
+    <meta name="copyright" content="Copyright (C) 2008 - 2016 by the deal.II authors">
     <meta name="keywords" content="deal.II">
   </head>
 
@@ -37,8 +37,10 @@
 
     <p style="color: red"><b>Note:</b> The most recent version of PETSc
       that has been reported to be compatible with
-      <acronym>deal.II</acronym> is version 3.6.0. If you use a later
-      version than this and encounter problems, let us know.
+      <acronym>deal.II</acronym> is version 3.7.6. If you use a later
+      version than this and encounter problems, let us
+      know. <acronym>deal.II</acronym> does not support versions of PETSc prior
+      to 3.3.0.
     </p>
 
     <p>
@@ -113,7 +115,12 @@
 
     <p>
       This automatically builds PETSc with both MPI and the algebraic
-      multigrid preconditioner package Hypre (which we use in step-40).
+      multigrid preconditioner package Hypre (which we use in step-40). If you
+      would like to use PETSc with MPI then we recommend that you install MPI
+      through your package manager instead of letting PETSc install it: put
+      another way, installing PETSc with the flag <code>--download-mpich</code>
+      often causes problems (such as linking errors or poor performance)
+      that may be avoided by using whatever your system provides instead.
       <br>
       Now let PETSc check his own sanity:
       <pre>

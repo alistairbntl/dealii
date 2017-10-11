@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2014 by the deal.II authors
+// Copyright (C) 2010 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -16,5 +16,5 @@
 
 for (VEC : REAL_SERIAL_VECTORS ; deal_II_dimension : DIMENSIONS)
 {
-  template class DoFOutputOperator<VEC, deal_II_dimension, deal_II_dimension>;
+    template class DoFOutputOperator<VEC, deal_II_dimension, deal_II_dimension>;
 }

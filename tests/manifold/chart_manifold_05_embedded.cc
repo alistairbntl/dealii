@@ -16,20 +16,18 @@
 // make the chart higher dimensional
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/manifold.h>
 
 
 template <int dim, int spacedim>
-class MyFlatManifold : public ChartManifold<dim,spacedim,spacedim+1>
+class MyFlatManifold : public ChartManifold<dim,spacedim,spacedim>
 {
 public:
   virtual
-  Point<spacedim+1>
+  Point<spacedim>
   pull_back(const Point<spacedim> &space_point) const
   {
-    Point<spacedim+1> p;
+    Point<spacedim> p;
     for (unsigned int d=0; d<spacedim; ++d)
       p[d] = space_point[d];
     return p;
@@ -38,7 +36,7 @@ public:
 
   virtual
   Point<spacedim>
-  push_forward(const Point<spacedim+1> &chart_point) const
+  push_forward(const Point<spacedim> &chart_point) const
   {
     Point<spacedim> p;
     for (unsigned int d=0; d<spacedim; ++d)
@@ -47,10 +45,10 @@ public:
   }
 
   virtual
-  DerivativeForm<1,spacedim+1,spacedim>
-  push_forward_gradient(const Point<spacedim+1> &chart_point) const
+  DerivativeForm<1,spacedim,spacedim>
+  push_forward_gradient(const Point<spacedim> &chart_point) const
   {
-    DerivativeForm<1,spacedim+1,spacedim> x;
+    DerivativeForm<1,spacedim,spacedim> x;
     for (unsigned int d=0; d<spacedim; ++d)
       x[d][d] = 1;
     return x;
@@ -83,9 +81,7 @@ void test()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test<1,1>();
   test<1,2>();

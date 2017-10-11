@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__lapack_templates_h
-#define dealii__lapack_templates_h
+#ifndef dealii_lapack_templates_h
+#define dealii_lapack_templates_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/lac/lapack_support.h>
@@ -65,6 +65,33 @@ extern "C"
                 int *ipiv, double *inv_work, const int *lwork, int *info);
   void sgetri_ (const int *n, float *A, const int *lda,
                 int *ipiv, float *inv_work, const int *lwork, int *info);
+// Compute Cholesky factorization of SPD
+  void dpotrf_ (const char *uplo, const int *n, double *A,
+                const int *lda, int *info);
+  void spotrf_ (const char *uplo, const int *n, float *A,
+                const int *lda, int *info);
+// Estimate the reciprocal of the condition number in 1-norm from Cholesky
+  void dpocon_ (const char *uplo, const int *n, const double *A,
+                const int *lda, const double *anorm, double *rcond,
+                double *work, int *iwork, int *info);
+  void spocon_ (const char *uplo, const int *n, const float *A,
+                const int *lda, const float *anorm, float *rcond,
+                float *work, int *iwork, int *info);
+// Computes the inverse from Cholesky
+  void dpotri_ (const char *uplo, const int *n, double *A,
+                const int *lda, int *info);
+  void spotri_ (const char *uplo, const int *n, float *A,
+                const int *lda, int *info);
+// Norms
+  double dlansy_ (const char *norm, const char *uplo, const int *n, const double *A,
+                  const int *lda, double *work);
+  float  slansy_ (const char *norm, const char *uplo, const int *n, const float *A,
+                  const int *lda, float *work);
+  double dlange_ (const char *norm, const int *m, const int *n, const double *A,
+                  const int *lda, double *work);
+  float slange_ (const char *norm, const int *m, const int *n, const float *A,
+                 const int *lda, float *work);
+
 // Compute QR factorization (Householder)
   void dgeqrf_ (const int *m, const int *n, double *A,
                 const int *lda, double *tau, double *work,
@@ -252,7 +279,7 @@ DEAL_II_NAMESPACE_OPEN
 
 
 /// Template wrapper for LAPACK functions daxpy and saxpy
-template<typename number1, typename number2, typename number3>
+template <typename number1, typename number2, typename number3>
 inline void
 axpy (const int *, const number1 *, const number2 *, const int *, number3 *, const int *)
 {
@@ -290,7 +317,7 @@ axpy (const int *, const float *, const float *, const int *, float *, const int
 
 
 /// Template wrapper for LAPACK functions dgemv and sgemv
-template<typename number1, typename number2, typename number3, typename number4, typename number5>
+template <typename number1, typename number2, typename number3, typename number4, typename number5>
 inline void
 gemv (const char *, const int *, const int *, const number1 *, const number2 *, const int *, const number3 *, const int *, const number4 *, number5 *, const int *)
 {
@@ -328,7 +355,7 @@ gemv (const char *, const int *, const int *, const float *, const float *, cons
 
 
 /// Template wrapper for LAPACK functions dgemm and sgemm
-template<typename number1, typename number2, typename number3, typename number4, typename number5>
+template <typename number1, typename number2, typename number3, typename number4, typename number5>
 inline void
 gemm (const char *, const char *, const int *, const int *, const int *, const number1 *, const number2 *, const int *, const number3 *, const int *, const number4 *, number5 *, const int *)
 {
@@ -365,8 +392,230 @@ gemm (const char *, const char *, const int *, const int *, const int *, const f
 #endif
 
 
+
+/// Template wrapper for potrf
+template <typename number1>
+inline void
+potrf (const char *, const int *, number1 *, const int *, int *)
+{
+  Assert (false, ExcNotImplemented());
+}
+
+inline void
+potrf (const char *uplo, const int *n, double *A, const int *lda, int *info)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  dpotrf_ (uplo,n,A,lda,info);
+#else
+  (void) uplo;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) info;
+
+  Assert (false, LAPACKSupport::ExcMissing("dpotrf"));
+#endif
+}
+
+inline void
+potrf (const char *uplo, const int *n, float *A, const int *lda, int *info)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  spotrf_ (uplo,n,A,lda,info);
+#else
+  (void) uplo;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) info;
+
+  Assert (false, LAPACKSupport::ExcMissing("spotrf"));
+#endif
+}
+
+
+
+/// Template wrapper for pocon
+template <typename number1>
+inline void
+pocon (const char *, const int *, const number1 *, const int *, const number1 *, number1 *, number1 *, int *, int *)
+{
+  Assert (false, ExcNotImplemented());
+}
+
+inline void
+pocon (const char *uplo, const int *n, const double *A, const int *lda, const double *anorm, double *rcond, double *work, int *iwork, int *info)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  dpocon_ (uplo,n,A,lda,anorm,rcond,work,iwork,info);
+#else
+  (void) uplo;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) anorm;
+  (void) rcond;
+  (void) work;
+  (void) iwork;
+  (void) info;
+
+  Assert (false, LAPACKSupport::ExcMissing("dpocon"));
+#endif
+}
+
+inline void
+pocon (const char *uplo, const int *n, const float *A, const int *lda, const float *anorm, float *rcond, float *work, int *iwork, int *info)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  spocon_ (uplo,n,A,lda,anorm,rcond,work,iwork,info);
+#else
+  (void) uplo;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) anorm;
+  (void) rcond;
+  (void) work;
+  (void) iwork;
+  (void) info;
+
+  Assert (false, LAPACKSupport::ExcMissing("dpocon"));
+#endif
+}
+
+/// Template wrapper for potri
+template <typename number1>
+inline void
+potri(const char *, const int *, number1 *, const int *, int *)
+{
+  Assert (false, ExcNotImplemented());
+}
+
+inline void
+potri(const char *uplo, const int *n, double *A, const int *lda, int *info)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  dpotri_(uplo,n,A,lda,info);
+#else
+  (void) uplo;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) info;
+
+  Assert (false, LAPACKSupport::ExcMissing("dpotri"));
+#endif
+}
+
+inline void
+potri(const char *uplo, const int *n, float *A, const int *lda, int *info)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  spotri_(uplo,n,A,lda,info);
+#else
+  (void) uplo;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) info;
+
+  Assert (false, LAPACKSupport::ExcMissing("spotri"));
+#endif
+}
+
+
+/// Template wrapper for lansy
+template <typename number>
+inline
+number lansy (const char *, const char *, const int *, const number *, const int *, number *)
+{
+  Assert (false, ExcNotImplemented());
+}
+
+inline
+double lansy (const char *norm, const char *uplo, const int *n, const double *A, const int *lda, double *work)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  return dlansy_(norm,uplo,n,A,lda,work);
+#else
+  (void) norm;
+  (void) uplo;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) work;
+
+  Assert (false, LAPACKSupport::ExcMissing("lansy"));
+  return 0.;
+#endif
+}
+
+inline
+float lansy (const char *norm, const char *uplo, const int *n, const float *A, const int *lda, float *work)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  return slansy_(norm,uplo,n,A,lda,work);
+#else
+  (void) norm;
+  (void) uplo;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) work;
+
+  Assert (false, LAPACKSupport::ExcMissing("lansy"));
+  return 0.;
+#endif
+}
+
+
+
+/// Template wrapper for lange
+template <typename number>
+inline
+number lange (const char *, const int *, const int *, const number *, const int *, number *)
+{
+  Assert (false, ExcNotImplemented());
+}
+
+inline
+double lange (const char *norm, const int *m, const int *n, const double *A, const int *lda, double *work)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  return dlange_(norm,m,n,A,lda,work);
+#else
+  (void) norm;
+  (void) m;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) work;
+
+  Assert (false, LAPACKSupport::ExcMissing("lange"));
+  return 0.;
+#endif
+}
+
+inline
+float lange (const char *norm, const int *m, const int *n, const float *A, const int *lda, float *work)
+{
+#ifdef DEAL_II_WITH_LAPACK
+  return slange_(norm,m,n,A,lda,work);
+#else
+  (void) norm;
+  (void) m;
+  (void) n;
+  (void) A;
+  (void) lda;
+  (void) work;
+
+  Assert (false, LAPACKSupport::ExcMissing("lange"));
+  return 0.;
+#endif
+}
+
 /// Template wrapper for LAPACK functions dgetrf and sgetrf
-template<typename number1>
+template <typename number1>
 inline void
 getrf (const int *, const int *, number1 *, const int *, int *, int *)
 {
@@ -404,7 +653,7 @@ getrf (const int *, const int *, float *, const int *, int *, int *)
 
 
 /// Template wrapper for LAPACK functions dgetrs and sgetrs
-template<typename number1, typename number2>
+template <typename number1, typename number2>
 inline void
 getrs (const char *, const int *, const int *, const number1 *, const int *, const int *, number2 *, const int *, int *)
 {
@@ -442,7 +691,7 @@ getrs (const char *, const int *, const int *, const float *, const int *, const
 
 
 /// Template wrapper for LAPACK functions dgetri and sgetri
-template<typename number1, typename number2>
+template <typename number1, typename number2>
 inline void
 getri (const int *, number1 *, const int *, int *, number2 *, const int *, int *)
 {
@@ -480,7 +729,7 @@ getri (const int *, float *, const int *, int *, float *, const int *, int *)
 
 
 /// Template wrapper for LAPACK functions dgeqrf and sgeqrf
-template<typename number1, typename number2, typename number3>
+template <typename number1, typename number2, typename number3>
 inline void
 geqrf (const int *, const int *, number1 *, const int *, number2 *, number3 *, const int *, int *)
 {
@@ -518,7 +767,7 @@ geqrf (const int *, const int *, float *, const int *, float *, float *, const i
 
 
 /// Template wrapper for LAPACK functions dormqr and sormqr
-template<typename number1, typename number2, typename number3, typename number4>
+template <typename number1, typename number2, typename number3, typename number4>
 inline void
 ormqr (const char *, const char *, const int *, const int *, const int *, const number1 *, const int *, const number2 *, number3 *, const int *, number4 *, const int *, int *)
 {
@@ -556,7 +805,7 @@ ormqr (const char *, const char *, const int *, const int *, const int *, const 
 
 
 /// Template wrapper for LAPACK functions dorgqr and sorgqr
-template<typename number1, typename number2, typename number3>
+template <typename number1, typename number2, typename number3>
 inline void
 orgqr (const int *, const int *, const int *, const number1 *, const int *, const number2 *, number3 *, const int *, int *)
 {
@@ -594,7 +843,7 @@ orgqr (const int *, const int *, const int *, const float *, const int *, const 
 
 
 /// Template wrapper for LAPACK functions dtrtrs and strtrs
-template<typename number1, typename number2>
+template <typename number1, typename number2>
 inline void
 trtrs (const char *, const char *, const char *, const int *, const int *, const number1 *, const int *, number2 *, const int *, int *)
 {
@@ -632,7 +881,7 @@ trtrs (const char *, const char *, const char *, const int *, const int *, const
 
 
 /// Template wrapper for LAPACK functions dgeev and sgeev
-template<typename number1, typename number2, typename number3, typename number4, typename number5, typename number6>
+template <typename number1, typename number2, typename number3, typename number4, typename number5, typename number6>
 inline void
 geev (const char *, const char *, const int *, number1 *, const int *, number2 *, number3 *, number4 *, const int *, number5 *, const int *, number6 *, const int *, int *)
 {
@@ -670,7 +919,7 @@ geev (const char *, const char *, const int *, float *, const int *, float *, fl
 
 
 /// Template wrapper for LAPACK functions dgeevx and sgeevx
-template<typename number1, typename number2, typename number3, typename number4, typename number5, typename number6, typename number7, typename number8, typename number9, typename number10>
+template <typename number1, typename number2, typename number3, typename number4, typename number5, typename number6, typename number7, typename number8, typename number9, typename number10>
 inline void
 geevx (const char *, const char *, const char *, const char *, const int *, number1 *, const int *, number2 *, number3 *, number4 *, const int *, number5 *, const int *, int *, int *, number6 *, number7 *, number8 *, number9 *, number10 *, const int *, int *, int *)
 {
@@ -708,7 +957,7 @@ geevx (const char *, const char *, const char *, const char *, const int *, floa
 
 
 /// Template wrapper for LAPACK functions dsyev and ssyev
-template<typename number1, typename number2, typename number3>
+template <typename number1, typename number2, typename number3>
 inline void
 syev (const char *, const char *, const int *, number1 *, const int *, number2 *, number3 *, const int *, int *)
 {
@@ -746,7 +995,7 @@ syev (const char *, const char *, const int *, float *, const int *, float *, fl
 
 
 /// Template wrapper for LAPACK functions dsyevx and ssyevx
-template<typename number1, typename number2, typename number3, typename number4, typename number5, typename number6, typename number7>
+template <typename number1, typename number2, typename number3, typename number4, typename number5, typename number6, typename number7>
 inline void
 syevx (const char *, const char *, const char *, const int *, number1 *, const int *, const number2 *, const number3 *, const int *, const int *, const number4 *, int *, number5 *, number6 *, const int *, number7 *, const int *, int *, int *, int *)
 {
@@ -784,7 +1033,7 @@ syevx (const char *, const char *, const char *, const int *, float *, const int
 
 
 /// Template wrapper for LAPACK functions dsygv and ssygv
-template<typename number1, typename number2, typename number3, typename number4>
+template <typename number1, typename number2, typename number3, typename number4>
 inline void
 sygv (const int *, const char *, const char *, const int *, number1 *, const int *, number2 *, const int *, number3 *, number4 *, const int *, int *)
 {
@@ -822,7 +1071,7 @@ sygv (const int *, const char *, const char *, const int *, float *, const int *
 
 
 /// Template wrapper for LAPACK functions dsygvx and ssygvx
-template<typename number1, typename number2, typename number3, typename number4, typename number5, typename number6, typename number7, typename number8>
+template <typename number1, typename number2, typename number3, typename number4, typename number5, typename number6, typename number7, typename number8>
 inline void
 sygvx (const int *, const char *, const char *, const char *, const int *, number1 *, const int *, number2 *, const int *, const number3 *, const number4 *, const int *, const int *, const number5 *, int *, number6 *, number7 *, const int *, number8 *, const int *, int *, int *, int *)
 {
@@ -860,7 +1109,7 @@ sygvx (const int *, const char *, const char *, const char *, const int *, float
 
 
 /// Template wrapper for LAPACK functions dgesdd and sgesdd
-template<typename number1, typename number2, typename number3, typename number4, typename number5>
+template <typename number1, typename number2, typename number3, typename number4, typename number5>
 inline void
 gesdd (const char *, const int *, const int *, number1 *, const int *, number2 *, number3 *, const int *, number4 *, const int *, number5 *, const int *, int *, int *)
 {
@@ -898,7 +1147,7 @@ gesdd (const char *, const int *, const int *, float *, const int *, float *, fl
 
 
 /// Template wrapper for LAPACK functions dgesvd and sgesvd
-template<typename number1, typename number2, typename number3, typename number4, typename number5>
+template <typename number1, typename number2, typename number3, typename number4, typename number5>
 inline void
 gesvd (int *, int *, const int *, const int *, number1 *, const int *, number2 *, number3 *, const int *, number4 *, const int *, number5 *, const int *, int *)
 {
@@ -936,7 +1185,7 @@ gesvd (int *, int *, const int *, const int *, float *, const int *, float *, fl
 
 
 /// Template wrapper for LAPACK functions dgelsd and sgelsd
-template<typename number1, typename number2, typename number3, typename number4, typename number5>
+template <typename number1, typename number2, typename number3, typename number4, typename number5>
 inline void
 gelsd (const int *, const int *, const int *, const number1 *, const int *, number2 *, const int *, number3 *, const number4 *, int *, number5 *, const int *, int *, int *)
 {
@@ -974,7 +1223,7 @@ gelsd (const int *, const int *, const int *, const float *, const int *, float 
 
 
 /// Template wrapper for LAPACK functions dstev and sstev
-template<typename number1, typename number2, typename number3, typename number4>
+template <typename number1, typename number2, typename number3, typename number4>
 inline void
 stev (const char *, const int *, number1 *, number2 *, number3 *, const int *, number4 *, int *)
 {

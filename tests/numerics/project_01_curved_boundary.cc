@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -34,7 +34,6 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/dofs/dof_accessor.h>
 
-#include <fstream>
 
 
 // define a function that is zero within the square
@@ -61,7 +60,7 @@ public:
 };
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   HyperBallBoundary<dim> boundary;
@@ -167,7 +166,6 @@ int main()
 {
   std::ofstream logfile ("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<2>();
   test<3>();

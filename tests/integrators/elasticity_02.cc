@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,7 +20,6 @@
 #include "../tests.h"
 #include "../test_grids.h"
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/integrators/elasticity.h>
 
 #include <deal.II/fe/fe_dgq.h>
@@ -38,8 +37,8 @@ void test_boundary(const FEValuesBase<dim> &fev)
   FullMatrix<double> M(n,n);
   nitsche_tangential_matrix(M, fev, 17);
   {
-    LogStream::Prefix pre("bdry");
-    M.print(deallog,12,8);
+    deallog << "bdry" << std::endl;
+    M.print_formatted(deallog.get_file_stream(), 3, true, 0, "0.");
   }
 
   Vector<double> u(n), v(n), w(n);
@@ -54,7 +53,7 @@ void test_boundary(const FEValuesBase<dim> &fev)
     indices[i] = i;
 
   {
-    LogStream::Prefix pre("Residuals");
+    deallog << "Residuals" << std::endl;
     for (unsigned int i=0; i<n; ++i)
       {
         u = 0.;
@@ -80,7 +79,7 @@ test_fe(Triangulation<dim> &tr, FiniteElement<dim> &fe)
   typename Triangulation<dim>::cell_iterator cell1 = tr.begin(1);
 
   QGauss<dim-1> face_quadrature(fe.tensor_degree()+1);
-  FEFaceValues<dim> fef1(fe, face_quadrature, update_values | update_gradients | update_normal_vectors);
+  FEFaceValues<dim> fef1(fe, face_quadrature, update_values | update_gradients | update_normal_vectors | update_JxW_values);
   for (unsigned int i=0; i<GeometryInfo<dim>::faces_per_cell; ++i)
     {
       deallog << "boundary_matrix " << i << std::endl;
@@ -114,7 +113,6 @@ test(Triangulation<dim> &tr)
 int main()
 {
   initlog();
-  deallog.threshold_double(1.e-10);
   deallog.precision(8);
 
   Triangulation<2> tr2;

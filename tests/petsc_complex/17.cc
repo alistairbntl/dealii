@@ -15,23 +15,27 @@
 
 
 
-// check PETScWrappers::Vector::l1_norm()
+// check PETScWrappers::MPI::Vector::l1_norm()
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
-#include <fstream>
+#include <deal.II/lac/petsc_parallel_vector.h>
 #include <iostream>
 #include <vector>
 
 
-void test (PETScWrappers::Vector &v)
+void test (PETScWrappers::MPI::Vector &v)
 {
   // set some elements of the vector
   double norm = 0;
   for (unsigned int k=0; k<v.size(); k+=1+k)
     {
-      v(k) = PetscScalar (k,2.*k);
-      norm += std::fabs (1.*k+2.*k);
+      const PetscScalar  s(1.*k,2.*k);
+      v(k) = s;
+#if DEAL_II_PETSC_VERSION_LT(3,7,0)
+      norm += std::fabs (1.*k)+std::fabs(2.*k);
+#else
+      norm += std::abs (s);
+#endif
     }
   v.compress (VectorOperation::insert);
 
@@ -44,16 +48,14 @@ void test (PETScWrappers::Vector &v)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   try
     {
       Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv, 1);
       {
-        PETScWrappers::Vector v (100);
+        PETScWrappers::MPI::Vector v (MPI_COMM_WORLD, 100, 100);
         test (v);
       }
     }

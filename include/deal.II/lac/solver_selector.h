@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__solver_selector_h
-#define dealii__solver_selector_h
+#ifndef dealii_solver_selector_h
+#define dealii_solver_selector_h
 
 
 #include <deal.II/base/config.h>
@@ -106,7 +106,7 @@ public:
   /**
    * Constructor, filling in default values
    */
-  SolverSelector ();
+  SolverSelector () = default;
 
   /**
    * Destructor
@@ -118,7 +118,7 @@ public:
    * SolverName was specified in the constructor.
    *
    */
-  template<class Matrix, class Preconditioner>
+  template <class Matrix, class Preconditioner>
   void solve (const Matrix         &A,
               VectorType           &x,
               const VectorType     &b,
@@ -172,7 +172,16 @@ public:
                 ::AdditionalData &data);
 
   /**
-   * Get the names of all implemented solvers.
+   * Get the names of all implemented solvers. The list of possible
+   * options includes:
+   * <ul>
+   * <li>  "richardson" </li>
+   * <li>  "cg" </li>
+   * <li>  "bicgstab" </li>
+   * <li>  "gmres" </li>
+   * <li>  "fgmres" </li>
+   * <li>  "minres" </li>
+   * </ul>
    */
   static std::string get_solver_names ();
 
@@ -234,11 +243,6 @@ private:
 
 
 template <typename VectorType>
-SolverSelector<VectorType>::SolverSelector()
-{}
-
-
-template <typename VectorType>
 SolverSelector<VectorType>::~SolverSelector()
 {}
 
@@ -252,7 +256,7 @@ SolverSelector<VectorType>::select(const std::string &name)
 
 
 template <typename VectorType>
-template<class Matrix, class Preconditioner>
+template <class Matrix, class Preconditioner>
 void
 SolverSelector<VectorType>::solve (const Matrix         &A,
                                    VectorType           &x,

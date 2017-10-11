@@ -13,16 +13,16 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__table_indices_h
-#define dealii__table_indices_h
+#ifndef dealii_table_indices_h
+#define dealii_table_indices_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
-#include <deal.II/base/std_cxx11/iterator.h>
 
 #include <algorithm>
 #include <ostream>
+#include <iterator>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -34,6 +34,8 @@ DEAL_II_NAMESPACE_OPEN
  * It is used in tensorial objects like the TableBase and SymmetricTensor
  * classes to represent a nested choice of indices.
  *
+ * @tparam N The number of indices stored in each object.
+ *
  * @ingroup data
  * @author Wolfgang Bangerth, Matthias Maier, 2002, 2015
  */
@@ -43,9 +45,69 @@ class TableIndices
 public:
 
   /**
-   * Default constructor. It sets all indices to zero.
+   * Default constructor. This constructor sets all indices to zero.
    */
   TableIndices();
+
+  /**
+   * Constructor. This is the appropriate constructor for an
+   * object of type TableIndices<1> and initializes the single
+   * index with @p index0.
+   *
+   * This constructor will result in a compiler error if
+   * the template argument @p N is different from one.
+   */
+  explicit TableIndices (const unsigned int index0);
+
+  /**
+   * Constructor. This is the appropriate constructor for an
+   * object of type TableIndices<2> and initializes the
+   * indices stored by this object by the given arguments.
+   *
+   * This constructor will result in a compiler error if
+   * the template argument @p N is different from two.
+   */
+  TableIndices (const unsigned int index0,
+                const unsigned int index1);
+
+  /**
+   * Constructor. This is the appropriate constructor for an
+   * object of type TableIndices<3> and initializes the
+   * indices stored by this object by the given arguments.
+   *
+   * This constructor will result in a compiler error if
+   * the template argument @p N is different from three.
+   */
+  TableIndices (const unsigned int index0,
+                const unsigned int index1,
+                const unsigned int index2);
+
+  /**
+   * Constructor. This is the appropriate constructor for an
+   * object of type TableIndices<4> and initializes the
+   * indices stored by this object by the given arguments.
+   *
+   * This constructor will result in a compiler error if
+   * the template argument @p N is different from four.
+   */
+  TableIndices (const unsigned int index0,
+                const unsigned int index1,
+                const unsigned int index2,
+                const unsigned int index3);
+
+  /**
+   * Constructor. This is the appropriate constructor for an
+   * object of type TableIndices<5> and initializes the
+   * indices stored by this object by the given arguments.
+   *
+   * This constructor will result in a compiler error if
+   * the template argument @p N is different from five.
+   */
+  TableIndices (const unsigned int index0,
+                const unsigned int index1,
+                const unsigned int index2,
+                const unsigned int index3,
+                const unsigned int index4);
 
   /**
    * Convenience constructor that takes up to 9 arguments. It can be used to
@@ -58,17 +120,18 @@ public:
    *
    * Note that only the first <tt>N</tt> arguments are actually used.
    *
-   * @tparam N The number of indices stored in each object.
+   * @deprecated Use the constructor with the appropriate number of arguments
+   *   to initialize the @p N indices instead.
    */
   TableIndices (const unsigned int index0,
-                const unsigned int index1 = numbers::invalid_unsigned_int,
-                const unsigned int index2 = numbers::invalid_unsigned_int,
-                const unsigned int index3 = numbers::invalid_unsigned_int,
-                const unsigned int index4 = numbers::invalid_unsigned_int,
-                const unsigned int index5 = numbers::invalid_unsigned_int,
+                const unsigned int index1,
+                const unsigned int index2,
+                const unsigned int index3,
+                const unsigned int index4,
+                const unsigned int index5,
                 const unsigned int index6 = numbers::invalid_unsigned_int,
                 const unsigned int index7 = numbers::invalid_unsigned_int,
-                const unsigned int index8 = numbers::invalid_unsigned_int);
+                const unsigned int index8 = numbers::invalid_unsigned_int) DEAL_II_DEPRECATED;
 
   /**
    * Read-only access the value of the <tt>i</tt>th index.
@@ -125,6 +188,77 @@ TableIndices<N>::TableIndices()
 }
 
 
+
+template <int N>
+TableIndices<N>::TableIndices(const unsigned int index0)
+{
+  static_assert (N==1,
+                 "This constructor is only available for TableIndices<1> objects.");
+  indices[0] = index0;
+}
+
+
+
+template <int N>
+TableIndices<N>::TableIndices(const unsigned int index0,
+                              const unsigned int index1)
+{
+  static_assert (N==2,
+                 "This constructor is only available for TableIndices<2> objects.");
+  indices[0] = index0;
+  indices[1] = index1;
+}
+
+
+
+template <int N>
+TableIndices<N>::TableIndices(const unsigned int index0,
+                              const unsigned int index1,
+                              const unsigned int index2)
+{
+  static_assert (N==3,
+                 "This constructor is only available for TableIndices<3> objects.");
+  indices[0] = index0;
+  indices[1] = index1;
+  indices[2] = index2;
+}
+
+
+
+template <int N>
+TableIndices<N>::TableIndices(const unsigned int index0,
+                              const unsigned int index1,
+                              const unsigned int index2,
+                              const unsigned int index3)
+{
+  static_assert (N==4,
+                 "This constructor is only available for TableIndices<4> objects.");
+  indices[0] = index0;
+  indices[1] = index1;
+  indices[2] = index2;
+  indices[3] = index3;
+}
+
+
+
+template <int N>
+TableIndices<N>::TableIndices(const unsigned int index0,
+                              const unsigned int index1,
+                              const unsigned int index2,
+                              const unsigned int index3,
+                              const unsigned int index4)
+{
+  static_assert (N==5,
+                 "This constructor is only available for TableIndices<5> objects.");
+  indices[0] = index0;
+  indices[1] = index1;
+  indices[2] = index2;
+  indices[3] = index3;
+  indices[4] = index4;
+}
+
+
+
 template <int N>
 TableIndices<N>::TableIndices(const unsigned int index0,
                               const unsigned int index1,
@@ -140,22 +274,30 @@ TableIndices<N>::TableIndices(const unsigned int index0,
 
   switch (N)
     {
-    case 1: // fallthrough
+    case 1:
       Assert (index1 == numbers::invalid_unsigned_int, ExcMessage("more than N index values provided"));
-    case 2: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 2:
       Assert (index2 == numbers::invalid_unsigned_int, ExcMessage("more than N index values provided"));
-    case 3: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 3:
       Assert (index3 == numbers::invalid_unsigned_int, ExcMessage("more than N index values provided"));
-    case 4: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 4:
       Assert (index4 == numbers::invalid_unsigned_int, ExcMessage("more than N index values provided"));
-    case 5: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 5:
       Assert (index5 == numbers::invalid_unsigned_int, ExcMessage("more than N index values provided"));
-    case 6: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 6:
       Assert (index6 == numbers::invalid_unsigned_int, ExcMessage("more than N index values provided"));
-    case 7: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 7:
       Assert (index7 == numbers::invalid_unsigned_int, ExcMessage("more than N index values provided"));
-    case 8: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 8:
       Assert (index8 == numbers::invalid_unsigned_int, ExcMessage("more than N index values provided"));
+      break;
     default:
       ;
     }
@@ -169,23 +311,32 @@ TableIndices<N>::TableIndices(const unsigned int index0,
       // remaining indices to numbers::invalid_unsigned_int:
       for (unsigned int i=0; i<N; ++i)
         indices[i] = numbers::invalid_unsigned_int;
-    case 9: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 9:
       indices[8 % N] = index8;
-    case 8: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 8:
       indices[7 % N] = index7;
-    case 7: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 7:
       indices[6 % N] = index6;
-    case 6: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 6:
       indices[5 % N] = index5;
-    case 5: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 5:
       indices[4 % N] = index4;
-    case 4: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 4:
       indices[3 % N] = index3;
-    case 3: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 3:
       indices[2 % N] = index2;
-    case 2: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 2:
       indices[1 % N] = index1;
-    case 1: // fallthrough
+      DEAL_II_FALLTHROUGH;
+    case 1:
       indices[0 % N] = index0;
     }
 
@@ -238,7 +389,7 @@ inline
 void
 TableIndices<N>::sort ()
 {
-  std::sort(std_cxx11::begin(indices), std_cxx11::end(indices));
+  std::sort(std::begin(indices), std::end(indices));
 }
 
 

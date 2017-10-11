@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__dof_accessor_h
-#define dealii__dof_accessor_h
+#ifndef dealii_dof_accessor_h
+#define dealii_dof_accessor_h
 
 
 #include <deal.II/base/config.h>
@@ -177,10 +177,11 @@ namespace internal
  *
  * @tparam structdim The dimensionality of the objects the accessor
  *   represents. For example, points have @p structdim equal to zero,
- *   edges have @structdim equal to one, etc.
+ *   edges have @p structdim equal to one, etc.
  * @tparam DoFHandlerType The type of the DoF handler into which accessor
  *   of this type point. This is either the DoFHandler or hp::DoFHandler
- *   class. See also the @ref ConceptDoFHandlerType "DoFHandlerType concept".
+ *   class. See also the
+ *   @ref ConceptDoFHandlerType "DoFHandlerType concept".
  * @tparam level_dof_access If @p false, then the accessor simply represents
  *   a cell, face, or edge in a DoFHandler for which degrees of freedom only
  *   exist on the finest level. Some operations are not allowed in this case,
@@ -286,6 +287,18 @@ public:
    */
   template <bool level_dof_access2>
   DoFAccessor(const DoFAccessor<structdim, DoFHandlerType, level_dof_access2> &);
+
+  /**
+   * Copy operator. These operators are usually used in a context like <tt>iterator a,b;
+   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
+   * by @p b to the object pointed to by @p a. However, the result of
+   * dereferencing an iterator is not an object but an accessor; consequently,
+   * this operation is not useful for iterators on DoF handler objects.
+   * Consequently, this operator is declared as deleted and can not be used.
+   */
+  DoFAccessor<structdim,DoFHandlerType, level_dof_access> &
+  operator = (const DoFAccessor<structdim,DoFHandlerType, level_dof_access> &da) = delete;
+
   /**
    * @}
    */
@@ -402,7 +415,7 @@ public:
                            const unsigned int fe_index = DoFHandlerType::default_fe_index) const;
 
   /**
-   * Sets the level DoF indices that are returned by get_mg_dof_indices.
+   * Set the level DoF indices that are returned by get_mg_dof_indices.
    */
   void set_mg_dof_indices (const int level,
                            const std::vector<types::global_dof_index> &dof_indices,
@@ -431,7 +444,7 @@ public:
    const unsigned int fe_index = DoFHandlerType::default_fe_index) const;
 
   /**
-   * Returns the global DoF index of the <code>i</code>th degree of freedom
+   * Return the global DoF index of the <code>i</code>th degree of freedom
    * associated with the <code>vertex</code>th vertex on level @p level. Also
    * see vertex_dof_index().
    */
@@ -473,7 +486,7 @@ public:
    const unsigned int fe_index = DoFHandlerType::default_fe_index) const;
 
   /**
-   * Returns the dof_index on the given level. Also see dof_index.
+   * Return the dof_index on the given level. Also see dof_index.
    */
   types::global_dof_index mg_dof_index (const int level, const unsigned int i) const;
 
@@ -624,10 +637,9 @@ protected:
    * a cell object, there can only be a single set of degrees of freedom, and
    * fe_index has to match the result of active_fe_index().
    */
-  void set_dof_index
-  (const unsigned int i,
-   const types::global_dof_index index,
-   const unsigned int fe_index = DoFHandlerType::default_fe_index) const;
+  void set_dof_index (const unsigned int i,
+                      const types::global_dof_index index,
+                      const unsigned int fe_index = DoFHandlerType::default_fe_index) const;
 
   void set_mg_dof_index (const int level, const unsigned int i, const types::global_dof_index index) const;
 
@@ -669,18 +681,6 @@ protected:
   template <int, class, bool> friend class DoFAccessor;
 
 private:
-  /**
-   * Copy operator. This is normally used in a context like <tt>iterator a,b;
-   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
-   * by @p b to the object pointed to by @p a. However, the result of
-   * dereferencing an iterator is not an object but an accessor; consequently,
-   * this operation is not useful for iterators on triangulations. We declare
-   * this function here private, thus it may not be used from outside.
-   * Furthermore it is not implemented and will give a linker error if used
-   * anyway.
-   */
-  DoFAccessor<structdim,DoFHandlerType, level_dof_access> &
-  operator = (const DoFAccessor<structdim,DoFHandlerType, level_dof_access> &da);
 
   /**
    * Make the DoFHandler class a friend so that it can call the set_xxx()
@@ -801,6 +801,17 @@ public:
   DoFAccessor (const DoFAccessor<dim2, DoFHandlerType2, level_dof_access2> &);
 
   /**
+   * Copy operator. These operators are usually used in a context like <tt>iterator a,b;
+   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
+   * by @p b to the object pointed to by @p a. However, the result of
+   * dereferencing an iterator is not an object but an accessor; consequently,
+   * this operation is not useful for iterators on DoF handler objects.
+   * Consequently, this operator is declared as deleted and can not be used.
+   */
+  DoFAccessor<0,DoFHandlerType<1,spacedim>, level_dof_access> &
+  operator = (const DoFAccessor<0,DoFHandlerType<1,spacedim>, level_dof_access> &da) = delete;
+
+  /**
    * @}
    */
 
@@ -809,12 +820,6 @@ public:
    */
   const DoFHandlerType<1,spacedim> &
   get_dof_handler () const;
-
-  /**
-   * Copy operator.
-   */
-  DoFAccessor<0,DoFHandlerType<1,spacedim>, level_dof_access> &
-  operator = (const DoFAccessor<0,DoFHandlerType<1,spacedim>, level_dof_access> &da);
 
   /**
    * Implement the copy operator needed for the iterator classes.
@@ -844,17 +849,19 @@ public:
   child (const unsigned int c) const;
 
   /**
-   * Pointer to the @p ith line bounding this object. If the current object is
-   * a line itself, then the only valid index is @p i equals to zero, and the
-   * function returns an iterator to itself.
+   * Pointer to the @p ith line bounding this object.
+   *
+   * Since meshes with dimension 1 do not have quads this method just throws
+   * an exception.
    */
   typename dealii::internal::DoFHandler::Iterators<DoFHandlerType<1,spacedim>, level_dof_access>::line_iterator
   line (const unsigned int i) const;
 
   /**
-   * Pointer to the @p ith quad bounding this object. If the current object is
-   * a quad itself, then the only valid index is @p i equals to zero, and the
-   * function returns an iterator to itself.
+   * Pointer to the @p ith quad bounding this object.
+   *
+   * Since meshes with dimension 1 do not have quads this method just throws
+   * an exception.
    */
   typename dealii::internal::DoFHandler::Iterators<DoFHandlerType<1,spacedim>, level_dof_access>::quad_iterator
   quad (const unsigned int i) const;
@@ -872,14 +879,12 @@ public:
 
   /**
    * Return the <i>global</i> indices of the degrees of freedom located on
-   * this object in the standard ordering defined by the finite element (i.e.,
-   * dofs on vertex 0, dofs on vertex 1, etc, dofs on line 0, dofs on line 1,
-   * etc, dofs on quad 0, etc.) This function is only available on
-   * <i>active</i> objects (see
+   * this object in the standard ordering defined by the finite element. This
+   * function is only available on <i>active</i> objects (see
    * @ref GlossActive "this glossary entry").
    *
-   * The cells needs to be an active cell (and not artificial in a parallel
-   * distributed computation).
+   * The present vertex must belong to an active cell (and not artificial in a
+   * parallel distributed computation).
    *
    * The vector has to have the right size before being passed to this
    * function.
@@ -905,6 +910,16 @@ public:
    */
   void get_dof_indices (std::vector<types::global_dof_index> &dof_indices,
                         const unsigned int fe_index = AccessorData::default_fe_index) const;
+
+  /**
+   * Return the global multilevel indices of the degrees of freedom that live
+   * on the current object with respect to the given level within the
+   * multigrid hierarchy. The indices refer to the local numbering for the
+   * level this line lives on.
+   */
+  void get_mg_dof_indices (const int level,
+                           std::vector<types::global_dof_index> &dof_indices,
+                           const unsigned int fe_index = AccessorData::default_fe_index) const;
 
   /**
    * Global DoF index of the <i>i</i> degree associated with the @p vertexth
@@ -939,20 +954,7 @@ public:
    * cells, as well as vertices, there may therefore be two sets of degrees of
    * freedom, one for each of the finite elements used on the adjacent cells.
    * In order to specify which set of degrees of freedom to work on, the last
-   * argument is used to disambiguate. Finally, if this function is called for
-   * a cell object, there can only be a single set of degrees of freedom, and
-   * fe_index has to match the result of active_fe_index().
-   *
-   * @note While the get_dof_indices() function returns an array that contains
-   * the indices of all degrees of freedom that somehow live on this object
-   * (i.e. on the vertices, edges or interior of this object), the current
-   * dof_index() function only considers the DoFs that really belong to this
-   * particular object's interior. In other words, as an example, if the
-   * current object refers to a quad (a cell in 2d, a face in 3d) and the
-   * finite element associated with it is a bilinear one, then the
-   * get_dof_indices() will return an array of size 4 while dof_index() will
-   * produce an exception because no degrees are defined in the interior of
-   * the face.
+   * argument is used to disambiguate.
    */
   types::global_dof_index dof_index (const unsigned int i,
                                      const unsigned int fe_index = AccessorData::default_fe_index) const;
@@ -971,33 +973,30 @@ public:
   /**
    * Return the number of finite elements that are active on a given object.
    *
-   * For non-hp DoFHandler objects, the answer is of course always one.
-   * However, for hp::DoFHandler objects, this isn't the case: If this is a
-   * cell, the answer is of course one. If it is a face, the answer may be one
-   * or two, depending on whether the two adjacent cells use the same finite
-   * element or not. If it is an edge in 3d, the possible return value may be
-   * one or any other value larger than that.
+   * Since vertices do not store the information necessary for this to be
+   * calculated, this method just raises an exception and only exists to
+   * enable dimension-independent programming.
    */
   unsigned int
   n_active_fe_indices () const;
 
   /**
-   * Return the @p n-th active fe index on this object. For cells and all non-
-   * hp objects, there is only a single active fe index, so the argument must
-   * be equal to zero. For lower-dimensional hp objects, there are
-   * n_active_fe_indices() active finite elements, and this function can be
-   * queried for their indices.
+   * Return the @p n-th active fe index on this object.
+   *
+   * Since vertices do not store the information necessary for this to be
+   * calculated, this method just raises an exception and only exists to
+   * enable dimension-independent programming.
    */
   unsigned int
   nth_active_fe_index (const unsigned int n) const;
 
   /**
    * Return true if the finite element with given index is active on the
-   * present object. For non-hp DoF accessors, this is of course the case only
-   * if @p fe_index equals zero. For cells, it is the case if @p fe_index
-   * equals active_fe_index() of this cell. For faces and other lower-
-   * dimensional objects, there may be more than one @p fe_index that are
-   * active on any given object (see n_active_fe_indices()).
+   * present object.
+   *
+   * Since vertices do not store the information necessary for this to be
+   * calculated, this method just raises an exception and only exists to
+   * enable dimension-independent programming.
    */
   bool
   fe_index_is_active (const unsigned int fe_index) const;
@@ -1141,6 +1140,81 @@ protected:
 };
 
 
+
+/* -------------------------------------------------------------------------- */
+
+
+/**
+ * A class that represents DoF accessor objects to iterators that don't make sense
+ * such as quad iterators in on 1d meshes.  This class can not be used to
+ * create objects (it will in fact throw an exception if this should ever be
+ * attempted but it sometimes allows code to be written in a simpler way in a
+ * dimension independent way. For example, it allows to write code that works
+ * on quad iterators that is dimension independent -- i.e., also compiles
+ * in 1d -- because quad iterators
+ * (via the current class) exist and are syntactically correct. You can not
+ * expect, however, to ever create an actual object of one of these iterators
+ * in 1d, meaning you need to expect to wrap the code block in which you use
+ * quad iterators into something like <code>if (dim@>1)</code> -- which makes
+ * eminent sense anyway.
+ *
+ * This class provides the minimal interface necessary for Accessor classes to
+ * interact with Iterator classes. However, this is only for syntactic
+ * correctness, none of the functions do anything but generate errors.
+ *
+ * @ingroup Accessors
+ * @author Wolfgang Bangerth, 2017
+ */
+template <int structdim, int dim, int spacedim=dim>
+class DoFInvalidAccessor : public InvalidAccessor<structdim,dim,spacedim>
+{
+public:
+  /**
+   * Propagate typedef from base class to this class.
+   */
+  typedef typename InvalidAccessor<structdim,dim,spacedim>::AccessorData AccessorData;
+
+  /**
+   * Constructor.  This class is used for iterators that do not make
+   * sense in a given dimension, for example quads for 1d meshes. Consequently,
+   * while the creation of such objects is syntactically valid, they make no
+   * semantic sense, and we generate an exception when such an object is
+   * actually generated.
+   */
+  DoFInvalidAccessor (const Triangulation<dim,spacedim> *parent     =  0,
+                      const int                 level      = -1,
+                      const int                 index      = -1,
+                      const AccessorData       *local_data =  0);
+
+  /**
+   * Copy constructor.  This class is used for iterators that do not make
+   * sense in a given dimension, for example quads for 1d meshes. Consequently,
+   * while the creation of such objects is syntactically valid, they make no
+   * semantic sense, and we generate an exception when such an object is
+   * actually generated.
+   */
+  DoFInvalidAccessor (const DoFInvalidAccessor<structdim,dim,spacedim> &);
+
+  /**
+   * Conversion from other accessors to the current invalid one. This of
+   * course also leads to a run-time error.
+   */
+  template <typename OtherAccessor>
+  DoFInvalidAccessor (const OtherAccessor &);
+
+  /**
+   * Set the index of the <i>i</i>th degree of freedom of this object to @p
+   * index. Since the current object doesn't point to anything useful, like
+   * all other functions in this class this function only throws an exception.
+   */
+  void set_dof_index (const unsigned int i,
+                      const types::global_dof_index index,
+                      const unsigned int fe_index = DoFHandler<dim,spacedim>::default_fe_index) const;
+};
+
+
+
+
 /* -------------------------------------------------------------------------- */
 
 
@@ -1234,6 +1308,17 @@ public:
   DoFCellAccessor (const DoFAccessor<dim2, DoFHandlerType2, level_dof_access2> &);
 
   /**
+   * Copy operator. These operators are usually used in a context like <tt>iterator a,b;
+   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
+   * by @p b to the object pointed to by @p a. However, the result of
+   * dereferencing an iterator is not an object but an accessor; consequently,
+   * this operation is not useful for iterators on DoF handler objects.
+   * Consequently, this operator is declared as deleted and can not be used.
+   */
+  DoFCellAccessor<DoFHandlerType, level_dof_access> &
+  operator = (const DoFCellAccessor<DoFHandlerType, level_dof_access> &da) = delete;
+
+  /**
    * @}
    */
 
@@ -1291,8 +1376,8 @@ public:
   /**
    * Return an iterator to the @p ith face of this cell.
    *
-   * This function is not implemented in 1D, and returns DoFAccessor::line in
-   * 2D and DoFAccessor::quad in 3d.
+   * This function returns a DoFAccessor with <code>structdim == 0</code> in
+   * 1D, a DoFAccessor::line in 2D, and a DoFAccessor::quad in 3d.
    */
   face_iterator
   face (const unsigned int i) const;
@@ -1673,7 +1758,7 @@ public:
   get_fe () const;
 
   /**
-   * Returns the index inside the hp::FECollection of the FiniteElement used
+   * Return the index inside the hp::FECollection of the FiniteElement used
    * for this cell. This function is only useful if the DoF handler object
    * associated with the current cell is an hp::DoFHandler.
    *
@@ -1683,11 +1768,20 @@ public:
    * indices on non-active cells since they do not have finite element spaces
    * associated with them without having any degrees of freedom. Consequently,
    * this function will produce an exception when called on non-active cells.
+   *
+   * @note When using parallel meshes, either through the
+   * parallel::shared::Triangulation or parallel::distributed::Triangulation
+   * classes, it is only allowed to call this function on locally
+   * owned or ghost cells. No information is available on artificial cells.
+   * Furthermore, @p active_fe_index information is exchanged from locally
+   * owned cells on one processor to other processors where they may be
+   * ghost cells, during the call to hp::DoFHandler::distribute_dofs().
+   * See the documentation of hp::DoFHandler for more information.
    */
   unsigned int active_fe_index () const;
 
   /**
-   * Sets the index of the FiniteElement used for this cell. This determines
+   * Set the index of the FiniteElement used for this cell. This determines
    * which element in an hp::FECollection to use. This function is only useful
    * if the DoF handler object associated with the current cell is an
    * hp::DoFHandler.
@@ -1698,8 +1792,20 @@ public:
    * indices to non-active cells since they do not have finite element spaces
    * associated with them without having any degrees of freedom. Consequently,
    * this function will produce an exception when called on non-active cells.
+   *
+   * @note When using parallel meshes, either through the
+   * parallel::shared::Triangulation or parallel::distributed::Triangulation
+   * classes, it is only allowed to call this function on locally
+   * owned cells (see @ref GlossLocallyOwnedCell "this glossary entry"). This
+   * is because otherwise a common source of errors would be if one
+   * processor sets a different @p active_fe_index on a ghost cell than
+   * the processor that actually owns the cell does. To avoid this mistake,
+   * one can only set @p active_fe_index information on locally owned
+   * cells, and this information is then mirrored to all processors that
+   * have this cell as a ghost cell -- see the documentation of the
+   * hp::DoFHandler class.
    */
-  void set_active_fe_index (const unsigned int i);
+  void set_active_fe_index (const unsigned int i) const;
   /**
    * @}
    */
@@ -1721,18 +1827,6 @@ public:
   void update_cell_dof_indices_cache () const;
 
 private:
-  /**
-   * Copy operator. This is normally used in a context like <tt>iterator a,b;
-   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
-   * by @p b to the object pointed to by @p a. However, the result of
-   * dereferencing an iterator is not an object but an accessor; consequently,
-   * this operation is not useful for iterators on triangulations. We declare
-   * this function here private, thus it may not be used from outside.
-   * Furthermore it is not implemented and will give a linker error if used
-   * anyway.
-   */
-  DoFCellAccessor<DoFHandlerType, level_dof_access> &
-  operator = (const DoFCellAccessor<DoFHandlerType, level_dof_access> &da);
 
   /**
    * Make the DoFHandler class a friend so that it can call the
@@ -1749,6 +1843,21 @@ bool
 DoFAccessor<sd, DoFHandlerType, level_dof_access>::is_level_cell()
 {
   return level_dof_access;
+}
+
+
+
+template <int structdim, int dim, int spacedim>
+template <typename OtherAccessor>
+DoFInvalidAccessor<structdim, dim, spacedim>::
+DoFInvalidAccessor (const OtherAccessor &)
+{
+  Assert (false,
+          ExcMessage ("You are attempting an illegal conversion between "
+                      "iterator/accessor types. The constructor you call "
+                      "only exists to make certain template constructs "
+                      "easier to write as dimension independent code but "
+                      "the conversion is not valid in the current context."));
 }
 
 

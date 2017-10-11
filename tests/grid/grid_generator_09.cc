@@ -21,18 +21,13 @@
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
-#include <deal.II/base/logstream.h>
-#include <cmath>
-#include <cstdlib>
 
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 
 std::ofstream logfile("output");
 
 
-template<int dim>
+template <int dim>
 void check_rect1 (unsigned int n, bool color, bool log)
 {
   Point<dim> left;

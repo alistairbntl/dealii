@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2007 - 2015 by the deal.II authors
+// Copyright (C) 2007 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,7 +19,6 @@
 // verified to be correct
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -31,11 +30,10 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_q1.h>
 
-#include <fstream>
 
 
 
-template<int dim>
+template <int dim>
 void test (const Triangulation<dim> &tr,
            const FiniteElement<dim> &fe)
 {
@@ -51,7 +49,7 @@ void test (const Triangulation<dim> &tr,
 
   const QGauss<dim> quadrature(2);
   FEValues<dim> fe_values (fe, quadrature,
-                           update_values | update_gradients | update_q_points);
+                           update_values | update_gradients | update_quadrature_points);
   fe_values.reinit (dof.begin_active());
 
   // let the FEValues object compute the
@@ -78,7 +76,7 @@ void test (const Triangulation<dim> &tr,
 
 
 
-template<int dim>
+template <int dim>
 void test_hyper_cube()
 {
   Triangulation<dim> tr;
@@ -96,7 +94,6 @@ int main()
   deallog << std::setprecision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   test_hyper_cube<1>();
   test_hyper_cube<2>();

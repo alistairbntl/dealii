@@ -17,11 +17,7 @@
 // Test Lagrange interpolation
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/polynomial.h>
 #include <deal.II/base/quadrature_lib.h>
 
@@ -82,7 +78,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-//  deallog.threshold_double(1.e-10);
 
   QTrapez<1> trapez;
   QSimpson<1> simpson;

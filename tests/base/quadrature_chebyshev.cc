@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,17 +21,13 @@
 
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
-#include <cmath>
 
 using namespace dealii;
 
 
-template<typename quadrature_type, unsigned short startn>
+template <typename quadrature_type, unsigned short startn>
 void check_quadrature (double *);
 void check_GRC_right(double *);
 
@@ -75,9 +71,7 @@ int main()
   exact_monomials[31] = 0.3170611116013786;
 
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
   deallog << std::setprecision(8);
 
   deallog << "* 1d Gauss-Chebyshev" << std::endl;
@@ -96,7 +90,7 @@ int main()
 }
 
 
-template<typename quadrature_type,unsigned short startn>
+template <typename quadrature_type,unsigned short startn>
 void check_quadrature(double *exact_monomials)
 {
 
@@ -123,7 +117,7 @@ void check_quadrature(double *exact_monomials)
           err = std::fabs(quadrature_int-exact_monomials[i]);
           deallog << "Quadrature order " << n << ", polynomial of degree " << i << ": ";
 
-          if (err < 1.e-15)
+          if (err < 1.e-14)
             deallog << "exact." << std::endl;
           else
             deallog << "error " << err << std::endl;

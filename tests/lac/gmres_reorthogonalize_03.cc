@@ -59,7 +59,7 @@ void test (unsigned int variant)
       matrix(i,i) = 1e30*(i+1)*(i+1)*(i+1)*(i+1);
   else
     Assert(false, ExcMessage("Invalid variant"));
-  if (types_are_equal<number,float>::value == true)
+  if (std::is_same<number,float>::value == true)
     Assert(variant < 4, ExcMessage("Invalid_variant"));
 
   deallog.push(Utilities::int_to_string(variant,1));
@@ -70,6 +70,13 @@ void test (unsigned int variant)
   data.force_re_orthogonalization = true;
 
   SolverGMRES<Vector<number> > solver(control, data);
+  auto print_re_orthogonalization =
+    [](int accumulated_iterations)
+  {
+    deallog.get_file_stream() << "Re-orthogonalization enabled at step "
+                              << accumulated_iterations << std::endl;
+  };
+  solver.connect_re_orthogonalization_slot(print_re_orthogonalization);
   solver.solve(matrix, sol, rhs, PreconditionIdentity());
 
   deallog.pop();
@@ -80,7 +87,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(3);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("double");
   test<double>(0);
@@ -90,7 +96,6 @@ int main()
   test<double>(4);
   test<double>(5);
   deallog.pop();
-  deallog.threshold_double(1.e-4);
   deallog.push("float");
   test<float>(0);
   test<float>(1);

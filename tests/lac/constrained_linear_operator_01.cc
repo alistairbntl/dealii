@@ -47,7 +47,6 @@
 #include <deal.II/lac/packaged_operation.h>
 #include <deal.II/lac/constrained_linear_operator.h>
 
-#include <fstream>
 #include <iostream>
 
 using namespace dealii;
@@ -109,7 +108,7 @@ void Step6<dim>::setup_system ()
                                            constraints);
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ConstantFunction<dim>(1.),
+                                            Functions::ConstantFunction<dim>(1.),
                                             constraints);
   constraints.close ();
 

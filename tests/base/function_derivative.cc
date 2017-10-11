@@ -17,7 +17,6 @@
 // Check automatic differentiation
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/base/auto_derivative_function.h>
@@ -25,12 +24,10 @@
 #include <deal.II/lac/vector.h>
 
 #include <vector>
-#include <iomanip>
-#include <fstream>
 #include <string>
 
 
-template<int dim>
+template <int dim>
 void
 check_derivative_order(const std::vector<Tensor<1,dim> > &gradients,
                        FunctionDerivative<dim> &df,
@@ -67,7 +64,7 @@ check_derivative_order(const std::vector<Tensor<1,dim> > &gradients,
 }
 
 
-template<int dim>
+template <int dim>
 void
 check_hessian_order(const std::vector<double> &values,
                     FunctionDerivative<dim> &df,
@@ -113,7 +110,7 @@ check_hessian_order(const std::vector<double> &values,
 }
 
 
-template<int dim>
+template <int dim>
 void
 check_sine(unsigned int nquad)
 {
@@ -158,9 +155,7 @@ check_sine(unsigned int nquad)
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   check_sine<2>(3);
   check_sine<3>(3);

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,8 +20,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 
@@ -31,7 +29,7 @@ std::ofstream logfile("output");
 #include <deal.II/base/work_stream.h>
 #include <deal.II/base/tensor_function.h>
 #include <deal.II/lac/constraint_matrix.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/solver_bicgstab.h>
 #include <deal.II/lac/precondition.h>
@@ -50,9 +48,6 @@ std::ofstream logfile("output");
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
 
 namespace Step51
@@ -350,7 +345,7 @@ namespace Step51
     constraints.close ();
 
     {
-      CompressedSimpleSparsityPattern csp (dof_handler.n_dofs());
+      DynamicSparsityPattern csp (dof_handler.n_dofs());
       DoFTools::make_sparsity_pattern (dof_handler, csp,
                                        constraints, false);
       sparsity_pattern.copy_from(csp);
@@ -793,10 +788,10 @@ namespace Step51
 
       WorkStream::run(dof_handler_u_post.begin_active(),
                       dof_handler_u_post.end(),
-                      std_cxx11::bind (&HDG<dim>::postprocess_one_cell,
-                                       std_cxx11::ref(*this),
-                                       std_cxx11::_1, std_cxx11::_2, std_cxx11::_3),
-                      std_cxx11::function<void(const unsigned int &)>(),
+                      std::bind (&HDG<dim>::postprocess_one_cell,
+                                 std::ref(*this),
+                                 std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+                      std::function<void(const unsigned int &)>(),
                       scratch,
                       0U);
     }
@@ -974,7 +969,6 @@ int main ()
   logfile << std::setprecision(6);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   {
     Step51::HDG<1> hdg_problem (1);

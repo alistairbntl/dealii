@@ -31,10 +31,7 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/grid_refinement.h>
 
-#include <fstream>
 #include <iostream>
-#include <cmath>
-#include <deal.II/base/logstream.h>
 
 std::ofstream logfile("output");
 
@@ -84,7 +81,7 @@ void flatten_triangulation( Triangulation<dim> &tria_in, Triangulation<dim> &tri
 // eps image of the mesh so we can see the nodes are at the right
 // place.
 
-template<int dim>
+template <int dim>
 void mesh_info(const Triangulation<dim> &tria,
                const std::string        &filename)
 {
@@ -163,7 +160,6 @@ int main ()
   deallog << std::setprecision(2);
   logfile << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test ();
 

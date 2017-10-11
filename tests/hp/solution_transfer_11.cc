@@ -18,7 +18,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 
 #include <deal.II/grid/tria.h>
@@ -31,7 +30,6 @@
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/numerics/solution_transfer.h>
 #include <deal.II/fe/fe_q.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -81,7 +79,6 @@ int main()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog << "   1D solution transfer" << std::endl;
   transfer<1>(logfile);

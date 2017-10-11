@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2016 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__grid_in_h
-#define dealii__grid_in_h
+#ifndef dealii_grid_in_h
+#define dealii_grid_in_h
 
 
 #include <deal.II/base/config.h>
@@ -33,20 +33,24 @@ template <int dim> struct CellData;
 /**
  * This class implements an input mechanism for grid data. It allows to read a
  * grid structure into a triangulation object. At present, UCD (unstructured
- * cell data), DB Mesh, XDA, Gmsh, Tecplot, NetCDF, UNV, VTK, and Cubit are
- * supported as input format for grid data. Any numerical data other than
+ * cell data), DB Mesh, XDA, Gmsh, Tecplot, NetCDF, UNV, VTK, ASSIMP, and Cubit
+ * are supported as input format for grid data. Any numerical data other than
  * geometric (vertex locations) and topological (how vertices form cells,
  * faces, and edges) information is ignored, but the readers for the various
  * formats generally do read information that associates material ids or
- * boundary ids to cells or faces (see @ref GlossMaterialId "this" and
- * @ref GlossBoundaryIndicator "this" glossary entry for more information).
+ * boundary ids to cells or faces (see
+ * @ref GlossMaterialId "this"
+ * and
+ * @ref
+ * GlossBoundaryIndicator "this"
+ * glossary entry for more information).
  *
  * @note Since deal.II only supports line, quadrilateral and hexahedral
  * meshes, the functions in this class can only read meshes that consist
  * exclusively of such cells. If you absolutely need to work with a mesh that
  * uses triangles or tetrahedra, then your only option is to convert the mesh
- * to quadrilaterals and hexahedra. A tool that can do this is tethex, see
- * http://code.google.com/p/tethex/wiki/Tethex .
+ * to quadrilaterals and hexahedra. A tool that can do this is tethex,
+ * available <a href="https://github.com/martemyev/tethex">here</a>.
  *
  * The mesh you read will form the coarsest level of a @p Triangulation
  * object. As such, it must not contain hanging nodes or other forms of
@@ -155,15 +159,15 @@ template <int dim> struct CellData;
  * generator, see http://www.salome-platform.org/ . The sections of the format
  * that the GridIn::read_unv function supports are documented here:
  * <ul>
- * <li> section 2411: http://www.sdrl.uc.edu/universal-file-formats-for-modal-
- * analysis-testing-1/file-format-storehouse/unv_2411.htm
- * <li> section 2412: http://www.sdrl.uc.edu/universal-file-formats-for-modal-
- * analysis-testing-1/file-format-storehouse/unv_2412.htm
- * <li> section 2467: http://www.sdrl.uc.edu/universal-file-formats-for-modal-
- * analysis-testing-1/file-format-storehouse/unv_2467.htm
+ * <li> section 2411:
+ * http://www.sdrl.uc.edu/sdrl/referenceinfo/universalfileformats/file-format-storehouse/universal-dataset-number-2411
+ * <li> section 2412:
+ * http://www.sdrl.uc.edu/sdrl/referenceinfo/universalfileformats/file-format-storehouse/universal-dataset-number-2412
+ * <li> section 2467:
+ * http://www.sdrl.uc.edu/sdrl/referenceinfo/universalfileformats/file-format-storehouse/universal-dataset-number-2467
  * <li> all sections of this format, even if they may not be supported in our
- * reader, can be found here: http://www.sdrl.uc.edu/universal-file-formats-
- * for-modal-analysis-testing-1/file-format-storehouse/file-formats
+ * reader, can be found here:
+ * http://www.sdrl.uc.edu/sdrl/referenceinfo/universalfileformats/file-format-storehouse
  * </ul>
  * Note that Salome, let's say in 2D, can only make a quad mesh on an object
  * that has exactly 4 edges (or 4 pieces of the boundary). That means, that if
@@ -207,14 +211,14 @@ template <int dim> struct CellData;
  * <li> <tt>Cubit</tt> format: deal.II doesn't directly support importing from
  * Cubit at this time. However, Cubit can export in UCD format using a simple
  * plug-in, and the resulting UCD file can then be read by this class. The
- * plug-in script can be found on the deal.II wiki page,
- * http://code.google.com/p/dealii/wiki/MeshInputAndOutput .
+ * plug-in script can be found on the deal.II wiki page under
+ * <a href="https://github.com/dealii/dealii/wiki/Mesh-Input-And-Output">Mesh
+ * Input and Output</a>.
  *
  * Alternatively, Cubit can generate ABAQUS files that can be read in via the
  * read_abaqus() function. This may be a better option for geometries with
- * complex boundary condition surfaces and multiple materials
- *  - information which is currently not easily obtained through
- * Cubit's python interface.
+ * complex boundary condition surfaces and multiple materials - information
+ * which is currently not easily obtained through Cubit's python interface.
  *
  * </ul>
  *
@@ -322,7 +326,9 @@ public:
     /// Use read_tecplot()
     tecplot,
     /// Use read_vtk()
-    vtk
+    vtk,
+    /// Use read_assimp()
+    assimp,
   };
 
   /**
@@ -399,8 +405,8 @@ public:
    * - Files generated in Abaqus CAE 6.12 have been verified to be
    * correctly imported, but older (or newer) versions of Abaqus may also
    * generate valid input decks.
-   * - Files generated using Cubit 11.x, 12.x and 13.x are valid, but only
-   * when using a specific set of export steps. These are as follows:
+   * - Files generated using Cubit 11.x, 12.x, 13.x, 14.x and 15.x are valid,
+   * but only when using a specific set of export steps. These are as follows:
    *     - Go to "Analysis setup mode" by clicking on the disc icon in the
    * toolbar on the right.
    *     - Select "Export Mesh" under "Operation" by clicking on the
@@ -453,7 +459,47 @@ public:
   void read_tecplot (std::istream &in);
 
   /**
-   * Returns the standard suffix for a file in this format.
+   * Read in a file supported by Assimp, and generate a Triangulation
+   * out of it.  If you specify a @p mesh_index, only the mesh with
+   * the given index will be extracted, otherwise all meshes which are
+   * present in the file will be used to generate the Triangulation.
+   *
+   * This function can only be used to read two-dimensional meshes (possibly
+   * embedded in three dimensions). This is the standard for graphical software
+   * such as blender, or 3D studio max, and that is what the original Assimp
+   * library was built for. We "bend" it to deal.II to support complex
+   * co-dimension one meshes and complex two-dimensional meshes.
+   *
+   * If @p remove_duplicates is set to true (the default), then
+   * duplicated vertices will be removed if their distance is lower
+   * than @p tol.
+   *
+   * Only the elements compatible with the given dimension and spacedimension
+   * will be extracted from the mesh, and only those elements that are
+   * compatible with deal.II are supported. If you set
+   * `ignore_unsupported_element_types`, all the other element types are simply
+   * ignored by this algorithm. If your mesh contains a mixture of triangles
+   * and quadrilaterals, for example, only the quadrilaterals will be
+   * extracted. The resulting mesh (as represented in the Triangulation object)
+   * may not make any sense if you are mixing compatible and incompatible
+   * element types. If `ignore_unsupported_element_types` is set to `false`,
+   * then an exception is thrown when an unsupporte type is encountered.
+   *
+   * @param filename The file to read from
+   * @param mesh_index Index of the mesh within the file
+   * @param remove_duplicates Remove duplicated vertices
+   * @param tol Tolerance to use when removing vertices
+   * @param ignore_unsupported_element_types Don't throw exceptions if we
+   *        encounter unsupported types during parsing
+   */
+  void read_assimp(const std::string &filename,
+                   const unsigned int mesh_index=numbers::invalid_unsigned_int,
+                   const bool remove_duplicates=true,
+                   const double tol = 1e-12,
+                   const bool ignore_unsupported_element_types = true);
+
+  /**
+   * Return the standard suffix for a file in this format.
    */
   static std::string default_suffix (const Format format);
 
@@ -506,6 +552,15 @@ public:
                   int, int,
                   << "While creating cell " << arg1
                   << ", you are referencing a vertex with index " << arg2
+                  << " but no vertex with this index has been described in the input file.");
+  /**
+   * Exception
+   */
+  DeclException3 (ExcInvalidVertexIndexGmsh,
+                  int, int, int,
+                  << "While creating cell " << arg1
+                  << " (which is numbered as " << arg2
+                  << " in the input file), you are referencing a vertex with index " << arg3
                   << " but no vertex with this index has been described in the input file.");
   /**
    * Exception
@@ -637,7 +692,6 @@ void
 GridIn<3>::debug_output_grid (const std::vector<CellData<3> > &cells,
                               const std::vector<Point<3> >    &vertices,
                               std::ostream                    &out);
-
 #endif // DOXYGEN
 
 DEAL_II_NAMESPACE_CLOSE

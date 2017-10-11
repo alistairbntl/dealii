@@ -13,10 +13,11 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__la_vector_templates_h
-#define dealii__la_vector_templates_h
+#ifndef dealii_la_vector_templates_h
+#define dealii_la_vector_templates_h
 
 #include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/vector_operations_internal.h>
 #include <iostream>
 #include <iomanip>
 
@@ -25,11 +26,105 @@ DEAL_II_NAMESPACE_OPEN
 namespace LinearAlgebra
 {
   template <typename Number>
+  void Vector<Number>::reinit(const size_type size,
+                              const bool omit_zeroing_entries)
+  {
+    ReadWriteVector<Number>::reinit(size, omit_zeroing_entries);
+  }
+
+
+
+  template <typename Number>
+  template <typename Number2>
+  void Vector<Number>::reinit(const ReadWriteVector<Number2> &in_vector,
+                              const bool                      omit_zeroing_entries)
+  {
+    ReadWriteVector<Number>::reinit(in_vector, omit_zeroing_entries);
+  }
+
+
+
+  template <typename Number>
+  void Vector<Number>::reinit(const IndexSet &locally_stored_indices,
+                              const bool      omit_zeroing_entries)
+  {
+    ReadWriteVector<Number>::reinit(locally_stored_indices, omit_zeroing_entries);
+  }
+
+
+
+  template <typename Number>
+  void Vector<Number>::reinit(const VectorSpaceVector<Number> &V,
+                              const bool omit_zeroing_entries)
+  {
+    // Check that casting will work.
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=NULL, ExcVectorTypeNotCompatible());
+
+    // Downcast V. If fails, throws an exception.
+    const Vector<Number> &down_V = dynamic_cast<const Vector<Number>&>(V);
+    Assert(down_V.size()==this->size(),
+           ExcMessage("Cannot add two vectors with different numbers of elements"));
+
+    ReadWriteVector<Number>::reinit(down_V, omit_zeroing_entries);
+  }
+
+
+
+  template <typename Number>
+  Vector<Number> &Vector<Number>::operator= (const Vector<Number> &in_vector)
+  {
+    if (PointerComparison::equal(this, &in_vector))
+      return *this;
+
+    this->thread_loop_partitioner = in_vector.thread_loop_partitioner;
+    if (this->size() != in_vector.size())
+      this->reinit(in_vector, true);
+
+    dealii::internal::VectorOperations::Vector_copy<Number, Number> copier(in_vector.val, this->val);
+    internal::VectorOperations::parallel_for(copier, 0, this->size(), this->thread_loop_partitioner);
+
+    return *this;
+  }
+
+
+
+  template <typename Number>
+  template <typename Number2>
+  Vector<Number> &Vector<Number>::operator= (const Vector<Number2> &in_vector)
+  {
+    this->thread_loop_partitioner = in_vector.thread_loop_partitioner;
+    if (this->size() != in_vector.size())
+      ReadWriteVector<Number>::reinit(in_vector, true);
+
+    dealii::internal::VectorOperations::Vector_copy<Number, Number2> copier(in_vector.val, this->val);
+    internal::VectorOperations::parallel_for(copier, 0, this->size(), this->thread_loop_partitioner);
+
+    return *this;
+  }
+
+
+
+  template <typename Number>
+  Vector<Number> &Vector<Number>::operator= (const Number s)
+  {
+    Assert(s==static_cast<Number>(0), ExcMessage("Only 0 can be assigned to a vector."));
+    (void) s;
+
+    internal::VectorOperations::Vector_set<Number> setter(Number(), this->val);
+    internal::VectorOperations::parallel_for(setter, 0, this->size(), this->thread_loop_partitioner);
+
+    return *this;
+  }
+
+
+
+  template <typename Number>
   Vector<Number> &Vector<Number>::operator*= (const Number factor)
   {
     AssertIsFinite(factor);
-    for (unsigned int i=0; i<this->size(); ++i)
-      this->val[i] *= factor;
+
+    internal::VectorOperations::Vectorization_multiply_factor<Number> vector_multiply(this->val, factor);
+    internal::VectorOperations::parallel_for(vector_multiply, 0, this->size(), this->thread_loop_partitioner);
 
     return *this;
   }
@@ -52,17 +147,15 @@ namespace LinearAlgebra
   Vector<Number> &Vector<Number>::operator+= (const VectorSpaceVector<Number> &V)
   {
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&V)!=NULL, ExcVectorTypeNotCompatible());
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=nullptr, ExcVectorTypeNotCompatible());
 
     // Downcast V. If fails, throws an exception.
     const Vector<Number> &down_V = dynamic_cast<const Vector<Number>&>(V);
     Assert(down_V.size()==this->size(),
            ExcMessage("Cannot add two vectors with different numbers of elements"));
-    for (unsigned int i=0; i<this->size(); ++i)
-      {
-        AssertIsFinite(down_V[i]);
-        this->val[i] += down_V[i];
-      }
+
+    internal::VectorOperations::Vectorization_add_v<Number> vector_add(this->val, down_V.val);
+    internal::VectorOperations::parallel_for(vector_add, 0, this->size(), this->thread_loop_partitioner);
 
     return *this;
   }
@@ -73,17 +166,14 @@ namespace LinearAlgebra
   Vector<Number> &Vector<Number>::operator-= (const VectorSpaceVector<Number> &V)
   {
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&V)!=NULL, ExcVectorTypeNotCompatible());
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=nullptr, ExcVectorTypeNotCompatible());
 
     // Downcast V. If fails, throws an exception.
     const Vector<Number> &down_V = dynamic_cast<const Vector<Number>&>(V);
     Assert(down_V.size()==this->size(),
            ExcMessage("Cannot subtract two vectors with different numbers of elements"));
-    for (unsigned int i=0; i<this->size(); ++i)
-      {
-        AssertIsFinite(down_V[i]);
-        this->val[i] -= down_V[i];
-      }
+    internal::VectorOperations::Vectorization_subtract_v<Number> vector_subtract(this->val, down_V.val);
+    internal::VectorOperations::parallel_for(vector_subtract, 0, this->size(), this->thread_loop_partitioner);
 
     return *this;
   }
@@ -94,7 +184,7 @@ namespace LinearAlgebra
   Number Vector<Number>::operator* (const VectorSpaceVector<Number> &V) const
   {
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&V)!=NULL,
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=nullptr,
            ExcVectorTypeNotCompatible());
 
     // Downcast V. If fails, throws an exception.
@@ -102,24 +192,33 @@ namespace LinearAlgebra
     Assert(down_V.size()==this->size(),
            ExcMessage("Cannot compute the scalar product "
                       "of two vectors with different numbers of elements"));
-    Number value = 0.;
-    for (unsigned int i=0; i<this->size(); ++i)
-      {
-        AssertIsFinite(down_V[i]);
-        value += this->val[i]*down_V[i];
-      }
+    Number sum;
+    internal::VectorOperations::Dot<Number, Number> dot(this->val, down_V.val);
+    internal::VectorOperations::parallel_reduce(dot, 0, this->size(), sum, this->thread_loop_partitioner);
 
-    return value;
+    return sum;
   }
 
 
 
   template <typename Number>
   void Vector<Number>::import(const ReadWriteVector<Number> &,
-                              VectorOperation::values        ,
-                              std_cxx11::shared_ptr<const CommunicationPatternBase>)
+                              VectorOperation::values,
+                              std::shared_ptr<const CommunicationPatternBase>)
   {
     AssertThrow(false, ExcMessage("This function is not implemented."));
+  }
+
+
+
+  template <typename Number>
+  inline
+  void Vector<Number>::add(const Number a)
+  {
+    AssertIsFinite(a);
+
+    internal::VectorOperations::Vectorization_add_factor<Number> vector_add(this->val, a);
+    internal::VectorOperations::parallel_for(vector_add, 0, this->size(), this->thread_loop_partitioner);
   }
 
 
@@ -128,7 +227,7 @@ namespace LinearAlgebra
   void Vector<Number>::add(const Number a, const VectorSpaceVector<Number> &V)
   {
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&V)!=NULL,
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=nullptr,
            ExcVectorTypeNotCompatible());
 
     // Downcast V. If fails, throws an exception.
@@ -136,11 +235,9 @@ namespace LinearAlgebra
     AssertIsFinite(a);
     Assert(down_V.size()==this->size(),
            ExcMessage("Cannot add two vectors with different numbers of elements"));
-    for (unsigned int i=0; i<this->size(); ++i)
-      {
-        AssertIsFinite(down_V[i]);
-        this->val[i] += a*down_V[i];
-      }
+
+    internal::VectorOperations::Vectorization_add_av<Number> vector_add_av(this->val, down_V.val, a);
+    internal::VectorOperations::parallel_for(vector_add_av, 0, this->size(), this->thread_loop_partitioner);
   }
 
 
@@ -150,10 +247,10 @@ namespace LinearAlgebra
                            const Number b, const VectorSpaceVector<Number> &W)
   {
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&V)!=NULL,
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=nullptr,
            ExcVectorTypeNotCompatible());
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&W)!=NULL,
+    Assert(dynamic_cast<const Vector<Number>*>(&W)!=nullptr,
            ExcVectorTypeNotCompatible());
 
     // Downcast V. If fails, throws an exception.
@@ -166,12 +263,10 @@ namespace LinearAlgebra
     AssertIsFinite(b);
     Assert(down_W.size()==this->size(),
            ExcMessage("Cannot add two vectors with different numbers of elements"));
-    for (unsigned int i=0; i<this->size(); ++i)
-      {
-        AssertIsFinite(down_V[i]);
-        AssertIsFinite(down_W[i]);
-        this->val[i] += a*down_V[i]+b*down_W[i];
-      }
+
+    internal::VectorOperations::Vectorization_add_avpbw<Number> vector_add(this->val, down_V.val,
+        down_W.val, a, b);
+    internal::VectorOperations::parallel_for(vector_add, 0, this->size(), this->thread_loop_partitioner);
   }
 
 
@@ -180,16 +275,18 @@ namespace LinearAlgebra
   void Vector<Number>::sadd(const Number s, const Number a,
                             const VectorSpaceVector<Number> &V)
   {
+    AssertIsFinite(s);
+    AssertIsFinite(a);
+
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&V)!=NULL,
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=nullptr,
            ExcVectorTypeNotCompatible());
 
-    *this *= s;
     // Downcast V. It fails, throws an exception.
     const Vector<Number> &down_V = dynamic_cast<const Vector<Number>&>(V);
-    Vector<Number> tmp(down_V);
-    tmp *= a;
-    *this += tmp;
+    internal::VectorOperations::Vectorization_sadd_xav<Number> vector_sadd_xav(this->val, down_V.val,
+        a, s);
+    internal::VectorOperations::parallel_for(vector_sadd_xav, 0, this->size(), this->thread_loop_partitioner);
   }
 
 
@@ -198,7 +295,7 @@ namespace LinearAlgebra
   void Vector<Number>::scale(const VectorSpaceVector<Number> &scaling_factors)
   {
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&scaling_factors)!=NULL,
+    Assert(dynamic_cast<const Vector<Number>*>(&scaling_factors)!=nullptr,
            ExcVectorTypeNotCompatible());
 
     // Downcast scaling_factors. If fails, throws an exception.
@@ -206,11 +303,9 @@ namespace LinearAlgebra
       dynamic_cast<const Vector<Number>&>(scaling_factors);
     Assert(down_scaling_factors.size()==this->size(),
            ExcMessage("Cannot add two vectors with different numbers of elements"));
-    for (unsigned int i=0; i<this->size(); ++i)
-      {
-        AssertIsFinite(down_scaling_factors[i]);
-        this->val[i] *= down_scaling_factors[i];
-      }
+
+    internal::VectorOperations::Vectorization_scale<Number> vector_scale(this->val, down_scaling_factors.val);
+    internal::VectorOperations::parallel_for(vector_scale, 0, this->size(), this->thread_loop_partitioner);
   }
 
 
@@ -218,14 +313,46 @@ namespace LinearAlgebra
   template <typename Number>
   void Vector<Number>::equ(const Number a, const VectorSpaceVector<Number> &V)
   {
+    AssertIsFinite(a);
+
     // Check that casting will work.
-    Assert(dynamic_cast<const Vector<Number>*>(&V)!=NULL,
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=nullptr,
            ExcVectorTypeNotCompatible());
 
     // Downcast V. If fails, throws an exception.
     const Vector<Number> &down_V = dynamic_cast<const Vector<Number>&>(V);
-    *this = down_V;
-    *this *= a;
+    internal::VectorOperations::Vectorization_equ_au<Number> vector_equ(this->val, down_V.val, a);
+    internal::VectorOperations::parallel_for(vector_equ, 0, this->size(), this->thread_loop_partitioner);
+  }
+
+
+
+  template <typename Number>
+  bool Vector<Number>::all_zero() const
+  {
+    Assert(this->size(), ExcEmptyObject());
+
+    const size_type size = this->size();
+    for (size_type i=0; i<size; ++i)
+      if (this->val[i] != Number())
+        return false;
+
+    return true;
+  }
+
+
+
+  template <typename Number>
+  typename Vector<Number>::value_type Vector<Number>::mean_value() const
+  {
+    Assert (this->size(), ExcEmptyObject());
+
+    typedef typename VectorSpaceVector<Number>::real_type real_type;
+    value_type sum;
+    internal::VectorOperations::MeanValue<Number> mean_value(this->val);
+    internal::VectorOperations::parallel_reduce(mean_value, 0, this->size(), sum, this->thread_loop_partitioner);
+
+    return sum/static_cast<real_type>(this->size());
   }
 
 
@@ -235,10 +362,12 @@ namespace LinearAlgebra
   {
     Assert (this->size(), ExcEmptyObject());
 
-    typename ReadWriteVector<Number>::real_type norm = 0.;
-    norm = l1_norm_recursive(0,this->size()-1);
+    typedef typename VectorSpaceVector<Number>::real_type real_type;
+    real_type sum;
+    internal::VectorOperations::Norm1<Number, real_type> norm1(this->val);
+    internal::VectorOperations::parallel_reduce(norm1, 0, this->size(), sum, this->thread_loop_partitioner);
 
-    return norm;
+    return sum;
   }
 
 
@@ -254,9 +383,11 @@ namespace LinearAlgebra
     // might still be finite. In that case, recompute ig (this is a rare case,
     // so working on the vector twice is uncritical and paid off by the extended
     // precision) using the BLAS approach with a weight, see e.g. dnrm2.f.
-    typedef typename ReadWriteVector<Number>::real_type real_type;
-    real_type norm_square = 0.;
-    norm_square = l2_norm_squared_recursive(0,this->size()-1);
+    typedef typename VectorSpaceVector<Number>::real_type real_type;
+    real_type norm_square;
+    internal::VectorOperations::Norm2<Number, real_type> norm2(this->val);
+    internal::VectorOperations::parallel_reduce(norm2, 0, this->size(), norm_square,
+                                                this->thread_loop_partitioner);
     if (numbers::is_finite(norm_square) &&
         norm_square>=std::numeric_limits<real_type>::min())
       return std::sqrt(norm_square);
@@ -264,7 +395,8 @@ namespace LinearAlgebra
       {
         real_type scale = 0.;
         real_type sum = 1.;
-        for (unsigned int i=0; i<this->size(); ++i)
+        const size_type size = this->size();
+        for (size_type i=0; i<size; ++i)
           {
             if (this->val[i] != Number())
               {
@@ -290,7 +422,8 @@ namespace LinearAlgebra
   typename VectorSpaceVector<Number>::real_type Vector<Number>::linfty_norm() const
   {
     typename ReadWriteVector<Number>::real_type norm = 0.;
-    for (unsigned int i=0; i<this->size(); ++i)
+    const size_type size = this->size();
+    for (size_type i=0; i<size; ++i)
       norm = std::max(std::abs(this->val[i]),norm);
 
     return norm;
@@ -303,51 +436,29 @@ namespace LinearAlgebra
                                      const VectorSpaceVector<Number> &V,
                                      const VectorSpaceVector<Number> &W)
   {
-    this->add(a,V);
+    // Check that casting will work.
+    Assert(dynamic_cast<const Vector<Number>*>(&V)!=nullptr,
+           ExcVectorTypeNotCompatible());
+    // Check that casting will work.
+    Assert(dynamic_cast<const Vector<Number>*>(&W)!=nullptr,
+           ExcVectorTypeNotCompatible());
 
-    return *this*W;
-  }
+    // Downcast V. If fails, throws an exception.
+    const Vector<Number> &down_V = dynamic_cast<const Vector<Number>&>(V);
+    // Downcast W. If fails, throws an exception.
+    const Vector<Number> &down_W = dynamic_cast<const Vector<Number>&>(W);
+    AssertIsFinite(a);
+    Assert(down_V.size()==this->size(),
+           ExcMessage("Cannot add two vectors with different numbers of elements"));
+    Assert(down_W.size()==this->size(),
+           ExcMessage("Cannot add two vectors with different numbers of elements"));
 
+    Number sum;
+    internal::VectorOperations::AddAndDot<Number> adder(this->val, down_V.val, down_W.val, a);
+    internal::VectorOperations::parallel_reduce(adder, 0, this->size(), sum, this->thread_loop_partitioner);
+    AssertIsFinite(sum);
 
-
-  template <typename Number>
-  typename VectorSpaceVector<Number>::real_type Vector<Number>::l1_norm_recursive(
-    unsigned int i,
-    unsigned int j) const
-  {
-    Assert(j>=i, ExcInternalError());
-    typename ReadWriteVector<Number>::real_type norm = 0.;
-
-    if ((j-i)!=0)
-      {
-        norm += l1_norm_recursive(i,(i+j)/2);
-        norm += l1_norm_recursive((i+j)/2+1,j);
-      }
-    else
-      norm += std::abs(this->val[i]);
-
-    return norm;
-  }
-
-
-
-  template <typename Number>
-  typename VectorSpaceVector<Number>::real_type Vector<Number>::l2_norm_squared_recursive(
-    unsigned int i,
-    unsigned int j) const
-  {
-    Assert(j>=i, ExcInternalError());
-
-    typename ReadWriteVector<Number>::real_type norm = 0.;
-    if ((j-i)!=0)
-      {
-        norm += l2_norm_squared_recursive(i,(i+j)/2);
-        norm += l2_norm_squared_recursive((i+j)/2+1,j);
-      }
-    else
-      norm += std::pow(std::abs(this->val[i]),2);
-
-    return norm;
+    return sum;
   }
 
 
@@ -395,7 +506,7 @@ namespace LinearAlgebra
 
     in.getline(buf,16,'\n');
     sz = std::atoi(buf);
-    this->reinit(sz,true);
+    ReadWriteVector<Number>::reinit(sz,true);
 
     char c;
     // in >> c;

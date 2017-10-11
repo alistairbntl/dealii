@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,8 +19,6 @@
 // check DoFTools::extract_locally_active_dofs
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -35,10 +33,9 @@
 
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -109,7 +106,7 @@ void test()
             cell->get_dof_indices (local_dof_indices);
             for (std::vector<types::global_dof_index>::iterator it=local_dof_indices.begin(); it!= local_dof_indices.end(); ++it)
               {
-                types::global_dof_index invalid_dofindex = DoFHandler<dim,dim>::invalid_dof_index;
+                types::global_dof_index invalid_dofindex = numbers::invalid_dof_index;
                 Assert(*it!=invalid_dofindex, ExcInternalError());
                 control_dof_set.insert(*it);
               }
@@ -136,9 +133,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

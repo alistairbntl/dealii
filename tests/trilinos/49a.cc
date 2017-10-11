@@ -16,23 +16,23 @@
 
 
 // like 49, but do the test for
-//  TrilinosWrappers::BlockVector
+//  TrilinosWrappers::MPI::BlockVector
 //         ::operator = (dealii::BlockVector<TrilinosScalar>)
 // with block vectors instead of plain vectors
 
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
 
-void test (TrilinosWrappers::BlockVector &v)
+void test (TrilinosWrappers::MPI::BlockVector &v)
 {
   std::vector<types::global_dof_index> sizes (2, 3);
-  dealii::BlockVector<TrilinosScalar> w (sizes);
+  dealii::BlockVector<TrilinosScalar> w;
+  w.reinit(sizes);
 
   for (unsigned int i=0; i<w.size(); ++i)
     w(i) = i;
@@ -64,9 +64,7 @@ void test (TrilinosWrappers::BlockVector &v)
 
 int main (int argc,char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 
@@ -74,8 +72,9 @@ int main (int argc,char **argv)
   try
     {
       {
-        std::vector<types::global_dof_index> sizes (2, 3);
-        TrilinosWrappers::BlockVector v (sizes);
+        std::vector<IndexSet> sizes (2, complete_index_set(3));
+        TrilinosWrappers::MPI::BlockVector v;
+        v.reinit(sizes);
         test (v);
       }
     }

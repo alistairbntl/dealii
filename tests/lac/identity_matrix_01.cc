@@ -18,15 +18,11 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/identity_matrix.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
-#include <iomanip>
-#include <cmath>
 
-template<typename number>
+template <typename number>
 void
 check_vmult()
 {
@@ -71,7 +67,6 @@ int main()
   logfile.setf(std::ios::fixed);
   deallog << std::setprecision(0);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   check_vmult<double>();
   check_vmult<float>();

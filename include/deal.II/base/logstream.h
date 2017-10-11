@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,13 +13,12 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__logstream_h
-#define dealii__logstream_h
+#ifndef dealii_logstream_h
+#define dealii_logstream_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/smartpointer.h>
-#include <deal.II/base/std_cxx11/shared_ptr.h>
 #include <deal.II/base/thread_local_storage.h>
 
 #include <string>
@@ -27,15 +26,7 @@
 #include <map>
 #include <cmath>
 #include <sstream>
-
-#ifdef DEAL_II_HAVE_SYS_TIMES_H
-#  include <sys/times.h>
-#else
-struct tms
-{
-  int tms_utime, tms_stime, tms_cutime, tms_cstime;
-};
-#endif
+#include <memory>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -63,7 +54,7 @@ DEAL_II_NAMESPACE_OPEN
  * can be set via <tt>LogStream::Prefix p("loopname");</tt>. The destructor of
  * the prefix will pop the prefix text from the stack.
  *
- * Writes via the <tt>&lt;&lt;</tt> operator, <tt> deallog << "This is a log
+ * Write via the <tt>&lt;&lt;</tt> operator, <tt> deallog << "This is a log
  * notice";</tt> will be buffered thread locally until a <tt>std::flush</tt>
  * or <tt>std::endl</tt> is encountered, which will trigger a writeout to the
  * console and, if set up, the log file.
@@ -83,29 +74,6 @@ DEAL_II_NAMESPACE_OPEN
  * LogStream instance to a thread-local storage. After that prefixes are
  * thread-local.
  * </ul>
- *
- * <h3>LogStream and reproducible regression test output</h3>
- *
- * Generating reproducible floating point output for regression tests is
- * mildly put a nightmare. In order to make life a little easier, LogStream
- * implements a few features that try to achieve such a goal. These features
- * are turned on by calling test_mode(), and it is not recommended to use them
- * in any other environment. Right now, LogStream implements the following:
- *
- * <ol>
- * <li> A double number very close to zero will end up being output in
- * exponential format, although it has no significant digits. The parameter
- * #double_threshold determines which numbers are too close to zero to be
- * considered nonzero.
- * <li> For float numbers holds the same, but with a typically larger
- * #float_threshold.
- * <li> Rounded numbers become unreliable with inexact arithmetics. Therefore,
- * adding a small number before rounding makes results more reproducible,
- * assuming that numbers like 0.5 are more likely than 0.49997.
- * </ol>
- * It should be pointed out that all of these measures distort the output and
- * make it less accurate. Therefore, they are only recommended if the output
- * needs to be reproducible.
  *
  * @ingroup textoutput
  * @author Guido Kanschat, Wolfgang Bangerth, 1999, 2003, 2011
@@ -127,8 +95,8 @@ public:
    * <code>continue</code>, <code>break</code>, <code>return</code>,
    * <code>throw</code>, or by simply reaching the closing brace. In all of
    * these cases, it is not necessary to remember to pop the prefix manually
-   * using LogStream::pop. In this, it works just like the better known
-   * Threads::Mutex::ScopedLock class.
+   * using LogStream::pop(). In this, it works just like the better known
+   * std::unique_ptr and Threads::Mutex::ScopedLock classes.
    */
   class Prefix
   {
@@ -152,14 +120,17 @@ public:
     ~Prefix ();
 
   private:
+    /**
+     * A pointer to the LogStream object to which the prefix is
+     * applied.
+     */
     SmartPointer<LogStream,LogStream::Prefix> stream;
   };
 
 
   /**
-   * Standard constructor, since we intend to provide an object
-   * <tt>deallog</tt> in the library. Set the standard output stream to
-   * <tt>std::cerr</tt>.
+   * Standard constructor. The standard output stream to
+   * <tt>std::cout</tt>.
    */
   LogStream ();
 
@@ -187,19 +158,6 @@ public:
 
 
   /**
-   * Setup the logstream for regression test mode.
-   *
-   * This sets the parameters #double_threshold, #float_threshold, and #offset
-   * to nonzero values. The exact values being used have been determined
-   * experimentally and can be found in the source code.
-   *
-   * Called with an argument <tt>false</tt>, switches off test mode and sets
-   * all involved parameters to zero.
-   */
-  void test_mode (bool on=true);
-
-
-  /**
    * Gives the default stream (<tt>std_out</tt>).
    */
   std::ostream &get_console ();
@@ -218,13 +176,6 @@ public:
 
 
   /**
-   * Reroutes cerr to LogStream. Works as a switch, turning logging of
-   * <tt>cerr</tt> on and off alternatingly with every call.
-   */
-  void log_cerr ();
-
-
-  /**
    * Return the prefix string.
    */
   const std::string &get_prefix () const;
@@ -235,7 +186,12 @@ public:
    * a colon and there is a double colon after the last prefix.
    *
    * A simpler way to add a prefix (without the manual need to add the
-   * corresponding pop()) is to use the Prefix class.
+   * corresponding pop()) is to use the LogStream::Prefix class. Using
+   * that class has the advantage that the corresponding pop() call is
+   * issued whenever the Prefix object goes out of scope -- either at
+   * the end of the code block, at the nearest @p return statement, or
+   * because an intermediate function call results in an exception that
+   * is not immediately caught.
    */
   void push (const std::string &text);
 
@@ -270,66 +226,9 @@ public:
 
 
   /**
-   * Set time printing flag. If this flag is true, each output line will be
-   * prepended by the user time used by the running program so far.
-   *
-   * The previous value of this parameter is returned.
-   */
-  bool log_execution_time (const bool flag);
-
-
-  /**
-   * Output time differences between consecutive logs. If this function is
-   * invoked with <tt>true</tt>, the time difference between the previous log
-   * line and the recent one is printed. If it is invoked with <tt>false</tt>,
-   * the accumulated time since start of the program is printed (default
-   * behavior).
-   *
-   * The measurement of times is not changed by this function, just the
-   * output.
-   *
-   * The previous value of this parameter is returned.
-   */
-  bool log_time_differences (const bool flag);
-
-
-  /**
-   * Write detailed timing information.
-   */
-  void timestamp();
-
-
-  /**
    * Log the thread id.
    */
   bool log_thread_id (const bool flag);
-
-
-  /**
-   * Set a threshold for the minimal absolute value of double values. All
-   * numbers with a smaller absolute value will be printed as zero.
-   *
-   * The default value for this threshold is zero, i.e. numbers are printed
-   * according to their real value.
-   *
-   * This feature is mostly useful for automated tests: there, one would like
-   * to reproduce the exact same solution in each run of a testsuite. However,
-   * subtle difference in processor, operating system, or compiler version can
-   * lead to differences in the last few digits of numbers, due to different
-   * rounding. While one can avoid trouble for most numbers when comparing
-   * with stored results by simply limiting the accuracy of output, this does
-   * not hold for numbers very close to zero, i.e. zero plus accumulated
-   * round-off. For these numbers, already the first digit is tainted by
-   * round-off. Using the present function, it is possible to eliminate this
-   * source of problems, by simply writing zero to the output in this case.
-   */
-  void threshold_double(const double t);
-
-
-  /**
-   * The same as threshold_double(), but for float values.
-   */
-  void threshold_float(const float t);
 
 
   /**
@@ -357,24 +256,6 @@ public:
 
 
   /**
-   * Output double precision numbers through this stream.
-   *
-   * If they are set, this function applies the methods for making floating
-   * point output reproducible as discussed in the introduction.
-   */
-  LogStream &operator << (const double t);
-
-
-  /**
-   * Output single precision numbers through this stream.
-   *
-   * If they are set, this function applies the methods for making floating
-   * point output reproducible as discussed in the introduction.
-   */
-  LogStream &operator << (const float t);
-
-
-  /**
    * Treat ostream manipulators. This passes on the whole thing to the
    * template function with the exception of the <tt>std::endl</tt>
    * manipulator, for which special action is performed: write the temporary
@@ -398,12 +279,6 @@ public:
    */
   std::size_t memory_consumption () const;
 
-
-  /**
-   * Exception.
-   */
-  DeclException0(ExcNoFileStreamGiven);
-
 private:
 
 
@@ -424,7 +299,7 @@ private:
 
   /**
    * Default stream, where the output is to go to. This stream defaults to
-   * <tt>std::cerr</tt>, but can be set to another stream through the
+   * <tt>std::cout</tt>, but can be set to another stream through the
    * constructor.
    */
   std::ostream  *std_out;
@@ -451,72 +326,9 @@ private:
   unsigned int file_depth;
 
   /**
-   * Flag for printing execution time.
-   */
-  bool print_utime;
-
-  /**
-   * Flag for printing time differences.
-   */
-  bool diff_utime;
-
-  /**
-   * Time of last output line.
-   */
-  double last_time;
-
-  /**
-   * Threshold for printing double values. Every number with absolute value
-   * less than this is printed as zero.
-   */
-  double double_threshold;
-
-  /**
-   * Threshold for printing float values. Every number with absolute value
-   * less than this is printed as zero.
-   */
-  float float_threshold;
-
-  /**
-   * An offset added to every float or double number upon output. This is done
-   * after the number is compared to #double_threshold or #float_threshold,
-   * but before rounding.
-   *
-   * This functionality was introduced to produce more reproducible floating
-   * point output for regression tests. The rationale is, that an exact output
-   * value is much more likely to be 1/8 than 0.124997. If we round to two
-   * digits though, 1/8 becomes unreliably either .12 or .13 due to machine
-   * accuracy. On the other hand, if we add a something above machine accuracy
-   * first, we will always get .13.
-   *
-   * It is safe to leave this value equal to zero. For regression tests, the
-   * function test_mode() sets it to a reasonable value.
-   *
-   * The offset is relative to the magnitude of the number.
-   */
-  double offset;
-
-  /**
    * Flag for printing thread id.
    */
   bool print_thread_id;
-
-  /**
-   * The value times() returned on initialization.
-   */
-  double reference_time_val;
-
-  /**
-   * The tms structure times() filled on initialization.
-   */
-  struct tms reference_tms;
-
-  /**
-   * Original buffer of <tt>std::cerr</tt>. We store the address of that
-   * buffer when #log_cerr is called, and reset it to this value if #log_cerr
-   * is called a second time, or when the destructor of this class is run.
-   */
-  std::streambuf *old_cerr;
 
   /**
    * A flag indicating whether output is currently at a new line
@@ -524,8 +336,7 @@ private:
   bool at_newline;
 
   /**
-   * Print head of line. This prints optional time information and the
-   * contents of the prefix stack.
+   * Print head of line.
    */
   void print_line_head ();
 
@@ -539,7 +350,7 @@ private:
    * We use tbb's thread local storage facility to generate a stringstream for
    * every thread that sends log messages.
    */
-  Threads::ThreadLocalStorage<std_cxx11::shared_ptr<std::ostringstream> > outstreams;
+  Threads::ThreadLocalStorage<std::shared_ptr<std::ostringstream> > outstreams;
 
   template <typename T> friend LogStream &operator << (LogStream &log, const T &t);
 };
@@ -565,87 +376,6 @@ LogStream &operator<< (LogStream &log, const T &t)
 }
 
 
-inline
-std::ostringstream &
-LogStream::get_stream()
-{
-  // see if we have already created this stream. if not, do so and
-  // set the default flags (why we set these flags is lost to
-  // history, but this is what we need to keep several hundred tests
-  // from producing different output)
-  //
-  // note that in all of this we need not worry about thread-safety
-  // because we operate on a thread-local object and by definition
-  // there can only be one access at a time
-  if (outstreams.get().get() == 0)
-    {
-      outstreams.get().reset (new std::ostringstream);
-      outstreams.get()->setf(std::ios::showpoint | std::ios::left);
-    }
-
-  // then return the stream
-  return *outstreams.get();
-}
-
-
-
-
-inline
-LogStream &
-LogStream::operator<< (const double t)
-{
-  std::ostringstream &stream = get_stream();
-
-  // drop small numbers or skew them away from zero.
-  // we have to make sure that we don't catch NaN's and +-Inf's with the
-  // test, because for these denormals all comparisons are always false.
-  if (! numbers::is_finite(t))
-    stream << t;
-  else if (std::fabs(t) < double_threshold)
-    stream << '0';
-  else
-    stream << t*(1.+offset);
-
-  return *this;
-}
-
-
-
-inline
-LogStream &
-LogStream::operator<< (const float t)
-{
-  std::ostringstream &stream = get_stream();
-
-  // we have to make sure that we don't catch NaN's and +-Inf's with the
-  // test, because for these denormals all comparisons are always false.
-  // thus, for a NaN, both t<=0 and t>=0 are false at the same time, which
-  // can't be said for any other number
-  if (! (t<=0) && !(t>=0))
-    stream << t;
-  else if (std::fabs(t) < float_threshold)
-    stream << '0';
-  else
-    stream << t*(1.+offset);
-
-  return *this;
-}
-
-
-inline
-LogStream::Prefix::Prefix(const std::string &text, LogStream &s)
-  :
-  stream(&s)
-{
-  stream->push(text);
-}
-
-
-inline
-LogStream::Prefix::~Prefix()
-{
-  stream->pop();
-}
 
 
 /**
@@ -655,14 +385,6 @@ LogStream::Prefix::~Prefix()
  */
 extern LogStream deallog;
 
-
-inline
-LogStream::Prefix::Prefix(const std::string &text)
-  :
-  stream(&deallog)
-{
-  stream->push(text);
-}
 
 
 DEAL_II_NAMESPACE_CLOSE

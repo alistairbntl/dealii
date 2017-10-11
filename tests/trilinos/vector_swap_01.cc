@@ -22,11 +22,10 @@
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
-void print(TrilinosWrappers::Vector &v)
+void print(TrilinosWrappers::MPI::Vector &v)
 {
   deallog << "size= " << v.size()
           << " el(0)= " << v(0)
@@ -36,10 +35,12 @@ void print(TrilinosWrappers::Vector &v)
 
 void test ()
 {
-  TrilinosWrappers::Vector v(5);
+  TrilinosWrappers::MPI::Vector v;
+  v.reinit(complete_index_set(5), MPI_COMM_WORLD);
   for (unsigned int i=0; i<v.size(); ++i)
     v(i) = 1;
-  TrilinosWrappers::Vector w(9);
+  TrilinosWrappers::MPI::Vector w;
+  w.reinit(complete_index_set(9), MPI_COMM_WORLD);
   for (unsigned int i=0; i<w.size(); ++i)
     w(i) = 2;
 
@@ -67,9 +68,7 @@ void test ()
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 

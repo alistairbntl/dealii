@@ -22,7 +22,6 @@
 // like _01, but for FE_Nothing
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -31,10 +30,9 @@
 #include <deal.II/fe/fe_nothing.h>
 
 
-#include <fstream>
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);

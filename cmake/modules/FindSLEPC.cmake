@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2012 - 2014 by the deal.II authors
+## Copyright (C) 2012 - 2017 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -39,7 +39,7 @@ SET_IF_EMPTY(PETSC_ARCH "$ENV{PETSC_ARCH}")
 #
 
 DEAL_II_FIND_LIBRARY(SLEPC_LIBRARY
-  NAMES slepc
+  NAMES slepc libslepc
   HINTS ${SLEPC_DIR} ${SLEPC_DIR}/${PETSC_ARCH} ${PETSC_DIR}
   PATH_SUFFIXES lib${LIB_SUFFIX} lib64 lib
 )

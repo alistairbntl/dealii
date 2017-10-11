@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__function_lib_h
-#define dealii__function_lib_h
+#ifndef dealii_function_lib_h
+#define dealii_function_lib_h
 
 
 #include <deal.II/base/config.h>
@@ -22,7 +22,7 @@
 #include <deal.II/base/point.h>
 #include <deal.II/base/table.h>
 
-#include <deal.II/base/std_cxx11/array.h>
+#include <array>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -48,7 +48,7 @@ namespace Functions
    * @ingroup functions
    * @author: Guido Kanschat, 1999
    */
-  template<int dim>
+  template <int dim>
   class SquareFunction : public Function<dim>
   {
   public:
@@ -82,7 +82,7 @@ namespace Functions
    * @ingroup functions
    * @author: Guido Kanschat, 2000
    */
-  template<int dim>
+  template <int dim>
   class Q1WedgeFunction : public Function<dim>
   {
   public:
@@ -137,7 +137,7 @@ namespace Functions
    * @ingroup functions
    * @author: Guido Kanschat, 1999
    */
-  template<int dim>
+  template <int dim>
   class PillowFunction : public Function<dim>
   {
   public:
@@ -199,7 +199,7 @@ namespace Functions
    * @ingroup functions
    * @author Guido Kanschat, 1999
    */
-  template<int dim>
+  template <int dim>
   class CosineFunction : public Function<dim>
   {
   public:
@@ -260,7 +260,7 @@ namespace Functions
    * @ingroup functions
    * @author Guido Kanschat, 2010
    */
-  template<int dim>
+  template <int dim>
   class CosineGradFunction : public Function<dim>
   {
   public:
@@ -302,7 +302,7 @@ namespace Functions
    * @ingroup functions
    * @author Guido Kanschat, 1999
    */
-  template<int dim>
+  template <int dim>
   class ExpFunction : public Function<dim>
   {
   public:
@@ -527,7 +527,7 @@ namespace Functions
    * @ingroup functions
    * @author: Guido Kanschat, 2000
    */
-  template<int dim>
+  template <int dim>
   class JumpFunction : public Function<dim>
   {
   public:
@@ -888,7 +888,7 @@ namespace Functions
    * @ingroup functions
    * @author Guido Kanschat, 2001, 2002
    */
-  template<int dim>
+  template <int dim>
   class CutOffFunctionLinfty : public CutOffFunctionBase<dim>
   {
   public:
@@ -933,7 +933,7 @@ namespace Functions
    * @ingroup functions
    * @author Guido Kanschat, 2001, 2002
    */
-  template<int dim>
+  template <int dim>
   class CutOffFunctionW1 : public CutOffFunctionBase<dim>
   {
   public:
@@ -980,7 +980,7 @@ namespace Functions
    * @ingroup functions
    * @author Guido Kanschat, 2001, 2002
    */
-  template<int dim>
+  template <int dim>
   class CutOffFunctionCinfty : public CutOffFunctionBase<dim>
   {
   public:
@@ -1136,8 +1136,8 @@ namespace Functions
      * class has a number of conversion constructors that allow converting
      * other data types into a table where you specify this argument.
      */
-    InterpolatedTensorProductGridData (const std_cxx11::array<std::vector<double>,dim> &coordinate_values,
-                                       const Table<dim,double>                         &data_values);
+    InterpolatedTensorProductGridData (const std::array<std::vector<double>,dim> &coordinate_values,
+                                       const Table<dim,double>                   &data_values);
 
     /**
      * Compute the value of the function set by bilinear interpolation of the
@@ -1179,7 +1179,7 @@ namespace Functions
     /**
      * The set of coordinate values in each of the coordinate directions.
      */
-    const std_cxx11::array<std::vector<double>,dim> coordinate_values;
+    const std::array<std::vector<double>,dim> coordinate_values;
 
     /**
      * The data that is to be interpolated.
@@ -1241,9 +1241,9 @@ namespace Functions
      * class has a number of conversion constructors that allow converting
      * other data types into a table where you specify this argument.
      */
-    InterpolatedUniformGridData (const std_cxx11::array<std::pair<double,double>,dim> &interval_endpoints,
-                                 const std_cxx11::array<unsigned int,dim>             &n_subintervals,
-                                 const Table<dim,double>                              &data_values);
+    InterpolatedUniformGridData (const std::array<std::pair<double,double>,dim> &interval_endpoints,
+                                 const std::array<unsigned int,dim>             &n_subintervals,
+                                 const Table<dim,double>                        &data_values);
 
     /**
      * Compute the value of the function set by bilinear interpolation of the
@@ -1264,12 +1264,12 @@ namespace Functions
     /**
      * The set of interval endpoints in each of the coordinate directions.
      */
-    const std_cxx11::array<std::pair<double,double>,dim> interval_endpoints;
+    const std::array<std::pair<double,double>,dim> interval_endpoints;
 
     /**
      * The number of subintervals in each of the coordinate directions.
      */
-    const std_cxx11::array<unsigned int,dim>             n_subintervals;
+    const std::array<unsigned int,dim>             n_subintervals;
 
     /**
      * The data that is to be interpolated.

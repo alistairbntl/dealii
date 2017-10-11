@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2011 - 2015 by the deal.II authors
+// Copyright (C) 2011 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,11 +14,12 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__vectorization_h
-#define dealii__vectorization_h
+#ifndef dealii_vectorization_h
+#define dealii_vectorization_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
+#include <deal.II/base/template_constraints.h>
 
 #include <cmath>
 
@@ -38,6 +39,13 @@
 // 'check_01_cpu_features.cmake', ensures that these feature are not only
 // present in the compilation unit but also working properly.
 
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 2 && !defined(__AVX__)
+#error "Mismatch in vectorization capabilities: AVX was detected during configuration of deal.II and switched on, but it is apparently not available for the file you are trying to compile at the moment. Check compilation flags controlling the instruction set, such as -march=native."
+#endif
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 3 && !defined(__AVX512F__)
+#error "Mismatch in vectorization capabilities: AVX-512F was detected during configuration of deal.II and switched on, but it is apparently not available for the file you are trying to compile at the moment. Check compilation flags controlling the instruction set, such as -march=native."
+#endif
+
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 2 // AVX, AVX-512
 #include <immintrin.h>
 #elif DEAL_II_COMPILER_VECTORIZATION_LEVEL == 1 // SSE2
@@ -45,37 +53,48 @@
 #endif
 
 
-// forward declarations
 DEAL_II_NAMESPACE_OPEN
-template <typename Number> class VectorizedArray;
-template <typename T> struct EnableIfScalar;
-DEAL_II_NAMESPACE_CLOSE
 
 
-namespace std
+namespace internal
 {
-  template <typename Number> ::dealii::VectorizedArray<Number>
-  sqrt(const ::dealii::VectorizedArray<Number> &);
-  template <typename Number> ::dealii::VectorizedArray<Number>
-  abs(const ::dealii::VectorizedArray<Number> &);
-  template <typename Number> ::dealii::VectorizedArray<Number>
-  max(const ::dealii::VectorizedArray<Number> &, const ::dealii::VectorizedArray<Number> &);
-  template <typename Number> ::dealii::VectorizedArray<Number>
-  min (const ::dealii::VectorizedArray<Number> &, const ::dealii::VectorizedArray<Number> &);
+  /**
+  * The structs below are needed since VectorizedArray<T1> is a POD-type without a constructor and
+  * can be a template argument for SymmetricTensor<...,T2> where T2 would equal VectorizedArray<T1>.
+  * Internally, in previous versions of deal.II, SymmetricTensor<...,T2> would make use of the constructor
+  * of T2 leading to a compile-time error. However simply adding a constructor for VectorizedArray<T1>
+  * breaks the POD-idioms needed elsewhere. Calls to constructors of T2 subsequently got replaced by a
+  * call to internal::NumberType<T2> which then determines the right function to use by template deduction.
+  * A detailled discussion can be found at https://github.com/dealii/dealii/pull/3967 . Also see numbers.h
+  * for other specializations.
+  */
+  template <typename T>
+  struct NumberType<VectorizedArray<T> >
+  {
+    static const VectorizedArray<T> &value (const VectorizedArray<T> &t)
+    {
+      return t;
+    }
+
+    static VectorizedArray<T> value (const T &t)
+    {
+      VectorizedArray<T> tmp;
+      tmp=t;
+      return tmp;
+    }
+  };
 }
-
-
-DEAL_II_NAMESPACE_OPEN
 
 
 // Enable the EnableIfScalar type trait for VectorizedArray<Number> such
 // that it can be used as a Number type in Tensor<rank,dim,Number>, etc.
 
-template<typename Number>
+template <typename Number>
 struct EnableIfScalar<VectorizedArray<Number> >
 {
   typedef VectorizedArray<typename EnableIfScalar<Number>::type> type;
 };
+
 
 
 /**
@@ -143,6 +162,7 @@ public:
   /**
    * This function assigns a scalar to this class.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator = (const Number scalar)
   {
@@ -153,6 +173,7 @@ public:
   /**
    * Access operator (only valid with component 0)
    */
+  DEAL_II_ALWAYS_INLINE
   Number &
   operator [] (const unsigned int comp)
   {
@@ -164,6 +185,7 @@ public:
   /**
    * Constant access operator (only valid with component 0)
    */
+  DEAL_II_ALWAYS_INLINE
   const Number &
   operator [] (const unsigned int comp) const
   {
@@ -175,6 +197,7 @@ public:
   /**
    * Addition
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator += (const VectorizedArray<Number> &vec)
   {
@@ -185,6 +208,7 @@ public:
   /**
    * Subtraction
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator -= (const VectorizedArray<Number> &vec)
   {
@@ -195,6 +219,7 @@ public:
   /**
    * Multiplication
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator *= (const VectorizedArray<Number> &vec)
   {
@@ -205,6 +230,7 @@ public:
   /**
    * Division
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator /= (const VectorizedArray<Number> &vec)
   {
@@ -213,25 +239,65 @@ public:
   }
 
   /**
-   * Loads @p n_array_elements from memory into the calling class, starting at
+   * Load @p n_array_elements from memory into the calling class, starting at
    * the given address. The memory need not be aligned by the amount of bytes
    * in the vectorized array, as opposed to casting a double address to
    * VectorizedArray<double>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void load (const Number *ptr)
   {
     data = *ptr;
   }
 
   /**
-   * Writes the content of the calling class into memory in form of @p
+   * Write the content of the calling class into memory in form of @p
    * n_array_elements to the given address. The memory need not be aligned by
    * the amount of bytes in the vectorized array, as opposed to casting a
    * double address to VectorizedArray<double>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void store (Number *ptr) const
   {
     *ptr = data;
+  }
+
+  /**
+   * Load @p n_array_elements from memory into the calling class, starting at
+   * the given address and with given offsets, each entry from the offset
+   * providing one element of the vectorized array.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   this->operator[](v) = base_ptr[offsets[v]];
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void gather (const Number       *base_ptr,
+               const unsigned int *offsets)
+  {
+    data = base_ptr[offsets[0]];
+  }
+
+  /**
+   * Write the content of the calling class into memory in form of @p
+   * n_array_elements to the given address and the given offsets, filling the
+   * elements of the vectorized array into each offset.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   base_ptr[offsets[v]] = this->operator[](v);
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void scatter (const unsigned int *offsets,
+                Number             *base_ptr) const
+  {
+    base_ptr[offsets[0]] = data;
   }
 
   /**
@@ -242,9 +308,10 @@ public:
 
 private:
   /**
-   * Returns the square root of this field. Not for use in user code. Use
+   * Return the square root of this field. Not for use in user code. Use
    * sqrt(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_sqrt () const
   {
@@ -254,9 +321,10 @@ private:
   }
 
   /**
-   * Returns the absolute value of this field. Not for use in user code. Use
+   * Return the absolute value of this field. Not for use in user code. Use
    * abs(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_abs () const
   {
@@ -266,9 +334,10 @@ private:
   }
 
   /**
-   * Returns the component-wise maximum of this field and another one. Not for
+   * Return the component-wise maximum of this field and another one. Not for
    * use in user code. Use max(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_max (const VectorizedArray &other) const
   {
@@ -278,9 +347,10 @@ private:
   }
 
   /**
-   * Returns the component-wise minimum of this field and another one. Not for
+   * Return the component-wise minimum of this field and another one. Not for
    * use in user code. Use min(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_min (const VectorizedArray &other) const
   {
@@ -311,7 +381,7 @@ private:
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 make_vectorized_array (const Number &u)
 {
@@ -441,6 +511,7 @@ public:
   /**
    * This function can be used to set all data fields to a given scalar.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator = (const double x)
   {
@@ -451,6 +522,7 @@ public:
   /**
    * Access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   double &
   operator [] (const unsigned int comp)
   {
@@ -461,6 +533,7 @@ public:
   /**
    * Constant access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   const double &
   operator [] (const unsigned int comp) const
   {
@@ -471,6 +544,7 @@ public:
   /**
    * Addition.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator += (const VectorizedArray &vec)
   {
@@ -490,6 +564,7 @@ public:
   /**
    * Subtraction.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator -= (const VectorizedArray &vec)
   {
@@ -503,6 +578,7 @@ public:
   /**
    * Multiplication.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator *= (const VectorizedArray &vec)
   {
@@ -517,6 +593,7 @@ public:
   /**
    * Division.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator /= (const VectorizedArray &vec)
   {
@@ -529,24 +606,80 @@ public:
   }
 
   /**
-   * Loads @p n_array_elements from memory into the calling class, starting at
+   * Load @p n_array_elements from memory into the calling class, starting at
    * the given address. The memory need not be aligned by 64 bytes, as opposed
    * to casting a double address to VectorizedArray<double>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void load (const double *ptr)
   {
     data = _mm512_loadu_pd (ptr);
   }
 
   /**
-   * Writes the content of the calling class into memory in form of @p
+   * Write the content of the calling class into memory in form of @p
    * n_array_elements to the given address. The memory need not be aligned by
    * 64 bytes, as opposed to casting a double address to
    * VectorizedArray<double>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void store (double *ptr) const
   {
     _mm512_storeu_pd (ptr, data);
+  }
+
+  /**
+   * Load @p n_array_elements from memory into the calling class, starting at
+   * the given address and with given offsets, each entry from the offset
+   * providing one element of the vectorized array.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   this->operator[](v) = base_ptr[offsets[v]];
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void gather (const double       *base_ptr,
+               const unsigned int *offsets)
+  {
+    // unfortunately, there does not appear to be a 256 bit integer load, so
+    // do it by some reinterpret casts here. this is allowed because the Intel
+    // API allows aliasing between different vector types.
+    const __m256 index_val = _mm256_loadu_ps((const float *)offsets);
+    const __m256i index = *((__m256i *)(&index_val));
+    data = _mm512_i32gather_pd(index, base_ptr, 8);
+  }
+
+  /**
+   * Write the content of the calling class into memory in form of @p
+   * n_array_elements to the given address and the given offsets, filling the
+   * elements of the vectorized array into each offset.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   base_ptr[offsets[v]] = this->operator[](v);
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void scatter (const unsigned int *offsets,
+                double             *base_ptr) const
+  {
+    for (unsigned int i=0; i<8; ++i)
+      for (unsigned int j=i+1; j<8; ++j)
+        Assert(offsets[i] != offsets[j],
+               ExcMessage("Result of scatter undefined if two offset elements"
+                          " point to the same position"));
+
+    // unfortunately, there does not appear to be a 256 bit integer load, so
+    // do it by some reinterpret casts here. this is allowed because the Intel
+    // API allows aliasing between different vector types.
+    const __m256 index_val = _mm256_loadu_ps((const float *)offsets);
+    const __m256i index = *((__m256i *)(&index_val));
+    _mm512_i32scatter_pd(base_ptr, index, data, 8);
   }
 
   /**
@@ -557,9 +690,10 @@ public:
 
 private:
   /**
-   * Returns the square root of this field. Not for use in user code. Use
+   * Return the square root of this field. Not for use in user code. Use
    * sqrt(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_sqrt () const
   {
@@ -569,9 +703,10 @@ private:
   }
 
   /**
-   * Returns the absolute value of this field. Not for use in user code. Use
+   * Return the absolute value of this field. Not for use in user code. Use
    * abs(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_abs () const
   {
@@ -587,9 +722,10 @@ private:
   }
 
   /**
-   * Returns the component-wise maximum of this field and another one. Not for
+   * Return the component-wise maximum of this field and another one. Not for
    * use in user code. Use max(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_max (const VectorizedArray &other) const
   {
@@ -599,9 +735,10 @@ private:
   }
 
   /**
-   * Returns the component-wise minimum of this field and another one. Not for
+   * Return the component-wise minimum of this field and another one. Not for
    * use in user code. Use min(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_min (const VectorizedArray &other) const
   {
@@ -626,9 +763,123 @@ private:
 
 
 /**
- * Specialization for float and AVX.
+ * Specialization for double and AVX-512.
  */
-template<>
+template <>
+inline
+void
+vectorized_load_and_transpose(const unsigned int       n_entries,
+                              const double            *in,
+                              const unsigned int      *offsets,
+                              VectorizedArray<double> *out)
+{
+  const unsigned int n_chunks = n_entries/4;
+  for (unsigned int outer=0; outer<8; outer += 4)
+    {
+      const double *in0 = in + offsets[0+outer];
+      const double *in1 = in + offsets[1+outer];
+      const double *in2 = in + offsets[2+outer];
+      const double *in3 = in + offsets[3+outer];
+
+      for (unsigned int i=0; i<n_chunks; ++i)
+        {
+          __m256d u0 = _mm256_loadu_pd(in0+4*i);
+          __m256d u1 = _mm256_loadu_pd(in1+4*i);
+          __m256d u2 = _mm256_loadu_pd(in2+4*i);
+          __m256d u3 = _mm256_loadu_pd(in3+4*i);
+          __m256d t0 = _mm256_permute2f128_pd (u0, u2, 0x20);
+          __m256d t1 = _mm256_permute2f128_pd (u1, u3, 0x20);
+          __m256d t2 = _mm256_permute2f128_pd (u0, u2, 0x31);
+          __m256d t3 = _mm256_permute2f128_pd (u1, u3, 0x31);
+          *(__m256d *)((double *)(&out[4*i+0].data)+outer) = _mm256_unpacklo_pd (t0, t1);
+          *(__m256d *)((double *)(&out[4*i+1].data)+outer) = _mm256_unpackhi_pd (t0, t1);
+          *(__m256d *)((double *)(&out[4*i+2].data)+outer) = _mm256_unpacklo_pd (t2, t3);
+          *(__m256d *)((double *)(&out[4*i+3].data)+outer) = _mm256_unpackhi_pd (t2, t3);
+        }
+      for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+        for (unsigned int v=0; v<4; ++v)
+          out[i][outer+v] = in[offsets[v+outer]+i];
+    }
+}
+
+
+
+/**
+ * Specialization for double and AVX-512.
+ */
+template <>
+inline
+void
+vectorized_transpose_and_store(const bool                     add_into,
+                               const unsigned int             n_entries,
+                               const VectorizedArray<double> *in,
+                               const unsigned int            *offsets,
+                               double                        *out)
+{
+  const unsigned int n_chunks = n_entries/4;
+  // do not do full transpose because the code is too long and will most
+  // likely not pay off. rather do the transposition on the vectorized array
+  // on size smaller, mm256d
+  for (unsigned int outer=0; outer<8; outer += 4)
+    {
+      double *out0 = out + offsets[0+outer];
+      double *out1 = out + offsets[1+outer];
+      double *out2 = out + offsets[2+outer];
+      double *out3 = out + offsets[3+outer];
+      for (unsigned int i=0; i<n_chunks; ++i)
+        {
+          __m256d u0 = *(const __m256d *)((const double *)(&in[4*i+0].data)+outer);
+          __m256d u1 = *(const __m256d *)((const double *)(&in[4*i+1].data)+outer);
+          __m256d u2 = *(const __m256d *)((const double *)(&in[4*i+2].data)+outer);
+          __m256d u3 = *(const __m256d *)((const double *)(&in[4*i+3].data)+outer);
+          __m256d t0 = _mm256_permute2f128_pd (u0, u2, 0x20);
+          __m256d t1 = _mm256_permute2f128_pd (u1, u3, 0x20);
+          __m256d t2 = _mm256_permute2f128_pd (u0, u2, 0x31);
+          __m256d t3 = _mm256_permute2f128_pd (u1, u3, 0x31);
+          __m256d res0 = _mm256_unpacklo_pd (t0, t1);
+          __m256d res1 = _mm256_unpackhi_pd (t0, t1);
+          __m256d res2 = _mm256_unpacklo_pd (t2, t3);
+          __m256d res3 = _mm256_unpackhi_pd (t2, t3);
+
+          // Cannot use the same store instructions in both paths of the 'if'
+          // because the compiler cannot know that there is no aliasing between
+          // pointers
+          if (add_into)
+            {
+              res0 = _mm256_add_pd(_mm256_loadu_pd(out0+4*i), res0);
+              _mm256_storeu_pd(out0+4*i, res0);
+              res1 = _mm256_add_pd(_mm256_loadu_pd(out1+4*i), res1);
+              _mm256_storeu_pd(out1+4*i, res1);
+              res2 = _mm256_add_pd(_mm256_loadu_pd(out2+4*i), res2);
+              _mm256_storeu_pd(out2+4*i, res2);
+              res3 = _mm256_add_pd(_mm256_loadu_pd(out3+4*i), res3);
+              _mm256_storeu_pd(out3+4*i, res3);
+            }
+          else
+            {
+              _mm256_storeu_pd(out0+4*i, res0);
+              _mm256_storeu_pd(out1+4*i, res1);
+              _mm256_storeu_pd(out2+4*i, res2);
+              _mm256_storeu_pd(out3+4*i, res3);
+            }
+        }
+      if (add_into)
+        for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+          for (unsigned int v=0; v<4; ++v)
+            out[offsets[v+outer]+i] += in[i][v+outer];
+      else
+        for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+          for (unsigned int v=0; v<4; ++v)
+            out[offsets[v+outer]+i] = in[i][v+outer];
+    }
+}
+
+
+
+/**
+ * Specialization for float and AVX512.
+ */
+template <>
 class VectorizedArray<float>
 {
 public:
@@ -640,6 +891,7 @@ public:
   /**
    * This function can be used to set all data fields to a given scalar.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator = (const float x)
   {
@@ -650,6 +902,7 @@ public:
   /**
    * Access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   float &
   operator [] (const unsigned int comp)
   {
@@ -660,6 +913,7 @@ public:
   /**
    * Constant access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   const float &
   operator [] (const unsigned int comp) const
   {
@@ -670,6 +924,7 @@ public:
   /**
    * Addition.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator += (const VectorizedArray &vec)
   {
@@ -689,6 +944,7 @@ public:
   /**
    * Subtraction.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator -= (const VectorizedArray &vec)
   {
@@ -702,6 +958,7 @@ public:
   /**
    * Multiplication.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator *= (const VectorizedArray &vec)
   {
@@ -716,6 +973,7 @@ public:
   /**
    * Division.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator /= (const VectorizedArray &vec)
   {
@@ -728,24 +986,80 @@ public:
   }
 
   /**
-   * Loads @p n_array_elements from memory into the calling class, starting at
+   * Load @p n_array_elements from memory into the calling class, starting at
    * the given address. The memory need not be aligned by 64 bytes, as opposed
    * to casting a float address to VectorizedArray<float>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void load (const float *ptr)
   {
     data = _mm512_loadu_ps (ptr);
   }
 
   /**
-   * Writes the content of the calling class into memory in form of @p
+   * Write the content of the calling class into memory in form of @p
    * n_array_elements to the given address. The memory need not be aligned by
    * 64 bytes, as opposed to casting a float address to
    * VectorizedArray<float>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void store (float *ptr) const
   {
     _mm512_storeu_ps (ptr, data);
+  }
+
+  /**
+   * Load @p n_array_elements from memory into the calling class, starting at
+   * the given address and with given offsets, each entry from the offset
+   * providing one element of the vectorized array.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   this->operator[](v) = base_ptr[offsets[v]];
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void gather (const float        *base_ptr,
+               const unsigned int *offsets)
+  {
+    // unfortunately, there does not appear to be a 512 bit integer load, so
+    // do it by some reinterpret casts here. this is allowed because the Intel
+    // API allows aliasing between different vector types.
+    const __m512 index_val = _mm512_loadu_ps((const float *)offsets);
+    const __m512i index = *((__m512i *)(&index_val));
+    data = _mm512_i32gather_ps(index, base_ptr, 4);
+  }
+
+  /**
+   * Write the content of the calling class into memory in form of @p
+   * n_array_elements to the given address and the given offsets, filling the
+   * elements of the vectorized array into each offset.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   base_ptr[offsets[v]] = this->operator[](v);
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void scatter (const unsigned int *offsets,
+                float              *base_ptr) const
+  {
+    for (unsigned int i=0; i<16; ++i)
+      for (unsigned int j=i+1; j<16; ++j)
+        Assert(offsets[i] != offsets[j],
+               ExcMessage("Result of scatter undefined if two offset elements"
+                          " point to the same position"));
+
+    // unfortunately, there does not appear to be a 512 bit integer load, so
+    // do it by some reinterpret casts here. this is allowed because the Intel
+    // API allows aliasing between different vector types.
+    const __m512 index_val = _mm512_loadu_ps((const float *)offsets);
+    const __m512i index = *((__m512i *)(&index_val));
+    _mm512_i32scatter_ps(base_ptr, index, data, 4);
   }
 
   /**
@@ -757,9 +1071,10 @@ public:
 private:
 
   /**
-   * Returns the square root of this field. Not for use in user code. Use
+   * Return the square root of this field. Not for use in user code. Use
    * sqrt(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_sqrt () const
   {
@@ -769,9 +1084,10 @@ private:
   }
 
   /**
-   * Returns the absolute value of this field. Not for use in user code. Use
+   * Return the absolute value of this field. Not for use in user code. Use
    * abs(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_abs () const
   {
@@ -787,9 +1103,10 @@ private:
   }
 
   /**
-   * Returns the component-wise maximum of this field and another one. Not for
+   * Return the component-wise maximum of this field and another one. Not for
    * use in user code. Use max(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_max (const VectorizedArray &other) const
   {
@@ -799,9 +1116,10 @@ private:
   }
 
   /**
-   * Returns the component-wise minimum of this field and another one. Not for
+   * Return the component-wise minimum of this field and another one. Not for
    * use in user code. Use min(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_min (const VectorizedArray &other) const
   {
@@ -825,6 +1143,143 @@ private:
 
 
 
+/**
+ * Specialization for float and AVX-512.
+ */
+template <>
+inline
+void
+vectorized_load_and_transpose(const unsigned int      n_entries,
+                              const float            *in,
+                              const unsigned int     *offsets,
+                              VectorizedArray<float> *out)
+{
+  const unsigned int n_chunks = n_entries/4;
+  for (unsigned int outer = 0; outer<16; outer += 8)
+    {
+      for (unsigned int i=0; i<n_chunks; ++i)
+        {
+          __m128 u0 = _mm_loadu_ps(in+4*i+offsets[0+outer]);
+          __m128 u1 = _mm_loadu_ps(in+4*i+offsets[1+outer]);
+          __m128 u2 = _mm_loadu_ps(in+4*i+offsets[2+outer]);
+          __m128 u3 = _mm_loadu_ps(in+4*i+offsets[3+outer]);
+          __m128 u4 = _mm_loadu_ps(in+4*i+offsets[4+outer]);
+          __m128 u5 = _mm_loadu_ps(in+4*i+offsets[5+outer]);
+          __m128 u6 = _mm_loadu_ps(in+4*i+offsets[6+outer]);
+          __m128 u7 = _mm_loadu_ps(in+4*i+offsets[7+outer]);
+          // To avoid warnings about uninitialized variables, need to initialize
+          // one variable with zero before using it.
+          __m256 t0, t1, t2, t3 = _mm256_set1_ps(0.F);
+          t0 = _mm256_insertf128_ps (t3, u0, 0);
+          t0 = _mm256_insertf128_ps (t0, u4, 1);
+          t1 = _mm256_insertf128_ps (t3, u1, 0);
+          t1 = _mm256_insertf128_ps (t1, u5, 1);
+          t2 = _mm256_insertf128_ps (t3, u2, 0);
+          t2 = _mm256_insertf128_ps (t2, u6, 1);
+          t3 = _mm256_insertf128_ps (t3, u3, 0);
+          t3 = _mm256_insertf128_ps (t3, u7, 1);
+          __m256 v0 = _mm256_shuffle_ps (t0, t1, 0x44);
+          __m256 v1 = _mm256_shuffle_ps (t0, t1, 0xee);
+          __m256 v2 = _mm256_shuffle_ps (t2, t3, 0x44);
+          __m256 v3 = _mm256_shuffle_ps (t2, t3, 0xee);
+          *(__m256 *)((float *)(&out[4*i+0].data)+outer) = _mm256_shuffle_ps (v0, v2, 0x88);
+          *(__m256 *)((float *)(&out[4*i+1].data)+outer) = _mm256_shuffle_ps (v0, v2, 0xdd);
+          *(__m256 *)((float *)(&out[4*i+2].data)+outer) = _mm256_shuffle_ps (v1, v3, 0x88);
+          *(__m256 *)((float *)(&out[4*i+3].data)+outer) = _mm256_shuffle_ps (v1, v3, 0xdd);
+        }
+      for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+        for (unsigned int v=0; v<8; ++v)
+          out[i][v+outer] = in[offsets[v+outer]+i];
+    }
+}
+
+
+
+/**
+ * Specialization for float and AVX-512.
+ */
+template <>
+inline
+void
+vectorized_transpose_and_store(const bool                    add_into,
+                               const unsigned int            n_entries,
+                               const VectorizedArray<float> *in,
+                               const unsigned int           *offsets,
+                               float                        *out)
+{
+  const unsigned int n_chunks = n_entries/4;
+  for (unsigned int outer = 0; outer<16; outer += 8)
+    {
+      for (unsigned int i=0; i<n_chunks; ++i)
+        {
+          __m256 u0 = *(const __m256 *)((const float *)(&in[4*i+0].data)+outer);
+          __m256 u1 = *(const __m256 *)((const float *)(&in[4*i+1].data)+outer);
+          __m256 u2 = *(const __m256 *)((const float *)(&in[4*i+2].data)+outer);
+          __m256 u3 = *(const __m256 *)((const float *)(&in[4*i+3].data)+outer);
+          __m256 t0 = _mm256_shuffle_ps (u0, u1, 0x44);
+          __m256 t1 = _mm256_shuffle_ps (u0, u1, 0xee);
+          __m256 t2 = _mm256_shuffle_ps (u2, u3, 0x44);
+          __m256 t3 = _mm256_shuffle_ps (u2, u3, 0xee);
+          u0 = _mm256_shuffle_ps (t0, t2, 0x88);
+          u1 = _mm256_shuffle_ps (t0, t2, 0xdd);
+          u2 = _mm256_shuffle_ps (t1, t3, 0x88);
+          u3 = _mm256_shuffle_ps (t1, t3, 0xdd);
+          __m128 res0 = _mm256_extractf128_ps (u0, 0);
+          __m128 res4 = _mm256_extractf128_ps (u0, 1);
+          __m128 res1 = _mm256_extractf128_ps (u1, 0);
+          __m128 res5 = _mm256_extractf128_ps (u1, 1);
+          __m128 res2 = _mm256_extractf128_ps (u2, 0);
+          __m128 res6 = _mm256_extractf128_ps (u2, 1);
+          __m128 res3 = _mm256_extractf128_ps (u3, 0);
+          __m128 res7 = _mm256_extractf128_ps (u3, 1);
+
+          // Cannot use the same store instructions in both paths of the 'if'
+          // because the compiler cannot know that there is no aliasing between
+          // pointers
+          if (add_into)
+            {
+              res0 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[0+outer]), res0);
+              _mm_storeu_ps(out+4*i+offsets[0+outer], res0);
+              res1 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[1+outer]), res1);
+              _mm_storeu_ps(out+4*i+offsets[1+outer], res1);
+              res2 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[2+outer]), res2);
+              _mm_storeu_ps(out+4*i+offsets[2+outer], res2);
+              res3 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[3+outer]), res3);
+              _mm_storeu_ps(out+4*i+offsets[3+outer], res3);
+              res4 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[4+outer]), res4);
+              _mm_storeu_ps(out+4*i+offsets[4+outer], res4);
+              res5 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[5+outer]), res5);
+              _mm_storeu_ps(out+4*i+offsets[5+outer], res5);
+              res6 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[6+outer]), res6);
+              _mm_storeu_ps(out+4*i+offsets[6+outer], res6);
+              res7 = _mm_add_ps(_mm_loadu_ps(out+4*i+offsets[7+outer]), res7);
+              _mm_storeu_ps(out+4*i+offsets[7+outer], res7);
+            }
+          else
+            {
+              _mm_storeu_ps(out+4*i+offsets[0+outer], res0);
+              _mm_storeu_ps(out+4*i+offsets[1+outer], res1);
+              _mm_storeu_ps(out+4*i+offsets[2+outer], res2);
+              _mm_storeu_ps(out+4*i+offsets[3+outer], res3);
+              _mm_storeu_ps(out+4*i+offsets[4+outer], res4);
+              _mm_storeu_ps(out+4*i+offsets[5+outer], res5);
+              _mm_storeu_ps(out+4*i+offsets[6+outer], res6);
+              _mm_storeu_ps(out+4*i+offsets[7+outer], res7);
+            }
+        }
+      if (add_into)
+        for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+          for (unsigned int v=0; v<8; ++v)
+            out[offsets[v+outer]+i] += in[i][v+outer];
+      else
+        for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+          for (unsigned int v=0; v<8; ++v)
+            out[offsets[v+outer]+i] = in[i][v+outer];
+    }
+}
+
+
+
 #elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 2  && defined(__AVX__)
 
 /**
@@ -842,6 +1297,7 @@ public:
   /**
    * This function can be used to set all data fields to a given scalar.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator = (const double x)
   {
@@ -852,6 +1308,7 @@ public:
   /**
    * Access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   double &
   operator [] (const unsigned int comp)
   {
@@ -862,6 +1319,7 @@ public:
   /**
    * Constant access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   const double &
   operator [] (const unsigned int comp) const
   {
@@ -872,6 +1330,7 @@ public:
   /**
    * Addition.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator += (const VectorizedArray &vec)
   {
@@ -891,6 +1350,7 @@ public:
   /**
    * Subtraction.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator -= (const VectorizedArray &vec)
   {
@@ -904,6 +1364,7 @@ public:
   /**
    * Multiplication.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator *= (const VectorizedArray &vec)
   {
@@ -918,6 +1379,7 @@ public:
   /**
    * Division.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator /= (const VectorizedArray &vec)
   {
@@ -930,24 +1392,76 @@ public:
   }
 
   /**
-   * Loads @p n_array_elements from memory into the calling class, starting at
+   * Load @p n_array_elements from memory into the calling class, starting at
    * the given address. The memory need not be aligned by 32 bytes, as opposed
    * to casting a double address to VectorizedArray<double>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void load (const double *ptr)
   {
     data = _mm256_loadu_pd (ptr);
   }
 
   /**
-   * Writes the content of the calling class into memory in form of @p
+   * Write the content of the calling class into memory in form of @p
    * n_array_elements to the given address. The memory need not be aligned by
    * 32 bytes, as opposed to casting a double address to
    * VectorizedArray<double>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void store (double *ptr) const
   {
     _mm256_storeu_pd (ptr, data);
+  }
+
+  /**
+   * Load @p n_array_elements from memory into the calling class, starting at
+   * the given address and with given offsets, each entry from the offset
+   * providing one element of the vectorized array.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   this->operator[](v) = base_ptr[offsets[v]];
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void gather (const double       *base_ptr,
+               const unsigned int *offsets)
+  {
+#ifdef __AVX2__
+    // unfortunately, there does not appear to be a 128 bit integer load, so
+    // do it by some reinterpret casts here. this is allowed because the Intel
+    // API allows aliasing between different vector types.
+    const __m128 index_val = _mm_loadu_ps((const float *)offsets);
+    const __m128i index = *((__m128i *)(&index_val));
+    data = _mm256_i32gather_pd(base_ptr, index, 8);
+#else
+    for (unsigned int i=0; i<4; ++i)
+      *(reinterpret_cast<double *>(&data)+i) = base_ptr[offsets[i]];
+#endif
+  }
+
+  /**
+   * Write the content of the calling class into memory in form of @p
+   * n_array_elements to the given address and the given offsets, filling the
+   * elements of the vectorized array into each offset.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   base_ptr[offsets[v]] = this->operator[](v);
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void scatter (const unsigned int *offsets,
+                double             *base_ptr) const
+  {
+    // no scatter operation in AVX/AVX2
+    for (unsigned int i=0; i<4; ++i)
+      base_ptr[offsets[i]] = *(reinterpret_cast<const double *>(&data)+i);
   }
 
   /**
@@ -958,9 +1472,10 @@ public:
 
 private:
   /**
-   * Returns the square root of this field. Not for use in user code. Use
+   * Return the square root of this field. Not for use in user code. Use
    * sqrt(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_sqrt () const
   {
@@ -970,9 +1485,10 @@ private:
   }
 
   /**
-   * Returns the absolute value of this field. Not for use in user code. Use
+   * Return the absolute value of this field. Not for use in user code. Use
    * abs(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_abs () const
   {
@@ -986,9 +1502,10 @@ private:
   }
 
   /**
-   * Returns the component-wise maximum of this field and another one. Not for
+   * Return the component-wise maximum of this field and another one. Not for
    * use in user code. Use max(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_max (const VectorizedArray &other) const
   {
@@ -998,9 +1515,10 @@ private:
   }
 
   /**
-   * Returns the component-wise minimum of this field and another one. Not for
+   * Return the component-wise minimum of this field and another one. Not for
    * use in user code. Use min(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_min (const VectorizedArray &other) const
   {
@@ -1035,13 +1553,18 @@ vectorized_load_and_transpose(const unsigned int       n_entries,
                               const unsigned int      *offsets,
                               VectorizedArray<double> *out)
 {
-  const unsigned int n_chunks = n_entries/4, remainder = n_entries%4;
+  const unsigned int n_chunks = n_entries/4;
+  const double *in0 = in + offsets[0];
+  const double *in1 = in + offsets[1];
+  const double *in2 = in + offsets[2];
+  const double *in3 = in + offsets[3];
+
   for (unsigned int i=0; i<n_chunks; ++i)
     {
-      __m256d u0 = _mm256_loadu_pd(in+4*i+offsets[0]);
-      __m256d u1 = _mm256_loadu_pd(in+4*i+offsets[1]);
-      __m256d u2 = _mm256_loadu_pd(in+4*i+offsets[2]);
-      __m256d u3 = _mm256_loadu_pd(in+4*i+offsets[3]);
+      __m256d u0 = _mm256_loadu_pd(in0+4*i);
+      __m256d u1 = _mm256_loadu_pd(in1+4*i);
+      __m256d u2 = _mm256_loadu_pd(in2+4*i);
+      __m256d u3 = _mm256_loadu_pd(in3+4*i);
       __m256d t0 = _mm256_permute2f128_pd (u0, u2, 0x20);
       __m256d t1 = _mm256_permute2f128_pd (u1, u3, 0x20);
       __m256d t2 = _mm256_permute2f128_pd (u0, u2, 0x31);
@@ -1051,28 +1574,9 @@ vectorized_load_and_transpose(const unsigned int       n_entries,
       out[4*i+2].data = _mm256_unpacklo_pd (t2, t3);
       out[4*i+3].data = _mm256_unpackhi_pd (t2, t3);
     }
-  if (remainder > 0 && n_chunks > 0)
-    {
-      // simple re-load all data in the last slot
-      const unsigned int final_pos = n_chunks*4-4+remainder;
-      Assert(final_pos+4 == n_entries, ExcInternalError());
-      __m256d u0 = _mm256_loadu_pd(in+final_pos+offsets[0]);
-      __m256d u1 = _mm256_loadu_pd(in+final_pos+offsets[1]);
-      __m256d u2 = _mm256_loadu_pd(in+final_pos+offsets[2]);
-      __m256d u3 = _mm256_loadu_pd(in+final_pos+offsets[3]);
-      __m256d t0 = _mm256_permute2f128_pd (u0, u2, 0x20);
-      __m256d t1 = _mm256_permute2f128_pd (u1, u3, 0x20);
-      __m256d t2 = _mm256_permute2f128_pd (u0, u2, 0x31);
-      __m256d t3 = _mm256_permute2f128_pd (u1, u3, 0x31);
-      out[final_pos+0].data = _mm256_unpacklo_pd (t0, t1);
-      out[final_pos+1].data = _mm256_unpackhi_pd (t0, t1);
-      out[final_pos+2].data = _mm256_unpacklo_pd (t2, t3);
-      out[final_pos+3].data = _mm256_unpackhi_pd (t2, t3);
-    }
-  else if (remainder > 0)
-    for (unsigned int i=0; i<n_entries; ++i)
-      for (unsigned int v=0; v<4; ++v)
-        out[i][v] = in[offsets[v]+i];
+  for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+    for (unsigned int v=0; v<4; ++v)
+      out[i][v] = in[offsets[v]+i];
 }
 
 
@@ -1090,6 +1594,10 @@ vectorized_transpose_and_store(const bool                     add_into,
                                double                        *out)
 {
   const unsigned int n_chunks = n_entries/4;
+  double *out0 = out + offsets[0];
+  double *out1 = out + offsets[1];
+  double *out2 = out + offsets[2];
+  double *out3 = out + offsets[3];
   for (unsigned int i=0; i<n_chunks; ++i)
     {
       __m256d u0 = in[4*i+0].data;
@@ -1110,30 +1618,29 @@ vectorized_transpose_and_store(const bool                     add_into,
       // pointers
       if (add_into)
         {
-          res0 = _mm256_add_pd(_mm256_loadu_pd(out+4*i+offsets[0]), res0);
-          _mm256_storeu_pd(out+4*i+offsets[0], res0);
-          res1 = _mm256_add_pd(_mm256_loadu_pd(out+4*i+offsets[1]), res1);
-          _mm256_storeu_pd(out+4*i+offsets[1], res1);
-          res2 = _mm256_add_pd(_mm256_loadu_pd(out+4*i+offsets[2]), res2);
-          _mm256_storeu_pd(out+4*i+offsets[2], res2);
-          res3 = _mm256_add_pd(_mm256_loadu_pd(out+4*i+offsets[3]), res3);
-          _mm256_storeu_pd(out+4*i+offsets[3], res3);
+          res0 = _mm256_add_pd(_mm256_loadu_pd(out0+4*i), res0);
+          _mm256_storeu_pd(out0+4*i, res0);
+          res1 = _mm256_add_pd(_mm256_loadu_pd(out1+4*i), res1);
+          _mm256_storeu_pd(out1+4*i, res1);
+          res2 = _mm256_add_pd(_mm256_loadu_pd(out2+4*i), res2);
+          _mm256_storeu_pd(out2+4*i, res2);
+          res3 = _mm256_add_pd(_mm256_loadu_pd(out3+4*i), res3);
+          _mm256_storeu_pd(out3+4*i, res3);
         }
       else
         {
-          _mm256_storeu_pd(out+4*i+offsets[0], res0);
-          _mm256_storeu_pd(out+4*i+offsets[1], res1);
-          _mm256_storeu_pd(out+4*i+offsets[2], res2);
-          _mm256_storeu_pd(out+4*i+offsets[3], res3);
+          _mm256_storeu_pd(out0+4*i, res0);
+          _mm256_storeu_pd(out1+4*i, res1);
+          _mm256_storeu_pd(out2+4*i, res2);
+          _mm256_storeu_pd(out3+4*i, res3);
         }
     }
-  const unsigned int shift = n_chunks * 4;
   if (add_into)
-    for (unsigned int i=shift; i<n_entries; ++i)
+    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
       for (unsigned int v=0; v<4; ++v)
         out[offsets[v]+i] += in[i][v];
   else
-    for (unsigned int i=shift; i<n_entries; ++i)
+    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
       for (unsigned int v=0; v<4; ++v)
         out[offsets[v]+i] = in[i][v];
 }
@@ -1143,7 +1650,7 @@ vectorized_transpose_and_store(const bool                     add_into,
 /**
  * Specialization for float and AVX.
  */
-template<>
+template <>
 class VectorizedArray<float>
 {
 public:
@@ -1155,6 +1662,7 @@ public:
   /**
    * This function can be used to set all data fields to a given scalar.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator = (const float x)
   {
@@ -1165,6 +1673,7 @@ public:
   /**
    * Access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   float &
   operator [] (const unsigned int comp)
   {
@@ -1175,6 +1684,7 @@ public:
   /**
    * Constant access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   const float &
   operator [] (const unsigned int comp) const
   {
@@ -1185,6 +1695,7 @@ public:
   /**
    * Addition.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator += (const VectorizedArray &vec)
   {
@@ -1204,6 +1715,7 @@ public:
   /**
    * Subtraction.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator -= (const VectorizedArray &vec)
   {
@@ -1217,6 +1729,7 @@ public:
   /**
    * Multiplication.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator *= (const VectorizedArray &vec)
   {
@@ -1231,6 +1744,7 @@ public:
   /**
    * Division.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator /= (const VectorizedArray &vec)
   {
@@ -1243,24 +1757,76 @@ public:
   }
 
   /**
-   * Loads @p n_array_elements from memory into the calling class, starting at
+   * Load @p n_array_elements from memory into the calling class, starting at
    * the given address. The memory need not be aligned by 32 bytes, as opposed
    * to casting a float address to VectorizedArray<float>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void load (const float *ptr)
   {
     data = _mm256_loadu_ps (ptr);
   }
 
   /**
-   * Writes the content of the calling class into memory in form of @p
+   * Write the content of the calling class into memory in form of @p
    * n_array_elements to the given address. The memory need not be aligned by
    * 32 bytes, as opposed to casting a float address to
    * VectorizedArray<float>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void store (float *ptr) const
   {
     _mm256_storeu_ps (ptr, data);
+  }
+
+  /**
+   * Load @p n_array_elements from memory into the calling class, starting at
+   * the given address and with given offsets, each entry from the offset
+   * providing one element of the vectorized array.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   this->operator[](v) = base_ptr[offsets[v]];
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void gather (const float        *base_ptr,
+               const unsigned int *offsets)
+  {
+#ifdef __AVX2__
+    // unfortunately, there does not appear to be a 256 bit integer load, so
+    // do it by some reinterpret casts here. this is allowed because the Intel
+    // API allows aliasing between different vector types.
+    const __m256 index_val = _mm256_loadu_ps((const float *)offsets);
+    const __m256i index = *((__m256i *)(&index_val));
+    data = _mm256_i32gather_ps(base_ptr, index, 4);
+#else
+    for (unsigned int i=0; i<8; ++i)
+      *(reinterpret_cast<float *>(&data)+i) = base_ptr[offsets[i]];
+#endif
+  }
+
+  /**
+   * Write the content of the calling class into memory in form of @p
+   * n_array_elements to the given address and the given offsets, filling the
+   * elements of the vectorized array into each offset.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   base_ptr[offsets[v]] = this->operator[](v);
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void scatter (const unsigned int *offsets,
+                float              *base_ptr) const
+  {
+    // no scatter operation in AVX/AVX2
+    for (unsigned int i=0; i<8; ++i)
+      base_ptr[offsets[i]] = *(reinterpret_cast<const float *>(&data)+i);
   }
 
   /**
@@ -1272,9 +1838,10 @@ public:
 private:
 
   /**
-   * Returns the square root of this field. Not for use in user code. Use
+   * Return the square root of this field. Not for use in user code. Use
    * sqrt(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_sqrt () const
   {
@@ -1284,9 +1851,10 @@ private:
   }
 
   /**
-   * Returns the absolute value of this field. Not for use in user code. Use
+   * Return the absolute value of this field. Not for use in user code. Use
    * abs(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_abs () const
   {
@@ -1300,9 +1868,10 @@ private:
   }
 
   /**
-   * Returns the component-wise maximum of this field and another one. Not for
+   * Return the component-wise maximum of this field and another one. Not for
    * use in user code. Use max(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_max (const VectorizedArray &other) const
   {
@@ -1312,9 +1881,10 @@ private:
   }
 
   /**
-   * Returns the component-wise minimum of this field and another one. Not for
+   * Return the component-wise minimum of this field and another one. Not for
    * use in user code. Use min(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_min (const VectorizedArray &other) const
   {
@@ -1339,7 +1909,7 @@ private:
 
 
 /**
- * Specialization for double and AVX.
+ * Specialization for float and AVX.
  */
 template <>
 inline
@@ -1349,7 +1919,7 @@ vectorized_load_and_transpose(const unsigned int      n_entries,
                               const unsigned int     *offsets,
                               VectorizedArray<float> *out)
 {
-  const unsigned int n_chunks = n_entries/4, remainder = n_entries%4;
+  const unsigned int n_chunks = n_entries/4;
   for (unsigned int i=0; i<n_chunks; ++i)
     {
       __m128 u0 = _mm_loadu_ps(in+4*i+offsets[0]);
@@ -1380,47 +1950,15 @@ vectorized_load_and_transpose(const unsigned int      n_entries,
       out[4*i+2].data = _mm256_shuffle_ps (v1, v3, 0x88);
       out[4*i+3].data = _mm256_shuffle_ps (v1, v3, 0xdd);
     }
-  if (remainder > 0 && n_chunks > 0)
-    {
-      // simple re-load all data in the last slot
-      const unsigned int final_pos = n_chunks*4-4+remainder;
-      Assert(final_pos+4 == n_entries, ExcInternalError());
-      __m128 u0 = _mm_loadu_ps(in+final_pos+offsets[0]);
-      __m128 u1 = _mm_loadu_ps(in+final_pos+offsets[1]);
-      __m128 u2 = _mm_loadu_ps(in+final_pos+offsets[2]);
-      __m128 u3 = _mm_loadu_ps(in+final_pos+offsets[3]);
-      __m128 u4 = _mm_loadu_ps(in+final_pos+offsets[4]);
-      __m128 u5 = _mm_loadu_ps(in+final_pos+offsets[5]);
-      __m128 u6 = _mm_loadu_ps(in+final_pos+offsets[6]);
-      __m128 u7 = _mm_loadu_ps(in+final_pos+offsets[7]);
-      __m256 t0, t1, t2, t3 = _mm256_set1_ps(0.F);
-      t0 = _mm256_insertf128_ps (t3, u0, 0);
-      t0 = _mm256_insertf128_ps (t0, u4, 1);
-      t1 = _mm256_insertf128_ps (t3, u1, 0);
-      t1 = _mm256_insertf128_ps (t1, u5, 1);
-      t2 = _mm256_insertf128_ps (t3, u2, 0);
-      t2 = _mm256_insertf128_ps (t2, u6, 1);
-      t3 = _mm256_insertf128_ps (t3, u3, 0);
-      t3 = _mm256_insertf128_ps (t3, u7, 1);
-      __m256 v0 = _mm256_shuffle_ps (t0, t1, 0x44);
-      __m256 v1 = _mm256_shuffle_ps (t0, t1, 0xee);
-      __m256 v2 = _mm256_shuffle_ps (t2, t3, 0x44);
-      __m256 v3 = _mm256_shuffle_ps (t2, t3, 0xee);
-      out[final_pos+0].data = _mm256_shuffle_ps (v0, v2, 0x88);
-      out[final_pos+1].data = _mm256_shuffle_ps (v0, v2, 0xdd);
-      out[final_pos+2].data = _mm256_shuffle_ps (v1, v3, 0x88);
-      out[final_pos+3].data = _mm256_shuffle_ps (v1, v3, 0xdd);
-    }
-  else if (remainder > 0)
-    for (unsigned int i=0; i<n_entries; ++i)
-      for (unsigned int v=0; v<8; ++v)
-        out[i][v] = in[offsets[v]+i];
+  for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+    for (unsigned int v=0; v<8; ++v)
+      out[i][v] = in[offsets[v]+i];
 }
 
 
 
 /**
- * Specialization for double and AVX.
+ * Specialization for float and AVX.
  */
 template <>
 inline
@@ -1489,13 +2027,12 @@ vectorized_transpose_and_store(const bool                    add_into,
           _mm_storeu_ps(out+4*i+offsets[7], res7);
         }
     }
-  const unsigned int shift = n_chunks * 4;
   if (add_into)
-    for (unsigned int i=shift; i<n_entries; ++i)
+    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
       for (unsigned int v=0; v<8; ++v)
         out[offsets[v]+i] += in[i][v];
   else
-    for (unsigned int i=shift; i<n_entries; ++i)
+    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
       for (unsigned int v=0; v<8; ++v)
         out[offsets[v]+i] = in[i][v];
 }
@@ -1505,7 +2042,7 @@ vectorized_transpose_and_store(const bool                    add_into,
 // for safety, also check that __SSE2__ is defined in case the user manually
 // set some conflicting compile flags which prevent compilation
 
-#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+#elif DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1
 
 /**
  * Specialization for double and SSE2.
@@ -1522,6 +2059,7 @@ public:
   /**
    * This function can be used to set all data fields to a given scalar.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator = (const double x)
   {
@@ -1532,6 +2070,7 @@ public:
   /**
    * Access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   double &
   operator [] (const unsigned int comp)
   {
@@ -1542,6 +2081,7 @@ public:
   /**
    * Constant access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   const double &
   operator [] (const unsigned int comp) const
   {
@@ -1552,6 +2092,7 @@ public:
   /**
    * Addition.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator += (const VectorizedArray &vec)
   {
@@ -1566,6 +2107,7 @@ public:
   /**
    * Subtraction.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator -= (const VectorizedArray &vec)
   {
@@ -1576,9 +2118,11 @@ public:
 #endif
     return *this;
   }
+
   /**
    * Multiplication.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator *= (const VectorizedArray &vec)
   {
@@ -1593,6 +2137,7 @@ public:
   /**
    * Division.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator /= (const VectorizedArray &vec)
   {
@@ -1605,24 +2150,66 @@ public:
   }
 
   /**
-   * Loads @p n_array_elements from memory into the calling class, starting at
+   * Load @p n_array_elements from memory into the calling class, starting at
    * the given address. The memory need not be aligned by 16 bytes, as opposed
    * to casting a double address to VectorizedArray<double>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void load (const double *ptr)
   {
     data = _mm_loadu_pd (ptr);
   }
 
   /**
-   * Writes the content of the calling class into memory in form of @p
+   * Write the content of the calling class into memory in form of @p
    * n_array_elements to the given address. The memory need not be aligned by
    * 16 bytes, as opposed to casting a double address to
    * VectorizedArray<double>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void store (double *ptr) const
   {
     _mm_storeu_pd (ptr, data);
+  }
+
+  /**
+   * Load @p n_array_elements from memory into the calling class, starting at
+   * the given address and with given offsets, each entry from the offset
+   * providing one element of the vectorized array.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   this->operator[](v) = base_ptr[offsets[v]];
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void gather (const double       *base_ptr,
+               const unsigned int *offsets)
+  {
+    for (unsigned int i=0; i<2; ++i)
+      *(reinterpret_cast<double *>(&data)+i) = base_ptr[offsets[i]];
+  }
+
+  /**
+   * Write the content of the calling class into memory in form of @p
+   * n_array_elements to the given address and the given offsets, filling the
+   * elements of the vectorized array into each offset.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   base_ptr[offsets[v]] = this->operator[](v);
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void scatter (const unsigned int *offsets,
+                double             *base_ptr) const
+  {
+    for (unsigned int i=0; i<2; ++i)
+      base_ptr[offsets[i]] = *(reinterpret_cast<const double *>(&data)+i);
   }
 
   /**
@@ -1633,9 +2220,10 @@ public:
 
 private:
   /**
-   * Returns the square root of this field. Not for use in user code. Use
+   * Return the square root of this field. Not for use in user code. Use
    * sqrt(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_sqrt () const
   {
@@ -1645,9 +2233,10 @@ private:
   }
 
   /**
-   * Returns the absolute value of this field. Not for use in user code. Use
+   * Return the absolute value of this field. Not for use in user code. Use
    * abs(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_abs () const
   {
@@ -1662,9 +2251,10 @@ private:
   }
 
   /**
-   * Returns the component-wise maximum of this field and another one. Not for
+   * Return the component-wise maximum of this field and another one. Not for
    * use in user code. Use max(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_max (const VectorizedArray &other) const
   {
@@ -1674,9 +2264,10 @@ private:
   }
 
   /**
-   * Returns the component-wise minimum of this field and another one. Not for
+   * Return the component-wise minimum of this field and another one. Not for
    * use in user code. Use min(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_min (const VectorizedArray &other) const
   {
@@ -1710,7 +2301,7 @@ void vectorized_load_and_transpose(const unsigned int      n_entries,
                                    const unsigned int      *offsets,
                                    VectorizedArray<double> *out)
 {
-  const unsigned int n_chunks = n_entries/2, remainder = n_entries%2;
+  const unsigned int n_chunks = n_entries/2;
   for (unsigned int i=0; i<n_chunks; ++i)
     {
       __m128d u0 = _mm_loadu_pd(in+2*i+offsets[0]);
@@ -1718,16 +2309,15 @@ void vectorized_load_and_transpose(const unsigned int      n_entries,
       out[2*i+0].data = _mm_unpacklo_pd (u0, u1);
       out[2*i+1].data = _mm_unpackhi_pd (u0, u1);
     }
-  if (remainder > 0)
-    for (unsigned int i=0; i<n_entries; ++i)
-      for (unsigned int v=0; v<2; ++v)
-        out[i][v] = in[offsets[v]+i];
+  for (unsigned int i=2*n_chunks; i<n_entries; ++i)
+    for (unsigned int v=0; v<2; ++v)
+      out[i][v] = in[offsets[v]+i];
 }
 
 
 
 /**
- * Specialization for double and AVX.
+ * Specialization for double and SSE2.
  */
 template <>
 inline
@@ -1750,8 +2340,7 @@ vectorized_transpose_and_store(const bool                     add_into,
           _mm_storeu_pd(out+2*i+offsets[0], _mm_add_pd(_mm_loadu_pd(out+2*i+offsets[0]), res0));
           _mm_storeu_pd(out+2*i+offsets[1], _mm_add_pd(_mm_loadu_pd(out+2*i+offsets[1]), res1));
         }
-      const unsigned int shift = n_chunks * 2;
-      for (unsigned int i=shift; i<n_entries; ++i)
+      for (unsigned int i=2*n_chunks; i<n_entries; ++i)
         for (unsigned int v=0; v<2; ++v)
           out[offsets[v]+i] += in[i][v];
     }
@@ -1766,8 +2355,7 @@ vectorized_transpose_and_store(const bool                     add_into,
           _mm_storeu_pd(out+2*i+offsets[0], res0);
           _mm_storeu_pd(out+2*i+offsets[1], res1);
         }
-      const unsigned int shift = n_chunks * 2;
-      for (unsigned int i=shift; i<n_entries; ++i)
+      for (unsigned int i=2*n_chunks; i<n_entries; ++i)
         for (unsigned int v=0; v<2; ++v)
           out[offsets[v]+i] = in[i][v];
     }
@@ -1791,6 +2379,7 @@ public:
    * This function can be used to set all data fields to a given scalar.
    */
 
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator = (const float x)
   {
@@ -1801,6 +2390,7 @@ public:
   /**
    * Access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   float &
   operator [] (const unsigned int comp)
   {
@@ -1811,6 +2401,7 @@ public:
   /**
    * Constant access operator.
    */
+  DEAL_II_ALWAYS_INLINE
   const float &
   operator [] (const unsigned int comp) const
   {
@@ -1821,6 +2412,7 @@ public:
   /**
    * Addition.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator += (const VectorizedArray &vec)
   {
@@ -1835,6 +2427,7 @@ public:
   /**
    * Subtraction.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator -= (const VectorizedArray &vec)
   {
@@ -1849,6 +2442,7 @@ public:
   /**
    * Multiplication.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator *= (const VectorizedArray &vec)
   {
@@ -1863,6 +2457,7 @@ public:
   /**
    * Division.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray &
   operator /= (const VectorizedArray &vec)
   {
@@ -1875,24 +2470,66 @@ public:
   }
 
   /**
-   * Loads @p n_array_elements from memory into the calling class, starting at
+   * Load @p n_array_elements from memory into the calling class, starting at
    * the given address. The memory need not be aligned by 16 bytes, as opposed
    * to casting a float address to VectorizedArray<float>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void load (const float *ptr)
   {
     data = _mm_loadu_ps (ptr);
   }
 
   /**
-   * Writes the content of the calling class into memory in form of @p
+   * Write the content of the calling class into memory in form of @p
    * n_array_elements to the given address. The memory need not be aligned by
    * 16 bytes, as opposed to casting a float address to
    * VectorizedArray<float>*.
    */
+  DEAL_II_ALWAYS_INLINE
   void store (float *ptr) const
   {
     _mm_storeu_ps (ptr, data);
+  }
+
+  /**
+   * Load @p n_array_elements from memory into the calling class, starting at
+   * the given address and with given offsets, each entry from the offset
+   * providing one element of the vectorized array.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   this->operator[](v) = base_ptr[offsets[v]];
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void gather (const float        *base_ptr,
+               const unsigned int *offsets)
+  {
+    for (unsigned int i=0; i<4; ++i)
+      *(reinterpret_cast<float *>(&data)+i) = base_ptr[offsets[i]];
+  }
+
+  /**
+   * Write the content of the calling class into memory in form of @p
+   * n_array_elements to the given address and the given offsets, filling the
+   * elements of the vectorized array into each offset.
+   *
+   * This operation corresponds to the following code (but uses a more
+   * efficient implementation in case the hardware allows for that):
+   * @code
+   * for (unsigned int v=0; v<VectorizedArray<Number>::n_array_elements; ++v)
+   *   base_ptr[offsets[v]] = this->operator[](v);
+   * @endcode
+   */
+  DEAL_II_ALWAYS_INLINE
+  void scatter (const unsigned int *offsets,
+                float              *base_ptr) const
+  {
+    for (unsigned int i=0; i<4; ++i)
+      base_ptr[offsets[i]] = *(reinterpret_cast<const float *>(&data)+i);
   }
 
   /**
@@ -1903,9 +2540,10 @@ public:
 
 private:
   /**
-   * Returns the square root of this field. Not for use in user code. Use
+   * Return the square root of this field. Not for use in user code. Use
    * sqrt(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_sqrt () const
   {
@@ -1915,9 +2553,10 @@ private:
   }
 
   /**
-   * Returns the absolute value of this field. Not for use in user code. Use
+   * Return the absolute value of this field. Not for use in user code. Use
    * abs(x) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_abs () const
   {
@@ -1931,9 +2570,10 @@ private:
   }
 
   /**
-   * Returns the component-wise maximum of this field and another one. Not for
+   * Return the component-wise maximum of this field and another one. Not for
    * use in user code. Use max(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_max (const VectorizedArray &other) const
   {
@@ -1943,9 +2583,10 @@ private:
   }
 
   /**
-   * Returns the component-wise minimum of this field and another one. Not for
+   * Return the component-wise minimum of this field and another one. Not for
    * use in user code. Use min(x,y) instead.
    */
+  DEAL_II_ALWAYS_INLINE
   VectorizedArray
   get_min (const VectorizedArray &other) const
   {
@@ -1979,7 +2620,7 @@ void vectorized_load_and_transpose(const unsigned int      n_entries,
                                    const unsigned int     *offsets,
                                    VectorizedArray<float> *out)
 {
-  const unsigned int n_chunks = n_entries/4, remainder = n_entries%4;
+  const unsigned int n_chunks = n_entries/4;
   for (unsigned int i=0; i<n_chunks; ++i)
     {
       __m128 u0 = _mm_loadu_ps(in+4*i+offsets[0]);
@@ -1995,34 +2636,15 @@ void vectorized_load_and_transpose(const unsigned int      n_entries,
       out[4*i+2].data = _mm_shuffle_ps (v1, v3, 0x88);
       out[4*i+3].data = _mm_shuffle_ps (v1, v3, 0xdd);
     }
-  if (remainder > 0 && n_chunks > 0)
-    {
-      // simple re-load all data in the last slot
-      const unsigned int final_pos = n_chunks*4-4+remainder;
-      Assert(final_pos+4 == n_entries, ExcInternalError());
-      __m128 u0 = _mm_loadu_ps(in+final_pos+offsets[0]);
-      __m128 u1 = _mm_loadu_ps(in+final_pos+offsets[1]);
-      __m128 u2 = _mm_loadu_ps(in+final_pos+offsets[2]);
-      __m128 u3 = _mm_loadu_ps(in+final_pos+offsets[3]);
-      __m128 v0 = _mm_shuffle_ps (u0, u1, 0x44);
-      __m128 v1 = _mm_shuffle_ps (u0, u1, 0xee);
-      __m128 v2 = _mm_shuffle_ps (u2, u3, 0x44);
-      __m128 v3 = _mm_shuffle_ps (u2, u3, 0xee);
-      out[final_pos+0].data = _mm_shuffle_ps (v0, v2, 0x88);
-      out[final_pos+1].data = _mm_shuffle_ps (v0, v2, 0xdd);
-      out[final_pos+2].data = _mm_shuffle_ps (v1, v3, 0x88);
-      out[final_pos+3].data = _mm_shuffle_ps (v1, v3, 0xdd);
-    }
-  else if (remainder > 0)
-    for (unsigned int i=0; i<n_entries; ++i)
-      for (unsigned int v=0; v<4; ++v)
-        out[i][v] = in[offsets[v]+i];
+  for (unsigned int i=4*n_chunks; i<n_entries; ++i)
+    for (unsigned int v=0; v<4; ++v)
+      out[i][v] = in[offsets[v]+i];
 }
 
 
 
 /**
- * Specialization for double and AVX.
+ * Specialization for float and SSE2.
  */
 template <>
 inline
@@ -2071,13 +2693,12 @@ vectorized_transpose_and_store(const bool                    add_into,
           _mm_storeu_ps(out+4*i+offsets[3], u3);
         }
     }
-  const unsigned int shift = n_chunks * 4;
   if (add_into)
-    for (unsigned int i=shift; i<n_entries; ++i)
+    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
       for (unsigned int v=0; v<4; ++v)
         out[offsets[v]+i] += in[i][v];
   else
-    for (unsigned int i=shift; i<n_entries; ++i)
+    for (unsigned int i=4*n_chunks; i<n_entries; ++i)
       for (unsigned int v=0; v<4; ++v)
         out[offsets[v]+i] = in[i][v];
 }
@@ -2088,12 +2709,31 @@ vectorized_transpose_and_store(const bool                    add_into,
 
 
 /**
+ * Relational operator == for VectorizedArray
+ *
+ * @relates VectorizedArray
+ */
+template <typename Number>
+inline DEAL_II_ALWAYS_INLINE
+bool
+operator == (const VectorizedArray<Number> &lhs,
+             const VectorizedArray<Number> &rhs)
+{
+  for (unsigned int i=0; i<VectorizedArray<Number>::n_array_elements; ++i)
+    if (lhs[i] != rhs[i])
+      return false;
+
+  return true;
+}
+
+
+/**
  * Addition of two vectorized arrays with operator +.
  *
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator + (const VectorizedArray<Number> &u,
             const VectorizedArray<Number> &v)
@@ -2108,7 +2748,7 @@ operator + (const VectorizedArray<Number> &u,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator - (const VectorizedArray<Number> &u,
             const VectorizedArray<Number> &v)
@@ -2123,7 +2763,7 @@ operator - (const VectorizedArray<Number> &u,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator * (const VectorizedArray<Number> &u,
             const VectorizedArray<Number> &v)
@@ -2138,7 +2778,7 @@ operator * (const VectorizedArray<Number> &u,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator / (const VectorizedArray<Number> &u,
             const VectorizedArray<Number> &v)
@@ -2154,7 +2794,7 @@ operator / (const VectorizedArray<Number> &u,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator + (const Number                  &u,
             const VectorizedArray<Number> &v)
@@ -2172,7 +2812,7 @@ operator + (const Number                  &u,
  *
  * @relates VectorizedArray
  */
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<float>
 operator + (const double                 &u,
             const VectorizedArray<float> &v)
@@ -2189,7 +2829,7 @@ operator + (const double                 &u,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator + (const VectorizedArray<Number> &v,
             const Number                  &u)
@@ -2205,7 +2845,7 @@ operator + (const VectorizedArray<Number> &v,
  *
  * @relates VectorizedArray
  */
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<float>
 operator + (const VectorizedArray<float> &v,
             const double                 &u)
@@ -2220,7 +2860,7 @@ operator + (const VectorizedArray<float> &v,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator - (const Number                  &u,
             const VectorizedArray<Number> &v)
@@ -2238,7 +2878,7 @@ operator - (const Number                  &u,
  *
  * @relates VectorizedArray
  */
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<float>
 operator - (const double                 &u,
             const VectorizedArray<float> &v)
@@ -2255,7 +2895,7 @@ operator - (const double                 &u,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator - (const VectorizedArray<Number> &v,
             const Number                  &u)
@@ -2273,7 +2913,7 @@ operator - (const VectorizedArray<Number> &v,
  *
  * @relates VectorizedArray
  */
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<float>
 operator - (const VectorizedArray<float> &v,
             const double                 &u)
@@ -2290,7 +2930,7 @@ operator - (const VectorizedArray<float> &v,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator * (const Number                  &u,
             const VectorizedArray<Number> &v)
@@ -2308,7 +2948,7 @@ operator * (const Number                  &u,
  *
  * @relates VectorizedArray
  */
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<float>
 operator * (const double                 &u,
             const VectorizedArray<float> &v)
@@ -2325,7 +2965,7 @@ operator * (const double                 &u,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator * (const VectorizedArray<Number> &v,
             const Number                  &u)
@@ -2341,7 +2981,7 @@ operator * (const VectorizedArray<Number> &v,
  *
  * @relates VectorizedArray
  */
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<float>
 operator * (const VectorizedArray<float> &v,
             const double                 &u)
@@ -2356,7 +2996,7 @@ operator * (const VectorizedArray<float> &v,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator / (const Number                  &u,
             const VectorizedArray<Number> &v)
@@ -2374,7 +3014,7 @@ operator / (const Number                  &u,
  *
  * @relates VectorizedArray
  */
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<float>
 operator / (const double                 &u,
             const VectorizedArray<float> &v)
@@ -2391,7 +3031,7 @@ operator / (const double                 &u,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator / (const VectorizedArray<Number> &v,
             const Number                  &u)
@@ -2409,7 +3049,7 @@ operator / (const VectorizedArray<Number> &v,
  *
  * @relates VectorizedArray
  */
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<float>
 operator / (const VectorizedArray<float> &v,
             const double                 &u)
@@ -2425,7 +3065,7 @@ operator / (const VectorizedArray<float> &v,
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator + (const VectorizedArray<Number> &u)
 {
@@ -2438,7 +3078,7 @@ operator + (const VectorizedArray<Number> &u)
  * @relates VectorizedArray
  */
 template <typename Number>
-inline
+inline DEAL_II_ALWAYS_INLINE
 VectorizedArray<Number>
 operator - (const VectorizedArray<Number> &u)
 {
@@ -2460,7 +3100,7 @@ DEAL_II_NAMESPACE_CLOSE
 namespace std
 {
   /**
-   * Computes the sine of a vectorized data field. The result is returned as
+   * Compute the sine of a vectorized data field. The result is returned as
    * vectorized array in the form <tt>{sin(x[0]), sin(x[1]), ...,
    * sin(x[n_array_elements-1])}</tt>.
    *
@@ -2487,7 +3127,7 @@ namespace std
 
 
   /**
-   * Computes the cosine of a vectorized data field. The result is returned as
+   * Compute the cosine of a vectorized data field. The result is returned as
    * vectorized array in the form <tt>{cos(x[0]), cos(x[1]), ...,
    * cos(x[n_array_elements-1])}</tt>.
    *
@@ -2509,7 +3149,7 @@ namespace std
 
 
   /**
-   * Computes the tangent of a vectorized data field. The result is returned
+   * Compute the tangent of a vectorized data field. The result is returned
    * as vectorized array in the form <tt>{tan(x[0]), tan(x[1]), ...,
    * tan(x[n_array_elements-1])}</tt>.
    *
@@ -2531,7 +3171,7 @@ namespace std
 
 
   /**
-   * Computes the exponential of a vectorized data field. The result is
+   * Compute the exponential of a vectorized data field. The result is
    * returned as vectorized array in the form <tt>{exp(x[0]), exp(x[1]), ...,
    * exp(x[n_array_elements-1])}</tt>.
    *
@@ -2553,7 +3193,7 @@ namespace std
 
 
   /**
-   * Computes the natural logarithm of a vectorized data field. The result is
+   * Compute the natural logarithm of a vectorized data field. The result is
    * returned as vectorized array in the form <tt>{log(x[0]), log(x[1]), ...,
    * log(x[n_array_elements-1])}</tt>.
    *
@@ -2575,7 +3215,7 @@ namespace std
 
 
   /**
-   * Computes the square root of a vectorized data field. The result is
+   * Compute the square root of a vectorized data field. The result is
    * returned as vectorized array in the form <tt>{sqrt(x[0]), sqrt(x[1]),
    * ..., sqrt(x[n_array_elements-1])}</tt>.
    *
@@ -2615,7 +3255,7 @@ namespace std
 
 
   /**
-   * Computes the absolute value (modulus) of a vectorized data field. The
+   * Compute the absolute value (modulus) of a vectorized data field. The
    * result is returned as vectorized array in the form <tt>{abs(x[0]),
    * abs(x[1]), ..., abs(x[n_array_elements-1])}</tt>.
    *
@@ -2632,7 +3272,7 @@ namespace std
 
 
   /**
-   * Computes the componentwise maximum of two vectorized data fields. The
+   * Compute the componentwise maximum of two vectorized data fields. The
    * result is returned as vectorized array in the form <tt>{max(x[0],y[0]),
    * max(x[1],y[1]), ...}</tt>.
    *
@@ -2650,7 +3290,7 @@ namespace std
 
 
   /**
-   * Computes the componentwise minimum of two vectorized data fields. The
+   * Compute the componentwise minimum of two vectorized data fields. The
    * result is returned as vectorized array in the form <tt>{min(x[0],y[0]),
    * min(x[1],y[1]), ...}</tt>.
    *

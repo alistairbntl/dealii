@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,7 +22,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function_lib.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/vector.h>
@@ -38,7 +37,6 @@
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/numerics/matrix_tools.h>
 
-#include <fstream>
 
 
 
@@ -121,6 +119,12 @@ int main ()
   deallog << std::setprecision (2);
   deallog << std::fixed;
   deallog.attach(logfile);
+
+  // there used to be a bug in the cell similarity detection for the above
+  // test pattern of an FE_RaviartThomas inside and FESystem, but cell
+  // similarity is only enabled without threads. to make sure this test is
+  // effective, manually set the thread limit 1.
+  MultithreadInfo::set_thread_limit(1);
 
   deallog.push ("2d");
   check<2> ();

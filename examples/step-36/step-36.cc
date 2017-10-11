@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2009 - 2015 by the deal.II authors
+ * Copyright (C) 2009 - 2016 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -44,7 +44,7 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/lac/full_matrix.h>
 
-// IndexSet is used to set the size of PETScWrappers::Vector:
+// IndexSet is used to set the size of each PETScWrappers::MPI::Vector:
 #include <deal.II/base/index_set.h>
 
 // PETSc appears here because SLEPc depends on this library:
@@ -135,7 +135,7 @@ namespace Step36
                               Patterns::Anything(),
                               "A functional description of the potential.");
 
-    parameters.read_input (prm_file);
+    parameters.parse_input (prm_file);
   }
 
 

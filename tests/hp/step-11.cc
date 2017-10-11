@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,13 +20,10 @@
 
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("output");
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/table_handler.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -47,12 +44,10 @@ std::ofstream logfile("output");
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
 #include <algorithm>
 #include <iostream>
-#include <iomanip>
-#include <cmath>
 
 
 template <int dim>
@@ -123,8 +118,8 @@ void LaplaceProblem<dim>::setup_system ()
                                         i, -1);
   mean_value_constraints.close ();
 
-  CompressedSparsityPattern csp (dof_handler.n_dofs(),
-                                 dof_handler.n_dofs());
+  DynamicSparsityPattern csp (dof_handler.n_dofs(),
+                              dof_handler.n_dofs());
   DoFTools::make_sparsity_pattern (dof_handler, csp);
   mean_value_constraints.condense (csp);
 
@@ -146,12 +141,12 @@ void LaplaceProblem<dim>::assemble_and_solve ()
                                       system_matrix);
   VectorTools::create_right_hand_side (mapping, dof_handler,
                                        hp::QCollection<dim>(QGauss<dim>(gauss_degree)),
-                                       ConstantFunction<dim>(-2),
+                                       Functions::ConstantFunction<dim>(-2),
                                        system_rhs);
   Vector<double> tmp (system_rhs.size());
   VectorTools::create_boundary_right_hand_side (mapping, dof_handler,
                                                 hp::QCollection<dim-1>(QGauss<dim-1>(gauss_degree)),
-                                                ConstantFunction<dim>(1),
+                                                Functions::ConstantFunction<dim>(1),
                                                 tmp);
   system_rhs += tmp;
 
@@ -164,7 +159,7 @@ void LaplaceProblem<dim>::assemble_and_solve ()
   Vector<float> norm_per_cell (triangulation.n_active_cells());
   VectorTools::integrate_difference (mapping, dof_handler,
                                      solution,
-                                     ZeroFunction<dim>(),
+                                     Functions::ZeroFunction<dim>(),
                                      norm_per_cell,
                                      hp::QCollection<dim>(QGauss<dim>(gauss_degree+1)),
                                      VectorTools::H1_seminorm);
@@ -221,7 +216,6 @@ int main ()
       deallog << std::setprecision(2);
 
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       for (unsigned int mapping_degree=1; mapping_degree<=3; ++mapping_degree)
         LaplaceProblem<2>(mapping_degree).run ();

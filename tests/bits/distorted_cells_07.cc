@@ -18,7 +18,6 @@
 // check that the mapping throws an exception for the test case in distorted_cells_01.cc
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -29,7 +28,6 @@
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 
 
 // create a (i) pinched cell (where two vertices coincide), or (ii)
@@ -94,9 +92,7 @@ int main ()
 {
   deal_II_exceptions::disable_abort_on_exception();
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   // only twisted cells for FEValues (pinched cells are OK on Gauss points)
   check<1> (2);

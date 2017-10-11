@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparse_vanka_h
-#define dealii__sparse_vanka_h
+#ifndef dealii_sparse_vanka_h
+#define dealii_sparse_vanka_h
 
 
 
@@ -127,7 +127,7 @@ template <typename number> class SparseBlockVanka;
  * @author Guido Kanschat, Wolfgang Bangerth; 1999, 2000; extension for full
  * compatibility with LinearOperator class: Jean-Paul Pelteret, 2015
  */
-template<typename number>
+template <typename number>
 class SparseVanka
 {
 public:
@@ -227,7 +227,7 @@ public:
    * Do the preconditioning. This function takes the residual in @p src and
    * returns the resulting update vector in @p dst.
    */
-  template<typename number2>
+  template <typename number2>
   void vmult (Vector<number2>       &dst,
               const Vector<number2> &src) const;
 
@@ -235,12 +235,12 @@ public:
    * Apply transpose preconditioner. This function takes the residual in @p
    * src  and returns the resulting update vector in @p dst.
    */
-  template<typename number2>
+  template <typename number2>
   void Tvmult (Vector<number2>       &dst,
                const Vector<number2> &src) const;
 
   /**
-   * Return the dimension of the codomain (or range) space. To remember: the
+   * Return the dimension of the codomain (or range) space. Note that the
    * matrix is of dimension $m \times n$.
    *
    * @note This function should only be called if the preconditioner has been
@@ -249,7 +249,7 @@ public:
   size_type m () const;
 
   /**
-   * Return the dimension of the domain space. To remember: the matrix is of
+   * Return the dimension of the domain space. Note that the matrix is of
    * dimension $m \times n$.
    *
    * @note This function should only be called if the preconditioner has been
@@ -279,10 +279,10 @@ protected:
    * The @p vmult of this class of course calls this function with a null
    * pointer
    */
-  template<typename number2>
+  template <typename number2>
   void apply_preconditioner (Vector<number2>         &dst,
                              const Vector<number2>   &src,
-                             const std::vector<bool> *const dof_mask = 0) const;
+                             const std::vector<bool> *const dof_mask = nullptr) const;
 
   /**
    * Determine an estimate for the memory consumption (in bytes) of this
@@ -502,7 +502,7 @@ private:
  *
  * @author Wolfgang Bangerth, 2000
  */
-template<typename number>
+template <typename number>
 class SparseBlockVanka : public SparseVanka<number>
 {
 public:
@@ -517,7 +517,14 @@ public:
    */
   enum BlockingStrategy
   {
-    index_intervals, adaptive
+    /**
+     * Block by index intervals.
+     */
+    index_intervals,
+    /**
+     * Block with an adaptive strategy.
+     */
+    adaptive
   };
 
   /**
@@ -533,7 +540,7 @@ public:
   /**
    * Apply the preconditioner.
    */
-  template<typename number2>
+  template <typename number2>
   void vmult (Vector<number2>       &dst,
               const Vector<number2> &src) const;
 
@@ -572,7 +579,7 @@ private:
 
 #ifndef DOXYGEN
 
-template<typename number>
+template <typename number>
 inline typename SparseVanka<number>::size_type
 SparseVanka<number>::m () const
 {
@@ -580,7 +587,7 @@ SparseVanka<number>::m () const
   return _m;
 }
 
-template<typename number>
+template <typename number>
 inline typename SparseVanka<number>::size_type
 SparseVanka<number>::n () const
 {
@@ -588,11 +595,11 @@ SparseVanka<number>::n () const
   return _n;
 }
 
-template<typename number>
-template<typename number2>
+template <typename number>
+template <typename number2>
 inline void
-SparseVanka<number>::Tvmult (Vector<number2>       &dst,
-                             const Vector<number2> &src) const
+SparseVanka<number>::Tvmult (Vector<number2>       &/*dst*/,
+                             const Vector<number2> &/*src*/) const
 {
   AssertThrow(false, ExcNotImplemented());
 }

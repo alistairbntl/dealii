@@ -22,7 +22,6 @@
 // constraint we have requested
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -31,8 +30,6 @@
 #include <deal.II/grid/intergrid_map.h>
 #include <deal.II/base/utilities.h>
 
-#include <fstream>
-#include <cstdlib>
 
 
 template <int dim>
@@ -67,7 +64,7 @@ satisfies_level1_at_vertex_rule (const Triangulation<dim> &tr)
 }
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   Triangulation<dim> triangulation (Triangulation<dim>::limit_level_difference_at_vertices);
@@ -105,7 +102,6 @@ void test()
 int main()
 {
   initlog();
-  deallog.threshold_double(1.e-10);
 
   deallog.push("1d");
   test<1>();

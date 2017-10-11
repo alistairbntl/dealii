@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,25 +13,32 @@
 //
 // ---------------------------------------------------------------------
 
-#include <deal.II/base/std_cxx11/array.h>
 #include <deal.II/fe/mapping_q1_eulerian.h>
 #include <deal.II/lac/vector.h>
-#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/block_vector.h>
+#include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/fe/fe.h>
 
+
+#include <array>
+
 DEAL_II_NAMESPACE_OPEN
 
 
-template <int dim, class EulerVectorType, int spacedim>
-MappingQ1Eulerian<dim, EulerVectorType, spacedim>::
-MappingQ1Eulerian (const EulerVectorType  &euler_transform_vectors,
-                   const DoFHandler<dim,spacedim> &shiftmap_dof_handler)
+template <int dim, class VectorType, int spacedim>
+MappingQ1Eulerian<dim, VectorType, spacedim>::
+MappingQ1Eulerian (const DoFHandler<dim,spacedim> &shiftmap_dof_handler,
+                   const VectorType               &euler_transform_vectors)
   :
   MappingQGeneric<dim,spacedim>(1),
   euler_transform_vectors(&euler_transform_vectors),
@@ -40,20 +47,20 @@ MappingQ1Eulerian (const EulerVectorType  &euler_transform_vectors,
 
 
 
-template <int dim, class EulerVectorType, int spacedim>
-std_cxx11::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
-MappingQ1Eulerian<dim, EulerVectorType, spacedim>::
+template <int dim, class VectorType, int spacedim>
+std::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
+MappingQ1Eulerian<dim, VectorType, spacedim>::
 get_vertices
 (const typename Triangulation<dim,spacedim>::cell_iterator &cell) const
 {
-  std_cxx11::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell> vertices;
+  std::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell> vertices;
   // The assertions can not be in the constructor, since this would
   // require to call dof_handler.distribute_dofs(fe) *before* the mapping
   // object is constructed, which is not necessarily what we want.
 
   //TODO: Only one of these two assertions should be relevant
   AssertDimension (spacedim, shiftmap_dof_handler->get_fe().n_dofs_per_vertex());
-  AssertDimension (shiftmap_dof_handler->get_fe().n_components(), spacedim);
+  AssertDimension (shiftmap_dof_handler->get_fe(0).n_components(), spacedim);
 
   AssertDimension (shiftmap_dof_handler->n_dofs(), euler_transform_vectors->size());
 
@@ -89,12 +96,12 @@ get_vertices
 
 
 
-template<int dim, class EulerVectorType, int spacedim>
+template <int dim, class VectorType, int spacedim>
 std::vector<Point<spacedim> >
-MappingQ1Eulerian<dim,EulerVectorType,spacedim>::
+MappingQ1Eulerian<dim,VectorType,spacedim>::
 compute_mapping_support_points(const typename Triangulation<dim,spacedim>::cell_iterator &cell) const
 {
-  const std_cxx11::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
+  const std::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
   vertices = this->get_vertices(cell);
 
   std::vector<Point<spacedim> > a(GeometryInfo<dim>::vertices_per_cell);
@@ -108,20 +115,20 @@ compute_mapping_support_points(const typename Triangulation<dim,spacedim>::cell_
 
 
 
-template <int dim, class EulerVectorType, int spacedim>
-MappingQ1Eulerian<dim,EulerVectorType,spacedim> *
-MappingQ1Eulerian<dim, EulerVectorType, spacedim>::clone () const
+template <int dim, class VectorType, int spacedim>
+MappingQ1Eulerian<dim,VectorType,spacedim> *
+MappingQ1Eulerian<dim, VectorType, spacedim>::clone () const
 {
-  return new MappingQ1Eulerian<dim,EulerVectorType,spacedim>(*this);
+  return new MappingQ1Eulerian<dim,VectorType,spacedim>(*this);
 }
 
 
 
-template<int dim, class EulerVectorType, int spacedim>
+template <int dim, class VectorType, int spacedim>
 CellSimilarity::Similarity
-MappingQ1Eulerian<dim,EulerVectorType,spacedim>::
+MappingQ1Eulerian<dim,VectorType,spacedim>::
 fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &cell,
-                const CellSimilarity::Similarity                           ,
+                const CellSimilarity::Similarity,
                 const Quadrature<dim>                                     &quadrature,
                 const typename Mapping<dim,spacedim>::InternalDataBase    &internal_data,
                 internal::FEValues::MappingRelatedData<dim,spacedim>      &output_data) const

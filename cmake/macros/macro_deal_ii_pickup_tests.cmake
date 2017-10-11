@@ -1,6 +1,6 @@
 ## ---------------------------------------------------------------------
 ##
-## Copyright (C) 2013 - 2015 by the deal.II authors
+## Copyright (C) 2013 - 2017 by the deal.II authors
 ##
 ## This file is part of the deal.II library.
 ##
@@ -81,6 +81,11 @@ MACRO(DEAL_II_PICKUP_TESTS)
   # Necessary external interpreters and programs:
   #
 
+  IF(DEAL_II_WITH_CUDA)
+    FIND_PACKAGE(CUDA)
+    SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++11 -arch=sm_35)
+  ENDIF()
+
   FIND_PACKAGE(Perl REQUIRED)
 
   FIND_PROGRAM(DIFF_EXECUTABLE
@@ -111,6 +116,65 @@ MACRO(DEAL_II_PICKUP_TESTS)
 
   IF(NUMDIFF_EXECUTABLE MATCHES "-NOTFOUND")
     SET(NUMDIFF_EXECUTABLE ${DIFF_EXECUTABLE})
+  ENDIF()
+
+  #
+  # Check that the diff programs can run and terminate successfully:
+  #
+  FOREACH(_diff_program ${NUMDIFF_EXECUTABLE} ${DIFF_EXECUTABLE})
+    EXECUTE_PROCESS(COMMAND ${_diff_program} "-v"
+      TIMEOUT 4 # seconds
+      OUTPUT_QUIET
+      ERROR_QUIET
+      RESULT_VARIABLE _diff_program_status
+      )
+
+    IF(NOT "${_diff_program_status}" STREQUAL "0")
+      MESSAGE(FATAL_ERROR
+        "\nThe command \"${_diff_program} -v\" did not run correctly: it either "
+        "failed to exit after a few seconds or returned a nonzero exit code. "
+        "The test suite cannot be set up without this program, so please "
+        "reinstall it and then run the test suite setup command again.\n")
+    ENDIF()
+  ENDFOREACH()
+
+  #
+  # Also check that numdiff is not a symlink to diff by running a relative
+  # tolerance test. Note that we set NUMDIFF_EXECUTABLE to diff in case we were
+  # not able to find it above, but here we check that the executable is really
+  # named 'numdiff'.
+  #
+  STRING(FIND "${NUMDIFF_EXECUTABLE}" "numdiff" _found_numdiff_binary)
+  IF(NOT "${_found_numdiff_binary}" STREQUAL "-1")
+    SET(_first_test_file_name
+      "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/numdiff-test-1.txt")
+    SET(_second_test_file_name
+      "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/numdiff-test-2.txt")
+    FILE(WRITE "${_first_test_file_name}" "0.99999999998\n2.0\n1.0\n")
+    FILE(WRITE "${_second_test_file_name}" "1.00000000001\n2.0\n1.0\n")
+
+    EXECUTE_PROCESS(COMMAND ${NUMDIFF_EXECUTABLE}
+      "-r" "1.0e-8" "--" "${_first_test_file_name}" "${_second_test_file_name}"
+      TIMEOUT 4 # seconds
+      OUTPUT_QUIET
+      ERROR_QUIET
+      RESULT_VARIABLE _numdiff_tolerance_test_status
+      )
+
+    #
+    # Tidy up:
+    #
+    FILE(REMOVE ${_first_test_file_name})
+    FILE(REMOVE ${_second_test_file_name})
+
+    IF(NOT "${_numdiff_tolerance_test_status}" STREQUAL "0")
+      MESSAGE(FATAL_ERROR
+        "\nThe detected numdiff executable was not able to pass a simple "
+        "relative tolerance test. This usually means that either numdiff "
+        "was misconfigured or that it is a symbolic link to diff. "
+        "The test suite needs numdiff to work correctly: please reinstall "
+        "numdiff and run the test suite configuration again.\n")
+    ENDIF()
   ENDIF()
 
   #
@@ -178,14 +242,18 @@ MACRO(DEAL_II_PICKUP_TESTS)
       STRING(REGEX MATCH "([0-9]+(\\.[0-9]+)*)$" _version ${_match})
 
       #
-      # Valid feature?
+      # We support two variables: DEAL_II_WITH_<FEATURE> and DEAL_II_<FEATURE>
       #
-      IF(NOT DEFINED DEAL_II_WITH_${_feature})
-        MESSAGE(FATAL_ERROR "
-Invalid feature constraint \"${_match}\" in file
-\"${_comparison}\":
-The feature \"DEAL_II_${_feature}\" does not exist.\n"
-          )
+      SET(_variable "DEAL_II_WITH_${_feature}")
+      IF(NOT DEFINED ${_variable})
+        SET(_variable "DEAL_II_${_feature}")
+        IF(NOT DEFINED ${_variable})
+          #
+          # If a variable is undefined, assume that we cannot configure a
+          # given test
+          #
+          SET(_define_test FALSE)
+        ENDIF()
       ENDIF()
 
       #
@@ -201,8 +269,8 @@ Comparison operator \"=\" expected for boolean match.\n"
         ENDIF()
 
         # This is why I hate CMake :-/
-        IF( (DEAL_II_WITH_${_feature} AND NOT ${_boolean}) OR
-            (NOT DEAL_II_WITH_${_feature} AND ${_boolean}) )
+        IF( (${_variable} AND NOT ${_boolean}) OR
+            (NOT ${_variable} AND ${_boolean}) )
           SET(_define_test FALSE)
         ENDIF()
       ENDIF()

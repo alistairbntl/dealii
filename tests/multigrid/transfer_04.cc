@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,7 +17,6 @@
 // check mg transfer in parallel, especially communication of copy_indices
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
@@ -38,9 +37,6 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/lac/trilinos_vector.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -94,7 +90,7 @@ void check_fe(FiniteElement<dim> &fe)
   deallog << fe.get_name() << std::endl;
 
   parallel::distributed::Triangulation<dim> tr(MPI_COMM_WORLD,
-                                               Triangulation<dim>::none,
+                                               Triangulation<dim>::limit_level_difference_at_vertices,
                                                parallel::distributed::Triangulation<dim>::construct_multigrid_hierarchy);
   setup_tria(tr);
 
@@ -131,7 +127,7 @@ void check_fe(FiniteElement<dim> &fe)
   DoFTools::make_hanging_node_constraints (dofh, hanging_node_constraints);
   hanging_node_constraints.close();
 
-  MGTransferPrebuilt<vector_t> transfer(hanging_node_constraints, mg_constrained_dofs);
+  MGTransferPrebuilt<vector_t> transfer(mg_constrained_dofs);
   transfer.build_matrices(dofh);
   //transfer.print_indices(deallog.get_file_stream());
 

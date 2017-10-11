@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tensor_function_templates_h
-#define dealii__tensor_function_templates_h
+#ifndef dealii_tensor_function_templates_h
+#define dealii_tensor_function_templates_h
 
 #include <deal.II/base/tensor_function.h>
 #include <deal.II/base/tensor.h>
@@ -32,10 +32,6 @@ TensorFunction<rank, dim, Number>::TensorFunction (const Number initial_time)
   FunctionTime<Number> (initial_time)
 {}
 
-
-template <int rank, int dim, typename Number>
-TensorFunction<rank, dim, Number>::~TensorFunction ()
-{}
 
 
 template <int rank, int dim, typename Number>
@@ -94,10 +90,6 @@ ConstantTensorFunction<rank, dim, Number>::ConstantTensorFunction (
   _value(value)
 {}
 
-
-template <int rank, int dim, typename Number>
-ConstantTensorFunction<rank, dim, Number>::~ConstantTensorFunction ()
-{}
 
 
 template <int rank, int dim, typename Number>
@@ -161,4 +153,4 @@ ZeroTensorFunction<rank, dim, Number>::ZeroTensorFunction (const Number initial_
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif /* dealii__tensor_function_templates_h */
+#endif /* dealii_tensor_function_templates_h */

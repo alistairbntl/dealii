@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -58,7 +58,6 @@
 #include <deal.II/numerics/data_out.h>
 
 #include <iostream>
-#include <fstream>
 
 namespace Step39
 {
@@ -385,6 +384,7 @@ namespace Step39
   template <int dim>
   InteriorPenaltyProblem<dim>::InteriorPenaltyProblem(const FiniteElement<dim> &fe)
     :
+    triangulation(Triangulation<dim>::limit_level_difference_at_vertices),
     mapping(1),
     fe(fe),
     dof_handler(triangulation),
@@ -411,13 +411,13 @@ namespace Step39
 
     const unsigned int n_levels = triangulation.n_levels();
     mg_matrix.resize(0, n_levels-1);
-    mg_matrix.clear();
+    mg_matrix.clear_elements();
     mg_matrix_dg_up.resize(0, n_levels-1);
-    mg_matrix_dg_up.clear();
+    mg_matrix_dg_up.clear_elements();
     mg_matrix_dg_down.resize(0, n_levels-1);
-    mg_matrix_dg_down.clear();
+    mg_matrix_dg_down.clear_elements();
     mg_matrix_in_out.resize(0, n_levels-1);
-    mg_matrix_in_out.clear();
+    mg_matrix_in_out.clear_elements();
     mg_sparsity.resize(0, n_levels-1);
     mg_sparsity_dg_interface.resize(0, n_levels-1);
 
@@ -674,6 +674,8 @@ namespace Step39
     data_out.build_patches ();
 
     data_out.write_gnuplot(gnuplot_output);
+
+    delete[] fn;
   }
 
   template <int dim>

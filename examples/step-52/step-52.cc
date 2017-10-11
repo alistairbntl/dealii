@@ -166,7 +166,7 @@ namespace Step52
   {
     dof_handler.distribute_dofs(fe);
 
-    VectorTools::interpolate_boundary_values(dof_handler,1,ZeroFunction<2>(),constraint_matrix);
+    VectorTools::interpolate_boundary_values(dof_handler,1,Functions::ZeroFunction<2>(),constraint_matrix);
     constraint_matrix.close();
 
     DynamicSparsityPattern dsp(dof_handler.n_dofs());
@@ -271,7 +271,7 @@ namespace Step52
 
 
 
-  // @sect4{<code>Diffusion:evaluate_diffusion</code>}
+  // @sect4{<code>Diffusion::evaluate_diffusion</code>}
   //
   // Next, we evaluate the weak form of the diffusion equation at a given time
   // $t$ and for a given vector $y$. In other words, as outlined in the
@@ -481,10 +481,10 @@ namespace Step52
     for (unsigned int i=0; i<n_time_steps; ++i)
       {
         time = explicit_runge_kutta.evolve_one_time_step(
-                 std_cxx11::bind(&Diffusion::evaluate_diffusion,
-                                 this,
-                                 std_cxx11::_1,
-                                 std_cxx11::_2),
+                 std::bind(&Diffusion::evaluate_diffusion,
+                           this,
+                           std::placeholders::_1,
+                           std::placeholders::_2),
                  time,time_step,solution);
 
         if ((i+1)%10==0)
@@ -513,15 +513,15 @@ namespace Step52
     for (unsigned int i=0; i<n_time_steps; ++i)
       {
         time = implicit_runge_kutta.evolve_one_time_step(
-                 std_cxx11::bind(&Diffusion::evaluate_diffusion,
-                                 this,
-                                 std_cxx11::_1,
-                                 std_cxx11::_2),
-                 std_cxx11::bind(&Diffusion::id_minus_tau_J_inverse,
-                                 this,
-                                 std_cxx11::_1,
-                                 std_cxx11::_2,
-                                 std_cxx11::_3),
+                 std::bind(&Diffusion::evaluate_diffusion,
+                           this,
+                           std::placeholders::_1,
+                           std::placeholders::_2),
+                 std::bind(&Diffusion::id_minus_tau_J_inverse,
+                           this,
+                           std::placeholders::_1,
+                           std::placeholders::_2,
+                           std::placeholders::_3),
                  time,time_step,solution);
 
         if ((i+1)%10==0)
@@ -580,7 +580,7 @@ namespace Step52
           time_step = final_time-time;
 
         time = embedded_explicit_runge_kutta.evolve_one_time_step(
-                 std_cxx11::bind(&Diffusion::evaluate_diffusion,this,std_cxx11::_1,std_cxx11::_2),
+                 std::bind(&Diffusion::evaluate_diffusion,this,std::placeholders::_1,std::placeholders::_2),
                  time,time_step,solution);
 
         if ((n_steps+1)%10==0)

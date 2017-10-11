@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -25,6 +25,7 @@
 
 #include <vector>
 #include <sstream>
+#include <deal.II/base/std_cxx14/memory.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -88,7 +89,7 @@ template <int dim, int spacedim>
 std::string
 FE_Q_DG0<dim,spacedim>::get_name () const
 {
-  // note that the FETools::get_fe_from_name function depends on the
+  // note that the FETools::get_fe_by_name function depends on the
   // particular format of the string this function returns, so they have to be
   // kept in synch
 
@@ -166,85 +167,37 @@ FE_Q_DG0<dim,spacedim>::get_name () const
 
 
 template <int dim, int spacedim>
-FiniteElement<dim,spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_Q_DG0<dim,spacedim>::clone() const
 {
-  return new FE_Q_DG0<dim,spacedim>(*this);
+  return std_cxx14::make_unique<FE_Q_DG0<dim,spacedim>>(*this);
 }
 
 
 
 template <int dim, int spacedim>
 void
-FE_Q_DG0<dim,spacedim>::interpolate(std::vector<double>       &local_dofs,
-                                    const std::vector<double> &values) const
+FE_Q_DG0<dim,spacedim>::
+convert_generalized_support_point_values_to_dof_values(const std::vector<Vector<double> > &support_point_values,
+                                                       std::vector<double>    &nodal_dofs) const
 {
-  Assert (values.size() == this->unit_support_points.size(),
-          ExcDimensionMismatch(values.size(),
+  Assert (support_point_values.size() == this->unit_support_points.size(),
+          ExcDimensionMismatch(support_point_values.size(),
                                this->unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (this->n_components() == 1,
-          ExcDimensionMismatch(this->n_components(), 1));
-
-  std::copy(values.begin(), values.end(), local_dofs.begin());
-
-  // We don't need the discontinuous function for local interpolation
-  local_dofs[local_dofs.size()-1] = 0.;
-}
-
-
-
-template <int dim, int spacedim>
-void
-FE_Q_DG0<dim,spacedim>::interpolate(std::vector<double>    &local_dofs,
-                                    const std::vector<Vector<double> > &values,
-                                    unsigned int offset) const
-{
-  Assert (values.size() == this->unit_support_points.size(),
-          ExcDimensionMismatch(values.size(),
-                               this->unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values[0].size() >= offset+this->n_components(),
-          ExcDimensionMismatch(values[0].size(),offset+this->n_components()));
+  Assert (nodal_dofs.size() == this->dofs_per_cell,
+          ExcDimensionMismatch(nodal_dofs.size(),this->dofs_per_cell));
+  Assert (support_point_values[0].size() == this->n_components(),
+          ExcDimensionMismatch(support_point_values[0].size(),this->n_components()));
 
   for (unsigned int i=0; i<this->dofs_per_cell-1; ++i)
     {
       const std::pair<unsigned int, unsigned int> index
         = this->system_to_component_index(i);
-      local_dofs[i] = values[i](offset+index.first);
+      nodal_dofs[i] = support_point_values[i](index.first);
     }
 
   // We don't need the discontinuous function for local interpolation
-  local_dofs[local_dofs.size()-1] = 0.;
-}
-
-
-
-template <int dim, int spacedim>
-void
-FE_Q_DG0<dim,spacedim>::interpolate(
-  std::vector<double> &local_dofs,
-  const VectorSlice<const std::vector<std::vector<double> > > &values) const
-{
-  Assert (values[0].size() == this->unit_support_points.size(),
-          ExcDimensionMismatch(values.size(),
-                               this->unit_support_points.size()));
-  Assert (local_dofs.size() == this->dofs_per_cell,
-          ExcDimensionMismatch(local_dofs.size(),this->dofs_per_cell));
-  Assert (values.size() == this->n_components(),
-          ExcDimensionMismatch(values.size(), this->n_components()));
-
-  for (unsigned int i=0; i<this->dofs_per_cell-1; ++i)
-    {
-      const std::pair<unsigned int, unsigned int> index
-        = this->system_to_component_index(i);
-      local_dofs[i] = values[index.first][i];
-    }
-
-  // We don't need the discontinuous function for local interpolation
-  local_dofs[local_dofs.size()-1] = 0.;
+  nodal_dofs[nodal_dofs.size()-1] = 0.;
 }
 
 
@@ -261,7 +214,7 @@ get_interpolation_matrix (const FiniteElement<dim,spacedim> &x_source_fe,
 
   AssertThrow ((x_source_fe.get_name().find ("FE_Q_DG0<") == 0)
                ||
-               (dynamic_cast<const FEQDG0 *>(&x_source_fe) != 0),
+               (dynamic_cast<const FEQDG0 *>(&x_source_fe) != nullptr),
                typename FEL::
                ExcInterpolationNotImplemented());
 

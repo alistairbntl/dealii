@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,7 +24,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -33,8 +32,6 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/fe/mapping_q.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 int main ()
@@ -43,7 +40,7 @@ int main ()
 
   Triangulation< dim >  tria;
   std::map< unsigned int, Point< dim > > new_points;
-  const unsigned int N = 16;
+  const unsigned int N = 8;
   GridGenerator::subdivided_hyper_cube (tria, N, -5, 5);
 
   // find the vertex at the origin
@@ -64,9 +61,9 @@ int main ()
           best_dist   = dist;
         }
     }
-  // move the point at the origin by 2 units to the right
+  // move the point at the origin by 1 unit to the right
   new_points[best_vertex] = Point<dim>();
-  new_points[best_vertex][0] += 2;
+  new_points[best_vertex][0] += 1.;
 
   // now pin all of the points on the boundary
   cell = tria.begin_active();
@@ -83,7 +80,7 @@ int main ()
             }
 
   // then compute new point locations and output the result
-  GridTools::laplace_transform  (new_points,tria);
+  GridTools::laplace_transform<dim>  (new_points,tria, nullptr, true);
   std::ofstream out ("output");
   GridOut grid_out;
   grid_out.write_eps (tria, out);

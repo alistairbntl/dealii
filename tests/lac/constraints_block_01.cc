@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,7 +23,6 @@
 // testcase by Jason Sheldon
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/quadrature_lib.h>
 
@@ -34,7 +33,7 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/sparse_direct.h>
 #include <deal.II/lac/full_matrix.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/constraint_matrix.h>
 
@@ -61,9 +60,6 @@
 #include <deal.II/grid/tria_boundary_lib.h>
 #include <deal.II/grid/tria.h>
 
-#include <fstream>
-#include <cmath>
-#include <cstdlib>
 
 
 std::ofstream logfile("output");
@@ -74,7 +70,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // setting up some constants
   const unsigned int dim = 2;
@@ -114,8 +109,8 @@ int main ()
   std::string fluid_fe_name = "FESystem[FE_Nothing()^2-FE_Nothing()^2-FE_Q(2)^2-FE_Q(1)-FE_Q(2)^2]";
 
   hp::FECollection<dim> fe_collection;
-  FiniteElement<dim> *solid_fe = FETools::get_fe_from_name<dim>(solid_fe_name);
-  FiniteElement<dim> *fluid_fe = FETools::get_fe_from_name<dim>(fluid_fe_name);
+  std::unique_ptr<FiniteElement<dim> > solid_fe (FETools::get_fe_by_name<dim, dim>(solid_fe_name));
+  std::unique_ptr<FiniteElement<dim> > fluid_fe (FETools::get_fe_by_name<dim, dim>(fluid_fe_name));
 
   deallog << "Solid FE Space: " << solid_fe->get_name() << std::endl;
   deallog << "Fluid/Mesh FE Space: " << fluid_fe->get_name() << std::endl;
@@ -157,7 +152,7 @@ int main ()
 
   BlockSparsityPattern   block_sparsity_pattern;
   {
-    BlockCompressedSimpleSparsityPattern  csp(3,3);
+    BlockDynamicSparsityPattern  csp(3,3);
     csp.block(0,0).reinit (dofs_per_block[0],dofs_per_block[0]);//solid-solid
     csp.block(0,1).reinit (dofs_per_block[0],dofs_per_block[1]);//solid-fluid
     csp.block(0,2).reinit (dofs_per_block[0],dofs_per_block[2]);//solid-mesh

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,7 +21,6 @@
  */
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
@@ -29,7 +28,6 @@
 #include <deal.II/multigrid/multigrid.h>
 #include <deal.II/multigrid/mg_matrix.h>
 
-#include <fstream>
 
 #define N 3
 typedef Vector<double> VectorType;
@@ -72,8 +70,8 @@ void test_cycles(unsigned int minlevel, unsigned int maxlevel)
     level_matrices[i].reinit(N, N);
   mg::Matrix<VectorType> mgmatrix(level_matrices);
 
-  Multigrid<VectorType> mg1(minlevel, maxlevel, mgmatrix, all, all, all, all,
-                            Multigrid<VectorType>::v_cycle);
+  Multigrid<VectorType> mg1(mgmatrix, all, all, all, all,
+                            minlevel, maxlevel, Multigrid<VectorType>::v_cycle);
   mg1.set_debug(3);
   for (unsigned int i=minlevel; i<=maxlevel; ++i)
     mg1.defect[i].reinit(N);
@@ -90,9 +88,7 @@ void test_cycles(unsigned int minlevel, unsigned int maxlevel)
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test_cycles (0,4);
   test_cycles (2,5);

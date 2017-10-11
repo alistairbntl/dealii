@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__distributed_solution_transfer_h
-#define dealii__distributed_solution_transfer_h
+#ifndef dealii_distributed_solution_transfer_h
+#define dealii_distributed_solution_transfer_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/distributed/tria.h>
@@ -112,9 +112,17 @@ namespace parallel
      * @ingroup distributed
      * @author Timo Heister, 2009-2011
      */
-    template<int dim, typename VectorType, typename DoFHandlerType=DoFHandler<dim> >
+    template <int dim,
+              typename VectorType,
+              typename DoFHandlerType = DoFHandler<dim> >
     class SolutionTransfer
     {
+#ifndef DEAL_II_MSVC
+      static_assert (dim == DoFHandlerType::dimension,
+                     "The dimension explicitly provided as a template "
+                     "argument, and the dimension of the DoFHandlerType "
+                     "template argument must match.");
+#endif
     public:
       /**
        * Constructor, takes the current DoFHandler as argument.
@@ -123,7 +131,7 @@ namespace parallel
       /**
        * Destructor.
        */
-      ~SolutionTransfer();
+      ~SolutionTransfer() = default;
 
       /**
        * Prepares the @p SolutionTransfer for coarsening and refinement. It

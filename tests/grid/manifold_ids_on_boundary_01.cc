@@ -16,7 +16,6 @@
 // Test set_manifold_ids_on_boundary(b_id,man_id)
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -24,12 +23,10 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/manifold_lib.h>
 
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 
 
-void dim2(std::ostream &os)
+void dim_2(std::ostream &os)
 {
   const unsigned int d=2;
   const Point<d> center(0,0);
@@ -49,7 +46,7 @@ void dim2(std::ostream &os)
   gout.write_vtk(tr, os);
 }
 
-void dim3(std::ostream &os)
+void dim_3(std::ostream &os)
 {
   const unsigned int d=3;
 
@@ -73,6 +70,6 @@ int main()
 {
   initlog(true);
   std::ostream &logfile = deallog.get_file_stream();
-  dim2(logfile);
-  dim3(logfile);
+  dim_2(logfile);
+  dim_3(logfile);
 }

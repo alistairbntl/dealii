@@ -18,7 +18,6 @@
 // Like _01, but make sure we don't coarsen if we don't want to
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/lac/vector.h>
@@ -31,7 +30,6 @@
 #include <deal.II/base/utilities.h>
 
 
-#include <fstream>
 
 
 void test()
@@ -114,9 +112,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       test();
     }

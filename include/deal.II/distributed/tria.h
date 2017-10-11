@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2008 - 2016 by the deal.II authors
+// Copyright (C) 2008 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__distributed_tria_h
-#define dealii__distributed_tria_h
+#ifndef dealii_distributed_tria_h
+#define dealii_distributed_tria_h
 
 
 #include <deal.II/base/config.h>
@@ -23,15 +23,15 @@
 #include <deal.II/base/template_constraints.h>
 #include <deal.II/grid/tria.h>
 
-#include <deal.II/base/std_cxx11/function.h>
-#include <deal.II/base/std_cxx11/tuple.h>
-
 #include <deal.II/distributed/tria_base.h>
+#include <deal.II/distributed/p4est_wrappers.h>
 
 #include <set>
 #include <vector>
 #include <list>
 #include <utility>
+#include <functional>
+#include <tuple>
 
 #ifdef DEAL_II_WITH_MPI
 #  include <mpi.h>
@@ -58,98 +58,16 @@ namespace internal
   {
     namespace Policy
     {
-      template <int, int> class ParallelDistributed;
+      template <typename> class ParallelDistributed;
     }
   }
 }
 
-
-namespace internal
+namespace FETools
 {
-  namespace p4est
+  namespace internal
   {
-    /**
-     * A structure whose explicit specializations contain typedefs to the
-     * relevant p4est_* and p8est_* types. Using this structure, for example
-     * by saying <tt>types<dim>::connectivity</tt> we can write code in a
-     * dimension independent way, either referring to p4est_connectivity_t or
-     * p8est_connectivity_t, depending on template argument.
-     */
-    template <int> struct types;
-
-    template <>
-    struct types<2>
-    {
-      typedef p4est_connectivity_t connectivity;
-      typedef p4est_t              forest;
-      typedef p4est_tree_t         tree;
-      typedef p4est_quadrant_t     quadrant;
-      typedef p4est_topidx_t       topidx;
-      typedef p4est_locidx_t       locidx;
-#if DEAL_II_P4EST_VERSION_GTE(0,3,4,3)
-      typedef p4est_connect_type_t balance_type;
-#else
-      typedef p4est_balance_type_t balance_type;
-#endif
-      typedef p4est_ghost_t        ghost;
-    };
-
-    template <>
-    struct types<3>
-    {
-      typedef p8est_connectivity_t connectivity;
-      typedef p8est_t              forest;
-      typedef p8est_tree_t         tree;
-      typedef p8est_quadrant_t     quadrant;
-      typedef p4est_topidx_t       topidx;
-      typedef p4est_locidx_t       locidx;
-#if DEAL_II_P4EST_VERSION_GTE(0,3,4,3)
-      typedef p8est_connect_type_t balance_type;
-#else
-      typedef p8est_balance_type_t balance_type;
-#endif
-      typedef p8est_ghost_t        ghost;
-    };
-
-
-    /**
-     * Initialize the GeometryInfo<dim>::max_children_per_cell children of the
-     * cell p4est_cell.
-     */
-    template <int dim>
-    void
-    init_quadrant_children
-    (const typename types<dim>::quadrant &p4est_cell,
-     typename types<dim>::quadrant (&p4est_children)[GeometryInfo<dim>::max_children_per_cell]);
-
-
-    /**
-     * Initialize quadrant to represent a coarse cell.
-     */
-    template <int dim>
-    void
-    init_coarse_quadrant(typename types<dim>::quadrant &quad);
-
-
-
-    /**
-     * Returns whether q1 and q2 are equal
-     */
-    template <int dim>
-    bool
-    quadrant_is_equal (const typename types<dim>::quadrant &q1,
-                       const typename types<dim>::quadrant &q2);
-
-    //TODO: remove these functions from
-    //public interface somehow? [TH]
-
-    /**
-     * returns whether q1 is an ancestor of q2
-     */
-    template <int dim>
-    bool
-    quadrant_is_ancestor (const typename types<dim>::quadrant &q1,
-                          const typename types<dim>::quadrant &q2);
+    template <int, int, class> class ExtrapolateImplementation;
   }
 }
 
@@ -238,7 +156,7 @@ namespace parallel
      * information into the function. C++ provides a nice mechanism for this
      * that is best explained using an example:
      * @code
-     *     #include <deal.II/base/std_cxx11/bind.h>
+     *     #include <functional>
      *
      *     template <int dim>
      *     void set_boundary_ids (parallel::distributed::Triangulation<dim> &triangulation)
@@ -254,13 +172,13 @@ namespace parallel
      *       ... create the coarse mesh ...
      *
      *       coarse_grid.signals.post_refinement.connect
-     *         (std_cxx11::bind (&set_boundary_ids<dim>,
-     *                           std_cxx11::ref(coarse_grid)));
+     *         (std::bind (&set_boundary_ids<dim>,
+     *                     std::ref(coarse_grid)));
      *
      *     }
      * @endcode
      *
-     * What the call to <code>std_cxx11::bind</code> does is to produce an
+     * What the call to <code>std::bind</code> does is to produce an
      * object that can be called like a function with no arguments. It does so
      * by taking the address of a function that does, in fact, take an
      * argument but permanently fix this one argument to a reference to the
@@ -278,7 +196,7 @@ namespace parallel
      * static, but possibly private) member function of the
      * <code>MyClass</code> class, then the following will work:
      * @code
-     *     #include <deal.II/base/std_cxx11/bind.h>
+     *     #include <functional>
      *
      *     template <int dim>
      *     void
@@ -296,9 +214,9 @@ namespace parallel
      *       ... create the coarse mesh ...
      *
      *       coarse_grid.signals.post_refinement.connect
-     *         (std_cxx11::bind (&MyGeometry<dim>::set_boundary_ids,
-     *                           std_cxx11::cref(*this),
-     *                           std_cxx11::ref(coarse_grid)));
+     *         (std::bind (&MyGeometry<dim>::set_boundary_ids,
+     *                     std::cref(*this),
+     *                     std::ref(coarse_grid)));
      *     }
      * @endcode
      * Here, like any other member function, <code>set_boundary_ids</code>
@@ -327,7 +245,7 @@ namespace parallel
     {
     public:
       /**
-       * A typedef that is used to to identify cell iterators. The concept of
+       * A typedef that is used to identify cell iterators. The concept of
        * iterators is discussed at length in the
        * @ref Iterators "iterators documentation module".
        *
@@ -346,7 +264,7 @@ namespace parallel
       typedef typename dealii::Triangulation<dim,spacedim>::cell_iterator        cell_iterator;
 
       /**
-       * A typedef that is used to to identify
+       * A typedef that is used to identify
        * @ref GlossActive "active cell iterators".
        * The concept of iterators is discussed at length in the
        * @ref Iterators "iterators documentation module".
@@ -379,7 +297,7 @@ namespace parallel
         default_setting = 0x0,
         /**
          * If set, the deal.II mesh will be reconstructed from the coarse mesh
-         * every time a repartioning in p4est happens. This can be a bit more
+         * every time a repartitioning in p4est happens. This can be a bit more
          * expensive, but guarantees the same memory layout and therefore cell
          * ordering in the deal.II mesh. As assembly is done in the deal.II
          * cell ordering, this flag is required to get reproducible behaviour
@@ -394,7 +312,7 @@ namespace parallel
          */
         construct_multigrid_hierarchy = 0x2,
         /**
-         * Setting this flag will disable automatic repartioning of the cells
+         * Setting this flag will disable automatic repartitioning of the cells
          * after a refinement cycle. It can be executed manually by calling
          * repartition().
          */
@@ -414,6 +332,9 @@ namespace parallel
        * the kinds of smoothing operations that can be applied.
        *
        * @param settings See the description of the Settings enumerator.
+       * Providing <code>construct_multigrid_hierarchy</code> enforces
+       * <code>Triangulation::limit_level_difference_at_vertices</code>
+       * for smooth_grid.
        *
        * @note This class does not currently support the
        * <code>check_for_distorted_cells</code> argument provided by the base
@@ -451,8 +372,14 @@ namespace parallel
 
       /**
        * Implementation of the same function as in the base class.
+       *
+       * @note This function cannot copy a triangulation that has been refined.
+       *
+       * @note This function can be used to copy a serial Triangulation to a
+       * parallel::distributed::Triangulation but only if the serial
+       * Triangulation has never been refined.
        */
-      virtual void copy_triangulation (const dealii::Triangulation<dim, spacedim> &old_tria);
+      virtual void copy_triangulation (const dealii::Triangulation<dim, spacedim> &other_tria);
 
       /**
        * Create a triangulation as documented in the base class.
@@ -605,7 +532,7 @@ namespace parallel
 
 
       /**
-       * Returns true if the triangulation has hanging nodes.
+       * Return true if the triangulation has hanging nodes.
        *
        * In the context of parallel distributed triangulations, every
        * processor stores only that part of the triangulation it locally owns.
@@ -698,11 +625,12 @@ namespace parallel
        * can be different than the coarsen and refine flags set by you). If it
        * is
        *
-       * - CELL_PERIST: the cell won't be refined/coarsened, but might be
-       * moved to a different processor - CELL_REFINE: this cell will be
-       * refined into 4/8 cells, you can not access the children (because they
-       * don't exist yet) - CELL_COARSEN: the children of this cell will be
-       * coarsened into the given cell (you can access the active children!)
+       * - CELL_PERSIST: the cell won't be refined/coarsened, but might be
+       * moved to a different processor
+       * - CELL_REFINE: this cell will be refined into 4/8 cells, you can not
+       * access the children (because they don't exist yet)
+       * - CELL_COARSEN: the children of this cell will be coarsened into the
+       * given cell (you can access the active children!)
        *
        * When unpacking the data with notify_ready_to_unpack() you can access
        * the children of the cell if the status is CELL_REFINE but not for
@@ -715,9 +643,9 @@ namespace parallel
        */
       unsigned int
       register_data_attach (const std::size_t size,
-                            const std_cxx11::function<void (const cell_iterator &,
-                                                            const CellStatus,
-                                                            void *)> &pack_callback);
+                            const std::function<void (const cell_iterator &,
+                                                      const CellStatus,
+                                                      void *)> &pack_callback);
 
       /**
        * The supplied callback function is called for each newly locally owned
@@ -735,9 +663,9 @@ namespace parallel
        */
       void
       notify_ready_to_unpack (const unsigned int offset,
-                              const std_cxx11::function<void (const cell_iterator &,
-                                                              const CellStatus,
-                                                              const void *)> &unpack_callback);
+                              const std::function<void (const cell_iterator &,
+                                                        const CellStatus,
+                                                        const void *)> &unpack_callback);
 
       /**
        * Return a permutation vector for the order the coarse cells are handed
@@ -784,7 +712,6 @@ namespace parallel
       /**
        * Override the function to update the number cache so we can fill data
        * like @p level_ghost_owners.
-       *
        */
       virtual void update_number_cache ();
 
@@ -810,24 +737,12 @@ namespace parallel
        * triangulation.
        */
       typename dealii::internal::p4est::types<dim>::forest *parallel_forest;
+
       /**
        * A data structure that holds some information about the ghost cells of
        * the triangulation.
        */
       typename dealii::internal::p4est::types<dim>::ghost  *parallel_ghost;
-
-      /**
-       * A flag that indicates whether refinement of a triangulation is
-       * currently in progress. This flag is used to disambiguate whether a
-       * call to execute_coarsening_and_triangulation came from the outside or
-       * through a recursive call. While the first time we want to take over
-       * work to copy things from a refined p4est, the other times we don't
-       * want to get in the way as these latter calls to
-       * Triangulation::execute_coarsening_and_refinement() are simply there
-       * in order to re-create a triangulation that matches the p4est.
-       */
-      bool refinement_in_progress;
-
 
       /**
        * number of bytes that get attached to the Triangulation through
@@ -847,7 +762,7 @@ namespace parallel
        */
       unsigned int n_attached_deserialize;
 
-      typedef  std_cxx11::function<
+      typedef  std::function<
       void(typename Triangulation<dim,spacedim>::cell_iterator, CellStatus, void *)
       > pack_callback_t;
 
@@ -897,8 +812,8 @@ namespace parallel
        *
        * This function exists in 2d and 3d variants.
        */
-      void copy_new_triangulation_to_p4est (dealii::internal::int2type<2>);
-      void copy_new_triangulation_to_p4est (dealii::internal::int2type<3>);
+      void copy_new_triangulation_to_p4est (std::integral_constant<int, 2>);
+      void copy_new_triangulation_to_p4est (std::integral_constant<int, 3>);
 
       /**
        * Copy the local part of the refined forest from p4est into the
@@ -930,25 +845,11 @@ namespace parallel
       get_cell_weights();
 
       /**
-       * Fills a map that, for each vertex, lists all the processors whose
-       * subdomains are adjacent to that vertex. Used by
-       * DoFHandler::Policy::ParallelDistributed.
+       * Override the implementation in parallel::Triangulation because
+       * we can ask p4est about ghost neighbors across periodic boundaries.
        */
-      void
-      fill_vertices_with_ghost_neighbors
-      (std::map<unsigned int, std::set<dealii::types::subdomain_id> >
-       &vertices_with_ghost_neighbors);
-
-      /**
-       * Fills a map that, for each vertex, lists all the processors whose
-       * subdomains are adjacent to that vertex on the given level for the
-       * multigrid hierarchy. Used by DoFHandler::Policy::ParallelDistributed.
-       */
-      void
-      fill_level_vertices_with_ghost_neighbors
-      (const int level,
-       std::map<unsigned int, std::set<dealii::types::subdomain_id> >
-       &vertices_with_ghost_neighbors);
+      virtual std::map<unsigned int, std::set<dealii::types::subdomain_id> >
+      compute_vertices_with_ghost_neighbors () const;
 
       /**
        * This method returns a bit vector of length tria.n_vertices()
@@ -962,7 +863,9 @@ namespace parallel
       std::vector<bool>
       mark_locally_active_vertices_on_level(const int level) const;
 
-      template <int, int> friend class dealii::internal::DoFHandler::Policy::ParallelDistributed;
+      template <typename> friend class dealii::internal::DoFHandler::Policy::ParallelDistributed;
+
+      template <int,int,class> friend class dealii::FETools::internal::ExtrapolateImplementation;
     };
 
 
@@ -987,7 +890,7 @@ namespace parallel
       virtual ~Triangulation ();
 
       /**
-       * Returns a permutation vector for the order the coarse cells are
+       * Return a permutation vector for the order the coarse cells are
        * handed of to p4est. For example the first element i in this vector
        * denotes that the first cell in hierarchical ordering is the ith deal
        * cell starting from begin(0).
@@ -1059,20 +962,15 @@ namespace parallel
        * Like above, this method, which is only implemented for dim = 2 or 3,
        * needs a stub because it is used in dof_handler_policy.cc
        */
-      void
-      fill_vertices_with_ghost_neighbors
-      (std::map<unsigned int, std::set<dealii::types::subdomain_id> >
-       &vertices_with_ghost_neighbors);
+      std::map<unsigned int, std::set<dealii::types::subdomain_id> >
+      compute_vertices_with_ghost_neighbors () const;
 
       /**
        * Like above, this method, which is only implemented for dim = 2 or 3,
        * needs a stub because it is used in dof_handler_policy.cc
        */
-      void
-      fill_level_vertices_with_ghost_neighbors
-      (const unsigned int level,
-       std::map<unsigned int, std::set<dealii::types::subdomain_id> >
-       &vertices_with_ghost_neighbors);
+      std::map<unsigned int, std::set<dealii::types::subdomain_id> >
+      compute_level_vertices_with_ghost_neighbors (const unsigned int level) const;
 
       /**
        * Like above, this method, which is only implemented for dim = 2 or 3,
@@ -1099,18 +997,19 @@ namespace parallel
      * parallel::distributed::Triangulation objects throughout the library
      * even if it is disabled.
      *
-     * Since the constructor of this class is private, no such objects can
-     * actually be created if we don't have p4est available.
+     * Since the constructor of this class is deleted, no such objects
+     * can actually be created as this would be pointless given that
+     * p4est is not available.
      */
     template <int dim, int spacedim = dim>
     class Triangulation : public dealii::parallel::Triangulation<dim,spacedim>
     {
-    private:
+    public:
       /**
-       * Constructor.
+       * Constructor. Deleted to make sure that objects of this type cannot be
+       * constructed (see also the class documentation).
        */
-      Triangulation ();
-
+      Triangulation () = delete;
     };
   }
 }

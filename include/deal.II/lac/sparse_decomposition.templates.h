@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__sparse_decomposition_templates_h
-#define dealii__sparse_decomposition_templates_h
+#ifndef dealii_sparse_decomposition_templates_h
+#define dealii_sparse_decomposition_templates_h
 
 
 #include <deal.II/base/memory_consumption.h>
@@ -27,23 +27,24 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-template<typename number>
+template <typename number>
 SparseLUDecomposition<number>::SparseLUDecomposition()
   :
   SparseMatrix<number>(),
-  own_sparsity(0)
+  strengthen_diagonal (0),
+  own_sparsity(nullptr)
 {}
 
 
 
-template<typename number>
+template <typename number>
 SparseLUDecomposition<number>::~SparseLUDecomposition()
 {
   clear();
 }
 
 
-template<typename number>
+template <typename number>
 void SparseLUDecomposition<number>::clear()
 {
   std::vector<const size_type *> tmp;
@@ -54,13 +55,13 @@ void SparseLUDecomposition<number>::clear()
   if (own_sparsity)
     {
       delete own_sparsity;
-      own_sparsity=0;
+      own_sparsity=nullptr;
     }
 }
 
 
 
-template<typename number>
+template <typename number>
 template <typename somenumber>
 void SparseLUDecomposition<number>::initialize (
   const SparseMatrix<somenumber> &matrix,
@@ -68,7 +69,7 @@ void SparseLUDecomposition<number>::initialize (
 {
   const SparsityPattern &matrix_sparsity=matrix.get_sparsity_pattern();
 
-  const SparsityPattern *sparsity_pattern_to_use = 0;
+  const SparsityPattern *sparsity_pattern_to_use = nullptr;
 
   if (data.use_this_sparsity)
     sparsity_pattern_to_use = data.use_this_sparsity;
@@ -118,7 +119,8 @@ void SparseLUDecomposition<number>::initialize (
 
   // now use this sparsity pattern
   Assert (sparsity_pattern_to_use->n_rows()==sparsity_pattern_to_use->n_cols(),
-          typename SparsityPattern::ExcDiagonalNotOptimized());
+          ExcMessage ("It is not possible to compute this matrix decomposition for "
+                      "matrices that are not square."));
   {
     std::vector<const size_type *> tmp;
     tmp.swap (prebuilt_lower_bound);
@@ -128,14 +130,14 @@ void SparseLUDecomposition<number>::initialize (
 
 
 
-template<typename number>
+template <typename number>
 void
 SparseLUDecomposition<number>::prebuild_lower_bound()
 {
   const size_type *const
-  column_numbers = this->get_sparsity_pattern().colnums;
+  column_numbers = this->get_sparsity_pattern().colnums.get();
   const std::size_t *const
-  rowstart_indices = this->get_sparsity_pattern().rowstart;
+  rowstart_indices = this->get_sparsity_pattern().rowstart.get();
   const size_type N = this->m();
 
   prebuilt_lower_bound.resize (N);
@@ -158,10 +160,10 @@ SparseLUDecomposition<number>::copy_from (const SparseMatrix<somenumber> &matrix
   // pattern as the input matrix
   if (&this->get_sparsity_pattern() == &matrix.get_sparsity_pattern())
     {
-      const somenumber *input_ptr = matrix.val;
-      number *this_ptr = this->val;
+      const somenumber *input_ptr = matrix.val.get();
+      number *this_ptr = this->val.get();
       const number *const end_ptr = this_ptr + this->n_nonzero_elements();
-      if (types_are_equal<somenumber, number>::value == true)
+      if (std::is_same<somenumber, number>::value == true)
         std::memcpy (this_ptr, input_ptr, this->n_nonzero_elements()*sizeof(number));
       else
         for ( ; this_ptr != end_ptr; ++input_ptr, ++this_ptr)
@@ -232,4 +234,4 @@ SparseLUDecomposition<number>::memory_consumption () const
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif // dealii__sparse_decomposition_templates_h
+#endif // dealii_sparse_decomposition_templates_h

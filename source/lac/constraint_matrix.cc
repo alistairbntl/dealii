@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,21 +23,20 @@
 #include <deal.II/lac/sparse_matrix_ez.h>
 #include <deal.II/lac/chunk_sparse_matrix.h>
 #include <deal.II/lac/block_sparse_matrix_ez.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
-#include <deal.II/lac/petsc_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
+#include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
-#include <deal.II/lac/petsc_block_sparse_matrix.h>
 #include <deal.II/lac/petsc_parallel_vector.h>
 #include <deal.II/lac/petsc_parallel_block_vector.h>
 #include <deal.II/lac/petsc_parallel_sparse_matrix.h>
 #include <deal.II/lac/petsc_parallel_block_sparse_matrix.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/trilinos_block_sparse_matrix.h>
 #include <deal.II/lac/matrix_block.h>
+#include <deal.II/lac/diagonal_matrix.h>
 
 #include <algorithm>
 #include <numeric>
@@ -53,6 +52,17 @@ const Table<2,bool> ConstraintMatrix::default_empty_table = Table<2,bool>();
 
 
 
+void
+ConstraintMatrix::copy_from (const ConstraintMatrix &other)
+{
+  lines       = other.lines;
+  lines_cache = other.lines_cache;
+  local_lines = other.local_lines;
+  sorted      = other.sorted;
+}
+
+
+
 bool
 ConstraintMatrix::check_zero_weight (const std::pair<size_type, double> &p)
 {
@@ -64,7 +74,7 @@ ConstraintMatrix::check_zero_weight (const std::pair<size_type, double> &p)
 bool
 ConstraintMatrix::ConstraintLine::operator < (const ConstraintLine &a) const
 {
-  return line < a.line;
+  return index < a.index;
 }
 
 
@@ -72,7 +82,7 @@ ConstraintMatrix::ConstraintLine::operator < (const ConstraintLine &a) const
 bool
 ConstraintMatrix::ConstraintLine::operator == (const ConstraintLine &a) const
 {
-  return line == a.line;
+  return index == a.index;
 }
 
 
@@ -80,9 +90,16 @@ ConstraintMatrix::ConstraintLine::operator == (const ConstraintLine &a) const
 std::size_t
 ConstraintMatrix::ConstraintLine::memory_consumption () const
 {
-  return (MemoryConsumption::memory_consumption (line) +
+  return (MemoryConsumption::memory_consumption (index) +
           MemoryConsumption::memory_consumption (entries) +
           MemoryConsumption::memory_consumption (inhomogeneity));
+}
+
+
+
+const ConstraintMatrix::LineRange ConstraintMatrix::get_lines() const
+{
+  return boost::make_iterator_range(lines.begin(), lines.end());
 }
 
 
@@ -125,7 +142,7 @@ ConstraintMatrix::add_entries
   Assert (is_constrained(line), ExcLineInexistant(line));
 
   ConstraintLine *line_ptr = &lines[lines_cache[calculate_line_index(line)]];
-  Assert (line_ptr->line == line, ExcInternalError());
+  Assert (line_ptr->index == line, ExcInternalError());
 
   // if in debug mode, check whether an entry for this column already
   // exists and if its the same as the one entered at present
@@ -164,13 +181,13 @@ void ConstraintMatrix::add_selected_constraints
   if (constraints.n_constraints() == 0)
     return;
 
-  Assert (filter.size() > constraints.lines.back().line,
+  Assert (filter.size() > constraints.lines.back().index,
           ExcMessage ("Filter needs to be larger than constraint matrix size."));
   for (std::vector<ConstraintLine>::const_iterator line=constraints.lines.begin();
        line!=constraints.lines.end(); ++line)
-    if (filter.is_element(line->line))
+    if (filter.is_element(line->index))
       {
-        const size_type row = filter.index_within_set (line->line);
+        const size_type row = filter.index_within_set (line->index);
         add_line (row);
         set_inhomogeneity (row, line->inhomogeneity);
         for (size_type i=0; i<line->entries.size(); ++i)
@@ -198,14 +215,14 @@ void ConstraintMatrix::close ()
     size_type counter = 0;
     for (std::vector<ConstraintLine>::const_iterator line=lines.begin();
          line!=lines.end(); ++line, ++counter)
-      new_lines[calculate_line_index(line->line)] = counter;
+      new_lines[calculate_line_index(line->index)] = counter;
     std::swap (lines_cache, new_lines);
   }
 
   // in debug mode: check whether we really set the pointers correctly.
   for (size_type i=0; i<lines_cache.size(); ++i)
     if (lines_cache[i] != numbers::invalid_size_type)
-      Assert (i == calculate_line_index(lines[lines_cache[i]].line),
+      Assert (i == calculate_line_index(lines[lines_cache[i]].index),
               ExcInternalError());
 
   // first, strip zero entries, as we have to do that only once
@@ -285,12 +302,12 @@ void ConstraintMatrix::close ()
                 const size_type  dof_index = line->entries[entry].first;
                 const double     weight = line->entries[entry].second;
 
-                Assert (dof_index != line->line,
+                Assert (dof_index != line->index,
                         ExcMessage ("Cycle in constraints detected!"));
 
                 const ConstraintLine *constrained_line =
                   &lines[lines_cache[calculate_line_index(dof_index)]];
-                Assert (constrained_line->line == dof_index,
+                Assert (constrained_line->index == dof_index,
                         ExcInternalError());
 
                 // now we have to replace an entry by its expansion. we do
@@ -315,10 +332,9 @@ void ConstraintMatrix::close ()
                                       weight);
 
                     for (size_type i=1; i<constrained_line->entries.size(); ++i)
-                      line->entries
-                      .push_back (std::make_pair (constrained_line->entries[i].first,
-                                                  constrained_line->entries[i].second *
-                                                  weight));
+                      line->entries.emplace_back (constrained_line->entries[i].first,
+                                                  constrained_line->entries[i].second
+                                                  * weight);
 
 #ifdef DEBUG
                     // keep track of how many entries we replace in this
@@ -462,7 +478,7 @@ void ConstraintMatrix::close ()
           // make sure that entry->first is not the index of a line itself
           const bool is_circle = is_constrained(entry->first);
           Assert (is_circle == false,
-                  ExcDoFConstrainedToConstrainedDoF(line->line, entry->first));
+                  ExcDoFConstrainedToConstrainedDoF(line->index, entry->first));
         }
 #endif
 
@@ -473,18 +489,18 @@ void ConstraintMatrix::close ()
 
 void
 ConstraintMatrix::merge (const ConstraintMatrix &other_constraints,
-                         const MergeConflictBehavior merge_conflict_behavior)
+                         const MergeConflictBehavior merge_conflict_behavior,
+                         const bool allow_different_local_lines)
 {
-  AssertThrow(local_lines == other_constraints.local_lines,
-              ExcNotImplemented());
+  (void) allow_different_local_lines;
+  Assert(allow_different_local_lines ||
+         local_lines == other_constraints.local_lines,
+         ExcMessage("local_lines for this and the other objects are not the same "
+                    "although allow_different_local_lines is false."));
 
   // store the previous state with respect to sorting
   const bool object_was_sorted = sorted;
   sorted = false;
-
-  if (other_constraints.lines_cache.size() > lines_cache.size())
-    lines_cache.resize(other_constraints.lines_cache.size(),
-                       numbers::invalid_size_type);
 
   // first action is to fold into the present object possible constraints
   // in the second object. we don't strictly need to do this any more since
@@ -501,15 +517,16 @@ ConstraintMatrix::merge (const ConstraintMatrix &other_constraints,
       tmp.clear ();
       for (size_type i=0; i<line->entries.size(); ++i)
         {
-          // if the present dof is not constrained, or if we won't take the
+          // if the present dof is not stored, or not constrained, or if we won't take the
           // constraint from the other object, then simply copy it over
-          if (other_constraints.is_constrained(line->entries[i].first) == false
+          if ((other_constraints.local_lines.size() != 0
+               && other_constraints.local_lines.is_element(line->entries[i].first) == false)
+              ||
+              other_constraints.is_constrained(line->entries[i].first) == false
               ||
               ((merge_conflict_behavior != right_object_wins)
-               &&
-               other_constraints.is_constrained(line->entries[i].first)
-               &&
-               this->is_constrained(line->entries[i].first)))
+               && other_constraints.is_constrained(line->entries[i].first)
+               && this->is_constrained(line->entries[i].first)))
             tmp.push_back(line->entries[i]);
           else
             // otherwise resolve further constraints by replacing the old
@@ -518,66 +535,92 @@ ConstraintMatrix::merge (const ConstraintMatrix &other_constraints,
             {
               const ConstraintLine::Entries *other_line
                 = other_constraints.get_constraint_entries (line->entries[i].first);
-              Assert (other_line != 0,
+              Assert (other_line != nullptr,
                       ExcInternalError());
 
               const double weight = line->entries[i].second;
 
               for (ConstraintLine::Entries::const_iterator j=other_line->begin();
                    j!=other_line->end(); ++j)
-                tmp.push_back (std::pair<size_type,double>(j->first,
-                                                           j->second*weight));
+                tmp.emplace_back(j->first, j->second*weight);
 
-              line->inhomogeneity += other_constraints.get_inhomogeneity(line->entries[i].first) *
-                                     weight;
+              line->inhomogeneity
+              += other_constraints.get_inhomogeneity(line->entries[i].first) *
+                 weight;
             }
         }
       // finally exchange old and newly resolved line
       line->entries.swap (tmp);
     }
 
+  if (local_lines.size() != 0)
+    local_lines.add_indices(other_constraints.local_lines);
 
+  {
+    // do not bother to resize the lines cache exactly since it is pretty
+    // cheap to adjust it along the way.
+    std::fill(lines_cache.begin(), lines_cache.end(), numbers::invalid_size_type);
 
-  // next action: append those lines at the end that we want to add
-  for (std::vector<ConstraintLine>::const_iterator
-       line=other_constraints.lines.begin();
-       line!=other_constraints.lines.end(); ++line)
-    if (is_constrained(line->line) == false)
-      lines.push_back (*line);
-    else
+    // reset lines_cache for our own constraints
+    size_type index = 0;
+    for (std::vector<ConstraintLine>::const_iterator line = lines.begin();
+         line != lines.end(); ++line)
       {
-        // the constrained dof we want to copy from the other object is
-        // also constrained here. let's see what we should do with that
-        switch (merge_conflict_behavior)
+        size_type local_line_no = calculate_line_index(line->index);
+        if (local_line_no >= lines_cache.size())
+          lines_cache.resize(local_line_no+1, numbers::invalid_size_type);
+        lines_cache[local_line_no] = index++;
+      }
+
+    // Add other_constraints to lines cache and our list of constraints
+    for (std::vector<ConstraintLine>::const_iterator line = other_constraints.lines.begin();
+         line != other_constraints.lines.end(); ++line)
+      {
+        const size_type local_line_no = calculate_line_index(line->index);
+        if (local_line_no >= lines_cache.size())
           {
-          case no_conflicts_allowed:
-            AssertThrow (false,
-                         ExcDoFIsConstrainedFromBothObjects (line->line));
-            break;
+            lines_cache.resize(local_line_no+1, numbers::invalid_size_type);
+            lines.push_back(*line);
+            lines_cache[local_line_no] = index++;
+          }
+        else if (lines_cache[local_line_no] == numbers::invalid_size_type)
+          {
+            // there are no constraints for that line yet
+            lines.push_back(*line);
+            AssertIndexRange(local_line_no, lines_cache.size());
+            lines_cache[local_line_no] = index++;
+          }
+        else
+          {
+            // we already store that line
+            switch (merge_conflict_behavior)
+              {
+              case no_conflicts_allowed:
+                AssertThrow (false,
+                             ExcDoFIsConstrainedFromBothObjects (line->index));
+                break;
 
-          case left_object_wins:
-            // ignore this constraint
-            break;
+              case left_object_wins:
+                // ignore this constraint
+                break;
 
-          case right_object_wins:
-            // we need to replace the existing constraint by the one from
-            // the other object
-            lines[lines_cache[calculate_line_index(line->line)]].entries
-              = line->entries;
-            lines[lines_cache[calculate_line_index(line->line)]].inhomogeneity
-              = line->inhomogeneity;
-            break;
+              case right_object_wins:
+                AssertIndexRange(local_line_no, lines_cache.size());
+                lines[lines_cache[local_line_no]] = *line;
+                break;
 
-          default:
-            Assert (false, ExcNotImplemented());
+              default:
+                Assert (false, ExcNotImplemented());
+              }
           }
       }
 
-  // update the lines cache
-  size_type counter = 0;
-  for (std::vector<ConstraintLine>::const_iterator line=lines.begin();
-       line!=lines.end(); ++line, ++counter)
-    lines_cache[calculate_line_index(line->line)] = counter;
+    // check that we set the pointers correctly
+    for (size_type i=0; i<lines_cache.size(); ++i)
+      if (lines_cache[i] != numbers::invalid_size_type)
+        Assert (i == calculate_line_index(lines[lines_cache[i]].index),
+                ExcInternalError());
+  }
 
   // if the object was sorted before, then make sure it is so afterward as
   // well. otherwise leave everything in the unsorted state
@@ -589,21 +632,35 @@ ConstraintMatrix::merge (const ConstraintMatrix &other_constraints,
 
 void ConstraintMatrix::shift (const size_type offset)
 {
-  //TODO: this doesn't work with IndexSets yet. [TH]
-  AssertThrow(local_lines.size()==0, ExcNotImplemented());
-
-  lines_cache.insert (lines_cache.begin(), offset,
-                      numbers::invalid_size_type);
+  if (local_lines.size() == 0)
+    lines_cache.insert (lines_cache.begin(), offset,
+                        numbers::invalid_size_type);
+  else
+    {
+      // shift local_lines
+      IndexSet new_local_lines(local_lines.size());
+      new_local_lines.add_indices(local_lines, offset);
+      std::swap(local_lines, new_local_lines);
+    }
 
   for (std::vector<ConstraintLine>::iterator i = lines.begin();
        i != lines.end(); ++i)
     {
-      i->line += offset;
+      i->index += offset;
       for (ConstraintLine::Entries::iterator
            j = i->entries.begin();
            j != i->entries.end(); ++j)
         j->first += offset;
     }
+
+#ifdef DEBUG
+  // make sure that lines, lines_cache and local_lines
+  // are still linked correctly
+  for (size_type i=0; i<lines_cache.size(); ++i)
+    Assert(lines_cache[i] == numbers::invalid_size_type ||
+           calculate_line_index(lines[lines_cache[i]].index) == i,
+           ExcInternalError());
+#endif
 }
 
 
@@ -653,7 +710,7 @@ void ConstraintMatrix::condense (SparsityPattern &sparsity) const
                                     numbers::invalid_size_type);
 
   for (size_type c=0; c<lines.size(); ++c)
-    distribute[lines[c].line] = c;
+    distribute[lines[c].index] = c;
 
   const size_type n_rows = sparsity.n_rows();
   for (size_type row=0; row<n_rows; ++row)
@@ -737,7 +794,7 @@ void ConstraintMatrix::condense (DynamicSparsityPattern &sparsity) const
                                     numbers::invalid_size_type);
 
   for (size_type c=0; c<lines.size(); ++c)
-    distribute[lines[c].line] = c;
+    distribute[lines[c].index] = c;
 
   const size_type n_rows = sparsity.n_rows();
   for (size_type row=0; row<n_rows; ++row)
@@ -837,7 +894,7 @@ void ConstraintMatrix::condense (BlockSparsityPattern &sparsity) const
                                      numbers::invalid_size_type);
 
   for (size_type c=0; c<lines.size(); ++c)
-    distribute[lines[c].line] = c;
+    distribute[lines[c].index] = c;
 
   const size_type n_rows = sparsity.n_rows();
   for (size_type row=0; row<n_rows; ++row)
@@ -948,7 +1005,7 @@ void ConstraintMatrix::condense (BlockDynamicSparsityPattern &sparsity) const
                                      numbers::invalid_size_type);
 
   for (size_type c=0; c<lines.size(); ++c)
-    distribute[lines[c].line] = static_cast<signed int>(c);
+    distribute[lines[c].index] = static_cast<signed int>(c);
 
   const size_type n_rows = sparsity.n_rows();
   for (size_type row=0; row<n_rows; ++row)
@@ -1044,7 +1101,7 @@ bool ConstraintMatrix::is_identity_constrained (const size_type index) const
     return false;
 
   const ConstraintLine &p = lines[lines_cache[calculate_line_index(index)]];
-  Assert (p.line == index, ExcInternalError());
+  Assert (p.index == index, ExcInternalError());
 
   // return if an entry for this line was found and if it has only one
   // entry equal to 1.0
@@ -1059,7 +1116,7 @@ bool ConstraintMatrix::are_identity_constrained (const size_type index1,
   if (is_constrained(index1) == true)
     {
       const ConstraintLine &p = lines[lines_cache[calculate_line_index(index1)]];
-      Assert (p.line == index1, ExcInternalError());
+      Assert (p.index == index1, ExcInternalError());
 
       // return if an entry for this line was found and if it has only one
       // entry equal to 1.0 and that one is index2
@@ -1070,7 +1127,7 @@ bool ConstraintMatrix::are_identity_constrained (const size_type index1,
   else if (is_constrained(index2) == true)
     {
       const ConstraintLine &p = lines[lines_cache[calculate_line_index(index2)]];
-      Assert (p.line == index2, ExcInternalError());
+      Assert (p.index == index2, ExcInternalError());
 
       // return if an entry for this line was found and if it has only one
       // entry equal to 1.0 and that one is index1
@@ -1119,13 +1176,13 @@ void ConstraintMatrix::print (std::ostream &out) const
       if (lines[i].entries.size() > 0)
         {
           for (size_type j=0; j<lines[i].entries.size(); ++j)
-            out << "    " << lines[i].line
+            out << "    " << lines[i].index
                 << " " << lines[i].entries[j].first
                 << ":  " << lines[i].entries[j].second << "\n";
 
           // print out inhomogeneity.
           if (lines[i].inhomogeneity != 0)
-            out << "    " << lines[i].line
+            out << "    " << lines[i].index
                 << ": " << lines[i].inhomogeneity << "\n";
         }
       else
@@ -1134,11 +1191,11 @@ void ConstraintMatrix::print (std::ostream &out) const
         // combination of other dofs
         {
           if (lines[i].inhomogeneity != 0)
-            out << "    " << lines[i].line
+            out << "    " << lines[i].index
                 << " = " << lines[i].inhomogeneity
                 << "\n";
           else
-            out << "    " << lines[i].line << " = 0\n";
+            out << "    " << lines[i].index << " = 0\n";
         }
     }
 
@@ -1157,12 +1214,12 @@ ConstraintMatrix::write_dot (std::ostream &out) const
       // same concept as in the previous function
       if (lines[i].entries.size() > 0)
         for (size_type j=0; j<lines[i].entries.size(); ++j)
-          out << "  " << lines[i].line << "->" << lines[i].entries[j].first
+          out << "  " << lines[i].index << "->" << lines[i].entries[j].first
               << "; // weight: "
               << lines[i].entries[j].second
               << "\n";
       else
-        out << "  " << lines[i].line << "\n";
+        out << "  " << lines[i].index << "\n";
     }
   out << "}" << std::endl;
 }
@@ -1190,7 +1247,7 @@ ConstraintMatrix::resolve_indices (std::vector<types::global_dof_index> &indices
       line_ptr = get_constraint_entries(indices[i]);
       // if the index is constraint, the constraints indices are added to the
       // indices vector
-      if (line_ptr!=NULL)
+      if (line_ptr!=nullptr)
         {
           const unsigned int line_size = line_ptr->size();
           for (unsigned int j=0; j<line_size; ++j)
@@ -1266,7 +1323,7 @@ PARALLEL_VECTOR_FUNCTIONS(TrilinosWrappers::MPI::BlockVector);
                                                       MatrixType                      &, \
                                                       VectorType                      &, \
                                                       bool                             , \
-                                                      internal::bool2type<false>) const
+                                                      std::integral_constant<bool, false>) const
 #define MATRIX_FUNCTIONS(MatrixType) \
   template void ConstraintMatrix:: \
   distribute_local_to_global<MatrixType,Vector<MatrixType::value_type> > (const FullMatrix<MatrixType::value_type>        &, \
@@ -1275,7 +1332,7 @@ PARALLEL_VECTOR_FUNCTIONS(TrilinosWrappers::MPI::BlockVector);
       MatrixType                      &, \
       Vector<MatrixType::value_type>                  &, \
       bool                             , \
-      internal::bool2type<false>) const
+      std::integral_constant<bool, false>) const
 #define BLOCK_MATRIX_VECTOR_FUNCTIONS(MatrixType, VectorType)   \
   template void ConstraintMatrix:: \
   distribute_local_to_global<MatrixType,VectorType > (const FullMatrix<MatrixType::value_type>        &, \
@@ -1284,7 +1341,7 @@ PARALLEL_VECTOR_FUNCTIONS(TrilinosWrappers::MPI::BlockVector);
                                                       MatrixType                      &, \
                                                       VectorType                      &, \
                                                       bool                             , \
-                                                      internal::bool2type<true>) const
+                                                      std::integral_constant<bool, true>) const
 #define BLOCK_MATRIX_FUNCTIONS(MatrixType)      \
   template void ConstraintMatrix:: \
   distribute_local_to_global<MatrixType,Vector<MatrixType::value_type> > (const FullMatrix<MatrixType::value_type>        &, \
@@ -1293,16 +1350,14 @@ PARALLEL_VECTOR_FUNCTIONS(TrilinosWrappers::MPI::BlockVector);
       MatrixType                      &, \
       Vector<MatrixType::value_type>                  &, \
       bool                             , \
-      internal::bool2type<true>) const
+      std::integral_constant<bool, true>) const
 
-MATRIX_FUNCTIONS(SparseMatrix<long double>);
 MATRIX_FUNCTIONS(SparseMatrix<double>);
 MATRIX_FUNCTIONS(SparseMatrix<float>);
 MATRIX_FUNCTIONS(FullMatrix<double>);
 MATRIX_FUNCTIONS(FullMatrix<float>);
 MATRIX_FUNCTIONS(FullMatrix<std::complex<double> >);
 MATRIX_FUNCTIONS(SparseMatrix<std::complex<double> >);
-MATRIX_FUNCTIONS(SparseMatrix<std::complex<long double> >);
 MATRIX_FUNCTIONS(SparseMatrix<std::complex<float> >);
 
 BLOCK_MATRIX_FUNCTIONS(BlockSparseMatrix<double>);
@@ -1320,20 +1375,15 @@ MATRIX_FUNCTIONS(ChunkSparseMatrix<float>);
 
 #ifdef DEAL_II_WITH_PETSC
 MATRIX_FUNCTIONS(PETScWrappers::SparseMatrix);
-BLOCK_MATRIX_FUNCTIONS(PETScWrappers::BlockSparseMatrix);
 MATRIX_FUNCTIONS(PETScWrappers::MPI::SparseMatrix);
 BLOCK_MATRIX_FUNCTIONS(PETScWrappers::MPI::BlockSparseMatrix);
-MATRIX_VECTOR_FUNCTIONS(PETScWrappers::SparseMatrix, PETScWrappers::Vector);
-BLOCK_MATRIX_VECTOR_FUNCTIONS(PETScWrappers::BlockSparseMatrix, PETScWrappers::BlockVector);
 MATRIX_VECTOR_FUNCTIONS(PETScWrappers::MPI::SparseMatrix, PETScWrappers::MPI::Vector);
-BLOCK_MATRIX_VECTOR_FUNCTIONS(PETScWrappers::MPI::BlockSparseMatrix ,PETScWrappers::MPI::BlockVector);
+BLOCK_MATRIX_VECTOR_FUNCTIONS(PETScWrappers::MPI::BlockSparseMatrix,PETScWrappers::MPI::BlockVector);
 #endif
 
 #ifdef DEAL_II_WITH_TRILINOS
 MATRIX_FUNCTIONS(TrilinosWrappers::SparseMatrix);
 BLOCK_MATRIX_FUNCTIONS(TrilinosWrappers::BlockSparseMatrix);
-MATRIX_VECTOR_FUNCTIONS(TrilinosWrappers::SparseMatrix, TrilinosWrappers::Vector);
-BLOCK_MATRIX_VECTOR_FUNCTIONS(TrilinosWrappers::BlockSparseMatrix, TrilinosWrappers::BlockVector);
 MATRIX_VECTOR_FUNCTIONS(TrilinosWrappers::SparseMatrix, TrilinosWrappers::MPI::Vector);
 BLOCK_MATRIX_VECTOR_FUNCTIONS(TrilinosWrappers::BlockSparseMatrix, TrilinosWrappers::MPI::BlockVector);
 #endif
@@ -1345,7 +1395,7 @@ BLOCK_MATRIX_VECTOR_FUNCTIONS(TrilinosWrappers::BlockSparseMatrix, TrilinosWrapp
       SparsityPatternType &,                                                         \
       const bool,                                                                    \
       const Table<2,bool> &,                                                         \
-      internal::bool2type<false>) const;                                             \
+      std::integral_constant<bool, false>) const;                                             \
   template void ConstraintMatrix::add_entries_local_to_global<SparsityPatternType> ( \
       const std::vector<ConstraintMatrix::size_type> &,                              \
       const std::vector<ConstraintMatrix::size_type> &,                              \
@@ -1358,7 +1408,7 @@ BLOCK_MATRIX_VECTOR_FUNCTIONS(TrilinosWrappers::BlockSparseMatrix, TrilinosWrapp
       SparsityPatternType &,                                                         \
       const bool,                                                                    \
       const Table<2,bool> &,                                                         \
-      internal::bool2type<true>) const;                                              \
+      std::integral_constant<bool, true>) const;                                              \
   template void ConstraintMatrix::add_entries_local_to_global<SparsityPatternType> ( \
       const std::vector<ConstraintMatrix::size_type> &,                              \
       const std::vector<ConstraintMatrix::size_type> &,                              \
@@ -1377,11 +1427,17 @@ BLOCK_SPARSITY_FUNCTIONS(TrilinosWrappers::BlockSparsityPattern);
 #endif
 
 
-#define ONLY_MATRIX_FUNCTIONS(MatrixType) \
-  template void ConstraintMatrix::distribute_local_to_global<MatrixType > (\
-      const FullMatrix<MatrixType::value_type>        &, \
-      const std::vector<ConstraintMatrix::size_type> &, \
-      const std::vector<ConstraintMatrix::size_type> &, \
+#define ONLY_MATRIX_FUNCTIONS(MatrixType)                                   \
+  template void ConstraintMatrix::distribute_local_to_global<MatrixType > ( \
+      const FullMatrix<MatrixType::value_type>        &,                    \
+      const std::vector<ConstraintMatrix::size_type> &,                     \
+      const std::vector<ConstraintMatrix::size_type> &,                     \
+      MatrixType                      &) const;                             \
+  template void ConstraintMatrix::distribute_local_to_global<MatrixType > ( \
+      const FullMatrix<MatrixType::value_type>        &,                      \
+      const std::vector<ConstraintMatrix::size_type> &,                       \
+      const ConstraintMatrix &,                                               \
+      const std::vector<ConstraintMatrix::size_type> &,                       \
       MatrixType                      &) const
 
 ONLY_MATRIX_FUNCTIONS(FullMatrix<float>);
@@ -1400,7 +1456,6 @@ ONLY_MATRIX_FUNCTIONS(TrilinosWrappers::BlockSparseMatrix);
 
 #ifdef DEAL_II_WITH_PETSC
 ONLY_MATRIX_FUNCTIONS(PETScWrappers::SparseMatrix);
-ONLY_MATRIX_FUNCTIONS(PETScWrappers::BlockSparseMatrix);
 ONLY_MATRIX_FUNCTIONS(PETScWrappers::MPI::SparseMatrix);
 ONLY_MATRIX_FUNCTIONS(PETScWrappers::MPI::BlockSparseMatrix);
 #endif
@@ -1415,15 +1470,13 @@ namespace internals
 {
 #define SCRATCH_INITIALIZER(Number,Name)                                \
   ConstraintMatrixData<Number>::ScratchData scratch_data_initializer_##Name; \
-  template<> Threads::ThreadLocalStorage<ConstraintMatrixData<Number>::ScratchData> \
+  template <> Threads::ThreadLocalStorage<ConstraintMatrixData<Number>::ScratchData> \
   ConstraintMatrixData<Number>::scratch_data(scratch_data_initializer_##Name)
 
   SCRATCH_INITIALIZER(double,double);
   SCRATCH_INITIALIZER(float,float);
-  SCRATCH_INITIALIZER(long double,ldouble);
   SCRATCH_INITIALIZER(std::complex<double>,cdouble);
   SCRATCH_INITIALIZER(std::complex<float>,cfloat);
-  SCRATCH_INITIALIZER(std::complex<long double>,cldouble);
 #undef SCRATCH_INITIALIZER
 }
 

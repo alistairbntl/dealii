@@ -19,12 +19,7 @@
 
 
 #include "../tests.h"
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <cstdlib>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/table.h>
 
 
@@ -35,7 +30,6 @@ main ()
   deallog << std::fixed;
   deallog << std::setprecision(0);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // rank=1
   {

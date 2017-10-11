@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__precondition_selector_h
-#define dealii__precondition_selector_h
+#ifndef dealii_precondition_selector_h
+#define dealii_precondition_selector_h
 
 
 #include <deal.II/base/config.h>
@@ -119,13 +119,13 @@ public:
   void use_matrix(const MatrixType &M);
 
   /**
-   * Return the dimension of the codomain (or range) space. To remember: the
+   * Return the dimension of the codomain (or range) space. Note that the
    * matrix is of dimension $m \times n$.
    */
   size_type m () const;
 
   /**
-   * Return the dimension of the domain space. To remember: the matrix is of
+   * Return the dimension of the domain space. Note that the matrix is of
    * dimension $m \times n$.
    */
   size_type n () const;
@@ -143,7 +143,14 @@ public:
   virtual void Tvmult (VectorType &dst, const VectorType &src) const;
 
   /**
-   * Get the names of all implemented preconditionings.
+   * Get the names of all implemented preconditionings. The list of possible
+   * options includes:
+   * <ul>
+   * <li>  "none" </li>
+   * <li>  "jacobi" </li>
+   * <li>  "sor" </li>
+   * <li>  "ssor" </li>
+   * </ul>
    */
   static std::string get_precondition_names();
 
@@ -195,7 +202,7 @@ template <typename MatrixType, typename VectorType>
 PreconditionSelector<MatrixType,VectorType>::~PreconditionSelector()
 {
   // release the matrix A
-  A=0;
+  A=nullptr;
 }
 
 
@@ -210,7 +217,7 @@ template <typename MatrixType, typename VectorType>
 inline typename PreconditionSelector<MatrixType,VectorType>::size_type
 PreconditionSelector<MatrixType,VectorType>::m () const
 {
-  Assert(A!=0, ExcNoMatrixGivenToUse());
+  Assert(A!=nullptr, ExcNoMatrixGivenToUse());
   return A->m();
 }
 
@@ -219,7 +226,7 @@ template <typename MatrixType, typename VectorType>
 inline typename PreconditionSelector<MatrixType,VectorType>::size_type
 PreconditionSelector<MatrixType,VectorType>::n () const
 {
-  Assert(A!=0, ExcNoMatrixGivenToUse());
+  Assert(A!=nullptr, ExcNoMatrixGivenToUse());
   return A->n();
 }
 
@@ -235,7 +242,7 @@ void PreconditionSelector<MatrixType,VectorType>::vmult (VectorType &dst,
     }
   else
     {
-      Assert(A!=0, ExcNoMatrixGivenToUse());
+      Assert(A!=nullptr, ExcNoMatrixGivenToUse());
 
       if (preconditioning=="jacobi")
         {
@@ -265,7 +272,7 @@ void PreconditionSelector<MatrixType,VectorType>::Tvmult (VectorType &dst,
     }
   else
     {
-      Assert(A!=0, ExcNoMatrixGivenToUse());
+      Assert(A!=nullptr, ExcNoMatrixGivenToUse());
 
       if (preconditioning=="jacobi")
         {

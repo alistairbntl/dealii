@@ -21,11 +21,7 @@
 
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor_product_polynomials.h>
 #include <deal.II/base/polynomial_space.h>
 
@@ -33,7 +29,7 @@
 using namespace Polynomials;
 
 
-template<int dim, class PolynomialType>
+template <int dim, class PolynomialType>
 void check_poly(const Point<dim>     &x,
                 const PolynomialType &p)
 {
@@ -173,7 +169,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("Lagrange");
   std::vector<Polynomial<double> > p;

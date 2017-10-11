@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2016 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,13 +13,14 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__signaling_nan_h
-#define dealii__signaling_nan_h
+#ifndef dealii_signaling_nan_h
+#define dealii_signaling_nan_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/symmetric_tensor.h>
 #include <deal.II/base/derivative_form.h>
+#include <deal.II/base/point.h>
 
 #include <limits>
 
@@ -117,6 +118,27 @@ namespace numbers
             nan_tensor[i] = NaNInitializer<Tensor<rank-1,dim,T> >::invalid_element();
 
           return nan_tensor;
+        }
+      };
+
+
+
+      /**
+       * A specialization of the general NaNInitializer class that provides a
+       * function that returns a Tensor<rank,dim> value whose components are
+       * invalid signaling NaN values.
+       */
+      template <int dim, typename T>
+      struct NaNInitializer<Point<dim,T> >
+      {
+        static Point<dim,T> invalid_element ()
+        {
+          Point<dim,T> nan_point;
+
+          for (unsigned int i=0; i<dim; ++i)
+            nan_point[i] = NaNInitializer<T>::invalid_element();
+
+          return nan_point;
         }
       };
 

@@ -13,12 +13,11 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mg_transfer_component_h
-#define dealii__mg_transfer_component_h
+#ifndef dealii_mg_transfer_component_h
+#define dealii_mg_transfer_component_h
 
 #include <deal.II/base/config.h>
 
-#include <deal.II/base/std_cxx11/shared_ptr.h>
 #include <deal.II/lac/block_vector.h>
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/lac/sparsity_pattern.h>
@@ -29,6 +28,8 @@
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/fe/component_mask.h>
 #include <deal.II/multigrid/mg_base.h>
+
+#include <memory>
 
 
 
@@ -126,7 +127,7 @@ protected:
   DeclException0(ExcMatricesNotBuilt);
 
 private:
-  std::vector<std_cxx11::shared_ptr<BlockSparsityPattern> >   prolongation_sparsities;
+  std::vector<std::shared_ptr<BlockSparsityPattern> >   prolongation_sparsities;
 
 protected:
 
@@ -135,7 +136,7 @@ protected:
    * of the mother cell, i.e. the coarse level. while row indices belong to
    * the child cell, i.e. the fine level.
    */
-  std::vector<std_cxx11::shared_ptr<BlockSparseMatrix<double> > > prolongation_matrices;
+  std::vector<std::shared_ptr<BlockSparseMatrix<double> > > prolongation_matrices;
 
   /**
    * Holds the mapping for the <tt>copy_to/from_mg</tt>-functions. The data is
@@ -185,7 +186,7 @@ public:
   /**
    * Destructor.
    */
-  virtual ~MGTransferSelect ();
+  virtual ~MGTransferSelect () = default;
 
 //TODO: rewrite docs; make sure defaulted args are actually allowed
   /**
@@ -241,7 +242,10 @@ public:
                                  const Vector<number> &src) const;
 
   /**
-   * Transfer from a vector on the global grid to a multilevel vector.
+   * Transfer from a vector on the global grid to a multilevel vector for the
+   * active degrees of freedom. In particular, for a globally refined mesh only
+   * the finest level in @p dst is filled as a plain copy of @p src. All the
+   * other level objects are left untouched.
    */
   template <int dim, typename number2, int spacedim>
   void
@@ -273,7 +277,10 @@ public:
                     const MGLevelObject<Vector<number> > &src) const;
 
   /**
-   * Transfer from a vector on the global grid to multilevel vectors.
+   * Transfer from a vector on the global grid to a multilevel vector for the
+   * active degrees of freedom. In particular, for a globally refined mesh only
+   * the finest level in @p dst is filled as a plain copy of @p src. All the
+   * other level objects are left untouched.
    */
   template <int dim, typename number2, int spacedim>
   void

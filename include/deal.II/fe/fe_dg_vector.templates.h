@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2016 by the deal.II authors
+// Copyright (C) 2006 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,10 +13,16 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_fe_dg_vector_templates_h
+#define dealii_fe_dg_vector_templates_h
+
 
 #include <deal.II/fe/fe_dg_vector.h>
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/base/quadrature_lib.h>
+
+#include <deal.II/base/std_cxx14/memory.h>
+
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -48,10 +54,10 @@ FE_DGVector<PolynomialType,dim,spacedim>::FE_DGVector (
 
 
 template <class PolynomialType, int dim, int spacedim>
-FiniteElement<dim, spacedim> *
+std::unique_ptr<FiniteElement<dim,spacedim> >
 FE_DGVector<PolynomialType,dim,spacedim>::clone() const
 {
-  return new FE_DGVector<PolynomialType, dim, spacedim>(*this);
+  return std_cxx14::make_unique<FE_DGVector<PolynomialType, dim, spacedim>>(*this);
 }
 
 
@@ -87,35 +93,6 @@ FE_DGVector<PolynomialType,dim,spacedim>::has_support_on_face
 }
 
 
-template <class PolynomialType, int dim, int spacedim>
-void
-FE_DGVector<PolynomialType,dim,spacedim>::interpolate
-(std::vector<double> &,
- const std::vector<double> &) const
-{
-  Assert(false, ExcNotImplemented());
-}
-
-
-template <class PolynomialType, int dim, int spacedim>
-void
-FE_DGVector<PolynomialType,dim,spacedim>::interpolate
-(std::vector<double> & /*local_dofs*/,
- const std::vector<Vector<double> > & /*values*/,
- unsigned int /*offset*/) const
-{
-  Assert(false, ExcNotImplemented());
-}
-
-template <class PolynomialType, int dim, int spacedim>
-void
-FE_DGVector<PolynomialType,dim,spacedim>::interpolate
-(std::vector<double> & /*local_dofs*/,
- const VectorSlice<const std::vector<std::vector<double> > > & /*values*/) const
-{
-  Assert(false, ExcNotImplemented());
-}
-
 
 template <class PolynomialType, int dim, int spacedim>
 std::size_t
@@ -126,3 +103,5 @@ FE_DGVector<PolynomialType,dim,spacedim>::memory_consumption() const
 }
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

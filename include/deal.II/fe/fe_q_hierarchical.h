@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2002 - 2015 by the deal.II authors
+// Copyright (C) 2002 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_q_hierarchical_h
-#define dealii__fe_q_hierarchical_h
+#ifndef dealii_fe_q_hierarchical_h
+#define dealii_fe_q_hierarchical_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/tensor_product_polynomials.h>
@@ -553,6 +553,10 @@ public:
    */
   virtual std::string get_name () const;
 
+  virtual
+  std::unique_ptr<FiniteElement<dim,dim> >
+  clone() const;
+
   /**
    * This function returns @p true, if the shape function @p shape_index has
    * non-zero function values somewhere on the face @p face_index.
@@ -655,8 +659,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -681,45 +685,12 @@ public:
   std::vector<unsigned int> get_embedding_dofs (const unsigned int sub_degree) const;
 
   /**
-   * Returns a list of constant modes of the element. For this element, the
+   * Return a list of constant modes of the element. For this element, the
    * list consists of true arguments for the first vertex shape functions and
    * false for the remaining ones.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
   get_constant_modes () const;
-
-  /**
-   * This function is not implemented and throws an exception if called.
-   */
-  virtual
-  void interpolate(std::vector<double>       &local_dofs,
-                   const std::vector<double> &values) const;
-
-  /**
-   * This function is not implemented and throws an exception if called.
-   */
-  virtual
-  void
-  interpolate(std::vector<double>                &local_dofs,
-              const std::vector<Vector<double> > &values,
-              unsigned int offset = 0) const;
-
-  /**
-   * This function is not implemented and throws an exception if called.
-   */
-  virtual
-  void
-  interpolate(std::vector<double> &local_dofs,
-              const VectorSlice<const std::vector<std::vector<double> > > &values) const;
-
-
-protected:
-  /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim> *clone() const;
 
 private:
 
@@ -789,16 +760,16 @@ private:
                                              const std::vector<FullMatrix<double> > &dofs_subcell);
 
   /**
-   * Initialize the @p unit_support_points field of the FiniteElement class.
+   * Initialize the @p generalized_support_points field of the FiniteElement class.
    * Called from the constructor.
    */
-  void initialize_unit_support_points ();
+  void initialize_generalized_support_points ();
 
   /**
-   * Initialize the @p unit_face_support_points field of the FiniteElement
+   * Initialize the @p generalized_face_support_points field of the FiniteElement
    * class. Called from the constructor.
    */
-  void initialize_unit_face_support_points ();
+  void initialize_generalized_face_support_points ();
 
   /**
    * Mapping from lexicographic to shape function numbering on first face.
@@ -819,7 +790,7 @@ private:
 /* -------------- declaration of explicit specializations ------------- */
 
 template <>
-void FE_Q_Hierarchical<1>::initialize_unit_face_support_points ();
+void FE_Q_Hierarchical<1>::initialize_generalized_face_support_points ();
 
 template <>
 bool

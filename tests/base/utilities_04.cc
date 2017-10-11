@@ -17,10 +17,6 @@
 // test functions in namespace Utilities
 
 #include "../tests.h"
-#include <iomanip>
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 #include <sstream>
 
 #include <deal.II/base/utilities.h>
@@ -86,9 +82,7 @@ void test ()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   test ();
 }

@@ -13,15 +13,15 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__function_time_templates_h
-#define dealii__function_time_templates_h
+#ifndef dealii_function_time_templates_h
+#define dealii_function_time_templates_h
 
 #include <deal.II/base/function_time.h>
 
 DEAL_II_NAMESPACE_OPEN
 
 
-template<typename Number>
+template <typename Number>
 FunctionTime<Number>::FunctionTime(const Number initial_time)
   :
   time(initial_time)
@@ -29,13 +29,7 @@ FunctionTime<Number>::FunctionTime(const Number initial_time)
 
 
 
-template<typename Number>
-FunctionTime<Number>::~FunctionTime()
-{}
-
-
-
-template<typename Number>
+template <typename Number>
 void
 FunctionTime<Number>::set_time (const Number new_time)
 {
@@ -43,7 +37,7 @@ FunctionTime<Number>::set_time (const Number new_time)
 }
 
 
-template<typename Number>
+template <typename Number>
 void
 FunctionTime<Number>::advance_time (const Number delta_t)
 {
@@ -53,4 +47,4 @@ FunctionTime<Number>::advance_time (const Number delta_t)
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif /* dealii__function_time_templates_h */
+#endif /* dealii_function_time_templates_h */

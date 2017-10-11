@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2014 - 2015 by the deal.II authors
+// Copyright (C) 2014 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__occ_utilities_h
-#define dealii__occ_utilities_h
+#ifndef dealii_occ_utilities_h
+#define dealii_occ_utilities_h
 
 #include <deal.II/base/config.h>
 
@@ -27,6 +27,7 @@
 #include <string>
 
 // opencascade needs "HAVE_CONFIG_H" to be exported...
+DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #define HAVE_CONFIG_H
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Face.hxx>
@@ -40,6 +41,7 @@
 #include <IFSelect_ReturnStatus.hxx>
 #include <gp_Pnt.hxx>
 #undef HAVE_CONFIG_H
+DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 
 
@@ -100,7 +102,7 @@ namespace OpenCASCADE
    * associated with actual geometries) which are contained in the given
    * shape.
    */
-  std_cxx11::tuple<unsigned int, unsigned int, unsigned int>
+  std::tuple<unsigned int, unsigned int, unsigned int>
   count_elements(const TopoDS_Shape &shape);
 
   /**
@@ -243,7 +245,7 @@ namespace OpenCASCADE
    * the u coordinate and the v coordinate (which is different from zero only
    * if the resulting shape is a face).
    */
-  std_cxx11::tuple<Point<3>, TopoDS_Shape, double, double>
+  std::tuple<Point<3>, TopoDS_Shape, double, double>
   project_point_and_pull_back(const TopoDS_Shape &in_shape,
                               const Point<3> &origin,
                               const double tolerance=1e-7);
@@ -276,7 +278,7 @@ namespace OpenCASCADE
    * face, returns the corresponding point in real space, the normal to the
    * surface at that point and the min and max curvatures as a tuple.
    */
-  std_cxx11::tuple<Point<3>,  Tensor<1,3>, double, double>
+  std::tuple<Point<3>,  Tensor<1,3>, double, double>
   push_forward_and_differential_forms(const TopoDS_Face &face,
                                       const double u,
                                       const double v,
@@ -290,7 +292,7 @@ namespace OpenCASCADE
    * and only the closest point is returned. This function will throw an
    * exception if the @p in_shape does not contain at least one face.
    */
-  std_cxx11::tuple<Point<3>,  Tensor<1,3>, double, double>
+  std::tuple<Point<3>,  Tensor<1,3>, double, double>
   closest_point_and_differential_forms(const TopoDS_Shape &in_shape,
                                        const Point<3> &origin,
                                        const double tolerance=1e-7);
@@ -327,9 +329,10 @@ namespace OpenCASCADE
    * optional parameter is used as a relative tolerance when comparing
    * objects.
    */
-  bool point_compare(const Point<3> &p1, const Point<3> &p2,
-                     const Tensor<1,3> &direction=Tensor<1,3>(),
-                     const double tolerance=1e-10);
+  bool point_compare(const Point<3>    &p1,
+                     const Point<3>    &p2,
+                     const Tensor<1,3> &direction = Tensor<1,3>(),
+                     const double       tolerance = 1e-10);
 
 
   /**

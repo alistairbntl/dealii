@@ -15,11 +15,8 @@
 
 #include "../tests.h"
 #include <deal.II/base/vector_slice.h>
-#include <deal.II/base/logstream.h>
 
 #include <vector>
-#include <fstream>
-#include <iomanip>
 
 void f(const std::vector<int> &v)
 {
@@ -36,9 +33,7 @@ int main()
 {
   deal_II_exceptions::disable_abort_on_exception();
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   std::vector<int> v(7);
 

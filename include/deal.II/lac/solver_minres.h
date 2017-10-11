@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__solver_minres_h
-#define dealii__solver_minres_h
+#ifndef dealii_solver_minres_h
+#define dealii_solver_minres_h
 
 
 #include <deal.II/base/config.h>
@@ -23,6 +23,7 @@
 #include <deal.II/base/logstream.h>
 #include <cmath>
 #include <deal.II/base/subscriptor.h>
+#include <deal.II/base/signaling_nan.h>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -93,17 +94,17 @@ public:
   /**
    * Virtual destructor.
    */
-  virtual ~SolverMinRes ();
+  virtual ~SolverMinRes () = default;
 
   /**
    * Solve the linear system $Ax=b$ for x.
    */
-  template<typename MatrixType, typename PreconditionerType>
+  template <typename MatrixType, typename PreconditionerType>
   void
   solve (const MatrixType         &A,
          VectorType               &x,
          const VectorType         &b,
-         const PreconditionerType &precondition);
+         const PreconditionerType &preconditioner);
 
   /**
    * @addtogroup Exceptions
@@ -121,23 +122,16 @@ protected:
    * Implementation of the computation of the norm of the residual.
    */
   virtual double criterion();
+
   /**
    * Interface for derived class. This function gets the current iteration
    * vector, the residual and the update vector in each step. It can be used
-   * for a graphical output of the convergence history.
+   * for graphical output of the convergence history.
    */
   virtual void print_vectors(const unsigned int step,
                              const VectorType   &x,
                              const VectorType   &r,
                              const VectorType   &d) const;
-
-  /**
-   * Temporary vectors, allocated through the @p VectorMemory object at the
-   * start of the actual solution process and deallocated at the end.
-   */
-  VectorType *Vu0, *Vu1, *Vu2;
-  VectorType *Vm0, *Vm1, *Vm2;
-  VectorType *Vv;
 
   /**
    * Within the iteration loop, the square of the residual vector is stored in
@@ -153,7 +147,7 @@ protected:
 
 #ifndef DOXYGEN
 
-template<class VectorType>
+template <class VectorType>
 SolverMinRes<VectorType>::SolverMinRes (SolverControl            &cn,
                                         VectorMemory<VectorType> &mem,
                                         const AdditionalData &)
@@ -163,21 +157,17 @@ SolverMinRes<VectorType>::SolverMinRes (SolverControl            &cn,
 
 
 
-template<class VectorType>
+template <class VectorType>
 SolverMinRes<VectorType>::SolverMinRes (SolverControl        &cn,
                                         const AdditionalData &)
   :
-  Solver<VectorType>(cn)
-{}
-
-
-template<class VectorType>
-SolverMinRes<VectorType>::~SolverMinRes ()
+  Solver<VectorType>(cn),
+  res2(numbers::signaling_nan<double>())
 {}
 
 
 
-template<class VectorType>
+template <class VectorType>
 double
 SolverMinRes<VectorType>::criterion()
 {
@@ -185,7 +175,7 @@ SolverMinRes<VectorType>::criterion()
 }
 
 
-template<class VectorType>
+template <class VectorType>
 void
 SolverMinRes<VectorType>::print_vectors(const unsigned int,
                                         const VectorType &,
@@ -195,33 +185,34 @@ SolverMinRes<VectorType>::print_vectors(const unsigned int,
 
 
 
-template<class VectorType>
-template<typename MatrixType, typename PreconditionerType>
+template <class VectorType>
+template <typename MatrixType, typename PreconditionerType>
 void
 SolverMinRes<VectorType>::solve (const MatrixType         &A,
                                  VectorType               &x,
                                  const VectorType         &b,
-                                 const PreconditionerType &precondition)
+                                 const PreconditionerType &preconditioner)
 {
-  SolverControl::State conv=SolverControl::iterate;
-
-  deallog.push("minres");
+  LogStream::Prefix prefix("minres");
 
   // Memory allocation
-  Vu0  = this->memory.alloc();
-  Vu1  = this->memory.alloc();
-  Vu2  = this->memory.alloc();
-  Vv   = this->memory.alloc();
-  Vm0  = this->memory.alloc();
-  Vm1  = this->memory.alloc();
-  Vm2  = this->memory.alloc();
+  typename VectorMemory<VectorType>::Pointer Vu0 (this->memory);
+  typename VectorMemory<VectorType>::Pointer Vu1 (this->memory);
+  typename VectorMemory<VectorType>::Pointer Vu2 (this->memory);
+
+  typename VectorMemory<VectorType>::Pointer Vm0 (this->memory);
+  typename VectorMemory<VectorType>::Pointer Vm1 (this->memory);
+  typename VectorMemory<VectorType>::Pointer Vm2 (this->memory);
+
+  typename VectorMemory<VectorType>::Pointer Vv (this->memory);
+
   // define some aliases for simpler access
   typedef VectorType *vecptr;
-  vecptr u[3] = {Vu0, Vu1, Vu2};
-  vecptr m[3] = {Vm0, Vm1, Vm2};
+  vecptr u[3] = {Vu0.get(), Vu1.get(), Vu2.get()};
+  vecptr m[3] = {Vm0.get(), Vm1.get(), Vm2.get()};
   VectorType &v   = *Vv;
-  // resize the vectors, but do not set
-  // the values since they'd be overwritten
+
+  // resize the vectors, but do not set the values since they'd be overwritten
   // soon anyway.
   u[0]->reinit(b,true);
   u[1]->reinit(b,true);
@@ -238,12 +229,10 @@ SolverMinRes<VectorType>::solve (const MatrixType         &A,
 
   double r_l2 = 0;
   double r0   = 0;
-  double tau = 0;
+  double tau  = 0;
   double c    = 0;
-  double gamma = 0;
-  double s = 0;
-  double d_ = 0;
-  double d = 0;
+  double s    = 0;
+  double d_   = 0;
 
   // The iteration step.
   unsigned int j = 1;
@@ -258,7 +247,7 @@ SolverMinRes<VectorType>::solve (const MatrixType         &A,
   // positive definite and symmetric
 
   // M v = u[1]
-  precondition.vmult (v,*u[1]);
+  preconditioner.vmult (v,*u[1]);
 
   delta[1] = v * (*u[1]);
   // Preconditioner positive
@@ -274,8 +263,7 @@ SolverMinRes<VectorType>::solve (const MatrixType         &A,
   m[1]->reinit(b);
   m[2]->reinit(b);
 
-  conv = this->iteration_status(0, r_l2, x);
-
+  SolverControl::State conv = this->iteration_status(0, r_l2, x);
   while (conv==SolverControl::iterate)
     {
       if (delta[1]!=0)
@@ -286,14 +274,14 @@ SolverMinRes<VectorType>::solve (const MatrixType         &A,
       A.vmult(*u[2],v);
       u[2]->add (-std::sqrt(delta[1]/delta[0]), *u[0]);
 
-      gamma = *u[2] * v;
+      const double gamma = *u[2] * v;
       u[2]->add (-gamma / std::sqrt(delta[1]), *u[1]);
       *m[0] = v;
 
       // precondition: solve M v = u[2]
       // Preconditioner has to be positive
       // definite and symmetric.
-      precondition.vmult(v,*u[2]);
+      preconditioner.vmult(v,*u[2]);
 
       delta[2] = v * (*u[2]);
 
@@ -312,7 +300,7 @@ SolverMinRes<VectorType>::solve (const MatrixType         &A,
           e[1] = -c * std::sqrt(delta[2]);
         }
 
-      d = std::sqrt (d_*d_ + delta[2]);
+      const double d = std::sqrt (d_*d_ + delta[2]);
 
       if (j>1)
         tau *= s / c;
@@ -361,17 +349,6 @@ SolverMinRes<VectorType>::solve (const MatrixType         &A,
       delta[0] = delta[1];
       delta[1] = delta[2];
     }
-
-  // Deallocation of Memory
-  this->memory.free(Vu0);
-  this->memory.free(Vu1);
-  this->memory.free(Vu2);
-  this->memory.free(Vv);
-  this->memory.free(Vm0);
-  this->memory.free(Vm1);
-  this->memory.free(Vm2);
-  // Output
-  deallog.pop ();
 
   // in case of failure: throw exception
   AssertThrow(conv == SolverControl::success,

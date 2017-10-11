@@ -17,9 +17,7 @@
 
 #include "../tests.h"
 #include <deal.II/algorithms/any_data.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
 
 double d1 = 17.;
 
@@ -64,12 +62,12 @@ void extract(const AnyData &data)
 
   deallog << *data.try_read<double>(" d  17.") << std::endl;
 
-  if (data.try_read<char *>(" d  17.") == 0)
+  if (data.try_read<char *>(" d  17.") == nullptr)
     deallog << "(nil)" << std::endl;
   else
     AssertThrow (false, ExcInternalError());
 
-  if (data.try_read<double>("does not exist") == 0)
+  if (data.try_read<double>("does not exist") == nullptr)
     deallog << "(nil)" << std::endl;
   else
     AssertThrow (false, ExcInternalError());
@@ -94,8 +92,7 @@ int main()
 {
   deal_II_exceptions::disable_abort_on_exception();
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   AnyData data;
   fill(data);

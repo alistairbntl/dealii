@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,7 +17,6 @@
 // check mg constrained dofs in parallel (different mesh than 01)
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
@@ -35,9 +34,6 @@
 #include <deal.II/multigrid/mg_tools.h>
 #include <deal.II/multigrid/mg_constrained_dofs.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -119,11 +115,11 @@ void check_fe(FiniteElement<dim> &fe)
   deallog << fe.get_name() << std::endl;
 
   parallel::distributed::Triangulation<dim> tr(MPI_COMM_WORLD,
-                                               Triangulation<dim>::none,
+                                               Triangulation<dim>::limit_level_difference_at_vertices,
                                                parallel::distributed::Triangulation<dim>::construct_multigrid_hierarchy);
   setup_tria(tr);
 
-  ZeroFunction<dim> zero;
+  Functions::ZeroFunction<dim> zero;
   typename FunctionMap<dim>::type fmap;
   fmap.insert(std::make_pair(0, &zero));
 
@@ -135,7 +131,7 @@ void check_fe(FiniteElement<dim> &fe)
   {
     // reorder
     parallel::distributed::Triangulation<dim> tr(MPI_COMM_SELF,
-                                                 Triangulation<dim>::none,
+                                                 Triangulation<dim>::limit_level_difference_at_vertices,
                                                  parallel::distributed::Triangulation<dim>::construct_multigrid_hierarchy);
     setup_tria(tr);
 
@@ -169,7 +165,7 @@ void check_fe(FiniteElement<dim> &fe)
       }
 
     typename FunctionMap<dim>::type      dirichlet_boundary;
-    ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
+    Functions::ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
     dirichlet_boundary[0] = &homogeneous_dirichlet_bc;
     mg_constrained_dofs_ref.initialize(dofhref, dirichlet_boundary);
   }
@@ -179,7 +175,7 @@ void check_fe(FiniteElement<dim> &fe)
   MGConstrainedDoFs                    mg_constrained_dofs;
 
   typename FunctionMap<dim>::type      dirichlet_boundary;
-  ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
+  Functions::ZeroFunction<dim>                    homogeneous_dirichlet_bc (1);
   dirichlet_boundary[0] = &homogeneous_dirichlet_bc;
   mg_constrained_dofs.initialize(dofh, dirichlet_boundary);
 

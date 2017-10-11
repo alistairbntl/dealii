@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,13 +20,10 @@
 
 #include "../tests.h"
 
-#include <deal.II/base/logstream.h>
-#include <fstream>
 std::ofstream logfile("step-15/output");
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/full_matrix.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -51,7 +48,6 @@ std::ofstream logfile("step-15/output");
 
 #include <deal.II/numerics/solution_transfer.h>
 
-#include <fstream>
 #include <iostream>
 #include <sstream>
 
@@ -192,7 +188,7 @@ void MinimizationProblem<dim>::assemble_step ()
   hp::QCollection<dim>  quadrature_formula(QGauss<dim>(4));
   hp::FEValues<dim> fe_values (fe, quadrature_formula,
                                update_values   | update_gradients |
-                               update_q_points | update_JxW_values);
+                               update_quadrature_points | update_JxW_values);
 
   const unsigned int dofs_per_cell = fe[0].dofs_per_cell;
   const unsigned int n_q_points    = quadrature_formula[0].size();
@@ -273,12 +269,12 @@ void MinimizationProblem<dim>::assemble_step ()
   std::map<types::global_dof_index,double> boundary_values;
   VectorTools::interpolate_boundary_values (dof_handler,
                                             0,
-                                            ZeroFunction<dim>(),
+                                            Functions::ZeroFunction<dim>(),
                                             boundary_values);
   if (dim == 1)
     VectorTools::interpolate_boundary_values (dof_handler,
                                               1,
-                                              ZeroFunction<dim>(),
+                                              Functions::ZeroFunction<dim>(),
                                               boundary_values);
   Vector<double> dummy (residual.size());
   MatrixTools::apply_boundary_values (boundary_values,
@@ -399,8 +395,8 @@ void MinimizationProblem<1>::refine_grid ()
   hp::QCollection<dim> quadrature(q);
   hp::FEValues<dim> fe_values (fe, quadrature,
                                update_values   | update_gradients |
-                               update_second_derivatives |
-                               update_q_points | update_JxW_values);
+                               update_hessians |
+                               update_quadrature_points | update_JxW_values);
 
   hp::FEValues<dim> neighbor_fe_values (fe, quadrature,
                                         update_gradients);
@@ -521,7 +517,7 @@ MinimizationProblem<dim>::energy (const hp::DoFHandler<dim> &dof_handler,
   hp::QCollection<dim>  quadrature_formula(QGauss<dim>(4));
   hp::FEValues<dim> fe_values (dof_handler.get_fe(), quadrature_formula,
                                update_values   | update_gradients |
-                               update_q_points | update_JxW_values);
+                               update_quadrature_points | update_JxW_values);
 
   const unsigned int   n_q_points    = quadrature_formula[0].size();
 
@@ -595,7 +591,6 @@ int main ()
       logfile.precision(2);
 
       deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
 
       const unsigned int n_realizations = 10;
       for (unsigned int realization=0; realization<n_realizations; ++realization)

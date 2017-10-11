@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__data_out_dof_data_h
-#define dealii__data_out_dof_data_h
+#ifndef dealii_data_out_dof_data_h
+#define dealii_data_out_dof_data_h
 
 
 
@@ -31,12 +31,9 @@
 #include <deal.II/numerics/data_postprocessor.h>
 #include <deal.II/numerics/data_component_interpretation.h>
 
-#include <deal.II/base/std_cxx11/shared_ptr.h>
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
-
-template <int, int> class FEValuesBase;
-
 
 namespace Exceptions
 {
@@ -185,7 +182,7 @@ namespace internal
       /**
        * Destructor made virtual.
        */
-      virtual ~DataEntryBase ();
+      virtual ~DataEntryBase () = default;
 
       /**
        * Assuming that the stored vector is a cell vector, extract the given
@@ -326,14 +323,14 @@ namespace internal
                         const unsigned int n_subdivisions,
                         const std::vector<unsigned int> &n_postprocessor_outputs,
                         const Mapping<dim,spacedim> &mapping,
-                        const std::vector<std_cxx11::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
+                        const std::vector<std::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
                         const UpdateFlags update_flags,
                         const bool        use_face_values);
 
       ParallelDataBase (const ParallelDataBase &data);
 
       template <typename DoFHandlerType>
-      void reinit_all_fe_values(std::vector<std_cxx11::shared_ptr<DataEntryBase<DoFHandlerType> > > &dof_data,
+      void reinit_all_fe_values(std::vector<std::shared_ptr<DataEntryBase<DoFHandlerType> > > &dof_data,
                                 const typename dealii::Triangulation<dim,spacedim>::cell_iterator &cell,
                                 const unsigned int face = numbers::invalid_unsigned_int);
 
@@ -345,20 +342,16 @@ namespace internal
       const unsigned int n_datasets;
       const unsigned int n_subdivisions;
 
-      std::vector<double>                                patch_values;
-      std::vector<dealii::Vector<double> >               patch_values_system;
-      std::vector<Tensor<1,spacedim> >                   patch_gradients;
-      std::vector<std::vector<Tensor<1,spacedim> > >     patch_gradients_system;
-      std::vector<Tensor<2,spacedim> >                   patch_hessians;
-      std::vector<std::vector<Tensor<2,spacedim> > >     patch_hessians_system;
+      DataPostprocessorInputs::Scalar<spacedim>          patch_values_scalar;
+      DataPostprocessorInputs::Vector<spacedim>          patch_values_system;
       std::vector<std::vector<dealii::Vector<double> > > postprocessed_values;
 
       const dealii::hp::MappingCollection<dim,spacedim> mapping_collection;
-      const std::vector<std_cxx11::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > finite_elements;
+      const std::vector<std::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > finite_elements;
       const UpdateFlags update_flags;
 
-      std::vector<std_cxx11::shared_ptr<dealii::hp::FEValues<dim,spacedim> > > x_fe_values;
-      std::vector<std_cxx11::shared_ptr<dealii::hp::FEFaceValues<dim,spacedim> > > x_fe_face_values;
+      std::vector<std::shared_ptr<dealii::hp::FEValues<dim,spacedim> > > x_fe_values;
+      std::vector<std::shared_ptr<dealii::hp::FEFaceValues<dim,spacedim> > > x_fe_face_values;
     };
   }
 }
@@ -392,8 +385,8 @@ namespace internal
  *   ...   // compute error_estimator, which contains one value per cell
  *
  *   std::vector<std::string> solution_names;
- *   solution_names.push_back ("x-displacement");
- *   solution_names.push_back ("y-displacement");
+ *   solution_names.emplace_back ("x-displacement");
+ *   solution_names.emplace_back ("y-displacement");
  *
  *   DataOut<dim> data_out;
  *   data_out.attach_dof_handler (dof_handler);
@@ -830,12 +823,12 @@ protected:
   /**
    * List of data elements with vectors of values for each degree of freedom.
    */
-  std::vector<std_cxx11::shared_ptr<internal::DataOut::DataEntryBase<DoFHandlerType> > >  dof_data;
+  std::vector<std::shared_ptr<internal::DataOut::DataEntryBase<DoFHandlerType> > >  dof_data;
 
   /**
    * List of data elements with vectors of values for each cell.
    */
-  std::vector<std_cxx11::shared_ptr<internal::DataOut::DataEntryBase<DoFHandlerType> > >  cell_data;
+  std::vector<std::shared_ptr<internal::DataOut::DataEntryBase<DoFHandlerType> > >  cell_data;
 
   /**
    * This is a list of patches that is created each time build_patches() is
@@ -862,15 +855,15 @@ protected:
    * Extracts the finite elements stored in the dof_data object, including a
    * dummy object of FE_DGQ<dim>(0) in case only the triangulation is used.
    */
-  std::vector<std_cxx11::shared_ptr<dealii::hp::FECollection<DoFHandlerType::dimension,DoFHandlerType::space_dimension> > >
-  get_finite_elements() const;
+  std::vector<std::shared_ptr<dealii::hp::FECollection<DoFHandlerType::dimension,DoFHandlerType::space_dimension> > >
+  get_fes() const;
 
   /**
    * Overload of the respective DataOutInterface::get_vector_data_ranges()
    * function. See there for a more extensive documentation.
    */
   virtual
-  std::vector<std_cxx11::tuple<unsigned int, unsigned int, std::string> >
+  std::vector<std::tuple<unsigned int, unsigned int, std::string> >
   get_vector_data_ranges () const;
 
   /**
@@ -879,11 +872,99 @@ protected:
    */
   template <class, int, int>
   friend class DataOut_DoFData;
+private:
+  /**
+   * Common function called by the four public add_data_vector methods.
+   */
+  template <class VectorType>
+  void
+  add_data_vector_internal
+  (const DoFHandlerType           *dof_handler,
+   const VectorType               &data,
+   const std::vector<std::string> &names,
+   const DataVectorType            type,
+   const std::vector<DataComponentInterpretation::DataComponentInterpretation> &data_component_interpretation,
+   const bool                      deduce_output_names);
 };
 
 
 
 // -------------------- template and inline functions ------------------------
+template <typename DoFHandlerType, int patch_dim, int patch_space_dim>
+template <typename VectorType>
+void
+DataOut_DoFData<DoFHandlerType,patch_dim,patch_space_dim>::
+add_data_vector
+(const VectorType                         &vec,
+ const std::string                        &name,
+ const DataVectorType                      type,
+ const std::vector<DataComponentInterpretation::DataComponentInterpretation> &data_component_interpretation)
+{
+  Assert (triangulation != nullptr, Exceptions::DataOut::ExcNoTriangulationSelected ());
+  std::vector<std::string> names(1, name);
+  add_data_vector_internal (dofs, vec, names, type, data_component_interpretation, true);
+}
+
+
+
+template <typename DoFHandlerType, int patch_dim, int patch_space_dim>
+template <typename VectorType>
+void
+DataOut_DoFData<DoFHandlerType,patch_dim,patch_space_dim>::
+add_data_vector
+(const VectorType                         &vec,
+ const std::vector<std::string>           &names,
+ const DataVectorType                      type,
+ const std::vector<DataComponentInterpretation::DataComponentInterpretation> &data_component_interpretation)
+{
+  Assert (triangulation != nullptr, Exceptions::DataOut::ExcNoTriangulationSelected ());
+  add_data_vector_internal(dofs, vec, names, type, data_component_interpretation, false);
+}
+
+
+
+template <typename DoFHandlerType, int patch_dim, int patch_space_dim>
+template <typename VectorType>
+void
+DataOut_DoFData<DoFHandlerType,patch_dim,patch_space_dim>::
+add_data_vector
+(const DoFHandlerType           &dof_handler,
+ const VectorType               &data,
+ const std::string              &name,
+ const std::vector<DataComponentInterpretation::DataComponentInterpretation> &data_component_interpretation)
+{
+  std::vector<std::string> names(1, name);
+  add_data_vector_internal (&dof_handler, data, names, type_dof_data, data_component_interpretation, true);
+}
+
+
+
+template <typename DoFHandlerType, int patch_dim, int patch_space_dim>
+template <typename VectorType>
+void
+DataOut_DoFData<DoFHandlerType,patch_dim,patch_space_dim>::
+add_data_vector
+(const DoFHandlerType           &dof_handler,
+ const VectorType               &data,
+ const std::vector<std::string> &names,
+ const std::vector<DataComponentInterpretation::DataComponentInterpretation> &data_component_interpretation)
+{
+  add_data_vector_internal(&dof_handler, data, names, type_dof_data, data_component_interpretation, false);
+}
+
+
+
+template <typename DoFHandlerType, int patch_dim, int patch_space_dim>
+template <typename VectorType>
+void
+DataOut_DoFData<DoFHandlerType,patch_dim,patch_space_dim>::
+add_data_vector (const VectorType                       &vec,
+                 const DataPostprocessor<DoFHandlerType::space_dimension> &data_postprocessor)
+{
+  Assert (dofs != nullptr, Exceptions::DataOut::ExcNoDoFHandlerSelected ());
+  add_data_vector(*dofs, vec, data_postprocessor);
+}
+
 
 
 template <typename DoFHandlerType, int patch_dim, int patch_space_dim>
@@ -925,16 +1006,16 @@ merge_patches (const DataOut_DoFData<DoFHandlerType2,patch_dim,patch_space_dim> 
                       "as vectors."));
   for (unsigned int i=0; i<get_vector_data_ranges().size(); ++i)
     {
-      Assert (std_cxx11::get<0>(get_vector_data_ranges()[i]) ==
-              std_cxx11::get<0>(source.get_vector_data_ranges()[i]),
+      Assert (std::get<0>(get_vector_data_ranges()[i]) ==
+              std::get<0>(source.get_vector_data_ranges()[i]),
               ExcMessage ("Both sources need to declare the same components "
                           "as vectors."));
-      Assert (std_cxx11::get<1>(get_vector_data_ranges()[i]) ==
-              std_cxx11::get<1>(source.get_vector_data_ranges()[i]),
+      Assert (std::get<1>(get_vector_data_ranges()[i]) ==
+              std::get<1>(source.get_vector_data_ranges()[i]),
               ExcMessage ("Both sources need to declare the same components "
                           "as vectors."));
-      Assert (std_cxx11::get<2>(get_vector_data_ranges()[i]) ==
-              std_cxx11::get<2>(source.get_vector_data_ranges()[i]),
+      Assert (std::get<2>(get_vector_data_ranges()[i]) ==
+              std::get<2>(source.get_vector_data_ranges()[i]),
               ExcMessage ("Both sources need to declare the same components "
                           "as vectors."));
     }

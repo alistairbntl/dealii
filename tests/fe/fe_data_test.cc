@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,9 +17,7 @@
 
 #include "../tests.h"
 #include <iostream>
-#include <fstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/polynomials_raviart_thomas.h>
 
@@ -95,7 +93,7 @@ void test_2d_3d (std::vector<FiniteElement<1> *> &fe_datas)
 
 
 
-template<int dim>
+template <int dim>
 void test_fe_datas()
 {
   std::vector<FiniteElement<dim> *> fe_datas;
@@ -120,6 +118,12 @@ void test_fe_datas()
   fe_datas.push_back(new FE_DGQ<dim> (4));
   deallog << (*fe_datas.rbegin())->get_name() << std::endl;
   fe_datas.push_back(new FE_DGQArbitraryNodes<dim> (QGauss<1>(3)));
+  deallog << (*fe_datas.rbegin())->get_name() << std::endl;
+  fe_datas.push_back(new FE_DGQLegendre<dim> (1));
+  deallog << (*fe_datas.rbegin())->get_name() << std::endl;
+  fe_datas.push_back(new FE_DGQLegendre<dim> (2));
+  deallog << (*fe_datas.rbegin())->get_name() << std::endl;
+  fe_datas.push_back(new FE_DGQHermite<dim> (3));
   deallog << (*fe_datas.rbegin())->get_name() << std::endl;
   fe_datas.push_back(new FE_DGP<dim> (1));
   deallog << (*fe_datas.rbegin())->get_name() << std::endl;
@@ -272,11 +276,7 @@ void test_fe_datas()
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
-//  deallog.log_execution_time(true);
-//  deallog.log_time_differences(true);
+  initlog();
 
   test_fe_datas<1>();
   test_fe_datas<2>();

@@ -321,7 +321,8 @@
  *   <tr valign="top">
  *       <td>step-37</td>
  *       <td> Solving a Poisson problem with a multilevel preconditioner without
- *       explicitly storing the matrix (a matrix-free method).
+ *       explicitly storing the matrix (a matrix-free method) in a massively
+ *       parallel context.
  *       </td></tr>
  *
  *   <tr valign="top">
@@ -396,7 +397,7 @@
  *
  *   <tr valign="top">
  *       <td>step-52</td>
- *       <td> Solving the time dependent neutron diffusion equation using 
+ *       <td> Solving the time dependent neutron diffusion equation using
  *       Runge-Kutta methods.
  *       </td></tr>
  *
@@ -409,6 +410,22 @@
  *       <td>step-54</td>
  *       <td> Using CAD files to describe the boundary of your domain.
  *       </td></tr>
+ *
+ *   <tr valign="top">
+ *       <td>step-55</td>
+ *       <td> Solving the Stokes problem in parallel.
+ *       </td></tr>
+ *
+ *   <tr valign="top">
+ *       <td>step-56</td>
+ *       <td> Geometric Multigrid for Stokes.
+ *       </td></tr>
+ *
+ *   <tr valign="top">
+ *       <td>step-57</td>
+ *       <td> Incompressible, stationary Navier Stokes equations.
+ *       </td></tr>
+ *
  * </table>
  *
  * <a name="topic"></a>
@@ -491,7 +508,10 @@
  *       step-31,
  *       step-32,
  *       step-43,
- *       step-44
+ *       step-44,
+ *       step-55,
+ *       step-56,
+ *       step-57
  *     </td>
  *   </tr>
  *
@@ -504,7 +524,8 @@
  *       step-33,
  *       step-41,
  *       step-42,
- *       step-43
+ *       step-43,
+ *       step-55
  *     </td>
  *   </tr>
  *
@@ -515,7 +536,8 @@
  *       step-17,
  *       step-18,
  *       step-19,
- *       step-40
+ *       step-40,
+ *       step-55
  *     </td>
  *   </tr>
  *
@@ -524,7 +546,8 @@
  *     </td>
  *     <td>
  *       step-32,
- *       step-42
+ *       step-42,
+ *       step-55
  *     </td>
  *   </tr>
  *
@@ -534,7 +557,8 @@
  *     <td>
  *       step-32,
  *       step-40,
- *       step-42
+ *       step-42,
+ *       step-55
  *     </td>
  *   </tr>
  *
@@ -586,7 +610,8 @@
  *       step-32,
  *       step-33,
  *       step-42,
- *       step-43
+ *       step-43,
+ *       step-57
  *     </td>
  *   </tr>
  *
@@ -644,7 +669,7 @@
  *   </tr>
  *
  *   <tr valign="top">
- *     <td> Matrix-free methods
+ *     <td> Matrix-free methods with sum factorization
  *     </td>
  *     <td>
  *       step-37,
@@ -695,7 +720,8 @@
  *       step-39,
  *       step-41,
  *       step-42,
- *       step-43
+ *       step-43,
+ *       step-56
  *     </td>
  *   </tr>
  *
@@ -706,8 +732,10 @@
  *       step-17,
  *       step-18,
  *       step-32,
+ *       step-37,
  *       step-40,
- *       step-42
+ *       step-42,
+ *       step-55
  *     </td>
  *   </tr>
  *
@@ -720,7 +748,10 @@
  *       step-22,
  *       step-31,
  *       step-32,
- *       step-43
+ *       step-43,
+ *       step-55,
+ *       step-56,
+ *       step-57
  *     </td>
  *   </tr>
  *
@@ -737,7 +768,8 @@
  *       step-33,
  *       step-41,
  *       step-42,
- *       step-44
+ *       step-44,
+ *       step-57
  *     </td>
  *   </tr>
  *
@@ -745,6 +777,12 @@
  *     <td> Eigenvalue solvers
  *     </td>
  *     <td>step-36</td>
+ *   </tr>
+ *
+ *   <tr valign="top">
+ *     <td> Linear operators
+ *     </td>
+ *     <td>step-44</td>
  *   </tr>
  *
  * </table>
@@ -831,7 +869,10 @@
  *       step-31,
  *       step-32,
  *       step-35,
- *       step-46
+ *       step-46,
+ *       step-55,
+ *       step-56,
+ *       step-57
  *     </td>
  *   </tr>
  *
@@ -912,7 +953,11 @@
  *     <td>step-22,
  *         step-31,
  *         step-32,
- *         step-35</td>
+ *         step-35,
+ *         step-55,
+ *         step-56,
+ *         step-57
+ *    </td>
  *   </tr>
  *
  *   <tr valign="top">

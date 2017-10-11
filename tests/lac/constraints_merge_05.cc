@@ -20,10 +20,7 @@
 
 #include "../tests.h"
 #include <deal.II/lac/constraint_matrix.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 std::ofstream logfile("output");
@@ -83,7 +80,6 @@ int main ()
   deallog << std::setprecision (2);
   logfile << std::setprecision (2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   merge_check ();
 }

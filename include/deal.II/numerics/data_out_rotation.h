@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__data_out_rotation_h
-#define dealii__data_out_rotation_h
+#ifndef dealii_data_out_rotation_h
+#define dealii_data_out_rotation_h
 
 
 #include <deal.II/base/config.h>
@@ -43,7 +43,7 @@ namespace internal
                     const unsigned int n_patches_per_circle,
                     const std::vector<unsigned int> &n_postprocessor_outputs,
                     const Mapping<dim,spacedim> &mapping,
-                    const std::vector<std_cxx11::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
+                    const std::vector<std::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
                     const UpdateFlags update_flags);
 
       const unsigned int n_patches_per_circle;
@@ -193,14 +193,14 @@ public:
 
 private:
   /**
-   * Builds every @p n_threads's patch. This function may be called in
-   * parallel. If multithreading is not used, the function is called once and
-   * generates all patches.
+   * Build all of the patches that correspond to the cell given in the first
+   * argument. Use the second argument as scratch space for parallel
+   * invocation in WorkStream, and put the results into the last argument.
    */
   void
   build_one_patch (const cell_iterator *cell,
                    internal::DataOutRotation::ParallelData<dimension, space_dimension> &data,
-                   std::vector<DataOutBase::Patch<dimension+1,space_dimension+1> > &patches);
+                   std::vector<DataOutBase::Patch<dimension+1,space_dimension+1> > &my_patches);
 };
 
 

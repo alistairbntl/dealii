@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,10 +17,9 @@
 #include <deal.II/lac/block_matrix_array.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_parallel_block_vector.h>
 
-#include <deal.II/lac/petsc_block_vector.h>
 #include <deal.II/lac/petsc_parallel_block_vector.h>
 
 DEAL_II_NAMESPACE_OPEN
@@ -36,7 +35,7 @@ BlockMatrixArray<number,BlockVectorType>::Entry::Entry (const Entry &e)
   matrix(e.matrix)
 {
   Entry &e2 = const_cast<Entry &>(e);
-  e2.matrix = 0;
+  e2.matrix = nullptr;
 }
 
 
@@ -375,7 +374,7 @@ BlockTrianglePrecondition<number,BlockVectorType>::vmult_add
   BlockVectorType aux;
   aux.reinit(dst);
   vmult(aux, src);
-  dst.add(aux);
+  dst += aux;
 }
 
 

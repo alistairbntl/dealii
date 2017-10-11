@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,12 +13,11 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__derivative_approximation_h
-#define dealii__derivative_approximation_h
+#ifndef dealii_derivative_approximation_h
+#define dealii_derivative_approximation_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
-#include <deal.II/base/std_cxx11/tuple.h>
 #include <deal.II/base/synchronous_iterator.h>
 #include <deal.II/fe/fe_update_flags.h>
 #include <deal.II/fe/mapping.h>
@@ -179,7 +178,7 @@ namespace DerivativeApproximation
                         const unsigned int                  component = 0);
 
   /**
-   * Calls the @p interpolate function, see above, with
+   * Call the @p interpolate function, see above, with
    * <tt>mapping=MappingQGeneric@<dim@>(1)</tt>.
    */
   template <int dim, template <int, int> class DoFHandlerType, class InputVector, int spacedim>
@@ -215,7 +214,7 @@ namespace DerivativeApproximation
                                  const unsigned int                  component = 0);
 
   /**
-   * Calls the @p interpolate function, see above, with
+   * Call the @p interpolate function, see above, with
    * <tt>mapping=MappingQGeneric@<dim@>(1)</tt>.
    */
   template <int dim, template <int, int> class DoFHandlerType, class InputVector, int spacedim>
@@ -238,24 +237,24 @@ namespace DerivativeApproximation
    * In a parallel computation the @p solution vector needs to contain the
    * locally relevant unknowns.
    */
-  template <typename DoFHandlerType, int dim, int spacedim, class InputVector, int order>
+  template <typename DoFHandlerType, class InputVector, int order>
   void
   approximate_derivative_tensor
-  (const Mapping<dim, spacedim>                        &mapping,
-   const DoFHandlerType                                &dof,
-   const InputVector                                   &solution,
+  (const Mapping<DoFHandlerType::dimension, DoFHandlerType::space_dimension>  &mapping,
+   const DoFHandlerType                                                       &dof,
+   const InputVector                                                          &solution,
 #ifndef _MSC_VER
-   const typename DoFHandlerType::active_cell_iterator &cell,
+   const typename DoFHandlerType::active_cell_iterator                        &cell,
 #else
    const TriaActiveIterator <dealii::DoFCellAccessor<DoFHandlerType, false> > &cell,
 #endif
-   Tensor<order, dim>                                  &derivative,
-   const unsigned int                                   component = 0);
+   Tensor<order, DoFHandlerType::dimension>                                   &derivative,
+   const unsigned int                                                         component = 0);
 
   /**
    * Same as above, with <tt>mapping=MappingQGeneric@<dim@>(1)</tt>.
    */
-  template <typename DoFHandlerType, int dim, int spacedim, class InputVector, int order>
+  template <typename DoFHandlerType, class InputVector, int order>
   void
   approximate_derivative_tensor
   (const DoFHandlerType                                &dof,
@@ -265,7 +264,7 @@ namespace DerivativeApproximation
 #else
    const TriaActiveIterator<dealii::DoFCellAccessor<DoFHandlerType, false> > &cell,
 #endif
-   Tensor<order, dim>                                  &derivative,
+   Tensor<order, DoFHandlerType::dimension>            &derivative,
    const unsigned int                                   component = 0);
 
   /**

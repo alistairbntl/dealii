@@ -1,6 +1,6 @@
 /* ---------------------------------------------------------------------
  *
- * Copyright (C) 2007 - 2015 by the deal.II authors
+ * Copyright (C) 2007 - 2017 by the deal.II authors
  *
  * This file is part of the deal.II library.
  *
@@ -28,7 +28,6 @@
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/conditional_ostream.h>
-#include <deal.II/base/std_cxx11/array.h>
 
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
@@ -81,6 +80,7 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #include <fstream>
 #include <vector>
 #include <memory>
+#include <array>
 
 // To end this section, introduce everything in the dealii library into the
 // namespace into which the contents of this program will go:
@@ -220,7 +220,7 @@ namespace Step33
     template <typename InputVector>
     static
     void compute_flux_matrix (const InputVector &W,
-                              std_cxx11::array <std_cxx11::array
+                              std::array <std::array
                               <typename InputVector::value_type, dim>,
                               EulerEquations<dim>::n_components > &flux)
     {
@@ -264,12 +264,12 @@ namespace Step33
                                 const InputVector                  &Wplus,
                                 const InputVector                  &Wminus,
                                 const double                        alpha,
-                                std_cxx11::array
+                                std::array
                                 <typename InputVector::value_type, n_components>
                                 &normal_flux)
     {
-      std_cxx11::array
-      <std_cxx11::array <typename InputVector::value_type, dim>,
+      std::array
+      <std::array <typename InputVector::value_type, dim>,
       EulerEquations<dim>::n_components > iflux, oflux;
 
       compute_flux_matrix (Wplus, iflux);
@@ -298,7 +298,7 @@ namespace Step33
     template <typename InputVector>
     static
     void compute_forcing_vector (const InputVector &W,
-                                 std_cxx11::array
+                                 std::array
                                  <typename InputVector::value_type, n_components>
                                  &forcing)
     {
@@ -543,12 +543,9 @@ namespace Step33
 
       virtual
       void
-      compute_derived_quantities_vector (const std::vector<Vector<double> >              &uh,
-                                         const std::vector<std::vector<Tensor<1,dim> > > &duh,
-                                         const std::vector<std::vector<Tensor<2,dim> > > &dduh,
-                                         const std::vector<Point<dim> >                  &normals,
-                                         const std::vector<Point<dim> >                  &evaluation_points,
-                                         std::vector<Vector<double> >                    &computed_quantities) const;
+      evaluate_vector_field
+      (const DataPostprocessorInputs::Vector<dim> &inputs,
+       std::vector<Vector<double> >               &computed_quantities) const;
 
       virtual std::vector<std::string> get_names () const;
 
@@ -579,41 +576,38 @@ namespace Step33
 
   // This is the only function worth commenting on. When generating graphical
   // output, the DataOut and related classes will call this function on each
-  // cell, with values, gradients, Hessians, and normal vectors (in case we're
-  // working on faces) at each quadrature point. Note that the data at each
-  // quadrature point is itself vector-valued, namely the conserved
+  // cell, with access to values, gradients, Hessians, and normal vectors (in
+  // case we're working on faces) at each quadrature point. Note that the data
+  // at each quadrature point is itself vector-valued, namely the conserved
   // variables. What we're going to do here is to compute the quantities we're
   // interested in at each quadrature point. Note that for this we can ignore
-  // the Hessians ("dduh") and normal vectors; to avoid compiler warnings
-  // about unused variables, we comment out their names.
+  // the Hessians ("inputs.solution_hessians") and normal vectors
+  // ("inputs.normals").
   template <int dim>
   void
   EulerEquations<dim>::Postprocessor::
-  compute_derived_quantities_vector (const std::vector<Vector<double> >              &uh,
-                                     const std::vector<std::vector<Tensor<1,dim> > > &duh,
-                                     const std::vector<std::vector<Tensor<2,dim> > > &/*dduh*/,
-                                     const std::vector<Point<dim> >                  &/*normals*/,
-                                     const std::vector<Point<dim> >                  &/*evaluation_points*/,
-                                     std::vector<Vector<double> >                    &computed_quantities) const
+  evaluate_vector_field
+  (const DataPostprocessorInputs::Vector<dim> &inputs,
+   std::vector<Vector<double> >               &computed_quantities) const
   {
     // At the beginning of the function, let us make sure that all variables
     // have the correct sizes, so that we can access individual vector
     // elements without having to wonder whether we might read or write
-    // invalid elements; we also check that the <code>duh</code> vector only
+    // invalid elements; we also check that the <code>solution_gradients</code> vector only
     // contains data if we really need it (the system knows about this because
     // we say so in the <code>get_needed_update_flags()</code> function
     // below). For the inner vectors, we check that at least the first element
     // of the outer vector has the correct inner size:
-    const unsigned int n_quadrature_points = uh.size();
+    const unsigned int n_quadrature_points = inputs.solution_values.size();
 
     if (do_schlieren_plot == true)
-      Assert (duh.size() == n_quadrature_points,
+      Assert (inputs.solution_gradients.size() == n_quadrature_points,
               ExcInternalError());
 
     Assert (computed_quantities.size() == n_quadrature_points,
             ExcInternalError());
 
-    Assert (uh[0].size() == n_components,
+    Assert (inputs.solution_values[0].size() == n_components,
             ExcInternalError());
 
     if (do_schlieren_plot == true)
@@ -630,17 +624,17 @@ namespace Step33
     // <code>density_component</code> information:
     for (unsigned int q=0; q<n_quadrature_points; ++q)
       {
-        const double density = uh[q](density_component);
+        const double density = inputs.solution_values[q](density_component);
 
         for (unsigned int d=0; d<dim; ++d)
           computed_quantities[q](d)
-            = uh[q](first_momentum_component+d) / density;
+            = inputs.solution_values[q](first_momentum_component+d) / density;
 
-        computed_quantities[q](dim) = compute_pressure (uh[q]);
+        computed_quantities[q](dim) = compute_pressure (inputs.solution_values[q]);
 
         if (do_schlieren_plot == true)
-          computed_quantities[q](dim+1) = duh[q][density_component] *
-                                          duh[q][density_component];
+          computed_quantities[q](dim+1) = inputs.solution_gradients[q][density_component] *
+                                          inputs.solution_gradients[q][density_component];
       }
   }
 
@@ -1096,12 +1090,20 @@ namespace Step33
     AllParameters<dim>::BoundaryConditions::BoundaryConditions ()
       :
       values (EulerEquations<dim>::n_components)
-    {}
+    {
+      for (unsigned int c=0; c<EulerEquations<dim>::n_components; ++c)
+        kind[c] = EulerEquations<dim>::no_penetration_boundary;
+    }
 
 
     template <int dim>
     AllParameters<dim>::AllParameters ()
       :
+      diffusion_power(0.),
+      time_step(1.),
+      final_time(1.),
+      theta(.5),
+      is_stationary(true),
       initial_conditions (EulerEquations<dim>::n_components)
     {}
 
@@ -1378,7 +1380,7 @@ namespace Step33
     ParameterHandler prm;
     Parameters::AllParameters<dim>::declare_parameters (prm);
 
-    prm.read_input (input_filename);
+    prm.parse_input (input_filename);
     parameters.parse_parameters (prm);
 
     verbose_cout.set_condition (parameters.output == Parameters::Solver::verbose);
@@ -1761,16 +1763,16 @@ namespace Step33
     // later easily be computed from it:
 
     std::vector <
-    std_cxx11::array <std_cxx11::array <Sacado::Fad::DFad<double>, dim>, EulerEquations<dim>::n_components >
+    std::array <std::array <Sacado::Fad::DFad<double>, dim>, EulerEquations<dim>::n_components >
     > flux(n_q_points);
 
     std::vector <
-    std_cxx11::array <std_cxx11::array <double, dim>, EulerEquations<dim>::n_components >
+    std::array <std::array <double, dim>, EulerEquations<dim>::n_components >
     > flux_old(n_q_points);
 
-    std::vector < std_cxx11::array< Sacado::Fad::DFad<double>, EulerEquations<dim>::n_components> > forcing(n_q_points);
+    std::vector < std::array< Sacado::Fad::DFad<double>, EulerEquations<dim>::n_components> > forcing(n_q_points);
 
-    std::vector < std_cxx11::array< double, EulerEquations<dim>::n_components> > forcing_old(n_q_points);
+    std::vector < std::array< double, EulerEquations<dim>::n_components> > forcing_old(n_q_points);
 
     for (unsigned int q=0; q<n_q_points; ++q)
       {
@@ -2011,8 +2013,8 @@ namespace Step33
     // that does so, we also need to determine the Lax-Friedrich's stability
     // parameter:
 
-    std::vector< std_cxx11::array < Sacado::Fad::DFad<double>, EulerEquations<dim>::n_components> >  normal_fluxes(n_q_points);
-    std::vector< std_cxx11::array < double, EulerEquations<dim>::n_components> >  normal_fluxes_old(n_q_points);
+    std::vector< std::array < Sacado::Fad::DFad<double>, EulerEquations<dim>::n_components> >  normal_fluxes(n_q_points);
+    std::vector< std::array < double, EulerEquations<dim>::n_components> >  normal_fluxes_old(n_q_points);
 
     double alpha;
 

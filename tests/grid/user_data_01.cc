@@ -23,9 +23,7 @@
 #include <deal.II/grid/tria_iterator.h>
 
 #include <deal.II/grid/grid_generator.h>
-#include <deal.II/base/logstream.h>
 
-#include <fstream>
 #include <string>
 
 
@@ -34,7 +32,7 @@
 /**
  * Check if user pointers are the same as entered below
  */
-template<int dim>
+template <int dim>
 void
 check_user_pointers(Triangulation<dim> &tr)
 {
@@ -83,7 +81,7 @@ check_user_pointers(Triangulation<dim> &tr)
 /**
  * Check if user indices are the same as entered below
  */
-template<int dim>
+template <int dim>
 void
 check_user_indices(Triangulation<dim> &tr)
 {
@@ -130,7 +128,7 @@ check_user_indices(Triangulation<dim> &tr)
 }
 
 
-template<int dim>
+template <int dim>
 void
 user_pointers(Triangulation<dim> &tr)
 {
@@ -192,7 +190,7 @@ user_pointers(Triangulation<dim> &tr)
 }
 
 
-template<int dim>
+template <int dim>
 void
 user_indices(Triangulation<dim> &tr)
 {
@@ -288,9 +286,7 @@ int main()
 {
   deal_II_exceptions::disable_abort_on_exception();
 
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   check<2>();
   check<3>();

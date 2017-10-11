@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,7 +23,7 @@
 #include <deal.II/base/conditional_ostream.h>
 #include <deal.II/base/index_set.h>
 
-#include <deal.II/lac/parallel_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
 
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/tria_accessor.h>
@@ -40,10 +40,9 @@
 #include <deal.II/distributed/tria.h>
 #include <deal.II/distributed/grid_refinement.h>
 
-#include <fstream>
 #include <iostream>
 
-template<int dim>
+template <int dim>
 void test()
 {
   parallel::distributed::Triangulation<dim> triangulation(MPI_COMM_WORLD);
@@ -58,7 +57,7 @@ void test()
   dof_handler.distribute_dofs (fe);
 
   IndexSet locally_owned_dofs = dof_handler.locally_owned_dofs ();
-  parallel::distributed::Vector<double> locally_owned_solution
+  LinearAlgebra::distributed::Vector<double> locally_owned_solution
   (locally_owned_dofs, MPI_COMM_WORLD);
 
   locally_owned_solution=1;
@@ -108,7 +107,6 @@ int main(int argc, char *argv[])
     {
       std::ofstream logfile("output");
       deallog.attach(logfile, false);
-      deallog.threshold_double(1.e-10);
 
       deallog.push("2d");
       test<2>();

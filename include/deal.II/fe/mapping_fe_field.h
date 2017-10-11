@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mapping_fe_h
-#define dealii__mapping_fe_h
+#ifndef dealii_mapping_fe_h
+#define dealii_mapping_fe_h
 
 
 #include <deal.II/base/config.h>
@@ -25,7 +25,7 @@
 #include <deal.II/fe/mapping.h>
 #include <deal.II/fe/fe.h>
 
-#include <deal.II/base/std_cxx11/array.h>
+#include <array>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -111,7 +111,7 @@ public:
    */
   MappingFEField (const DoFHandlerType &euler_dof_handler,
                   const VectorType     &euler_vector,
-                  const ComponentMask   mask = ComponentMask());
+                  const ComponentMask   &mask = ComponentMask());
 
   /**
    * Copy constructor.
@@ -253,7 +253,7 @@ public:
      * Constructor.
      */
     InternalData(const FiniteElement<dim,spacedim> &fe,
-                 const ComponentMask mask);
+                 const ComponentMask &mask);
 
     /**
      * Shape function at quadrature point. Shape functions are in tensor
@@ -372,7 +372,7 @@ public:
      *
      * Filled once.
      */
-    std_cxx11::array<std::vector<Tensor<1,dim> >, GeometryInfo<dim>::faces_per_cell *(dim-1)> unit_tangentials;
+    std::array<std::vector<Tensor<1,dim> >, GeometryInfo<dim>::faces_per_cell *(dim-1)> unit_tangentials;
 
     /**
      * Number of shape functions. If this is a Q1 mapping, then it is simply
@@ -553,14 +553,14 @@ private:
    * Update internal degrees of freedom.
    */
   void update_internal_dofs(const typename Triangulation<dim,spacedim>::cell_iterator &cell,
-                            const typename MappingFEField<dim, spacedim>::InternalData &data) const;
+                            const typename MappingFEField<dim, spacedim, VectorType, DoFHandlerType>::InternalData &data) const;
 
   /**
    * See the documentation of the base class for detailed information.
    */
   virtual void
   compute_shapes_virtual (const std::vector<Point<dim> > &unit_points,
-                          typename MappingFEField<dim, spacedim>::InternalData &data) const;
+                          typename MappingFEField<dim, spacedim, VectorType, DoFHandlerType>::InternalData &data) const;
 
   /*
    * Which components to use for the mapping.

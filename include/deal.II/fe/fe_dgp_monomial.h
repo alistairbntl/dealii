@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_dgp_monomial_h
-#define dealii__fe_dgp_monomial_h
+#ifndef dealii_fe_dgp_monomial_h
+#define dealii_fe_dgp_monomial_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/polynomials_p.h>
@@ -360,8 +360,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -433,14 +433,9 @@ public:
    */
   virtual std::size_t memory_consumption () const;
 
-protected:
-
-  /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim> *clone() const;
+  virtual
+  std::unique_ptr<FiniteElement<dim,dim> >
+  clone() const;
 
 private:
 

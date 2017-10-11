@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2015 by the deal.II authors
+// Copyright (C) 2015 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -19,6 +19,7 @@
 #include <deal.II/base/logstream.h>
 #include <deal.II/lac/sparsity_tools.h>
 #include <deal.II/lac/sparsity_pattern.h>
+#include <deal.II/lac/vector_memory.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -43,10 +44,9 @@ namespace parallel
                                               const bool check_for_distorted_cells)
     :
     dealii::Triangulation<dim,spacedim>(smooth_grid,check_for_distorted_cells),
-    mpi_communicator (Utilities::MPI::
-                      duplicate_communicator(mpi_communicator)),
+    mpi_communicator (mpi_communicator),
     my_subdomain (Utilities::MPI::this_mpi_process (this->mpi_communicator)),
-    n_subdomains(Utilities::MPI::n_mpi_processes(mpi_communicator))
+    n_subdomains(Utilities::MPI::n_mpi_processes (this->mpi_communicator))
   {
 #ifndef DEAL_II_WITH_MPI
     Assert(false, ExcMessage("You compiled deal.II without MPI support, for "
@@ -55,18 +55,30 @@ namespace parallel
     number_cache.n_locally_owned_active_cells.resize (n_subdomains);
   }
 
+
+
   template <int dim, int spacedim>
   void
-  Triangulation<dim,spacedim>::copy_triangulation (const dealii::Triangulation<dim, spacedim> &old_tria)
+  Triangulation<dim,spacedim>::
+  copy_triangulation (const dealii::Triangulation<dim, spacedim> &other_tria)
   {
 #ifndef DEAL_II_WITH_MPI
-    Assert(false, ExcNotImplemented());
-#endif
+    (void)other_tria;
+    Assert(false, ExcMessage("You compiled deal.II without MPI support, for "
+                             "which parallel::Triangulation is not available."));
+#else
+    dealii::Triangulation<dim,spacedim>::copy_triangulation (other_tria);
+
     if (const dealii::parallel::Triangulation<dim,spacedim> *
-        old_tria_x = dynamic_cast<const dealii::parallel::Triangulation<dim,spacedim> *>(&old_tria))
+        other_tria_x = dynamic_cast<const dealii::parallel::Triangulation<dim,spacedim> *>(&other_tria))
       {
-        mpi_communicator = Utilities::MPI::duplicate_communicator (old_tria_x->get_communicator ());
+        mpi_communicator = other_tria_x->get_communicator();
+
+        // release unused vector memory because we will have very different
+        // vectors now
+        ::dealii::internal::GrowingVectorMemory::release_all_unused_memory();
       }
+#endif
   }
 
 
@@ -89,10 +101,9 @@ namespace parallel
   template <int dim, int spacedim>
   Triangulation<dim,spacedim>::~Triangulation ()
   {
-#ifdef DEAL_II_WITH_MPI
-    // get rid of the unique communicator used here again
-    MPI_Comm_free (&this->mpi_communicator);
-#endif
+    // release unused vector memory because the vector layout is going to look
+    // very different now
+    ::dealii::internal::GrowingVectorMemory::release_all_unused_memory();
   }
 
   template <int dim, int spacedim>
@@ -188,13 +199,14 @@ namespace parallel
 
     unsigned int send_value
       = number_cache.n_locally_owned_active_cells[my_subdomain];
-    MPI_Allgather (&send_value,
-                   1,
-                   MPI_UNSIGNED,
-                   &number_cache.n_locally_owned_active_cells[0],
-                   1,
-                   MPI_UNSIGNED,
-                   this->mpi_communicator);
+    const int ierr = MPI_Allgather (&send_value,
+                                    1,
+                                    MPI_UNSIGNED,
+                                    &number_cache.n_locally_owned_active_cells[0],
+                                    1,
+                                    MPI_UNSIGNED,
+                                    this->mpi_communicator);
+    AssertThrowMPI(ierr);
 
     number_cache.n_global_active_cells
       = std::accumulate (number_cache.n_locally_owned_active_cells.begin(),
@@ -202,6 +214,80 @@ namespace parallel
                          /* ensure sum is computed with correct data type:*/
                          static_cast<types::global_dof_index>(0));
     number_cache.n_global_levels = Utilities::MPI::max(this->n_levels(), this->mpi_communicator);
+  }
+
+
+
+  template <int dim, int spacedim>
+  void
+  Triangulation<dim,spacedim>::fill_level_ghost_owners ()
+  {
+    number_cache.level_ghost_owners.clear ();
+
+    if (this->n_levels() > 0)
+      {
+        // find level ghost owners
+        for (typename Triangulation<dim,spacedim>::cell_iterator
+             cell = this->begin();
+             cell != this->end();
+             ++cell)
+          if (cell->level_subdomain_id() != numbers::artificial_subdomain_id
+              && cell->level_subdomain_id() != this->locally_owned_subdomain())
+            this->number_cache.level_ghost_owners.insert(cell->level_subdomain_id());
+
+#ifdef DEBUG
+        // Check that level_ghost_owners is symmetric by sending a message
+        // to everyone
+        {
+          int ierr = MPI_Barrier(this->mpi_communicator);
+          AssertThrowMPI(ierr);
+
+          // important: preallocate to avoid (re)allocation:
+          std::vector<MPI_Request> requests (this->number_cache.level_ghost_owners.size());
+          int dummy = 0;
+          unsigned int req_counter = 0;
+
+          for (std::set<types::subdomain_id>::iterator it = this->number_cache.level_ghost_owners.begin();
+               it != this->number_cache.level_ghost_owners.end();
+               ++it, ++req_counter)
+            {
+              Assert (typeid(types::subdomain_id)
+                      == typeid(unsigned int),
+                      ExcNotImplemented());
+              ierr = MPI_Isend(&dummy, 1, MPI_UNSIGNED,
+                               *it, 9001, this->mpi_communicator,
+                               &requests[req_counter]);
+              AssertThrowMPI(ierr);
+            }
+
+          for (std::set<types::subdomain_id>::iterator it = this->number_cache.level_ghost_owners.begin();
+               it != this->number_cache.level_ghost_owners.end();
+               ++it)
+            {
+              Assert (typeid(types::subdomain_id)
+                      == typeid(unsigned int),
+                      ExcNotImplemented());
+              unsigned int dummy;
+              ierr = MPI_Recv(&dummy, 1, MPI_UNSIGNED,
+                              *it, 9001, this->mpi_communicator,
+                              MPI_STATUS_IGNORE);
+              AssertThrowMPI(ierr);
+            }
+
+          if (requests.size() > 0)
+            {
+              ierr = MPI_Waitall(requests.size(), &requests[0], MPI_STATUSES_IGNORE);
+              AssertThrowMPI(ierr);
+            }
+
+          ierr = MPI_Barrier(this->mpi_communicator);
+          AssertThrowMPI(ierr);
+        }
+#endif
+
+        Assert(this->number_cache.level_ghost_owners.size() < Utilities::MPI::n_mpi_processes(this->mpi_communicator),
+               ExcInternalError());
+      }
   }
 #else
   template <int dim, int spacedim>
@@ -217,24 +303,64 @@ namespace parallel
   types::subdomain_id
   Triangulation<dim,spacedim>::locally_owned_subdomain () const
   {
-    Assert (dim > 1, ExcNotImplemented());
     return my_subdomain;
   }
 
+
+
   template <int dim, int spacedim>
-  const std::set<unsigned int> &
+  const std::set<types::subdomain_id> &
   Triangulation<dim,spacedim>::
   ghost_owners () const
   {
     return number_cache.ghost_owners;
   }
 
+
+
   template <int dim, int spacedim>
-  const std::set<unsigned int> &
+  const std::set<types::subdomain_id> &
   Triangulation<dim,spacedim>::
   level_ghost_owners () const
   {
     return number_cache.level_ghost_owners;
+  }
+
+
+
+  template <int dim, int spacedim>
+  std::map<unsigned int, std::set<dealii::types::subdomain_id> >
+  Triangulation<dim,spacedim>::
+  compute_vertices_with_ghost_neighbors () const
+  {
+    // TODO: we are not treating periodic neighbors correctly here. If we do
+    // we can remove the overriding implementation for p::d::Triangulation
+    // that is currently using a p4est callback to get correct ghost neighbors
+    // over periodic faces.
+    Assert(this->get_periodic_face_map().size()==0,
+           ExcNotImplemented());
+
+
+    std::vector<bool> vertex_of_own_cell(this->n_vertices(), false);
+
+    for (auto cell : this->active_cell_iterators())
+      if (cell->is_locally_owned())
+        for (unsigned int v=0; v<GeometryInfo<dim>::vertices_per_cell; ++v)
+          vertex_of_own_cell[cell->vertex_index(v)] = true;
+
+    std::map<unsigned int, std::set<dealii::types::subdomain_id> > result;
+    for (auto cell : this->active_cell_iterators())
+      if (cell->is_ghost())
+        {
+          const types::subdomain_id owner = cell->subdomain_id();
+          for (unsigned int v=0; v<GeometryInfo<dim>::vertices_per_cell; ++v)
+            {
+              if (vertex_of_own_cell[cell->vertex_index(v)])
+                result[cell->vertex_index(v)].insert(owner);
+            }
+        }
+
+    return result;
   }
 
 } // end namespace parallel

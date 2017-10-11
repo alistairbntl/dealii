@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015-2014 by the deal.II authors
+// Copyright (C) 2013 - 2016-2014 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -52,7 +52,7 @@ public:
 #define CALL_METHOD(degree)                                             \
   subrange_deg = data.create_cell_subrange_hp(cell_range, degree);    \
   if (subrange_deg.second > subrange_deg.first)                       \
-    helmholtz_operator<dim,degree,Vector<Number> > (data, dst, src, subrange_deg)
+    helmholtz_operator<dim,degree,Vector<Number>,degree+1> (data, dst, src, subrange_deg)
 
     CALL_METHOD(1);
     CALL_METHOD(2);
@@ -131,7 +131,7 @@ void do_test (const unsigned int parallel_option)
                                            constraints);
   VectorTools::interpolate_boundary_values (dof,
                                             0,
-                                            ZeroFunction<dim>(),
+                                            Functions::ZeroFunction<dim>(),
                                             constraints);
   constraints.close ();
 
@@ -218,12 +218,9 @@ void test ()
   else
     return;
   deallog.push("double");
-  deallog.threshold_double(1.e-12);
   do_test<dim,double>(parallel_option);
   deallog.pop();
   deallog.push("float");
-  deallog.threshold_double(1.e-6);
   do_test<dim,float>(parallel_option);
   deallog.pop();
 }
-

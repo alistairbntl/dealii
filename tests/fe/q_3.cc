@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2003 - 2015 by the deal.II authors
+// Copyright (C) 2003 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -21,18 +21,16 @@
 // table
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
 #include <string>
 
 #define PRECISION 5
 
 
 
-template<int dim>
+template <int dim>
 void
 test(const FE_Q<dim> &fe_q)
 {
@@ -62,7 +60,6 @@ main()
   deallog << std::setprecision(PRECISION);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   // we had the matrices precomputed up to Q4 for 1d, 2d and 3d
   for (unsigned int degree=1; degree<=4; ++degree)

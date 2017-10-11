@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2016 by the deal.II authors
+// Copyright (C) 1998 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_h
-#define dealii__fe_h
+#ifndef dealii_fe_h
+#define dealii_fe_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/fe/fe_base.h>
@@ -23,6 +23,9 @@
 #include <deal.II/fe/component_mask.h>
 #include <deal.II/fe/block_mask.h>
 #include <deal.II/fe/mapping.h>
+
+#include <memory>
+
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -146,6 +149,67 @@ template <int dim, int spacedim> class FESystem;
  * FiniteElement::system_to_block_index(). The number of blocks of a finite
  * element can be determined by FiniteElement::n_blocks().
  *
+ * To better illustrate these concepts, let's consider the following
+ * example of the multi-component system
+ * @code
+ * FESystem<dim> fe_basis(FE_Q<dim>(2), dim, FE_Q<dim>(1),1);
+ * @endcode
+ * with <code>dim=2</code>. The resulting finite element has 3 components:
+ * two that come from the quadratic element and one from the linear element.
+ * If, for example, this system were used to discretize a problem in fluid
+ * dynamics then one could think of the first two components representing a
+ * vector-valued velocity field whereas the last one corresponds to the scalar
+ * pressure field. Without degree-of-freedom (DoF) renumbering this finite element will
+ * produce the following distribution of local DoFs:
+ *
+ * @image html fe_system_example.png DoF indices
+ *
+ * Using the two functions FiniteElement::system_to_component_index() and
+ * FiniteElement::system_to_base_index() one can get the
+ * following information for each degree-of-freedom "i":
+ * @code
+ * const unsigned int component     = fe_basis.system_to_component_index(i).first;
+ * const unsigned int within_base   = fe_basis.system_to_component_index(i).second;
+ * const unsigned int base          = fe_basis.system_to_base_index(i).first.first;
+ * const unsigned int multiplicity  = fe_basis.system_to_base_index(i).first.second;
+ * const unsigned int within_base_  = fe_basis.system_to_base_index(i).second; // same as above
+ * @endcode
+ * which will result in:
+ *
+ * | DoF    | Component  | Base element | Shape function within base | Multiplicity |
+ * | :----: | :--------: | :----------: | :------------------------: | :----------: |
+ * |      0 |          0 |            0 |                          0 |            0 |
+ * |      1 |          1 |            0 |                          0 |            1 |
+ * |      2 |          2 |            1 |                          0 |            0 |
+ * |      3 |          0 |            0 |                          1 |            0 |
+ * |      4 |          1 |            0 |                          1 |            1 |
+ * |      5 |          2 |            1 |                          1 |            0 |
+ * |      6 |          0 |            0 |                          2 |            0 |
+ * |      7 |          1 |            0 |                          2 |            1 |
+ * |      8 |          2 |            1 |                          2 |            0 |
+ * |      9 |          0 |            0 |                          3 |            0 |
+ * |     10 |          1 |            0 |                          3 |            1 |
+ * |     11 |          2 |            1 |                          3 |            0 |
+ * |     12 |          0 |            0 |                          4 |            0 |
+ * |     13 |          1 |            0 |                          4 |            1 |
+ * |     14 |          0 |            0 |                          5 |            0 |
+ * |     15 |          1 |            0 |                          5 |            1 |
+ * |     16 |          0 |            0 |                          6 |            0 |
+ * |     17 |          1 |            0 |                          6 |            1 |
+ * |     18 |          0 |            0 |                          7 |            0 |
+ * |     19 |          1 |            0 |                          7 |            1 |
+ * |     20 |          0 |            0 |                          8 |            0 |
+ * |     21 |          1 |            0 |                          8 |            1 |
+ *
+ * What we see is the following: there are a total of 22 degrees-of-freedom on this
+ * element with components ranging from 0 to 2. Each DoF corresponds to
+ * one of the two base elements used to build FESystem : $\mathbb Q_2$ or $\mathbb Q_1$.
+ * Since FE_Q are primitive elements, we have a total of 9 distinct
+ * scalar-valued shape functions for the quadratic element and 4 for the linear element.
+ * Finally, for DoFs corresponding to the first base element multiplicity
+ * is either zero or one, meaning that we use the same scalar valued $\mathbb Q_2$
+ * for both $x$ and $y$ components of the velocity field $\mathbb Q_2 \otimes \mathbb Q_2$.
+ * For DoFs corresponding to the second base element multiplicity is zero.
  *
  * <h4>Support points</h4>
  *
@@ -607,7 +671,7 @@ public:
     /**
      * Copy construction is forbidden.
      */
-    InternalDataBase (const InternalDataBase &);
+    InternalDataBase (const InternalDataBase &) = delete;
 
   public:
     /**
@@ -619,7 +683,7 @@ public:
     /**
      * Destructor. Made virtual to allow polymorphism.
      */
-    virtual ~InternalDataBase ();
+    virtual ~InternalDataBase () = default;
 
     /**
      * A set of update flags specifying the kind of information that an
@@ -691,18 +755,46 @@ public:
                  const std::vector<ComponentMask> &nonzero_components);
 
   /**
+   * Move constructor.
+   */
+  FiniteElement (FiniteElement<dim, spacedim> &&) = default;
+
+  /**
+   * Copy constructor.
+   */
+  FiniteElement (const FiniteElement<dim, spacedim> &) = default;
+
+  /**
    * Virtual destructor. Makes sure that pointers to this class are deleted
    * properly.
    */
-  virtual ~FiniteElement ();
+  virtual ~FiniteElement () = default;
 
   /**
-   * A sort of virtual copy constructor. Some places in the library, for
+   * Creates information for creating a FESystem with this class as
+   * base element and with multiplicity @p multiplicity. In particular,
+   * the return type of this function can be used in the constructor
+   * for a FESystem object.
+   * This function calls clone() and hence creates a copy of the
+   * current object.
+   */
+  std::pair<std::unique_ptr<FiniteElement<dim, spacedim> >, unsigned int>
+  operator^ (const unsigned int multiplicity) const;
+
+  /**
+   * A sort of virtual copy constructor, this function returns a copy of
+   * the finite element object. Derived classes need to override the function
+   * here in this base class and return an object of the same type as the
+   * derived class.
+   *
+   * Some places in the library, for
    * example the constructors of FESystem as well as the hp::FECollection
    * class, need to make copies of finite elements without knowing their exact
    * type. They do so through this function.
    */
-  virtual FiniteElement<dim,spacedim> *clone() const = 0;
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const = 0;
 
   /**
    * Return a string that uniquely identifies a finite element. The general
@@ -1230,8 +1322,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -1276,6 +1368,8 @@ public:
    * respective shape function within the base element (since that has more
    * than one vector-component). For this information, refer to the
    * #system_to_base_table field and the system_to_base_index() function.
+   *
+   * See the class description above for an example of how this function is typically used.
    *
    * The use of this function is explained extensively in the step-8 and
    * @ref step_20 "step-20"
@@ -1337,7 +1431,7 @@ public:
    * Code implementing this would then look like this:
    * @code
    * for (i=0; i<dofs_per_face; ++i)
-   *  if (fe.is_primitive(fe.face_to_equivalent_cell_index(i, some_face_no)))
+   *  if (fe.is_primitive(fe.face_to_cell_index(i, some_face_no)))
    *   ... do whatever
    * @endcode
    * The function takes additional arguments that account for the fact that
@@ -1427,6 +1521,16 @@ public:
   n_nonzero_components (const unsigned int i) const;
 
   /**
+   * Return whether the entire finite element is primitive, in the sense that
+   * all its shape functions are primitive. If the finite element is scalar,
+   * then this is always the case.
+   *
+   * Since this is an extremely common operation, the result is cached and
+   * returned by this function.
+   */
+  bool is_primitive () const;
+
+  /**
    * Return whether the @p ith shape function is primitive in the sense that
    * the shape function is non-zero in only one vector component. Non-
    * primitive shape functions would then, for example, be those of divergence
@@ -1438,12 +1542,6 @@ public:
    */
   bool
   is_primitive (const unsigned int i) const;
-
-  /**
-   * Import function that is overloaded by the one above and would otherwise
-   * be hidden.
-   */
-  using FiniteElementData<dim>::is_primitive;
 
   /**
    * Number of base elements in a mixed discretization.
@@ -1489,6 +1587,8 @@ public:
    * #system_to_component_table. It differs only in case the element is
    * composed of other elements and at least one of them is vector-valued
    * itself.
+   *
+   * See the class documentation above for an example of how this function is typically used.
    *
    * This function returns valid values also in the case of vector-valued
    * (i.e. non-primitive) shape functions, in contrast to the
@@ -1707,7 +1807,7 @@ public:
   block_mask (const ComponentMask &component_mask) const;
 
   /**
-   * Returns a list of constant modes of the element. The number of rows in
+   * Return a list of constant modes of the element. The number of rows in
    * the resulting table depends on the elements in use. For standard
    * elements, the table has as many rows as there are components in the
    * element and dofs_per_cell columns. To each component of the finite
@@ -1831,7 +1931,7 @@ public:
   /**
    * Return whether a finite element has defined support points on faces. If
    * the result is true, then a call to the get_unit_face_support_points()
-   * yields a non-empty array.
+   * yields a non-empty vector.
    *
    * For more information, see the documentation for the has_support_points()
    * function.
@@ -1847,18 +1947,24 @@ public:
   unit_face_support_point (const unsigned int index) const;
 
   /**
-   * Return a support point vector for generalized interpolation.
+   * Return a vector of generalized support points.
+   *
+   * @note The vector returned by this function is always a minimal set of
+   * *unique* support points. This is in contrast to the behavior of
+   * get_unit_support_points() that returns a repeated list of unit support
+   * points for an FESystem of numerous (Lagrangian) base elements.
    *
    * See the
-   * @ref GlossGeneralizedSupport "glossary entry on generalized points"
+   * @ref GlossGeneralizedSupport "glossary entry on generalized support points"
    * for more information.
    */
   const std::vector<Point<dim> > &
   get_generalized_support_points () const;
 
   /**
-   * Returns <tt>true</tt> if the class provides nonempty vectors either from
-   * get_unit_support_points() or get_generalized_support_points().
+   * Return whether a finite element has defined generalized support
+   * points. If the result is true, then a call to the
+   * get_generalized_support_points() yields a non-empty vector.
    *
    * See the
    * @ref GlossGeneralizedSupport "glossary entry on generalized support points"
@@ -1867,21 +1973,30 @@ public:
   bool has_generalized_support_points () const;
 
   /**
+   * Return the equivalent to get_generalized_support_points(), except
+   * for faces.
    *
+   * @deprecated In general, it is not possible to associate a unique
+   * subset of generalized support points describing degrees of freedom for
+   * a given face. Don't use this function
    */
   const std::vector<Point<dim-1> > &
-  get_generalized_face_support_points () const;
+  get_generalized_face_support_points () const DEAL_II_DEPRECATED;
 
   /**
    * Return whether a finite element has defined generalized support points on
    * faces. If the result is true, then a call to the
-   * get_generalized_face_support_points yields a non-empty array.
+   * get_generalized_face_support_points() function yields a non-empty array.
    *
    * For more information, see the documentation for the has_support_points()
    * function.
+   *
+   * @deprecated In general, it is not possible to associate a unique
+   * subset of generalized support points describing degrees of freedom for
+   * a given face. Don't use this function
    */
   bool
-  has_generalized_face_support_points () const;
+  has_generalized_face_support_points () const DEAL_II_DEPRECATED;
 
   /**
    * For a given degree of freedom, return whether it is logically associated
@@ -1929,43 +2044,86 @@ public:
   GeometryPrimitive
   get_associated_geometry_primitive (const unsigned int cell_dof_index) const;
 
-  /**
-   * Interpolate a set of scalar values, computed in the generalized support
-   * points.
-   *
-   * @note This function is implemented in FiniteElement for the case that the
-   * element has support points. In this case, the resulting coefficients are
-   * just the values in the support points. All other elements must
-   * reimplement it.
-   */
-  virtual
-  void
-  interpolate(std::vector<double>       &local_dofs,
-              const std::vector<double> &values) const;
 
   /**
-   * Interpolate a set of vector values, computed in the generalized support
-   * points.
+   * Given the values of a function $f(\mathbf x)$ at the (generalized)
+   * support points of the reference cell, this function then computes what
+   * the nodal values of the element are, i.e., $\Psi_i[f]$, where $\Psi_i$
+   * are the node functionals of the element
+   * (see also @ref GlossNodes "Node values or node functionals").
+   * The values $\Psi_i[f]$ are then the expansion coefficients
+   * for the shape functions of the finite element function that
+   * <i>interpolates</i> the given function $f(x)$, i.e.,
+   * $ f_h(\mathbf x) = \sum_i \Psi_i[f] \varphi_i(\mathbf x)
+   * $ is the finite element interpolant of $f$ with the current element.
+   * The operation described here is used, for example, in the
+   * FETools::compute_node_matrix() function.
    *
-   * Since a finite element often only interpolates part of a vector,
-   * <tt>offset</tt> is used to determine the first component of the vector to
-   * be interpolated. Maybe consider changing your data structures to use the
-   * next function.
+   * In more detail, let us assume that the generalized support points
+   * (see
+   * @ref GlossGeneralizedSupport "this glossary entry"
+   * ) of the current
+   * element are $\hat{\mathbf x}_i$ and that the node functionals associated
+   * with the current element are $\Psi_i[\cdot]$. Then, the fact that the
+   * element is based on generalized support points, implies that if we
+   * apply $\Psi_i$ to a (possibly vector-valued) finite element function
+   * $\varphi$, the result must have the form
+   * $\Psi_i[\varphi] = f_i(\varphi(\hat{\mathbf x}_i))$ -- in other words,
+   * the value of the node functional $\Psi_i$ applied to $\varphi$ <i>only</i>
+   * depends on the <i>values of $\varphi$ at $\hat{\mathbf x}_i$</i> and not
+   * on values anywhere else, or integrals of $\varphi$, or any other kind
+   * of information.
+   *
+   * The exact form of $f_i$ depends on the element. For example, for scalar
+   * @ref GlossLagrange "Lagrange elements", we have that in fact
+   * $\Psi_i[\varphi] = \varphi(\hat{\mathbf x}_i)$. If you combine multiple
+   * scalar Lagrange elements via an FESystem object, then
+   * $\Psi_i[\varphi] = \varphi(\hat{\mathbf x}_i)_{c(i)}$ where $c(i)$
+   * is the result of the FiniteElement::system_to_component_index()
+   * function's return value's first component. In these two cases,
+   * $f_i$ is therefore simply the identity (in the scalar case) or a
+   * function that selects a particular vector component of its argument.
+   * On the other hand, for Raviart-Thomas elements, one would have that
+   * $f_i(\mathbf y) = \mathbf y \cdot \mathbf n_i$ where $\mathbf n_i$
+   * is the normal vector of the face at which the shape function is
+   * defined.
+   *
+   * Given all of this, what this function does is the following: If you
+   * input a list of values of a function $\varphi$ at all generalized
+   * support points (where each value is in fact a vector of values with
+   * as many components as the element has), then this function returns
+   * a vector of values obtained by applying the node functionals to
+   * these values. In other words, if you pass in
+   * $\{\varphi(\hat{\mathbf x}_i)\}_{i=0}^{N-1}$ then you
+   * will get out a vector
+   * $\{\Psi[\varphi]\}_{i=0}^{N-1}$ where $N$ equals @p dofs_per_cell.
+   *
+   * @param[in] support_point_values An array of size @p dofs_per_cell
+   *   (which equals the number of points the get_generalized_support_points()
+   *   function will return) where each element is a vector with as many entries
+   *   as the element has vector components. This array should contain
+   *   the values of a function at the generalized support points of the
+   *   current element.
+   * @param[out] nodal_values An array of size @p dofs_per_cell that contains
+   *   the node functionals of the element applied to the given function.
+   *
+   * @note It is safe to call this function for (transformed) values on the
+   * real cell only for elements with trivial MappingType. For all other
+   * elements (for example for H(curl), or H(div) conforming elements)
+   * vector values have to be transformed to the reference cell first.
+   *
+   * @note Given what the function is supposed to do, the function clearly
+   * can only work for elements that actually implement (generalized) support
+   * points. Elements that do not have generalized support points -- e.g.,
+   * elements whose nodal functionals evaluate integrals or moments of
+   * functions (such as FE_Q_Hierarchical) -- can in general not make
+   * sense of the operation that is required for this function. They
+   * consequently may not implement it.
    */
   virtual
   void
-  interpolate(std::vector<double>                &local_dofs,
-              const std::vector<Vector<double> > &values,
-              unsigned int offset = 0) const;
-
-  /**
-   * Interpolate a set of vector values, computed in the generalized support
-   * points.
-   */
-  virtual
-  void
-  interpolate(std::vector<double> &local_dofs,
-              const VectorSlice<const std::vector<std::vector<double> > > &values) const;
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
 
   //@}
 
@@ -2277,6 +2435,13 @@ protected:
    * initialized in the constructor of this class.
    */
   const std::vector<unsigned int> n_nonzero_components_table;
+
+  /**
+   * Store whether all shape functions are primitive. Since finding this out
+   * is a very common operation, we cache the result, i.e. compute the value
+   * in the constructor for simpler access.
+   */
+  const bool cached_primitivity;
 
   /**
    * Return the size of interface constraint matrices. Since this is needed in
@@ -2711,6 +2876,15 @@ protected:
   friend class FEFaceValues<dim,spacedim>;
   friend class FESubfaceValues<dim,spacedim>;
   friend class FESystem<dim,spacedim>;
+
+  // explicitly check for sensible template arguments, but not on windows
+  // because MSVC creates bogus warnings during normal compilation
+#ifndef DEAL_II_MSVC
+  static_assert (dim<=spacedim,
+                 "The dimension <dim> of a FiniteElement must be less than or "
+                 "equal to the space dimension <spacedim> in which it lives.");
+#endif
+
 };
 
 
@@ -2921,6 +3095,16 @@ FiniteElement<dim,spacedim>::n_nonzero_components (const unsigned int i) const
 {
   Assert (i < this->dofs_per_cell, ExcIndexRange (i, 0, this->dofs_per_cell));
   return n_nonzero_components_table[i];
+}
+
+
+
+template <int dim, int spacedim>
+inline
+bool
+FiniteElement<dim,spacedim>::is_primitive () const
+{
+  return cached_primitivity;
 }
 
 

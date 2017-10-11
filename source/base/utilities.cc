@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,17 @@
 //
 // ---------------------------------------------------------------------
 
+#include <deal.II/base/config.h>
+
+// It's necessary to include winsock2.h before thread_local_storage.h,
+// because Intel implementation of TBB includes winsock.h,
+// and we'll get a conflict between winsock.h and winsock2.h otherwise.
+#ifdef DEAL_II_MSVC
+#  include <winsock2.h>
+#endif
 
 #include <deal.II/base/utilities.h>
+#include <deal.II/base/mpi.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/thread_local_storage.h>
 
@@ -37,25 +46,27 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #include <limits>
 #include <sstream>
 
+#if defined(DEAL_II_HAVE_UNISTD_H) && defined(DEAL_II_HAVE_GETHOSTNAME)
+#  include <unistd.h>
+#endif
+
 #ifndef DEAL_II_MSVC
 #  include <stdlib.h>
 #endif
 
-#ifdef DEAL_II_MSVC
-#  include <winsock2.h>
-#endif
 
-
+DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #ifdef DEAL_II_WITH_TRILINOS
 #  ifdef DEAL_II_WITH_MPI
 #    include <Epetra_MpiComm.h>
 #    include <deal.II/lac/vector_memory.h>
 #    include <deal.II/lac/trilinos_vector.h>
-#    include <deal.II/lac/trilinos_block_vector.h>
+#    include <deal.II/lac/trilinos_parallel_block_vector.h>
 #  endif
-#  include "Teuchos_RCP.hpp"
-#  include "Epetra_SerialComm.h"
+#  include <Teuchos_RCP.hpp>
+#  include <Epetra_SerialComm.h>
 #endif
+DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 
 
@@ -131,7 +142,7 @@ namespace Utilities
   trim(const std::string &input)
   {
     std::string::size_type left = 0;
-    std::string::size_type right = input.size() - 1;
+    std::string::size_type right = input.size() > 0 ? input.size() - 1 : 0;
 
     for (; left < input.size(); ++left)
       {
@@ -243,7 +254,7 @@ namespace Utilities
     errno = 0;
     const double d = std::strtod(s.c_str(), &p);
     AssertThrow ( !((errno != 0) || (s.size() == 0) || ((s.size()>0) && (*p != '\0'))),
-                  ExcMessage ("Can't convert <" + s + "> to an integer."));
+                  ExcMessage ("Can't convert <" + s + "> to a double."));
 
     return d;
   }
@@ -263,7 +274,7 @@ namespace Utilities
 
   std::vector<std::string>
   split_string_list (const std::string &s,
-                     const char         delimiter)
+                     const std::string &delimiter)
   {
     // keep the currently remaining part of the input string in 'tmp' and
     // keep chopping elements of the list off the front
@@ -281,7 +292,6 @@ namespace Utilities
     // there was space after the last delimiter. this matches what's
     // discussed in the documentation
     std::vector<std::string> split_list;
-    split_list.reserve (std::count (tmp.begin(), tmp.end(), delimiter)+1);
     while (tmp.length() != 0)
       {
         std::string name;
@@ -290,7 +300,7 @@ namespace Utilities
         if (name.find(delimiter) != std::string::npos)
           {
             name.erase (name.find(delimiter), std::string::npos);
-            tmp.erase (0, tmp.find(delimiter)+1);
+            tmp.erase (0, tmp.find(delimiter)+delimiter.size());
           }
         else
           tmp = "";
@@ -307,6 +317,15 @@ namespace Utilities
     return split_list;
   }
 
+
+  std::vector<std::string>
+  split_string_list (const std::string &s,
+                     const char delimiter)
+  {
+    std::string d = ",";
+    d[0] = delimiter;
+    return split_string_list(s,d);
+  }
 
 
   std::vector<std::string>
@@ -329,7 +348,7 @@ namespace Utilities
         while ((text.length() != 0) && (text[0] == delimiter))
           text.erase(0, 1);
 
-        std::size_t pos_newline = text.find_first_of("\n", 0);
+        std::size_t pos_newline = text.find_first_of('\n', 0);
         if (pos_newline != std::string::npos && pos_newline <= width)
           {
             std::string line (text, 0, pos_newline);
@@ -656,7 +675,7 @@ namespace Utilities
 
     std::string get_time ()
     {
-      std::time_t  time1= std::time (0);
+      std::time_t  time1= std::time (nullptr);
       std::tm     *time = std::localtime(&time1);
 
       std::ostringstream o;
@@ -671,7 +690,7 @@ namespace Utilities
 
     std::string get_date ()
     {
-      std::time_t  time1= std::time (0);
+      std::time_t  time1= std::time (nullptr);
       std::tm     *time = std::localtime(&time1);
 
       std::ostringstream o;
@@ -690,7 +709,7 @@ namespace Utilities
       const int ierr = ::posix_memalign (memptr, alignment, size);
 
       AssertThrow (ierr == 0, ExcOutOfMemory());
-      AssertThrow (*memptr != 0, ExcOutOfMemory());
+      AssertThrow (*memptr != nullptr, ExcOutOfMemory());
 #else
       // Windows does not appear to have posix_memalign. just use the
       // regular malloc in that case
@@ -755,7 +774,7 @@ namespace Utilities
       // return a duplicate of it
       const Epetra_MpiComm
       *mpi_comm = dynamic_cast<const Epetra_MpiComm *>(&communicator);
-      if (mpi_comm != 0)
+      if (mpi_comm != nullptr)
         return new Epetra_MpiComm(Utilities::MPI::
                                   duplicate_communicator(mpi_comm->GetMpiComm()));
 #endif
@@ -765,7 +784,7 @@ namespace Utilities
       // not an MPI communicator, return a
       // copy of the same object again
       Assert (dynamic_cast<const Epetra_SerialComm *>(&communicator)
-              != 0,
+              != nullptr,
               ExcInternalError());
       return new Epetra_SerialComm(dynamic_cast<const Epetra_SerialComm &>(communicator));
     }
@@ -779,11 +798,12 @@ namespace Utilities
 #ifdef DEAL_II_WITH_MPI
       Epetra_MpiComm
       *mpi_comm = dynamic_cast<Epetra_MpiComm *>(&communicator);
-      if (mpi_comm != 0)
+      if (mpi_comm != nullptr)
         {
           MPI_Comm comm = mpi_comm->GetMpiComm();
           *mpi_comm = Epetra_MpiComm(MPI_COMM_SELF);
-          MPI_Comm_free (&comm);
+          const int ierr = MPI_Comm_free (&comm);
+          AssertThrowMPI(ierr);
         }
 #endif
     }

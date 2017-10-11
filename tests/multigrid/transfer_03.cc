@@ -19,7 +19,6 @@
 
 //TODO:[GK] Add checks for RT again!
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/block_vector.h>
@@ -39,9 +38,6 @@
 #include <deal.II/multigrid/mg_transfer.h>
 #include <deal.II/multigrid/mg_tools.h>
 
-#include <fstream>
-#include <iomanip>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -61,7 +57,7 @@ reinit_vector (const dealii::DoFHandler<dim,spacedim> &mg_dof,
 }
 
 
-template<int dim>
+template <int dim>
 void refine_mesh (Triangulation<dim> &triangulation)
 {
   bool cell_refined = false;
@@ -247,7 +243,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   //check_simple (FESystem<2>(FE_Q<2>(1), 2));
   check_simple (FESystem<2>(FE_Q<2>(1), 4));

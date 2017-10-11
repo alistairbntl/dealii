@@ -20,13 +20,10 @@
 
 
 #include "../tests.h"
-#include <fstream>
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/quadrature_selector.h>
 #include <string>
-#include <cmath>
 
 
 template <int dim>
@@ -43,9 +40,7 @@ void check (const std::string     &name,
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   check ("gauss", 2, QGauss<1>(2));
   check ("gauss", 2, QGauss<2>(2));

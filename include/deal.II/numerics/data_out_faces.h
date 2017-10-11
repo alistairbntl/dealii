@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__data_out_faces_h
-#define dealii__data_out_faces_h
+#ifndef dealii_data_out_faces_h
+#define dealii_data_out_faces_h
 
 
 #include <deal.II/base/config.h>
@@ -42,10 +42,9 @@ namespace internal
                     const unsigned int n_subdivisions,
                     const std::vector<unsigned int> &n_postprocessor_outputs,
                     const Mapping<dim,spacedim> &mapping,
-                    const std::vector<std_cxx11::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
+                    const std::vector<std::shared_ptr<dealii::hp::FECollection<dim,spacedim> > > &finite_elements,
                     const UpdateFlags update_flags);
 
-      std::vector<Point<dim> > patch_normals;
       std::vector<Point<spacedim> > patch_evaluation_points;
     };
   }

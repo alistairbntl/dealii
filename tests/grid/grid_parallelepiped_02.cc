@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2013 - 2015 by the deal.II authors
+// Copyright (C) 2013 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -24,13 +24,8 @@
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/logstream.h>
-#include <cmath>
-#include <cstdlib>
 
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 
 // Output
 std::ofstream logfile ("output");
@@ -41,7 +36,7 @@ std::ofstream logfile ("output");
 // grid), this test is not entirely trivial.
 //
 // Here is the implementation in nd:
-template<int dim>
+template <int dim>
 void check_nd_parallelepiped_by_comparison (bool log)
 {
 
@@ -59,8 +54,8 @@ void check_nd_parallelepiped_by_comparison (bool log)
 
     case 2:
     {
-      corners[0] = Point<dim> (0.25, 0.50);
-      corners[1] = Point<dim> (0.50, 0.25);
+      corners[0] = Point<dim> (0.50, 0.25);
+      corners[1] = Point<dim> (0.25, 0.50);
       break;
     }
 

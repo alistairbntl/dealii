@@ -19,7 +19,6 @@
 // DoFRenumbering::Cuthill_McKee also works on empty processors
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/mpi.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/grid/grid_generator.h>
@@ -28,10 +27,9 @@
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/fe/fe_q.h>
-#include <fstream>
 
 using namespace dealii;
-template<int dim>
+template <int dim>
 void test()
 {
   parallel::distributed::Triangulation < dim > tr(MPI_COMM_WORLD);
@@ -50,9 +48,7 @@ int main(int argc, char *argv[])
   deallog.push(Utilities::int_to_string(myid));
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("2d");
       test<2>();

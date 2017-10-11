@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__multithread_info_h
-#define dealii__multithread_info_h
+#ifndef dealii_multithread_info_h
+#define dealii_multithread_info_h
 //---------------------------------------------------------------------------
 
 
@@ -48,6 +48,12 @@ class MultithreadInfo
 {
 public:
   /**
+   * Constructor. This constructor is deleted because no instance of
+   * this class needs to be constructed (all members are static).
+   */
+  MultithreadInfo () = delete;
+
+  /**
    * The number of CPUs in the system. At the moment detection of CPUs is only
    * implemented on Linux, FreeBSD, and Mac computers.  It is one if detection
    * failed or is not implemented on your system.
@@ -59,7 +65,7 @@ public:
   static unsigned int n_cores ();
 
   /**
-   * Returns the number of threads to use. This is initially set to the number
+   * Return the number of threads to use. This is initially set to the number
    * of cores the system has (see n_cores()) but can be further restricted by
    * set_thread_limit() and the environment variable DEAL_II_NUM_THREADS.
    */
@@ -81,32 +87,21 @@ public:
    *
    * This routine is executed automatically with the default argument before
    * your code in main() is running (using a static constructor). It is also
-   * executed by MPI_InitFinalize. Use the appropriate argument of the
-   * constructor of MPI_InitFinalize if you have an MPI based code.
+   * executed by Utilities::MPI::MPI_InitFinalize. Use the appropriate
+   * argument of the constructor of Utilities::MPI::MPI_InitFinalize if you
+   * have an MPI based code.
    */
   static void set_thread_limit (const unsigned int max_threads = numbers::invalid_unsigned_int);
 
   /**
-   * Returns if the TBB is running using a single thread either because of
+   * Return if the TBB is running using a single thread either because of
    * thread affinity or because it is set via a call to set_thread_limit. This
    * is used in the PETScWrappers to avoid using the interface that is not
    * thread-safe.
    */
   static bool is_running_single_threaded ();
 
-  /**
-   * Exception
-   */
-  DeclException0(ExcProcNotPresent);
-
 private:
-
-
-  /**
-   * Constructor made private because no instance of this class needs to be
-   * constructed as all members are static.
-   */
-  MultithreadInfo ();
 
   /**
    * Private function to determine the number of CPUs. Implementation for
@@ -131,6 +126,6 @@ private:
 
 //---------------------------------------------------------------------------
 DEAL_II_NAMESPACE_CLOSE
-// end of #ifndef dealii__multithread_info_h
+// end of #ifndef dealii_multithread_info_h
 #endif
 //---------------------------------------------------------------------------

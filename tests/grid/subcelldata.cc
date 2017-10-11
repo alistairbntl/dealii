@@ -21,7 +21,6 @@
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/tria_accessor.h>
 
-#include <fstream>
 
 
 static unsigned subcells[6][4] = {{0, 1, 2, 3},
@@ -110,8 +109,7 @@ void test()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   test<2>();
   test<3>();

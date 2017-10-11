@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,36 +15,47 @@
 
 #include <deal.II/base/memory_consumption.h>
 #include <deal.II/grid/tria.h>
-#include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/tria_accessor.h>
-#include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
+#include <deal.II/distributed/tria.h>
+#include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/fe/fe.h>
+#include <deal.II/lac/vector_element_access.h>
 #include <deal.II/lac/vector.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <deal.II/lac/petsc_vector.h>
+#include <deal.II/lac/la_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_vector.h>
+#include <deal.II/lac/petsc_parallel_block_vector.h>
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/lac/block_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
-#include <deal.II/lac/petsc_block_vector.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 #include <deal.II/numerics/solution_transfer.h>
 
 DEAL_II_NAMESPACE_OPEN
 
-
-
-template<int dim, typename VectorType, typename DoFHandlerType>
-SolutionTransfer<dim, VectorType, DoFHandlerType>::SolutionTransfer(const DoFHandlerType &dof)
+template <int dim, typename VectorType, typename DoFHandlerType>
+SolutionTransfer<dim, VectorType, DoFHandlerType>::
+SolutionTransfer(const DoFHandlerType &dof)
   :
   dof_handler(&dof, typeid(*this).name()),
   n_dofs_old(0),
   prepared_for(none)
-{}
+{
+  Assert ((dynamic_cast<const parallel::distributed::Triangulation<DoFHandlerType::dimension, DoFHandlerType::space_dimension>*>
+           (&dof_handler->get_triangulation())
+           == nullptr),
+          ExcMessage ("You are calling the dealii::SolutionTransfer class "
+                      "with a DoF handler that is built on a "
+                      "parallel::distributed::Triangulation. This will not "
+                      "work for parallel computations. You probably want to "
+                      "use the parallel::distributed::SolutionTransfer class."));
+}
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 SolutionTransfer<dim, VectorType, DoFHandlerType>::~SolutionTransfer()
 {
   clear ();
@@ -52,7 +63,7 @@ SolutionTransfer<dim, VectorType, DoFHandlerType>::~SolutionTransfer()
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 void SolutionTransfer<dim, VectorType, DoFHandlerType>::clear ()
 {
   indices_on_cell.clear();
@@ -64,7 +75,7 @@ void SolutionTransfer<dim, VectorType, DoFHandlerType>::clear ()
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 void SolutionTransfer<dim, VectorType, DoFHandlerType>::prepare_for_pure_refinement()
 {
   Assert(prepared_for!=pure_refinement, ExcAlreadyPrepForRef());
@@ -101,7 +112,7 @@ void SolutionTransfer<dim, VectorType, DoFHandlerType>::prepare_for_pure_refinem
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 void
 SolutionTransfer<dim, VectorType, DoFHandlerType>::refine_interpolate
 (const VectorType &in,
@@ -137,7 +148,7 @@ SolutionTransfer<dim, VectorType, DoFHandlerType>::refine_interpolate
         // function
         {
           const unsigned int this_fe_index = pointerstruct->second.active_fe_index;
-          const unsigned int dofs_per_cell=cell->get_dof_handler().get_fe()[this_fe_index].dofs_per_cell;
+          const unsigned int dofs_per_cell=cell->get_dof_handler().get_fe(this_fe_index).dofs_per_cell;
           local_values.reinit(dofs_per_cell, true);
 
           // make sure that the size of the stored indices is the same as
@@ -146,7 +157,8 @@ SolutionTransfer<dim, VectorType, DoFHandlerType>::refine_interpolate
           Assert(dofs_per_cell==(*pointerstruct->second.indices_ptr).size(),
                  ExcInternalError());
           for (unsigned int i=0; i<dofs_per_cell; ++i)
-            local_values(i)=in((*pointerstruct->second.indices_ptr)[i]);
+            local_values(i)=internal::ElementAccess<VectorType>::get(
+                              in,(*pointerstruct->second.indices_ptr)[i]);
           cell->set_dof_values_by_interpolation(local_values, out,
                                                 this_fe_index);
         }
@@ -179,7 +191,7 @@ namespace internal
   void extract_interpolation_matrices (const dealii::hp::DoFHandler<dim,spacedim> &dof,
                                        dealii::Table<2,FullMatrix<double> > &matrices)
   {
-    const dealii::hp::FECollection<dim,spacedim> &fe = dof.get_fe();
+    const dealii::hp::FECollection<dim,spacedim> &fe = dof.get_fe_collection();
     matrices.reinit (fe.size(), fe.size());
     for (unsigned int i=0; i<fe.size(); ++i)
       for (unsigned int j=0; j<fe.size(); ++j)
@@ -227,7 +239,7 @@ namespace internal
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 void
 SolutionTransfer<dim, VectorType, DoFHandlerType>::
 prepare_for_coarsening_and_refinement(const std::vector<VectorType> &all_in)
@@ -291,7 +303,7 @@ prepare_for_coarsening_and_refinement(const std::vector<VectorType> &all_in)
   std::vector<std::vector<bool> > restriction_is_additive;
 
   internal::extract_interpolation_matrices (*dof_handler, interpolation_hp);
-  internal::restriction_additive (dof_handler->get_fe(), restriction_is_additive);
+  internal::restriction_additive (dof_handler->get_fe_collection(), restriction_is_additive);
 
   // we need counters for
   // the 'to_stay_or_refine' cells 'n_sr' and
@@ -352,7 +364,7 @@ prepare_for_coarsening_and_refinement(const std::vector<VectorType> &all_in)
                 most_general_child = child;
           const unsigned int target_fe_index = cell->child(most_general_child)->active_fe_index();
 
-          const unsigned int dofs_per_cell=cell->get_dof_handler().get_fe()[target_fe_index].dofs_per_cell;
+          const unsigned int dofs_per_cell=cell->get_dof_handler().get_fe(target_fe_index).dofs_per_cell;
 
           std::vector<Vector<typename VectorType::value_type> >(in_size,
                                                                 Vector<typename VectorType::value_type>(dofs_per_cell))
@@ -380,7 +392,7 @@ prepare_for_coarsening_and_refinement(const std::vector<VectorType> &all_in)
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 void
 SolutionTransfer<dim, VectorType, DoFHandlerType>::prepare_for_coarsening_and_refinement
 (const VectorType &in)
@@ -391,7 +403,7 @@ SolutionTransfer<dim, VectorType, DoFHandlerType>::prepare_for_coarsening_and_re
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 void SolutionTransfer<dim, VectorType, DoFHandlerType>::
 interpolate (const std::vector<VectorType> &all_in,
              std::vector<VectorType>       &all_out) const
@@ -439,7 +451,7 @@ interpolate (const std::vector<VectorType> &all_in,
           // cell stayed as it was or was refined
           if (indexptr)
             {
-              Assert (valuesptr == 0,
+              Assert (valuesptr == nullptr,
                       ExcInternalError());
 
               const unsigned int old_fe_index =
@@ -455,7 +467,8 @@ interpolate (const std::vector<VectorType> &all_in,
                 {
                   tmp.reinit (in_size, true);
                   for (unsigned int i=0; i<in_size; ++i)
-                    tmp(i) = all_in[j]((*indexptr)[i]);
+                    tmp(i) = internal::ElementAccess<VectorType>::get(all_in[j],
+                                                                      (*indexptr)[i]);
 
                   cell->set_dof_values_by_interpolation (tmp, all_out[j],
                                                          old_fe_index);
@@ -466,7 +479,7 @@ interpolate (const std::vector<VectorType> &all_in,
             // deleted
             {
               Assert (!cell->has_children(), ExcInternalError());
-              Assert (indexptr == 0,
+              Assert (indexptr == nullptr,
                       ExcInternalError());
 
               const unsigned int dofs_per_cell = cell->get_fe().dofs_per_cell;
@@ -490,7 +503,7 @@ interpolate (const std::vector<VectorType> &all_in,
                   // test we would have to
                   // store the fe_index of all
                   // cells
-                  const Vector<typename VectorType::value_type> *data = 0;
+                  const Vector<typename VectorType::value_type> *data = nullptr;
                   const unsigned int active_fe_index = cell->active_fe_index();
                   if (active_fe_index != pointerstruct->second.active_fe_index)
                     {
@@ -508,7 +521,8 @@ interpolate (const std::vector<VectorType> &all_in,
 
 
                   for (unsigned int i=0; i<dofs_per_cell; ++i)
-                    all_out[j](dofs[i])=(*data)(i);
+                    internal::ElementAccess<VectorType>::set((*data)(i), dofs[i],
+                                                             all_out[j]);
                 }
             }
           // undefined status
@@ -520,7 +534,7 @@ interpolate (const std::vector<VectorType> &all_in,
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 void SolutionTransfer<dim, VectorType, DoFHandlerType>::interpolate
 (const VectorType &in,
  VectorType       &out) const
@@ -541,7 +555,7 @@ void SolutionTransfer<dim, VectorType, DoFHandlerType>::interpolate
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 std::size_t
 SolutionTransfer<dim, VectorType, DoFHandlerType>::memory_consumption () const
 {
@@ -558,7 +572,7 @@ SolutionTransfer<dim, VectorType, DoFHandlerType>::memory_consumption () const
 
 
 
-template<int dim, typename VectorType, typename DoFHandlerType>
+template <int dim, typename VectorType, typename DoFHandlerType>
 std::size_t
 SolutionTransfer<dim, VectorType, DoFHandlerType>::Pointerstruct::memory_consumption () const
 {

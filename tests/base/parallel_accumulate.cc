@@ -17,8 +17,6 @@
 // test parallel::accumulate_from_subranges
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
 
 #include <deal.II/base/parallel.h>
 
@@ -35,9 +33,7 @@ int sum (const int begin,
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   const int N = 10000;
   const int s = parallel::accumulate_from_subranges<int> (&sum, 0, N, 10);

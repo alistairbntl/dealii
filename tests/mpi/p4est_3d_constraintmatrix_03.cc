@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,8 +20,6 @@
 // Mesh: shell with random refinement
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/function.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -39,12 +37,11 @@
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/grid/tria_boundary_lib.h>
 #include <deal.II/numerics/data_out.h>
-#include <deal.II/lac/trilinos_block_vector.h>
+#include <deal.II/lac/trilinos_parallel_block_vector.h>
 
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_system.h>
 
-#include <fstream>
 #include <sstream>
 
 const double R0      = 0.5;//6371000.-2890000.;
@@ -54,7 +51,7 @@ const double T1 = 2.0;
 
 
 
-template<int dim>
+template <int dim>
 class FilteredDataOut : public DataOut<dim>
 {
 public:
@@ -130,7 +127,7 @@ TemperatureInitialValues<dim>::vector_value (const Point<dim> &p,
 }
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   parallel::distributed::Triangulation<dim> tr(MPI_COMM_WORLD);
@@ -264,7 +261,7 @@ void test()
 
           VectorTools::interpolate_boundary_values (dofh,
           0,
-          ZeroFunction<dim>(1),
+          Functions::ZeroFunction<dim>(1),
           cm,
           velocity_mask);          */
 
@@ -324,9 +321,7 @@ int main(int argc, char *argv[])
 
   if (myid == 0)
     {
-      std::ofstream logfile("output");
-      deallog.attach(logfile);
-      deallog.threshold_double(1.e-10);
+      initlog();
 
       deallog.push("3d");
       test<3>();

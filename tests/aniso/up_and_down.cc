@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -23,7 +23,6 @@
 
 #include "../tests.h"
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -37,7 +36,6 @@
 #include <deal.II/fe/fe_values.h>
 
 #include <vector>
-#include <fstream>
 #include <string>
 
 #define PRECISION 2
@@ -155,8 +153,8 @@ void test ()
     new FE_DGQ<dim>(0),
     new FE_DGQ<dim>(1),
     new FE_DGQ<dim>(2),
-    (dim<3 ? new FE_DGQ<dim>(3) : 0),
-    (dim<3 ? new FE_DGQ<dim>(4) : 0),
+    (dim<3 ? new FE_DGQ<dim>(3) : nullptr),
+    (dim<3 ? new FE_DGQ<dim>(4) : nullptr),
 
     // FE_DGP
     new FE_DGP<dim>(0),
@@ -225,13 +223,18 @@ void test ()
 
 
       for (unsigned int i=0; i<sizeof(fe_list)/sizeof(fe_list[0]); ++i)
-        if (fe_list[i] != 0)
+        if (fe_list[i] != nullptr)
           {
             deallog << dim << "d, uniform grid, fe #" << i
                     << ", " << ref_case_names[j];
             check_element (tr, *fe_list[i]);
           }
     }
+
+
+  for (unsigned int i=0; i<sizeof(fe_list)/sizeof(fe_list[0]); ++i)
+    if (fe_list[i] != nullptr)
+      delete fe_list[i];
 }
 
 
@@ -243,7 +246,6 @@ main()
   logfile.precision (PRECISION);
   logfile.setf(std::ios::fixed);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test<1>();
   test<2>();

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2016 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,8 +14,10 @@
 // ---------------------------------------------------------------------
 
 #include <deal.II/base/memory_consumption.h>
+#include <deal.II/base/mpi.h>
 #include <deal.II/base/index_set.h>
-#include <list>
+
+#include <vector>
 
 #ifdef DEAL_II_WITH_TRILINOS
 #  ifdef DEAL_II_WITH_MPI
@@ -39,16 +41,21 @@ DEAL_II_NAMESPACE_OPEN
 IndexSet::IndexSet (const Epetra_Map &map)
   :
   is_compressed (true),
-  index_space_size (map.NumGlobalElements64()),
+  index_space_size (1+map.MaxAllGID64()),
   largest_range (numbers::invalid_unsigned_int)
 {
+  Assert(
+    map.MinAllGID64() == 0,
+    ExcMessage("The Epetra_Map does not contain the global index 0, which "
+               "means some entries are not present on any processor."));
+
   // For a contiguous map, we do not need to go through the whole data...
   if (map.LinearMap())
     add_range(size_type(map.MinMyGID64()), size_type(map.MaxMyGID64()+1));
   else
     {
       const size_type n_indices = map.NumMyElements();
-      size_type *indices = (size_type *)map.MyGlobalElements64();
+      size_type *indices = reinterpret_cast<size_type *>(map.MyGlobalElements64());
       add_indices(indices, indices+n_indices);
     }
   compress();
@@ -61,16 +68,21 @@ IndexSet::IndexSet (const Epetra_Map &map)
 IndexSet::IndexSet (const Epetra_Map &map)
   :
   is_compressed (true),
-  index_space_size (map.NumGlobalElements()),
+  index_space_size (1+map.MaxAllGID()),
   largest_range (numbers::invalid_unsigned_int)
 {
+  Assert(
+    map.MinAllGID() == 0,
+    ExcMessage("The Epetra_Map does not contain the global index 0, which "
+               "means some entries are not present on any processor."));
+
   // For a contiguous map, we do not need to go through the whole data...
   if (map.LinearMap())
     add_range(size_type(map.MinMyGID()), size_type(map.MaxMyGID()+1));
   else
     {
       const size_type n_indices = map.NumMyElements();
-      unsigned int *indices = (unsigned int *)map.MyGlobalElements();
+      unsigned int *indices = reinterpret_cast<unsigned int *>(map.MyGlobalElements());
       add_indices(indices, indices+n_indices);
     }
   compress();
@@ -117,6 +129,13 @@ IndexSet::add_range (const size_type begin,
 void
 IndexSet::do_compress () const
 {
+  // we will, in the following, modify mutable variables. this can only
+  // work in multithreaded applications if we lock the data structures
+  // via a mutex, so that users can call 'const' functions from threads
+  // in parallel (and these 'const' functions can then call compress()
+  // which itself calls the current function)
+  Threads::Mutex::ScopedLock lock (compress_mutex);
+
   // see if any of the contiguous ranges can be merged. do not use
   // std::vector::erase in-place as it is quadratic in the number of
   // ranges. since the ranges are sorted by their first index, determining
@@ -273,10 +292,9 @@ IndexSet::subtract_set (const IndexSet &other)
   is_compressed = false;
 
 
-  // we save new ranges to be added to our IndexSet in an temporary list and
-  // add all of them in one go at the end. This is necessary because a growing
-  // ranges vector invalidates iterators.
-  std::list<Range> temp_list;
+  // we save new ranges to be added to our IndexSet in an temporary vector and
+  // add all of them in one go at the end.
+  std::vector<Range> new_ranges;
 
   std::vector<Range>::iterator own_it = ranges.begin();
   std::vector<Range>::iterator other_it = other.ranges.begin();
@@ -302,7 +320,7 @@ IndexSet::subtract_set (const IndexSet &other)
         {
           Range r(own_it->begin, other_it->begin);
           r.nth_index_in_set = 0; //fix warning of unused variable
-          temp_list.push_back(r);
+          new_ranges.push_back(r);
         }
       // change own_it to the sub range behind other_it. Do not delete own_it
       // in any case. As removal would invalidate iterators, we just shrink
@@ -330,12 +348,50 @@ IndexSet::subtract_set (const IndexSet &other)
     }
 
   // done, now add the temporary ranges
-  for (std::list<Range>::iterator it = temp_list.begin();
-       it != temp_list.end();
-       ++it)
+  const std::vector<Range>::iterator end = new_ranges.end();
+  for (std::vector<Range>::iterator it = new_ranges.begin();
+       it != end; ++it)
     add_range(it->begin, it->end);
 
   compress();
+}
+
+
+
+IndexSet::size_type
+IndexSet::pop_back ()
+{
+  Assert(is_empty() == false,
+         ExcMessage("pop_back() failed, because this IndexSet contains no entries."));
+
+  const size_type index = ranges.back().end-1;
+  --ranges.back().end;
+
+  if (ranges.back().begin == ranges.back().end)
+    ranges.pop_back();
+
+  return index;
+}
+
+
+
+IndexSet::size_type
+IndexSet::pop_front ()
+{
+  Assert(is_empty() == false,
+         ExcMessage("pop_front() failed, because this IndexSet contains no entries."));
+
+  const size_type index = ranges.front().begin;
+  ++ranges.front().begin;
+
+  if (ranges.front().begin == ranges.front().end)
+    ranges.erase(ranges.begin());
+
+  // We have to set this in any case, because nth_index_in_set is no longer
+  // up to date for all but the first range
+  is_compressed = false;
+
+  return index;
 }
 
 
@@ -346,6 +402,11 @@ IndexSet::add_indices(const IndexSet &other,
 {
   if ((this == &other) && (offset == 0))
     return;
+
+  Assert (other.ranges.size() == 0
+          || other.ranges.back().end-1 < index_space_size,
+          ExcIndexRangeType<size_type> (other.ranges.back().end-1,
+                                        0, index_space_size));
 
   compress();
   other.compress();
@@ -368,7 +429,7 @@ IndexSet::add_indices(const IndexSet &other,
         }
       else if (r1 == ranges.end() || (r2->end+offset) < r1->begin)
         {
-          new_ranges.push_back(Range(r2->begin+offset,r2->end+offset));
+          new_ranges.emplace_back(r2->begin+offset, r2->end+offset);
           ++r2;
         }
       else
@@ -408,14 +469,18 @@ IndexSet::write(std::ostream &out) const
 void
 IndexSet::read(std::istream &in)
 {
-  size_type s;
-  unsigned int numranges;
+  AssertThrow (in, ExcIO());
 
-  in >> s >> numranges;
+  size_type s;
+  unsigned int n_ranges;
+
+  in >> s >> n_ranges;
   ranges.clear();
   set_size(s);
-  for (unsigned int i=0; i<numranges; ++i)
+  for (unsigned int i=0; i<n_ranges; ++i)
     {
+      AssertThrow (in, ExcIO());
+
       size_type b, e;
       in >> b >> e;
       add_range(b,e);
@@ -485,6 +550,7 @@ IndexSet::make_trilinos_map (const MPI_Comm &communicator,
                              const bool overlapping) const
 {
   compress ();
+  (void)communicator;
 
 #ifdef DEBUG
   if (!overlapping)
@@ -510,43 +576,112 @@ IndexSet::make_trilinos_map (const MPI_Comm &communicator,
     }
 #endif
 
-  // Check that all the processors have a contiguous range of values. Otherwise,
-  // we risk to call different Epetra_Map on different processors and the code
-  // hangs.
-  const bool all_contiguous = (Utilities::MPI::min (is_contiguous() ? 1 : 0, communicator) == 1);
-  if ((all_contiguous) && (!overlapping))
+  // Find out if the IndexSet is ascending and 1:1. This corresponds to a
+  // linear EpetraMap. Overlapping IndexSets are never 1:1.
+  const bool linear = overlapping ? false : is_ascending_and_one_to_one(communicator);
+
+  if (linear)
     return Epetra_Map (TrilinosWrappers::types::int_type(size()),
                        TrilinosWrappers::types::int_type(n_elements()),
                        0,
 #ifdef DEAL_II_WITH_MPI
-                       Epetra_MpiComm(communicator));
+                       Epetra_MpiComm(communicator)
 #else
-                       Epetra_SerialComm());
+                       Epetra_SerialComm()
 #endif
+                      );
   else
     {
       std::vector<size_type> indices;
       fill_index_vector(indices);
-
       return Epetra_Map (TrilinosWrappers::types::int_type(-1),
                          TrilinosWrappers::types::int_type(n_elements()),
                          (n_elements() > 0
                           ?
                           reinterpret_cast<TrilinosWrappers::types::int_type *>(&indices[0])
                           :
-                          0),
+                          nullptr),
                          0,
 #ifdef DEAL_II_WITH_MPI
-                         Epetra_MpiComm(communicator));
+                         Epetra_MpiComm(communicator)
 #else
-                         Epetra_SerialComm());
-      (void)communicator;
+                         Epetra_SerialComm()
 #endif
+                        );
     }
 }
-
-
 #endif
+
+
+
+bool
+IndexSet::is_ascending_and_one_to_one (const MPI_Comm &communicator) const
+{
+  // If the sum of local elements does not add up to the total size,
+  // the IndexSet can't be complete.
+  const size_type n_global_elements
+    = Utilities::MPI::sum (n_elements(), communicator);
+  if (n_global_elements != size())
+    return false;
+
+#ifdef DEAL_II_WITH_MPI
+  // Non-contiguous IndexSets can't be linear.
+  const bool all_contiguous = (Utilities::MPI::min (is_contiguous() ? 1 : 0, communicator) == 1);
+  if (!all_contiguous)
+    return false;
+
+  bool is_globally_ascending = true;
+  // we know that there is only one interval
+  types::global_dof_index first_local_dof
+    = (n_elements()>0) ? *(begin_intervals()->begin())
+      : numbers::invalid_dof_index ;
+
+  const unsigned int my_rank = Utilities::MPI::this_mpi_process(communicator);
+  const unsigned int n_ranks = Utilities::MPI::n_mpi_processes(communicator);
+  // first gather all information on process 0
+  const unsigned int gather_size = (my_rank==0)?n_ranks:1;
+  std::vector<types::global_dof_index> global_dofs(gather_size);
+
+  int ierr = MPI_Gather(&first_local_dof, 1, DEAL_II_DOF_INDEX_MPI_TYPE,
+                        &(global_dofs[0]), 1, DEAL_II_DOF_INDEX_MPI_TYPE, 0,
+                        communicator);
+  AssertThrowMPI(ierr);
+
+  if (my_rank == 0)
+    {
+      // find out if the received std::vector is ascending
+      types::global_dof_index old_dof = global_dofs[0];
+      types::global_dof_index index = 0;
+      while (global_dofs[index] == numbers::invalid_dof_index)
+        ++index;
+      old_dof = global_dofs[index++];
+      for (; index<global_dofs.size(); ++index)
+        {
+          const types::global_dof_index new_dof = global_dofs[index];
+          if (new_dof !=  numbers::invalid_dof_index)
+            {
+              if  (new_dof <= old_dof)
+                {
+                  is_globally_ascending = false;
+                  break;
+                }
+              else
+                old_dof = new_dof;
+            }
+        }
+    }
+
+  // now broadcast the result
+  int is_ascending = is_globally_ascending ? 1 : 0;
+  ierr = MPI_Bcast(&is_ascending, 1, MPI_INT, 0, communicator);
+  AssertThrowMPI(ierr);
+
+  return (is_ascending==1);
+#else
+  return true;
+#endif //DEAL_II_WITH_MPI
+}
+
 
 
 std::size_t
@@ -554,7 +689,8 @@ IndexSet::memory_consumption () const
 {
   return (MemoryConsumption::memory_consumption (ranges) +
           MemoryConsumption::memory_consumption (is_compressed) +
-          MemoryConsumption::memory_consumption (index_space_size));
+          MemoryConsumption::memory_consumption (index_space_size) +
+          sizeof (compress_mutex));
 }
 
 

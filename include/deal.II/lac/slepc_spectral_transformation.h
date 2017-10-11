@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2016 by the deal.II authors
+// Copyright (C) 2009 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -14,20 +14,21 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__slepc_spectral_transformation_h
-#define dealii__slepc_spectral_transformation_h
+#ifndef dealii_slepc_spectral_transformation_h
+#define dealii_slepc_spectral_transformation_h
 
 
 #include <deal.II/base/config.h>
 
 #ifdef DEAL_II_WITH_SLEPC
 
-#  include <deal.II/base/std_cxx11/shared_ptr.h>
 #  include <deal.II/lac/exceptions.h>
 #  include <deal.II/lac/petsc_solver.h>
 
 #  include <petscksp.h>
 #  include <slepceps.h>
+
+#  include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -86,8 +87,8 @@ namespace SLEPcWrappers
      * the spectral transformations.
      *
      * The possible values are given by the enumerator STMatMode in the SLEPc
-     * library http://www.grycap.upv.es/slepc/documentation/current/docs/manua
-     * lpages/ST/STMatMode.html
+     * library
+     * http://www.grycap.upv.es/slepc/documentation/current/docs/manualpages/ST/STMatMode.html
      */
     void set_matrix_mode(const STMatMode mode);
 

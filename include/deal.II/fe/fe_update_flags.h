@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_update_flags_h
-#define dealii__fe_update_flags_h
+#ifndef dealii_fe_update_flags_h
+#define dealii_fe_update_flags_h
 
 
 #include <deal.II/base/config.h>
@@ -196,7 +196,7 @@ enum UpdateFlags
    */
   update_jacobian_pushed_forward_3rd_derivatives = 0x1000000,
   /**
-   * @deprecated Update quadrature points
+   * @deprecated Use #update_quadrature_points instead.
    */
   update_q_points = update_quadrature_points,
   /**
@@ -207,7 +207,31 @@ enum UpdateFlags
   /**
    * Combination of the flags needed for Piola transform of Hdiv elements.
    */
-  update_piola = update_volume_elements | update_contravariant_transformation
+  update_piola = update_volume_elements | update_contravariant_transformation,
+  /**
+   * Combination of the flags that require a mapping calculation
+   */
+  update_mapping =
+    // Direct data
+    update_quadrature_points |
+    update_JxW_values |
+    update_jacobians |
+    update_jacobian_grads |
+    update_jacobian_pushed_forward_grads |
+    update_jacobian_2nd_derivatives |
+    update_jacobian_pushed_forward_2nd_derivatives |
+    update_jacobian_3rd_derivatives |
+    update_jacobian_pushed_forward_3rd_derivatives |
+    update_inverse_jacobians |
+    update_boundary_forms |
+    update_normal_vectors |
+    // Transformation dependence
+    update_covariant_transformation |
+    update_contravariant_transformation |
+    update_transformation_values |
+    update_transformation_gradients |
+    // Volume data
+    update_volume_elements
 };
 
 
@@ -218,7 +242,8 @@ enum UpdateFlags
  */
 template <class StreamType>
 inline
-StreamType &operator << (StreamType &s, UpdateFlags u)
+StreamType &operator << (StreamType &s,
+                         const UpdateFlags u)
 {
   s << " UpdateFlags|";
   if (u & update_values)                                  s << "values|";
@@ -257,7 +282,8 @@ StreamType &operator << (StreamType &s, UpdateFlags u)
  */
 inline
 UpdateFlags
-operator | (UpdateFlags f1, UpdateFlags f2)
+operator | (const UpdateFlags f1,
+            const UpdateFlags f2)
 {
   return static_cast<UpdateFlags> (
            static_cast<unsigned int> (f1) |
@@ -275,7 +301,8 @@ operator | (UpdateFlags f1, UpdateFlags f2)
  */
 inline
 UpdateFlags &
-operator |= (UpdateFlags &f1, UpdateFlags f2)
+operator |= (UpdateFlags &f1,
+             const UpdateFlags f2)
 {
   f1 = f1 | f2;
   return f1;
@@ -293,7 +320,8 @@ operator |= (UpdateFlags &f1, UpdateFlags f2)
  */
 inline
 UpdateFlags
-operator & (UpdateFlags f1, UpdateFlags f2)
+operator & (const UpdateFlags f1,
+            const UpdateFlags f2)
 {
   return static_cast<UpdateFlags> (
            static_cast<unsigned int> (f1) &
@@ -309,7 +337,8 @@ operator & (UpdateFlags f1, UpdateFlags f2)
  */
 inline
 UpdateFlags &
-operator &= (UpdateFlags &f1, UpdateFlags f2)
+operator &= (UpdateFlags &f1,
+             const UpdateFlags f2)
 {
   f1 = f1 & f2;
   return f1;
@@ -331,9 +360,22 @@ namespace CellSimilarity
 {
   enum Similarity
   {
+    /**
+     * The cells differ by something besides a translation or inverted
+     * translations.
+     */
     none,
+    /**
+     * The cells differ by a translation.
+     */
     translation,
+    /**
+     * The cells differ by an inverted translation.
+     */
     inverted_translation,
+    /**
+     * The next cell is not valid.
+     */
     invalid_next_cell
   };
 }

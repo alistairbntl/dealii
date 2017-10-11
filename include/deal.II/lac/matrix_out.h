@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__matrix_out_h
-#define dealii__matrix_out_h
+#ifndef dealii_matrix_out_h
+#define dealii_matrix_out_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/data_out_base.h>
@@ -114,7 +114,7 @@ public:
   /**
    * Destructor. Declared in order to make it virtual.
    */
-  virtual ~MatrixOut ();
+  virtual ~MatrixOut () = default;
 
   /**
    * Generate a list of patches from the given matrix and use the given string

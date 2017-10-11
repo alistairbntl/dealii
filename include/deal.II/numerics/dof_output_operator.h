@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------
 
 
-#ifndef dealii__dof_output_operator_h
-#define dealii__dof_output_operator_h
+#ifndef dealii_dof_output_operator_h
+#define dealii_dof_output_operator_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/parameter_handler.h>
@@ -47,7 +47,7 @@ namespace Algorithms
      * last step command. Numbers with less digits are filled with
      * zeros from the left.
      */
-    DoFOutputOperator (const std::string filename_base = std::string("output"),
+    DoFOutputOperator (const std::string &filename_base = std::string("output"),
                        const unsigned int digits = 3);
 
     void parse_parameters(ParameterHandler &param);

@@ -15,7 +15,7 @@
 
 
 
-// when calling TrilinosWrappers::Vector::operator() (), the return type is a
+// when calling TrilinosWrappers::MPI::Vector::operator() (), the return type is a
 // reference object, not a reference to the actual element. this leads to the
 // funny situation that an assignment like v2(i)=v1(i) isn't really what it
 // looks like: it tries to copy the reference objects, not the values they
@@ -26,13 +26,12 @@
 #include "../tests.h"
 #include <deal.II/base/utilities.h>
 #include <deal.II/lac/trilinos_vector.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
 
-void test (TrilinosWrappers::Vector &v,
-           TrilinosWrappers::Vector &w)
+void test (TrilinosWrappers::MPI::Vector &v,
+           TrilinosWrappers::MPI::Vector &w)
 {
   // set the first vector
   for (unsigned int i=0; i<v.size(); ++i)
@@ -52,9 +51,7 @@ void test (TrilinosWrappers::Vector &v,
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, testing_max_num_threads());
 
@@ -62,8 +59,10 @@ int main (int argc, char **argv)
   try
     {
       {
-        TrilinosWrappers::Vector v (100);
-        TrilinosWrappers::Vector w (100);
+        TrilinosWrappers::MPI::Vector v;
+        v.reinit(complete_index_set(100), MPI_COMM_WORLD);
+        TrilinosWrappers::MPI::Vector w;
+        w.reinit(complete_index_set(100), MPI_COMM_WORLD);
         test (v,w);
       }
     }

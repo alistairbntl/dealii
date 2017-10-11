@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2014 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -37,16 +37,24 @@ AutoDerivativeFunction (const double hh,
 }
 
 
-template <int dim>
-AutoDerivativeFunction<dim>::~AutoDerivativeFunction ()
-{}
-
-
 
 template <int dim>
 void
 AutoDerivativeFunction<dim>::set_formula (const DifferenceFormula form)
 {
+  // go through all known formulas, reject ones we don't know about
+  // and don't handle in the member functions of this class
+  switch (form)
+    {
+    case Euler:
+    case UpwindEuler:
+    case FourthOrder:
+      break;
+    default:
+      Assert(false, ExcMessage("The argument passed to this function does not "
+                               "match any known difference formula."));
+    }
+
   formula = form;
 }
 
@@ -108,7 +116,7 @@ AutoDerivativeFunction<dim>::gradient (const Point<dim>   &p,
       break;
     }
     default:
-      Assert(false, ExcInvalidFormula());
+      Assert(false, ExcNotImplemented());
     }
   return grad;
 }
@@ -185,7 +193,7 @@ vector_gradient (const Point<dim>            &p,
     }
 
     default:
-      Assert(false, ExcInvalidFormula());
+      Assert(false, ExcNotImplemented());
     }
 }
 
@@ -246,7 +254,7 @@ gradient_list (const std::vector<Point<dim> > &points,
     }
 
     default:
-      Assert(false, ExcInvalidFormula());
+      Assert(false, ExcNotImplemented());
     }
 }
 
@@ -314,7 +322,7 @@ vector_gradient_list (const std::vector<Point<dim> >            &points,
     }
 
     default:
-      Assert(false, ExcInvalidFormula());
+      Assert(false, ExcNotImplemented());
     }
 }
 

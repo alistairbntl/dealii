@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1998 - 2015 by the deal.II authors
+// Copyright (C) 1998 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,14 +13,16 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__quadrature_h
-#define dealii__quadrature_h
+#ifndef dealii_quadrature_h
+#define dealii_quadrature_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/point.h>
 #include <deal.II/base/subscriptor.h>
 #include <vector>
+#include <array>
+#include <memory>
 
 DEAL_II_NAMESPACE_OPEN
 
@@ -100,6 +102,8 @@ public:
   /**
    * Build this quadrature formula as the tensor product of a formula in a
    * dimension one less than the present and a formula in one dimension.
+   * This constructor assumes (and tests) that constant functions are integrated
+   * exactly, i.e. the sum of the quadrature weights is one.
    *
    * <tt>SubQuadrature<dim>::type</tt> expands to <tt>Quadrature<dim-1></tt>.
    */
@@ -117,6 +121,10 @@ public:
    * In order to avoid a conflict with the copy constructor in 1d, we let the
    * argument be a 0d quadrature formula for dim==1, and a 1d quadrature
    * formula for all other space dimensions.
+   *
+   * This constructor does not require that constant functions are integrated
+   * exactly. Therefore, it is appropriate if the one-dimensional formula
+   * is defined with respect to a weighting function.
    */
   explicit Quadrature (const Quadrature<dim != 1 ? 1 : 0> &quadrature_1d);
 
@@ -125,16 +133,11 @@ public:
    */
   Quadrature (const Quadrature<dim> &q);
 
-#ifdef DEAL_II_WITH_CXX11
   /**
    * Move constructor. Construct a new quadrature object by transferring the
    * internal data of another quadrature object.
-   *
-   * @note this constructor is only available if deal.II is configured with
-   * C++11 support.
    */
   Quadrature (Quadrature<dim> &&) = default;
-#endif
 
   /**
    * Construct a quadrature formula from given vectors of quadrature points
@@ -162,13 +165,19 @@ public:
   /**
    * Virtual destructor.
    */
-  virtual ~Quadrature ();
+  virtual ~Quadrature () = default;
 
   /**
    * Assignment operator. Copies contents of #weights and #quadrature_points
    * as well as size.
    */
   Quadrature &operator = (const Quadrature<dim> &);
+
+  /**
+   * Move assignment operator. Moves all data from another quadrature object
+   * to this object.
+   */
+  Quadrature &operator = (Quadrature<dim> &&) = default;
 
   /**
    * Test for equality of two quadratures.
@@ -220,6 +229,21 @@ public:
   template <class Archive>
   void serialize (Archive &ar, const unsigned int version);
 
+  /**
+   * This function returns true if the quadrature object is a tensor product
+   * of one-dimensional formulas and the quadrature points are sorted
+   * lexicographically.
+   */
+  bool is_tensor_product() const;
+
+  /**
+   * In case the quadrature formula is a tensor product, this function
+   * returns the one-dimensional basis objects.
+   * Otherwise, calling this function is not allowed.
+   */
+  typename std::conditional<dim==1, std::array<Quadrature<1>, dim>,const std::array<Quadrature<1>,dim>&>::type
+  get_tensor_basis() const;
+
 protected:
   /**
    * List of quadrature points. To be filled by the constructors of derived
@@ -232,6 +256,21 @@ protected:
    * constructors of derived classes.
    */
   std::vector<double>      weights;
+
+  /**
+   * Indicates if this object represents quadrature formula that is a tensor
+   * product of one-dimensional formulas.
+   * This flag is set if dim==1 or the constructors taking a Quadrature<1>
+   * (and possibly a Quadrature<dim-1> object) is called. This implies
+   * that the quadrature points are sorted lexicographically.
+   */
+  bool is_tensor_product_flag;
+
+  /**
+   * Stores the one-dimensional tensor basis objects in case this object
+   * can be represented by a tensor product.
+   */
+  std::unique_ptr<std::array<Quadrature<1>,dim>> tensor_basis;
 };
 
 
@@ -330,7 +369,7 @@ private:
 // -------------------  inline and template functions ----------------
 
 
-template<int dim>
+template <int dim>
 inline
 unsigned int
 Quadrature<dim>::size () const
@@ -381,6 +420,16 @@ Quadrature<dim>::get_weights () const
 
 
 template <int dim>
+inline
+bool
+Quadrature<dim>::is_tensor_product () const
+{
+  return is_tensor_product_flag;
+}
+
+
+
+template <int dim>
 template <class Archive>
 inline
 void
@@ -404,8 +453,6 @@ Quadrature<0>::Quadrature (const Quadrature<-1> &,
                            const Quadrature<1> &);
 template <>
 Quadrature<0>::Quadrature (const Quadrature<1> &);
-template <>
-Quadrature<0>::~Quadrature ();
 
 template <>
 Quadrature<1>::Quadrature (const Quadrature<0> &,

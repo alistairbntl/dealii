@@ -16,9 +16,7 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/std_cxx11/unique_ptr.h>
-#include <fstream>
-#include <iomanip>
+#include <memory>
 
 // counter for how many objects of type X there are
 int counter = 0;
@@ -45,9 +43,7 @@ struct X
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   // test with plain new/delete
   {
@@ -64,7 +60,7 @@ int main ()
   {
     AssertThrow (counter == 0, ExcInternalError());
     {
-      std_cxx11::unique_ptr<X> p (new X);
+      std::unique_ptr<X> p (new X);
       AssertThrow (counter == 1, ExcInternalError());
     }
     AssertThrow (counter == 0, ExcInternalError());
@@ -72,19 +68,17 @@ int main ()
 
   // test with plain unique_ptr, but also copy stuff. this only works
   // with move constructors, so test only in C++11 mode
-#ifdef DEAL_II_WITH_CXX11
   {
     AssertThrow (counter == 0, ExcInternalError());
     {
-      std_cxx11::unique_ptr<X> p (new X);
+      std::unique_ptr<X> p (new X);
       AssertThrow (counter == 1, ExcInternalError());
 
-      std_cxx11::unique_ptr<X> q = std::move(p);
+      std::unique_ptr<X> q = std::move(p);
       AssertThrow (counter == 1, ExcInternalError());
     }
     AssertThrow (counter == 0, ExcInternalError());
   }
-#endif
 
   deallog << "OK" << std::endl;
 }

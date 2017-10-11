@@ -19,7 +19,6 @@
 // cylinder parallel to the z-axis. this of course only works for 3d
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -32,7 +31,6 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_c1.h>
 
-#include <fstream>
 
 
 template <int dim>
@@ -64,9 +62,7 @@ void check ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   check<3> ();
 }

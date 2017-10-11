@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2004 - 2015 by the deal.II authors
+// Copyright (C) 2004 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__polynomials_raviart_thomas_h
-#define dealii__polynomials_raviart_thomas_h
+#ifndef dealii_polynomials_raviart_thomas_h
+#define dealii_polynomials_raviart_thomas_h
 
 
 #include <deal.II/base/config.h>
@@ -60,7 +60,7 @@ public:
   PolynomialsRaviartThomas (const unsigned int k);
 
   /**
-   * Computes the value and the first and second derivatives of each Raviart-
+   * Compute the value and the first and second derivatives of each Raviart-
    * Thomas polynomial at @p unit_point.
    *
    * The size of the vectors must either be zero or equal <tt>n()</tt>.  In
@@ -79,12 +79,12 @@ public:
                 std::vector<Tensor<5,dim> > &fourth_derivatives) const;
 
   /**
-   * Returns the number of Raviart-Thomas polynomials.
+   * Return the number of Raviart-Thomas polynomials.
    */
   unsigned int n () const;
 
   /**
-   * Returns the degree of the Raviart-Thomas space, which is one less than
+   * Return the degree of the Raviart-Thomas space, which is one less than
    * the highest polynomial degree.
    */
   unsigned int degree () const;

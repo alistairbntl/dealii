@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -31,8 +31,6 @@
 */
 
 #include "../tests.h"
-#include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -50,9 +48,8 @@
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/lac/trilinos_vector.h>
 
-#include <fstream>
 
-template<int dim>
+template <int dim>
 void output(parallel::distributed::Triangulation<dim> &tr)
 {
   const std::string filename = ("mesh." +
@@ -63,7 +60,7 @@ void output(parallel::distributed::Triangulation<dim> &tr)
 
 }
 
-template<int dim>
+template <int dim>
 void test()
 {
   unsigned int myid = Utilities::MPI::this_mpi_process (MPI_COMM_WORLD);
@@ -72,7 +69,7 @@ void test()
     deallog << "hyper_cube" << std::endl;
 
   parallel::distributed::Triangulation<dim> tr(MPI_COMM_WORLD,
-                                               Triangulation<dim>::none,
+                                               Triangulation<dim>:: limit_level_difference_at_vertices,
                                                parallel::distributed::Triangulation<dim>::construct_multigrid_hierarchy);
 
   GridGenerator::hyper_cube(tr);

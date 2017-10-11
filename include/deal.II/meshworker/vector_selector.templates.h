@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,6 +13,9 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_vector_selector_templates_h
+#define dealii_vector_selector_templates_h
+
 
 #include <deal.II/meshworker/vector_selector.h>
 #include <deal.II/base/vector_slice.h>
@@ -23,20 +26,11 @@ DEAL_II_NAMESPACE_OPEN
 namespace MeshWorker
 {
   template <int dim, int spacedim, typename Number>
-  VectorDataBase<dim, spacedim, Number>::~VectorDataBase()
-  {}
-
-
-  template <int dim, int spacedim, typename Number>
   VectorDataBase<dim, spacedim, Number>::VectorDataBase(const VectorSelector &v)
     :
     VectorSelector(v)
   {}
 
-
-  template <int dim, int spacedim, typename Number>
-  VectorDataBase<dim, spacedim, Number>::VectorDataBase()
-  {}
 
 
   template <int dim, int spacedim, typename Number>
@@ -52,8 +46,8 @@ namespace MeshWorker
   void
   VectorDataBase<dim, spacedim, Number>::fill(
     std::vector<std::vector<std::vector<Number> > > &,
-    std::vector<std::vector<std::vector<Tensor<1,dim,Number> > > > &,
-    std::vector<std::vector<std::vector<Tensor<2,dim,Number> > > > &,
+    std::vector<std::vector<std::vector<Tensor<1,spacedim,Number> > > > &,
+    std::vector<std::vector<std::vector<Tensor<2,spacedim,Number> > > > &,
     const FEValuesBase<dim,spacedim> &,
     const std::vector<types::global_dof_index> &,
     const unsigned int,
@@ -69,8 +63,8 @@ namespace MeshWorker
   void
   VectorDataBase<dim, spacedim, Number>::mg_fill(
     std::vector<std::vector<std::vector<Number> > > &,
-    std::vector<std::vector<std::vector<Tensor<1,dim,Number> > > > &,
-    std::vector<std::vector<std::vector<Tensor<2,dim,Number> > > > &,
+    std::vector<std::vector<std::vector<Tensor<1,spacedim,Number> > > > &,
+    std::vector<std::vector<std::vector<Tensor<2,spacedim,Number> > > > &,
     const FEValuesBase<dim,spacedim> &,
     const unsigned int,
     const std::vector<types::global_dof_index> &,
@@ -84,11 +78,6 @@ namespace MeshWorker
 
 
 //----------------------------------------------------------------------//
-
-  template <typename VectorType, int dim, int spacedim>
-  VectorData<VectorType, dim, spacedim>::VectorData()
-  {}
-
 
   template <typename VectorType, int dim, int spacedim>
   VectorData<VectorType, dim, spacedim>::VectorData(const VectorSelector &s)
@@ -120,8 +109,8 @@ namespace MeshWorker
   void
   VectorData<VectorType, dim, spacedim>::fill(
     std::vector<std::vector<std::vector<typename VectorType::value_type> > > &values,
-    std::vector<std::vector<std::vector<Tensor<1,dim,typename VectorType::value_type> > > > &gradients,
-    std::vector<std::vector<std::vector<Tensor<2,dim,typename VectorType::value_type> > > > &hessians,
+    std::vector<std::vector<std::vector<Tensor<1,spacedim,typename VectorType::value_type> > > > &gradients,
+    std::vector<std::vector<std::vector<Tensor<2,spacedim,typename VectorType::value_type> > > > &hessians,
     const FEValuesBase<dim,spacedim> &fe,
     const std::vector<types::global_dof_index> &index,
     const unsigned int component,
@@ -144,14 +133,14 @@ namespace MeshWorker
     for (unsigned int i=0; i<this->n_gradients(); ++i)
       {
         const VectorType *src = data.read_ptr<VectorType>(this->gradient_index(i));
-        VectorSlice<std::vector<std::vector<Tensor<1,dim,typename VectorType::value_type> > > > dst(gradients[i], component, n_comp);
+        VectorSlice<std::vector<std::vector<Tensor<1,spacedim,typename VectorType::value_type> > > > dst(gradients[i], component, n_comp);
         fe.get_function_gradients(*src, make_slice(index, start, size), dst, true);
       }
 
     for (unsigned int i=0; i<this->n_hessians(); ++i)
       {
         const VectorType *src = data.read_ptr<VectorType>(this->hessian_index(i));
-        VectorSlice<std::vector<std::vector<Tensor<2,dim,typename VectorType::value_type> > > > dst(hessians[i], component, n_comp);
+        VectorSlice<std::vector<std::vector<Tensor<2,spacedim,typename VectorType::value_type> > > > dst(hessians[i], component, n_comp);
         fe.get_function_hessians(*src, make_slice(index, start, size), dst, true);
       }
   }
@@ -167,11 +156,6 @@ namespace MeshWorker
   }
 
 //----------------------------------------------------------------------//
-
-  template <typename VectorType, int dim, int spacedim>
-  MGVectorData<VectorType, dim, spacedim>::MGVectorData()
-  {}
-
 
   template <typename VectorType, int dim, int spacedim>
   MGVectorData<VectorType, dim, spacedim>::MGVectorData(const VectorSelector &s)
@@ -204,8 +188,8 @@ namespace MeshWorker
   void
   VectorData<VectorType, dim, spacedim>::mg_fill
   (std::vector<std::vector<std::vector<typename VectorType::value_type> > >                &values,
-   std::vector<std::vector<std::vector<Tensor<1,dim,typename VectorType::value_type> > > > &gradients,
-   std::vector<std::vector<std::vector<Tensor<2,dim,typename VectorType::value_type> > > > &hessians,
+   std::vector<std::vector<std::vector<Tensor<1,spacedim,typename VectorType::value_type> > > > &gradients,
+   std::vector<std::vector<std::vector<Tensor<2,spacedim,typename VectorType::value_type> > > > &hessians,
    const FEValuesBase<dim,spacedim>           &fe,
    const unsigned int                         level,
    const std::vector<types::global_dof_index> &index,
@@ -230,17 +214,19 @@ namespace MeshWorker
     for (unsigned int i=0; i<this->n_gradients(); ++i)
       {
         const MGLevelObject<VectorType> *src = data.read_ptr<MGLevelObject<VectorType> >(this->value_index(i));
-        VectorSlice<std::vector<std::vector<Tensor<1,dim,typename VectorType::value_type> > > > dst(gradients[i], component, n_comp);
+        VectorSlice<std::vector<std::vector<Tensor<1,spacedim,typename VectorType::value_type> > > > dst(gradients[i], component, n_comp);
         fe.get_function_gradients((*src)[level], make_slice(index, start, size), dst, true);
       }
 
     for (unsigned int i=0; i<this->n_hessians(); ++i)
       {
         const MGLevelObject<VectorType> *src = data.read_ptr<MGLevelObject<VectorType> >(this->value_index(i));
-        VectorSlice<std::vector<std::vector<Tensor<2,dim,typename VectorType::value_type> > > > dst(hessians[i], component, n_comp);
+        VectorSlice<std::vector<std::vector<Tensor<2,spacedim,typename VectorType::value_type> > > > dst(hessians[i], component, n_comp);
         fe.get_function_hessians((*src)[level], make_slice(index, start, size), dst, true);
       }
   }
 }
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

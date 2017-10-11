@@ -20,7 +20,6 @@
 #include "../tests.h"
 
 #include <deal.II/base/geometry_info.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_accessor.h>
@@ -30,7 +29,6 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_refinement.h>
 
-#include <fstream>
 
 
 
@@ -64,9 +62,7 @@ int main (int argc, char *argv[])
   deal_II_exceptions::disable_abort_on_exception();
 
   Utilities::MPI::MPI_InitFinalize mpi_initialization (argc, argv, 1);
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<2> tria;
   parallel::distributed::Triangulation<2> tria2(MPI_COMM_WORLD);

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mg_transfer_block_h
-#define dealii__mg_transfer_block_h
+#ifndef dealii_mg_transfer_block_h
+#define dealii_mg_transfer_block_h
 
 #include <deal.II/base/config.h>
 
@@ -32,7 +32,7 @@
 
 #include <deal.II/dofs/dof_handler.h>
 
-#include <deal.II/base/std_cxx11/shared_ptr.h>
+#include <memory>
 
 
 DEAL_II_NAMESPACE_OPEN
@@ -65,11 +65,20 @@ public:
    * discontinuous finite elements or with no local refinement.
    */
   MGTransferBlockBase ();
+
   /**
    * Constructor with constraint matrices as well as mg_constrained_dofs.
    */
+  MGTransferBlockBase (const MGConstrainedDoFs &mg_constrained_dofs);
+
+  /**
+   * Constructor with constraint matrices as well as mg_constrained_dofs.
+   *
+   * @deprecated @p constraints is unused.
+   */
   MGTransferBlockBase (const ConstraintMatrix &constraints,
-                       const MGConstrainedDoFs &mg_constrained_dofs);
+                       const MGConstrainedDoFs &mg_constrained_dofs) DEAL_II_DEPRECATED;
+
   /**
    * Memory used by this object.
    */
@@ -131,7 +140,7 @@ protected:
   DeclException0(ExcMatricesNotBuilt);
 
 private:
-  std::vector<std_cxx11::shared_ptr<BlockSparsityPattern> >   prolongation_sparsities;
+  std::vector<std::shared_ptr<BlockSparsityPattern> >   prolongation_sparsities;
 
 protected:
 
@@ -140,7 +149,7 @@ protected:
    * of the mother cell, i.e. the coarse level. while row indices belong to
    * the child cell, i.e. the fine level.
    */
-  std::vector<std_cxx11::shared_ptr<BlockSparseMatrix<double> > > prolongation_matrices;
+  std::vector<std::shared_ptr<BlockSparseMatrix<double> > > prolongation_matrices;
 
   /**
    * Mapping for the <tt>copy_to/from_mg</tt>-functions. The indices into this
@@ -150,10 +159,7 @@ protected:
    */
   std::vector<std::vector<std::vector<std::pair<unsigned int, unsigned int> > > >
   copy_indices;
-  /**
-   * The constraints of the global system.
-   */
-  SmartPointer<const ConstraintMatrix, MGTransferBlockBase> constraints;
+
   /**
    * The mg_constrained_dofs of the level systems.
    */
@@ -208,7 +214,7 @@ public:
    * This function is a front-end for the same function in
    * MGTransferBlockBase.
    */
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   void build_matrices (const DoFHandler<dim,spacedim> &dof,
                        const DoFHandler<dim,spacedim> &mg_dof,
                        const std::vector<bool> &selected);
@@ -222,7 +228,10 @@ public:
                                  const BlockVector<number> &src) const;
 
   /**
-   * Transfer from a vector on the global grid to a multilevel vector.
+   * Transfer from a vector on the global grid to a multilevel vector for the
+   * active degrees of freedom. In particular, for a globally refined mesh only
+   * the finest level in @p dst is filled  as a plain copy of @p src. All the
+   * other level objects are left untouched.
    *
    * The action for discontinuous elements is as follows: on an active mesh
    * cell, the global vector entries are simply copied to the corresponding
@@ -299,15 +308,24 @@ public:
    * discontinuous finite elements or with no local refinement.
    */
   MGTransferBlockSelect ();
+
   /**
    * Constructor with constraint matrices as well as mg_constrained_dofs.
    */
+  MGTransferBlockSelect (const MGConstrainedDoFs &mg_constrained_dofs);
+
+  /**
+   * Constructor with constraint matrices as well as mg_constrained_dofs.
+   *
+   * @deprecated @p constraints is unused.
+   */
   MGTransferBlockSelect (const ConstraintMatrix &constraints,
-                         const MGConstrainedDoFs &mg_constrained_dofs);
+                         const MGConstrainedDoFs &mg_constrained_dofs) DEAL_II_DEPRECATED;
+
   /**
    * Destructor.
    */
-  virtual ~MGTransferBlockSelect ();
+  virtual ~MGTransferBlockSelect () = default;
 
   /**
    * Actually build the prolongation matrices for grouped blocks.
@@ -321,7 +339,7 @@ public:
    * @arg mg_selected: Number of the component for which the transfer matrices
    * should be built.
    */
-  template<int dim, int spacedim>
+  template <int dim, int spacedim>
   void build_matrices (const DoFHandler<dim,spacedim> &dof,
                        const DoFHandler<dim,spacedim> &mg_dof,
                        unsigned int selected);
@@ -341,7 +359,9 @@ public:
 
   /**
    * Transfer a single block from a vector on the global grid to a multilevel
-   * vector.
+   * vector for the active degrees of freedom. In particular, for a globally
+   * refined mesh only the finest level in @p dst is filled as a plain copy of
+   * @p src. All the other level objects are left untouched.
    */
   template <int dim, typename number2, int spacedim>
   void
@@ -374,7 +394,10 @@ public:
 
   /**
    * Transfer a block from a vector on the global grid to multilevel vectors.
-   * Only the block selected is transfered.
+   * Only the values for the active degrees of freedom of the block selected are
+   * transfered. In particular, for a globally refined mesh only the finest
+   * level in @p dst is filled as a plain copy of @p src. All the other level
+   * objects are left untouched.
    */
   template <int dim, typename number2, int spacedim>
   void

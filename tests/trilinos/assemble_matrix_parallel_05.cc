@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2009 - 2015 by the deal.II authors
+// Copyright (C) 2009 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,13 +17,12 @@
 
 // tests thread safety of parallel Trilinos matrices. Same test as
 // parallel_matrix_assemble_02 but initializing the matrix from
-// CompressedSimpleSparsityPattern instead of a Trilinos sparsity pattern.
+// DynamicSparsityPattern instead of a Trilinos sparsity pattern.
 
 #include "../tests.h"
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/base/graph_coloring.h>
@@ -32,7 +31,7 @@
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #include <deal.II/lac/constraint_matrix.h>
 #include <deal.II/lac/trilinos_sparsity_pattern.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/trilinos_vector.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
@@ -48,9 +47,8 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/matrix_tools.h>
 #include <deal.II/numerics/error_estimator.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
-#include <fstream>
 #include <iostream>
 #include <complex>
 
@@ -250,9 +248,9 @@ void LaplaceProblem<dim>::setup_system ()
   CellFilter begin(IteratorFilters::LocallyOwnedCell(),dof_handler.begin_active());
   CellFilter end(IteratorFilters::LocallyOwnedCell(),dof_handler.end());
   graph = GraphColoring::make_graph_coloring(begin,end,
-                                             static_cast<std_cxx11::function<std::vector<types::global_dof_index>
+                                             static_cast<std::function<std::vector<types::global_dof_index>
                                              (FilteredIterator<typename DoFHandler<dim>::active_cell_iterator> const &)> >
-                                             (std_cxx11::bind(&LaplaceProblem<dim>::get_conflict_indices, this,std_cxx11::_1)));
+                                             (std::bind(&LaplaceProblem<dim>::get_conflict_indices, this,std::placeholders::_1)));
 
   IndexSet locally_owned = dof_handler.locally_owned_dofs();
   {
@@ -267,8 +265,8 @@ void LaplaceProblem<dim>::setup_system ()
   {
     IndexSet relevant_set;
     DoFTools::extract_locally_relevant_dofs (dof_handler, relevant_set);
-    CompressedSimpleSparsityPattern csp(dof_handler.n_dofs(), dof_handler.n_dofs(),
-                                        relevant_set);
+    DynamicSparsityPattern csp(dof_handler.n_dofs(), dof_handler.n_dofs(),
+                               relevant_set);
     DoFTools::make_sparsity_pattern (dof_handler, csp,
                                      constraints, false);
     test_matrix.reinit (locally_owned, csp, MPI_COMM_WORLD, true);
@@ -368,16 +366,16 @@ void LaplaceProblem<dim>::assemble_test ()
 
   WorkStream::
   run (graph,
-       std_cxx11::bind (&LaplaceProblem<dim>::
-                        local_assemble,
-                        this,
-                        std_cxx11::_1,
-                        std_cxx11::_2,
-                        std_cxx11::_3),
-       std_cxx11::bind (&LaplaceProblem<dim>::
-                        copy_local_to_global,
-                        this,
-                        std_cxx11::_1),
+       std::bind (&LaplaceProblem<dim>::
+                  local_assemble,
+                  this,
+                  std::placeholders::_1,
+                  std::placeholders::_2,
+                  std::placeholders::_3),
+       std::bind (&LaplaceProblem<dim>::
+                  copy_local_to_global,
+                  this,
+                  std::placeholders::_1),
        Assembly::Scratch::Data<dim>(fe, quadrature),
        Assembly::Copy::Data (false),
        2*MultithreadInfo::n_threads(),
@@ -388,7 +386,6 @@ void LaplaceProblem<dim>::assemble_test ()
   test_matrix.add(-1, reference_matrix);
 
   // there should not even be roundoff difference between matrices
-  deallog.threshold_double(1.e-30);
   deallog << "error in matrix: " << test_matrix.frobenius_norm() << std::endl;
   test_rhs.add(-1., reference_rhs);
   deallog << "error in vector: " << test_rhs.l2_norm() << std::endl;

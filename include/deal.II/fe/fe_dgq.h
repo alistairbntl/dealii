@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2001 - 2015 by the deal.II authors
+// Copyright (C) 2001 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_dgq_h
-#define dealii__fe_dgq_h
+#ifndef dealii_fe_dgq_h
+#define dealii_fe_dgq_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/tensor_product_polynomials.h>
@@ -274,8 +274,8 @@ public:
    * meet at a common face, whether it is the other way around, whether
    * neither dominates, or if either could dominate.
    *
-   * For a definition of domination, see FiniteElementBase::Domination and in
-   * particular the
+   * For a definition of domination, see FiniteElementDomination::Domination
+   * and in particular the
    * @ref hp_paper "hp paper".
    */
   virtual
@@ -294,11 +294,23 @@ public:
                                     const unsigned int face_index) const;
 
   /**
-   * Returns a list of constant modes of the element. For this element, it
+   * Return a list of constant modes of the element. For this element, it
    * simply returns one row with all entries set to true.
    */
   virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
   get_constant_modes () const;
+
+  /**
+   * Implementation of the corresponding function in the FiniteElement
+   * class.  Since the current element is interpolatory, the nodal
+   * values are exactly the support point values. Furthermore, since
+   * the current element is scalar, the support point values need to
+   * be vectors of length 1.
+   */
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
 
   /**
    * Determine an estimate for the memory consumption (in bytes) of this
@@ -310,25 +322,20 @@ public:
    */
   virtual std::size_t memory_consumption () const;
 
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
 protected:
   /**
-   * Constructor for tensor product polynomials based on Polynomials::Lagrange
-   * interpolation of the support points in the quadrature rule
-   * <tt>points</tt>. The degree of these polynomials is
-   * <tt>points.size()-1</tt>.
+   * Constructor for tensor product polynomials based on an arbitrary vector
+   * of polynomials. This constructor is used in derived classes to construct
+   * e.g. elements with arbitrary nodes or elements based on Legendre
+   * polynomials.
    *
-   * Note: The FE_DGQ::clone function does not work properly for FE with
-   * arbitrary nodes!
+   * The degree of these polynomials is <tt>polynomials.size()-1</tt>.
    */
-  FE_DGQ (const Quadrature<1> &points);
-
-  /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
-   */
-  virtual FiniteElement<dim, spacedim> *clone() const;
+  FE_DGQ (const std::vector<Polynomials::Polynomial<double> > &polynomials);
 
 private:
   /**
@@ -410,13 +417,110 @@ public:
    */
   virtual std::string get_name () const;
 
-protected:
   /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
+   * Implementation of the corresponding function in the FiniteElement
+   * class.  Since the current element is interpolatory, the nodal
+   * values are exactly the support point values. Furthermore, since
+   * the current element is scalar, the support point values need to
+   * be vectors of length 1.
    */
-  virtual FiniteElement<dim,spacedim> *clone() const;
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
+};
+
+
+
+/**
+ * Implementation of scalar, discontinuous tensor product elements based on
+ * Legendre polynomials, described by the tensor product of the polynomial
+ * space Polynomials::Legendre. As opposed to the basic FE_DGQ element, these
+ * elements are not interpolatory and no support points are defined.
+ *
+ * See the base class documentation in FE_DGQ for details.
+ *
+ * @author Martin Kronbichler, 2017
+ */
+template <int dim,int spacedim=dim>
+class FE_DGQLegendre : public FE_DGQ<dim,spacedim>
+{
+public:
+  /**
+   * Constructor for tensor product polynomials based on Polynomials::Legendre
+   * interpolation.
+   */
+  FE_DGQLegendre (const unsigned int degree);
+
+  /**
+   * Return a list of constant modes of the element. For the Legendre basis,
+   * it returns one row where the first element (corresponding to the constant
+   * mode) is set to true and all other elements are set to false.
+   */
+  virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
+  get_constant_modes () const;
+
+  /**
+   * Return a string that uniquely identifies a finite element. This class
+   * returns <tt>FE_DGQLegendre<dim>(degree)</tt> with <tt>dim</tt> and
+   * <tt>degree</tt> replaced by the values given by the template parameter
+   * and the argument passed to the constructor, respectively.
+   */
+  virtual std::string get_name () const;
+
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
+};
+
+
+
+/**
+ * Implementation of scalar, discontinuous tensor product elements based on
+ * Hermite polynomials, described by the polynomial space
+ * Polynomials::HermiteInterpolation. As opposed to the basic FE_DGQ element,
+ * these elements are not interpolatory and no support points are defined.
+ *
+ * This element is only a Hermite polynomials for degrees larger or equal to
+ * three. For degrees zero to two, a usual Lagrange basis is selected.
+ *
+ * See the base class documentation in FE_DGQ for details.
+ *
+ * @author Martin Kronbichler, 2017
+ */
+template <int dim,int spacedim=dim>
+class FE_DGQHermite : public FE_DGQ<dim,spacedim>
+{
+public:
+  /**
+   * Constructor for tensor product polynomials based on
+   * Polynomials::HermiteInterpolation.
+   */
+  FE_DGQHermite (const unsigned int degree);
+
+  /**
+   * Return a list of constant modes of the element. For the Hermite basis of
+   * degree three and larger, it returns one row where the first two elements
+   * (corresponding to the value left and the value at the right) are set to
+   * true and all other elements are set to false.
+   */
+  virtual std::pair<Table<2,bool>, std::vector<unsigned int> >
+  get_constant_modes () const;
+
+  /**
+   * Return a string that uniquely identifies a finite element. This class
+   * returns <tt>FE_DGQHermite<dim>(degree)</tt>, with <tt>dim</tt> and
+   * <tt>degree</tt> replaced by the values given by the template parameter
+   * and the argument passed to the constructor, respectively.
+   */
+  virtual std::string get_name () const;
+
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 };
 
 

@@ -13,6 +13,9 @@
 //
 // ---------------------------------------------------------------------
 
+#ifndef dealii_fe_poly_face_templates_h
+#define dealii_fe_poly_face_templates_h
+
 
 #include <deal.II/base/qprojector.h>
 #include <deal.II/base/polynomial_space.h>
@@ -58,8 +61,8 @@ FE_PolyFace<PolynomialType,dim,spacedim>::requires_update_flags (const UpdateFla
     out |= update_gradients | update_covariant_transformation;
   if (flags & update_hessians)
     out |= update_hessians | update_covariant_transformation;
-  if (flags & update_cell_normal_vectors)
-    out |= update_cell_normal_vectors | update_JxW_values;
+  if (flags & update_normal_vectors)
+    out |= update_normal_vectors | update_JxW_values;
 
   return out;
 }
@@ -72,7 +75,7 @@ template <class PolynomialType, int dim, int spacedim>
 void
 FE_PolyFace<PolynomialType,dim,spacedim>::
 fill_fe_values (const typename Triangulation<dim,spacedim>::cell_iterator &,
-                const CellSimilarity::Similarity                                     ,
+                const CellSimilarity::Similarity,
                 const Quadrature<dim> &,
                 const Mapping<dim,spacedim> &,
                 const typename Mapping<dim,spacedim>::InternalDataBase &,
@@ -102,7 +105,7 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr, ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
   if (fe_data.update_each & update_values)
@@ -121,9 +124,8 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &
                 for (unsigned int k=0; k<this->dofs_per_quad; ++k)
                   output_data.shape_values(foffset+k,i) = fe_data.shape_values[k+this->first_face_quad_index][i];
               }
-
-            // fall through...
           }
+          DEAL_II_FALLTHROUGH;
 
           case 2:
           {
@@ -138,9 +140,8 @@ fill_fe_face_values (const typename Triangulation<dim,spacedim>::cell_iterator &
                         = fe_data.shape_values[k+(line*this->dofs_per_line)+this->first_face_line_index][i];
                   }
               }
-
-            // fall through...
           }
+          DEAL_II_FALLTHROUGH;
 
           case 1:
           {
@@ -173,7 +174,7 @@ fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterato
   // data for this class. fails with
   // an exception if that is not
   // possible
-  Assert (dynamic_cast<const InternalData *> (&fe_internal) != 0, ExcInternalError());
+  Assert (dynamic_cast<const InternalData *> (&fe_internal) != nullptr, ExcInternalError());
   const InternalData &fe_data = static_cast<const InternalData &> (fe_internal);
 
   const unsigned int foffset = fe_data.shape_values.size() * face_no;
@@ -194,3 +195,5 @@ fill_fe_subface_values (const typename Triangulation<dim,spacedim>::cell_iterato
 }
 
 DEAL_II_NAMESPACE_CLOSE
+
+#endif

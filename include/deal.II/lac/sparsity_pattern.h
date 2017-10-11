@@ -13,22 +13,33 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparsity_pattern_h
-#define dealii__sparsity_pattern_h
+#ifndef dealii_sparsity_pattern_h
+#define dealii_sparsity_pattern_h
 
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/subscriptor.h>
-#include <boost/serialization/array.hpp>
+
+// boost::serialization::make_array used to be in array.hpp, but was
+// moved to a different file in BOOST 1.64
+#include <boost/version.hpp>
+#if BOOST_VERSION >= 106400
+#  include <boost/serialization/array_wrapper.hpp>
+#else
+#  include <boost/serialization/array.hpp>
+#endif
 #include <boost/serialization/split_member.hpp>
 
+#include <memory>
 #include <vector>
 #include <iostream>
+#include <algorithm>
 
 DEAL_II_NAMESPACE_OPEN
 
 class SparsityPattern;
+class DynamicSparsityPattern;
 class ChunkSparsityPattern;
 template <typename number> class FullMatrix;
 template <typename number> class SparseMatrix;
@@ -391,7 +402,7 @@ public:
    * amounts of computing time. However, copy constructors are needed if one
    * wants to place a SparsityPattern in a container, e.g., to write such
    * statements like <tt>v.push_back (SparsityPattern());</tt>, with
-   * <tt>v</tt> a vector of SparsityPattern objects.
+   * <tt>v</tt> a std::vector of SparsityPattern objects.
    *
    * Usually, it is sufficient to use the explicit keyword to disallow
    * unwanted temporaries, but this does not work for <tt>std::vector</tt>s.
@@ -469,13 +480,13 @@ public:
    * compressed after this function finishes.
    */
   SparsityPattern (const SparsityPattern  &original,
-                   const unsigned int        max_per_row,
-                   const size_type        extra_off_diagonals);
+                   const unsigned int      max_per_row,
+                   const size_type         extra_off_diagonals);
 
   /**
    * Destructor.
    */
-  ~SparsityPattern ();
+  ~SparsityPattern () = default;
 
   /**
    * Copy operator. For this the same holds as for the copy constructor: it is
@@ -621,15 +632,16 @@ public:
                   const ForwardIterator end);
 
   /**
-   * Copy data from an object of type DynamicSparsityPattern. Although not a
-   * compressed sparsity pattern, this function is also instantiated if the
-   * argument is of type SparsityPattern (i.e., the current class). Previous
-   * content of this object is lost, and the sparsity pattern is in compressed
-   * mode afterwards.
+   * Copy data from a DynamicSparsityPattern. Previous content of this object
+   * is lost, and the sparsity pattern is in compressed mode afterwards.
    */
-  template <typename SparsityPatternType>
-  void copy_from (const SparsityPatternType &dsp);
+  void copy_from (const DynamicSparsityPattern &dsp);
 
+  /**
+   * Copy data from a SparsityPattern. Previous content of this object is
+   * lost, and the sparsity pattern is in compressed mode afterwards.
+   */
+  void copy_from (const SparsityPattern &sp);
 
   /**
    * Take a full matrix and use its nonzero entries to generate a sparse
@@ -762,7 +774,7 @@ public:
    * This function may only be called if the matrix struct is compressed. It
    * does not make too much sense otherwise anyway.
    */
-  size_type n_nonzero_elements () const;
+  std::size_t n_nonzero_elements () const;
 
   /**
    * Return whether the structure is compressed or not.
@@ -848,7 +860,7 @@ public:
    * of this function is <i>log(N)</i>.
    */
   std::pair<size_type, size_type>
-  matrix_position (const size_type global_index) const;
+  matrix_position (const std::size_t global_index) const;
 
   /**
    * Check if a value at a certain position may be non-zero.
@@ -979,22 +991,16 @@ public:
    * The operation is only allowed after the SparsityPattern has been set up
    * and compress() was called.
    */
-  DeclException0 (ExcNotCompressed);
+  DeclExceptionMsg (ExcNotCompressed,
+                    "The operation you attempted is only allowed after the SparsityPattern "
+                    "has been set up and compress() was called.");
   /**
    * This operation changes the structure of the SparsityPattern and is not
    * possible after compress() has been called.
    */
-  DeclException0 (ExcMatrixIsCompressed);
-  /**
-   * Exception
-   */
-  DeclException0 (ExcInvalidConstructorCall);
-  /**
-   * This exception is thrown if the matrix does not follow the convention of
-   * storing diagonal elements first in row. Refer to
-   * SparityPattern::optimize_diagonal() for more information.
-   */
-  DeclException0 (ExcDiagonalNotOptimized);
+  DeclExceptionMsg (ExcMatrixIsCompressed,
+                    "The operation you attempted changes the structure of the SparsityPattern "
+                    "and is not possible after compress() has been called.");
   /**
    * Exception
    */
@@ -1035,7 +1041,7 @@ private:
    * for the #rowstart array, i.e. it may be larger than the actually used
    * part of the array.
    */
-  size_type max_vec_len;
+  std::size_t max_vec_len;
 
   /**
    * Maximum number of elements per row. This is set to the value given to the
@@ -1059,7 +1065,7 @@ private:
    * region that is used. The actual number of elements that was allocated is
    * stored in #max_dim.
    */
-  std::size_t *rowstart;
+  std::unique_ptr<std::size_t[]> rowstart;
 
   /**
    * Array of column numbers. In this array, we store for each non-zero
@@ -1083,7 +1089,7 @@ private:
    * sorted, such that finding whether an element exists and determining its
    * position can be done by a binary search.
    */
-  size_type *colnums;
+  std::unique_ptr<size_type[]> colnums;
 
   /**
    * Store whether the compress() function was called for this object.
@@ -1159,10 +1165,10 @@ namespace SparsityPatternIterators
     Assert (is_valid_entry() == true, ExcInvalidIterator());
 
     const std::size_t *insert_point =
-      std::upper_bound(sparsity_pattern->rowstart,
-                       sparsity_pattern->rowstart + sparsity_pattern->rows + 1,
+      std::upper_bound(sparsity_pattern->rowstart.get(),
+                       sparsity_pattern->rowstart.get() + sparsity_pattern->rows + 1,
                        index_within_sparsity);
-    return insert_point - sparsity_pattern->rowstart - 1;
+    return insert_point - sparsity_pattern->rowstart.get() - 1;
   }
 
 
@@ -1400,10 +1406,10 @@ SparsityPattern::column_number (const size_type row,
 
 
 inline
-SparsityPattern::size_type
+std::size_t
 SparsityPattern::n_nonzero_elements () const
 {
-  Assert ((rowstart!=0) && (colnums!=0), ExcEmptyObject());
+  Assert ((rowstart!=nullptr) && (colnums!=nullptr), ExcEmptyObject());
   Assert (compressed, ExcNotCompressed());
   return rowstart[rows]-rowstart[0];
 }
@@ -1420,8 +1426,8 @@ SparsityPattern::save (Archive &ar, const unsigned int) const
 
   ar &max_dim &rows &cols &max_vec_len &max_row_length &compressed &store_diagonal_first_in_row;
 
-  ar &boost::serialization::make_array(rowstart, max_dim + 1);
-  ar &boost::serialization::make_array(colnums, max_vec_len);
+  ar &boost::serialization::make_array(rowstart.get(), max_dim + 1);
+  ar &boost::serialization::make_array(colnums.get(), max_vec_len);
 }
 
 
@@ -1436,11 +1442,11 @@ SparsityPattern::load (Archive &ar, const unsigned int)
 
   ar &max_dim &rows &cols &max_vec_len &max_row_length &compressed &store_diagonal_first_in_row;
 
-  rowstart = new std::size_t [max_dim + 1];
-  colnums = new size_type [max_vec_len];
+  rowstart.reset (new std::size_t[max_dim + 1]);
+  colnums.reset (new size_type[max_vec_len]);
 
-  ar &boost::serialization::make_array(rowstart, max_dim + 1);
-  ar &boost::serialization::make_array(colnums, max_vec_len);
+  ar &boost::serialization::make_array(rowstart.get(), max_dim + 1);
+  ar &boost::serialization::make_array(colnums.get(), max_vec_len);
 }
 
 

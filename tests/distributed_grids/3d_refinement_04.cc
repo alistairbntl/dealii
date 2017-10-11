@@ -25,7 +25,6 @@
 
 #include "../tests.h"
 #include "coarse_grid_common.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/distributed/tria.h>
@@ -35,11 +34,9 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_in.h>
 
-#include <fstream>
-#include <cstdlib>
 
 
-template<int dim>
+template <int dim>
 void test(std::ostream & /*out*/)
 {
   for (unsigned int i=0; i<GeometryInfo<dim>::max_children_per_cell; ++i)
@@ -85,7 +82,6 @@ int main(int argc, char *argv[])
 
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   deallog.push("3d");
   test<3>(logfile);

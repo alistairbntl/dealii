@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -29,13 +29,9 @@
 //
 // the problem was fixed by fixing the code
 
-char logname[] = "output";
-
-
 #include "../tests.h"
 
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
@@ -43,7 +39,6 @@ char logname[] = "output";
 #include <deal.II/grid/tria_iterator.h>
 #include <deal.II/grid/tria_boundary_lib.h>
 
-#include <fstream>
 
 
 void test ()
@@ -235,11 +230,10 @@ void test ()
 
 int main ()
 {
-  std::ofstream logfile(logname);
+  std::ofstream logfile("output");
   logfile.precision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
   test ();
   return 0;
 }

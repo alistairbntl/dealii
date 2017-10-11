@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2006 - 2015 by the deal.II authors
+// Copyright (C) 2006 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,7 +22,6 @@
 // verifying that it indeed works
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/lac/vector.h>
@@ -34,11 +33,10 @@
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 #include <vector>
 
 
-template<int dim>
+template <int dim>
 double
 value(const Point<dim> &p)
 {
@@ -51,12 +49,12 @@ value(const Point<dim> &p)
 
 namespace
 {
-  template<int dim>
+  template <int dim>
   struct Scratch
   {
     Scratch(const FiniteElement<dim> &fe, const Quadrature<dim> &quadrature) :
       fe_collection(fe), quadrature_collection(quadrature), x_fe_values(
-        fe_collection, quadrature_collection, update_q_points), rhs_values(
+        fe_collection, quadrature_collection, update_quadrature_points), rhs_values(
           quadrature_collection.size())
     {
     }
@@ -64,7 +62,7 @@ namespace
     Scratch(const Scratch &data) :
       fe_collection(data.fe_collection), quadrature_collection(
         data.quadrature_collection), x_fe_values(fe_collection,
-                                                 quadrature_collection, update_q_points), rhs_values(
+                                                 quadrature_collection, update_quadrature_points), rhs_values(
                                                    data.rhs_values)
     {
     }
@@ -100,7 +98,7 @@ zero_element(std::vector<double> &dst,
 }
 
 
-template<int dim>
+template <int dim>
 void
 mass_assembler(const typename Triangulation<dim>::active_cell_iterator &cell,
                Scratch<dim> &data, CopyData &copy_data)
@@ -112,8 +110,8 @@ mass_assembler(const typename Triangulation<dim>::active_cell_iterator &cell,
   // this appears to be the key: the following two ways both overwrite some
   // of the memory in which we store the quadrature point location.
   parallel::apply_to_subranges(0U, copy_data.cell_rhs.size(),
-                               std_cxx11::bind(&zero_subrange, std_cxx11::_1, std_cxx11::_2,
-                                               std_cxx11::ref(copy_data.cell_rhs)), 1);
+                               std::bind(&zero_subrange, std::placeholders::_1, std::placeholders::_2,
+                                         std::ref(copy_data.cell_rhs)), 1);
 
   AssertThrow(q == data.x_fe_values.quadrature_point(0),
               ExcInternalError());
@@ -151,7 +149,7 @@ do_project()
       copy_data.cell_rhs.resize(8);
       WorkStream::run(triangulation.begin_active(), triangulation.end(),
                       &mass_assembler<dim>,
-                      std_cxx11::bind(&copy_local_to_global, std_cxx11::_1, &sum),
+                      std::bind(&copy_local_to_global, std::placeholders::_1, &sum),
                       assembler_data, copy_data, 8, 1);
 
       Assert (std::fabs(sum-288.) < 1e-12, ExcInternalError());
@@ -166,7 +164,6 @@ int main()
   deallog << std::setprecision(3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   do_project();
 }

@@ -19,7 +19,6 @@
 // produces an invalid, unusable object
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -27,11 +26,10 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/fe/fe_values.h>
 
-#include <fstream>
 
 
 
-template<int dim>
+template <int dim>
 void test (const Triangulation<dim> &tr,
            const FiniteElement<dim> &fe)
 {
@@ -62,7 +60,7 @@ ok:
 
 
 
-template<int dim>
+template <int dim>
 void test()
 {
   Triangulation<dim> tr;
@@ -81,7 +79,6 @@ int main()
   deallog << std::setprecision (2);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   test<1>();
   test<2>();

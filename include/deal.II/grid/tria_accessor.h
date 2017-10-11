@@ -13,10 +13,11 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__tria_accessor_h
-#define dealii__tria_accessor_h
+#ifndef dealii_tria_accessor_h
+#define dealii_tria_accessor_h
 
 
+#include <deal.II/base/bounding_box.h>
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/geometry_info.h>
@@ -64,8 +65,7 @@ namespace internal
         /**
          * Default constructor.
          */
-        type ()
-        {}
+        type () = default;
 
         /**
          * Dummy constructor. Only level zero is allowed.
@@ -284,15 +284,25 @@ protected:
   /**
    * Constructor. Protected, thus only callable from friend classes.
    */
-  TriaAccessorBase (const Triangulation<dim,spacedim> *parent =  0,
+  TriaAccessorBase (const Triangulation<dim,spacedim> *parent =  nullptr,
                     const int                 level  = -1,
                     const int                 index  = -1,
-                    const AccessorData             * =  0);
+                    const AccessorData             * =  nullptr);
 
   /**
    * Copy constructor. Creates an object with exactly the same data.
    */
   TriaAccessorBase (const TriaAccessorBase &);
+
+  /**
+   * Copy operator. These operators are usually used in a context like <tt>iterator a,b;
+   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
+   * by @p b to the object pointed to by @p a. However, the result of
+   * dereferencing an iterator is not an object but an accessor; consequently,
+   * this operation is not useful for iterators on triangulations.
+   * Consequently, this operator is declared as deleted and can not be used.
+   */
+  void operator = (const TriaAccessorBase *) = delete;
 
   /**
    * Copy operator. Since this is only called from iterators, do not return
@@ -317,16 +327,6 @@ protected:
   bool operator < (const TriaAccessorBase &other) const;
 
 protected:
-  /**
-   * Copy operator. This is normally used in a context like <tt>iterator a,b;
-   * *a=*b;</tt>. Since the meaning is to copy the object pointed to by @p b
-   * to the object pointed to by @p a and since accessors are not real but
-   * virtual objects, this operation is not useful for iterators on
-   * triangulations. We declare this function here private, thus it may not be
-   * used from outside. Furthermore it is not implemented and will give a
-   * linker error if used anyway.
-   */
-  void operator = (const TriaAccessorBase *);
 
   /**
    * Compare for equality.
@@ -480,12 +480,13 @@ private:
  * create objects (it will in fact throw an exception if this should ever be
  * attempted but it sometimes allows code to be written in a simpler way in a
  * dimension independent way. For example, it allows to write code that works
- * on quad iterators that is dimension independent because quad iterators
- * (with the current class) exist and are syntactically correct. You can not
- * expect, however, to ever generate one of these iterators, meaning you need
- * to expect to wrap the code block in which you use quad iterators into
- * something like <code>if (dim@>1)</code> -- which makes eminent sense
- * anyway.
+ * on quad iterators that is dimension independent -- i.e., also compiles
+ * in 1d -- because quad iterators
+ * (via the current class) exist and are syntactically correct. You can not
+ * expect, however, to ever create an actual object of one of these iterators
+ * in 1d, meaning you need to expect to wrap the code block in which you use
+ * quad iterators into something like <code>if (dim@>1)</code> -- which makes
+ * eminent sense anyway.
  *
  * This class provides the minimal interface necessary for Accessor classes to
  * interact with Iterator classes. However, this is only for syntactic
@@ -504,11 +505,11 @@ public:
   typedef typename TriaAccessorBase<structdim,dim,spacedim>::AccessorData AccessorData;
 
   /**
-   * Constructor.  This class is used for iterators that make sense in a given
-   * dimension, for example quads for 1d meshes. Consequently, while the
-   * creation of such objects is syntactically valid, they make no semantic
-   * sense, and we generate an exception when such an object is actually
-   * generated.
+   * Constructor.  This class is used for iterators that do not make
+   * sense in a given dimension, for example quads for 1d meshes. Consequently,
+   * while the creation of such objects is syntactically valid, they make no
+   * semantic sense, and we generate an exception when such an object is
+   * actually generated.
    */
   InvalidAccessor (const Triangulation<dim,spacedim> *parent     =  0,
                    const int                 level      = -1,
@@ -516,11 +517,11 @@ public:
                    const AccessorData       *local_data =  0);
 
   /**
-   * Copy constructor.  This class is used for iterators that make sense in a
-   * given dimension, for example quads for 1d meshes. Consequently, while the
-   * creation of such objects is syntactically valid, they make no semantic
-   * sense, and we generate an exception when such an object is actually
-   * generated.
+   * Copy constructor.  This class is used for iterators that do not make
+   * sense in a given dimension, for example quads for 1d meshes. Consequently,
+   * while the creation of such objects is syntactically valid, they make no
+   * semantic sense, and we generate an exception when such an object is
+   * actually generated.
    */
   InvalidAccessor (const InvalidAccessor &);
 
@@ -559,6 +560,28 @@ public:
    * has children.
    */
   bool has_children () const;
+
+  /**
+   * Dummy function that always returns numbers::invalid_manifold_id.
+   */
+  types::manifold_id manifold_id () const;
+
+  /**
+   * Dummy function to extract vertices. Returns the origin.
+   */
+  Point<spacedim> &vertex (const unsigned int i) const;
+
+  /**
+   * Dummy function to extract lines. Returns a default-constructed line iterator.
+   */
+  typename dealii::internal::Triangulation::Iterators<dim,spacedim>::line_iterator
+  line (const unsigned int i) const;
+
+  /**
+   * Dummy function to extract quads. Returns a default-constructed quad iterator.
+   */
+  typename dealii::internal::Triangulation::Iterators<dim,spacedim>::quad_iterator
+  quad (const unsigned int i) const;
 };
 
 
@@ -574,6 +597,9 @@ public:
  * <code>spacedim==dim</code> the triangulation represents a domain in
  * $R^{dim}$, for <code>spacedim@>dim</code> the triangulation is of a
  * manifold embedded in a higher dimensional space).
+ *
+ * There is a specialization of this class for the case where
+ * @p structdim equals zero, i.e., for vertices of a triangulation.
  *
  * @ingroup Accessors
  * @author Wolfgang Bangerth and others, 1998, 2000, 2008
@@ -592,10 +618,10 @@ public:
   /**
    * Constructor.
    */
-  TriaAccessor (const Triangulation<dim,spacedim> *parent     =  0,
+  TriaAccessor (const Triangulation<dim,spacedim> *parent     =  nullptr,
                 const int                 level      = -1,
                 const int                 index      = -1,
-                const AccessorData       *local_data =  0);
+                const AccessorData       *local_data =  nullptr);
 
   /**
    * Conversion constructor. This constructor exists to make certain
@@ -620,6 +646,16 @@ public:
   TriaAccessor (const TriaAccessor<structdim2,dim2,spacedim2> &);
 
   /**
+   * Copy operator. These operators are usually used in a context like <tt>iterator a,b;
+   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
+   * by @p b to the object pointed to by @p a. However, the result of
+   * dereferencing an iterator is not an object but an accessor; consequently,
+   * this operation is not useful for iterators on triangulations.
+   * Consequently, this operator is declared as deleted and can not be used.
+   */
+  void operator = (const TriaAccessor &) = delete;
+
+  /**
    * Test for the element being used or not.  The return value is @p true for
    * all iterators that are either normal iterators or active iterators, only
    * raw iterators can return @p false. Since raw iterators are only used in
@@ -638,7 +674,7 @@ public:
    * Pointer to the @p ith vertex bounding this object. Throw an exception if
    * <code>dim=1</code>.
    */
-  typename dealii::internal::Triangulation::Iterators<dim,spacedim>::vertex_iterator
+  TriaIterator<TriaAccessor<0,dim,spacedim> >
   vertex_iterator (const unsigned int i) const;
 
   /**
@@ -1104,7 +1140,7 @@ public:
   void set_user_pointer (void *p) const;
 
   /**
-   * Reset the user pointer to a @p NULL pointer. See
+   * Reset the user pointer to a @p nullptr pointer. See
    * @ref GlossUserData
    * for more information.
    */
@@ -1238,6 +1274,39 @@ public:
   double diameter () const;
 
   /**
+   * Return a pair of Point and double corresponding to the center and
+   * the radius of a reasonably small enclosing ball of the object.
+   *
+   * The function implements Ritter's O(n) algorithm to get a reasonably
+   * small enclosing ball around the vertices of the object.
+   * The initial guess for the enclosing ball is taken to be the ball
+   * which contains the largest diagonal of the object as its diameter.
+   * Starting from such an initial guess, the algorithm tests whether all
+   * the vertices of the object (except the vertices of the largest diagonal)
+   * are geometrically within the ball.
+   * If any vertex (v) is found to be geometrically outside the ball,
+   * a new iterate of the ball is constructed by shifting its center and
+   * increasing the radius so as to geometrically enclose both the previous
+   * ball and the vertex (v). The algorithm terminates when all the vertices
+   * are geometrically inside the ball.
+   *
+   * If a vertex (v) is geometrically inside a particular iterate of the ball,
+   * then it will continue to be so in the subsequent iterates of
+   * the ball (this is true \a by \a construction).
+   *
+   * @note This function assumes d-linear mapping from the reference cell.
+   *
+   * <a href="http://geomalgorithms.com/a08-_containers.html">see this</a> and
+   * [Ritter 1990]
+   */
+  std::pair<Point<spacedim>,double> enclosing_ball () const;
+
+  /**
+   * Return the smallest bounding box that encloses the object.
+   */
+  BoundingBox<spacedim> bounding_box () const;
+
+  /**
    * Length of an object in the direction of the given axis, specified in the
    * local coordinate system. See the documentation of GeometryInfo for the
    * meaning and enumeration of the local axes.
@@ -1249,12 +1318,12 @@ public:
   double extent_in_direction (const unsigned int axis) const;
 
   /**
-   * Returns the minimal distance between any two vertices.
+   * Return the minimal distance between any two vertices.
    */
   double minimum_vertex_distance () const;
 
   /**
-   * Returns a point belonging to the Manifold<dim,spacedim> where this object
+   * Return a point belonging to the Manifold<dim,spacedim> where this object
    * lives, given its parametric coordinates on the reference @p structdim
    * cell. This function queries the underlying manifold object, and can be
    * used to obtain the exact geometrical location of arbitrary points on this
@@ -1269,20 +1338,51 @@ public:
   Point<spacedim> intermediate_point(const Point<structdim> &coordinates) const;
 
   /**
+   * This function computes a fast approximate transformation from the real to
+   * the unit cell by inversion of an affine approximation of the $d$-linear
+   * function from the reference $d$-dimensional cell.
+   *
+   * The affine approximation of the unit to real cell mapping is found by a
+   * least squares fit of an affine function to the $2^d$ vertices of the
+   * present object. For any valid mesh cell whose geometry is not degenerate,
+   * this operation results in a unique affine mapping. Thus, this function
+   * will return a finite result for all given input points, even in cases
+   * where the actual transformation by an actual bi-/trilinear or higher
+   * order mapping might be singular. Besides only approximating the mapping
+   * from the vertex points, this function also ignores the attached manifold
+   * descriptions. The result is only exact in case the transformation from
+   * the unit to the real cell is indeed affine, such as in one dimension or
+   * for Cartesian and affine (parallelogram) meshes in 2D/3D.
+   *
+   * For exact transformations to the unit cell, use
+   * Mapping::transform_real_to_unit_cell().
+   *
+   * @note If dim<spacedim we first project p onto the plane.
+   */
+  Point<structdim>
+  real_to_unit_cell_affine_approximation (const Point<spacedim> &point) const;
+
+  /**
    * Center of the object. The center of an object is defined to be the
-   * average of the locations of the vertices. If required, the user may ask
-   * this function to return the average of the point according to the
-   * underlying Manifold object, by setting to true the optional parameter @p
-   * respect_manifold.
+   * average of the locations of the vertices, which is also where a $Q_1$
+   * mapping would map the center of the reference cell. However, you can also
+   * ask this function to instead return the average of the vertices as
+   * computed by the underlying Manifold object associated with the current
+   * object, by setting to true the optional parameter @p respect_manifold.
+   * Manifolds would then typically pull back the coordinates of the vertices
+   * to a reference domain (not necessarily the reference cell), compute the
+   * average there, and then push forward the coordinates of the averaged
+   * point to the physical space again; the resulting point is guaranteed to
+   * lie within the manifold, even if the manifold is curved.
    *
    * When the geometry of a TriaAccessor is not flat, or when part of the
    * bounding objects of this TriaAccessor are not flat, the result given by
    * the TriaAccessor::center() function may not be accurate enough, even when
    * parameter @p respect_manifold is set to true. If you find this to be
    * case, than you can further refine the computation of the center by
-   * setting to true the second additional parameter @p
-   * use_laplace_transformation, which will force this function to compute the
-   * location of the center by solving a linear elasticity problem with
+   * setting to true the second additional parameter
+   * @p use_laplace_transformation, which will force this function to compute
+   * the location of the center by solving a linear elasticity problem with
    * Dirichlet boundary conditions set to the location of the bounding
    * vertices and the centers of the bounding lines and quads.
    */
@@ -1290,7 +1390,21 @@ public:
                           const bool use_laplace_transformation=false) const;
 
   /**
-   * Barycenter of the object.
+   * Return the barycenter (also called centroid)
+   * of the object. The barycenter for an object $K$
+   * of dimension $d$ in $D$ space dimensions is given by the $D$-dimensional
+   * vector $\mathbf x_K$ defined by
+   * @f[
+   *   \mathbf x_K = \frac{1}{|K|} \int_K \mathbf x \; \textrm{d}x
+   * @f]
+   * where the measure of the object is given by
+   * @f[
+   *   |K| = \int_K \mathbf 1 \; \textrm{d}x.
+   * @f]
+   * This function assumes that $K$ is mapped by a $d$-linear function from
+   * the reference $d$-dimensional cell. Then the integrals above can be
+   * pulled back to the reference cell and evaluated exactly (if through
+   * lengthy and, compared to the center() function, expensive computations).
    */
   Point<spacedim> barycenter () const;
 
@@ -1344,6 +1458,11 @@ public:
 
 
 private:
+  /**
+   * Like set_boundary_id but without checking for internal faces or invalid ids.
+   */
+  void set_boundary_id_internal(const types::boundary_id id) const;
+
   /**
    * Copy the data of the given object into the internal data structures of a
    * triangulation.
@@ -1435,17 +1554,6 @@ private:
   void clear_children () const;
 
 private:
-  /**
-   * Copy operator. This is normally used in a context like <tt>iterator a,b;
-   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
-   * by @p b to the object pointed to by @p a. However, the result of
-   * dereferencing an iterator is not an object but an accessor; consequently,
-   * this operation is not useful for iterators on triangulations. We declare
-   * this function here private, thus it may not be used from outside.
-   * Furthermore it is not implemented and will give a linker error if used
-   * anyway.
-   */
-  void operator = (const TriaAccessor &);
 
   template <int, int> friend class Triangulation;
 
@@ -1459,8 +1567,9 @@ private:
 
 
 /**
- * Specialization of <code>TriaAccessor<structdim, dim, spacedim></code>. This
- * class represent vertices in a triangulation of dimensionality
+ * This class is a specialization of <code>TriaAccessor<structdim, dim, spacedim></code>
+ * for the case that @p structdim is zero. This
+ * class represents vertices in a triangulation of dimensionality
  * <code>dim</code> (i.e. 1 for a triangulation of lines, 2 for a
  * triangulation of quads, and 3 for a triangulation of hexes) that is
  * embedded in a space of dimensionality <code>spacedim</code> (for
@@ -1468,10 +1577,14 @@ private:
  * ${\mathbb R}^\text{dim}$, for <code>spacedim@>dim</code> the triangulation
  * is of a manifold embedded in a higher dimensional space).
  *
+ * There is a further specialization of this class for the case that
+ * @p dim equals one, i.e., for vertices of a one-dimensional triangulation,
+ * since in that case vertices are also faces.
+ *
  * @ingroup Accessors
  * @author Bruno Turcksin, 2015
  */
-template<int dim, int spacedim>
+template <int dim, int spacedim>
 class TriaAccessor<0, dim, spacedim>
 {
 public:
@@ -1513,10 +1626,10 @@ public:
    * compatibility with the other accessor classes. @p index can be used to
    * set the global index of the vertex we point to.
    */
-  TriaAccessor (const Triangulation<dim,spacedim> *tria  = NULL,
+  TriaAccessor (const Triangulation<dim,spacedim> *tria  = nullptr,
                 const int                          level = 0,
                 const int                          index = 0,
-                const AccessorData                     * = 0);
+                const AccessorData                     * = nullptr);
 
   /**
    * Constructor. Should never be called and thus produces an error.
@@ -1811,10 +1924,17 @@ private:
 
 
 /**
- * A class that represents an access to a face in 1d -- i.e. to a point. This
- * is not a full fledged access from which you can build an iterator: for
- * example, you can't iterate from one such point to the next. Point also
- * don't have children, and they don't have neighbors.
+ * This class is a specialization of <code>TriaAccessor<structdim, dim, spacedim></code>
+ * for the case that @p structdim is zero and @p dim is one. This
+ * class represents vertices in a one-dimensional triangulation that is
+ * embedded in a space of dimensionality <code>spacedim</code> (for
+ * <code>spacedim==dim==1</code> the triangulation represents a domain in
+ * ${\mathbb R}^\text{dim}$, for <code>spacedim@>dim==1</code> the triangulation
+ * is of a manifold embedded in a higher dimensional space).
+ *
+ * The current specialization of the TriaAccessor<0,dim,spacedim> class
+ * for vertices of a one-dimensional triangulation exists
+ * since in the @p dim == 1 case vertices are also faces.
  *
  * @ingroup Accessors
  * @author Wolfgang Bangerth, 2010
@@ -1855,8 +1975,17 @@ public:
    */
   enum VertexKind
   {
+    /**
+     * Left vertex.
+     */
     left_vertex,
+    /**
+     * Interior vertex.
+     */
     interior_vertex,
+    /**
+     * Right vertex.
+     */
     right_vertex
   };
 
@@ -1880,10 +2009,10 @@ public:
    * compatibility with the other accessor classes. However, it doesn't do
    * anything useful here and so may not actually be called.
    */
-  TriaAccessor (const Triangulation<1,spacedim> *tria = 0,
+  TriaAccessor (const Triangulation<1,spacedim> *tria = nullptr,
                 const int = 0,
                 const int = 0,
-                const AccessorData * = 0);
+                const AccessorData * = nullptr);
 
   /**
    * Constructor. Should never be called and thus produces an error.
@@ -2046,6 +2175,11 @@ public:
    * @ref GlossBoundaryIndicator "Glossary entry on boundary indicators"
    */
   types::boundary_id boundary_id () const;
+
+  /**
+   * Return a constant reference to the manifold object used for this object.
+   */
+  const Manifold<1,spacedim> &get_manifold () const;
 
   /**
    * Return the manifold indicator of this object.
@@ -2288,10 +2422,10 @@ public:
   /**
    * Constructor.
    */
-  CellAccessor (const Triangulation<dim,spacedim> *parent     =  0,
+  CellAccessor (const Triangulation<dim,spacedim> *parent     =  nullptr,
                 const int                 level      = -1,
                 const int                 index      = -1,
-                const AccessorData       *local_data =  0);
+                const AccessorData       *local_data =  nullptr);
 
   /**
    * Copy constructor.
@@ -2319,6 +2453,16 @@ public:
    */
   template <int structdim2, int dim2, int spacedim2>
   CellAccessor (const TriaAccessor<structdim2,dim2,spacedim2> &);
+
+  /**
+   * Copy operator. These operators are usually used in a context like <tt>iterator a,b;
+   * *a=*b;</tt>. Presumably, the intent here is to copy the object pointed to
+   * by @p b to the object pointed to by @p a. However, the result of
+   * dereferencing an iterator is not an object but an accessor; consequently,
+   * this operation is not useful for iterators on triangulations.
+   * Consequently, this operator is declared as deleted and can not be used.
+   */
+  void operator = (const CellAccessor<dim, spacedim> &) = delete;
 
   /**
    * @}
@@ -2494,6 +2638,11 @@ public:
   unsigned int neighbor_face_no (const unsigned int neighbor) const;
 
   /**
+   * Compatibility interface with DoFCellAccessor. Always returns @p false.
+   */
+  static bool is_level_cell();
+
+  /**
    * @}
    */
   /**
@@ -2510,7 +2659,8 @@ public:
 
   /**
    * For a cell with its @c ith face at a periodic boundary,
-   * (see @ref GlossPeriodicConstraints "the entry for periodic boundaries")
+   * see
+   * @ref GlossPeriodicConstraints "the entry for periodic boundaries",
    * this function returns an iterator to the cell on the other side
    * of the periodic boundary. If there is no periodic boundary at the @c ith
    * face, an exception will be thrown.
@@ -2537,7 +2687,7 @@ public:
   neighbor_or_periodic_neighbor (const unsigned int i) const;
 
   /**
-   * Returns an iterator to the periodic neighbor of the cell at a given
+   * Return an iterator to the periodic neighbor of the cell at a given
    * face and subface number. The general guidelines for using this function
    * is similar to the function neighbor_child_on_subface(). The
    * implementation of this function is consistent with
@@ -3110,7 +3260,7 @@ protected:
    * partial templates. we use this auxiliary function that is then called
    * from point_inside.
    */
-  template<int dim_,int spacedim_ >
+  template <int dim_,int spacedim_ >
   bool point_inside_codim(const Point<spacedim_> &p) const;
 
 
@@ -3134,16 +3284,6 @@ private:
    * @ref GlossDirectionFlag.
    */
   void set_direction_flag (const bool new_direction_flag) const;
-  /**
-   * Copy operator. This is normally used in a context like <tt>iterator a,b;
-   * *a=*b;</tt>. Since the meaning is to copy the object pointed to by @p b
-   * to the object pointed to by @p a and since accessors are not real but
-   * virtual objects, this operation is not useful for iterators on
-   * triangulations. We declare this function here private, thus it may not be
-   * used from outside.  Furthermore it is not implemented and will give a
-   * linker error if used anyway.
-   */
-  void operator = (const CellAccessor<dim, spacedim> &);
 
   template <int, int> friend class Triangulation;
 
@@ -3227,39 +3367,6 @@ CellAccessor (const TriaAccessor<structdim2,dim2,spacedim2> &)
                       "only exists to make certain template constructs "
                       "easier to write as dimension independent code but "
                       "the conversion is not valid in the current context."));
-}
-
-template <int dim, int spacedim>
-CellId
-CellAccessor<dim,spacedim>::id() const
-{
-  std::vector<unsigned char> id(this->level(), -1);
-  unsigned int coarse_index;
-
-  CellAccessor<dim,spacedim> ptr = *this;
-  while (ptr.level()>0)
-    {
-      // determine which child we are
-      unsigned char v = static_cast<unsigned char>(-1);
-      for (unsigned int c=0; c<ptr.parent()->n_children(); ++c)
-        {
-          if (ptr.parent()->child_index(c)==ptr.index())
-            {
-              v = c;
-              break;
-            }
-        }
-
-      Assert(v != (unsigned char)-1, ExcInternalError());
-      id[ptr.level()-1] = v;
-
-      ptr.copy_from( *(ptr.parent()));
-    }
-
-  Assert(ptr.level()==0, ExcInternalError());
-  coarse_index = ptr.index();
-
-  return CellId(coarse_index, id);
 }
 
 

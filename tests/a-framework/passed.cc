@@ -18,14 +18,11 @@
 // test the testsuite framework. this test is supposed to run successfully
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
-#include <fstream>
 
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
 
   deallog << "OK" << std::endl;
 }

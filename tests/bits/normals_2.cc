@@ -26,7 +26,6 @@
 // orientations present that had to be weeded out
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_boundary_lib.h>
@@ -38,7 +37,6 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/fe/mapping_q.h>
 
-#include <fstream>
 
 
 
@@ -50,7 +48,6 @@ void check (const Triangulation<dim> &tria,
   FE_Q<dim> fe(1);
   DoFHandler<dim> dof_handler (tria);
   dof_handler.distribute_dofs (fe);
-  deallog.threshold_double(1.e-10);
 
   QGauss<dim-1> q_face(3);
 
@@ -101,9 +98,7 @@ void check (const Triangulation<dim> &tria,
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   {
     Triangulation<2> coarse_grid;

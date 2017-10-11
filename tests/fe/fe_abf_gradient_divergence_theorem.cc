@@ -19,7 +19,6 @@
 // divergence theorem
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
@@ -36,11 +35,10 @@
 #include <deal.II/fe/mapping_q1.h>
 
 #include <sstream>
-#include <fstream>
 
 
 
-template<int dim>
+template <int dim>
 Tensor<1,dim> ones ()
 {
   Tensor<1,dim> result;
@@ -49,7 +47,7 @@ Tensor<1,dim> ones ()
   return result;
 }
 
-template<int dim>
+template <int dim>
 void test (const Triangulation<dim> &tr,
            const FiniteElement<dim> &fe,
            const double tolerance)
@@ -138,7 +136,7 @@ void test (const Triangulation<dim> &tr,
 
 
 
-template<int dim>
+template <int dim>
 void test_hyper_cube(const double tolerance)
 {
   Triangulation<dim> tr;
@@ -163,7 +161,6 @@ int main()
   deallog << std::setprecision (3);
 
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-7);
 
   test_hyper_cube<2>(1e-6);
 

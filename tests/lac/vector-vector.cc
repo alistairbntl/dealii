@@ -16,11 +16,7 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/lac/vector.h>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
 
 
 
@@ -134,18 +130,12 @@ void check_vectors (Vector<number1> &d1, Vector<number2> &d2)
   d2.sadd (2., .5, d1);
   print (d2);
 
-  d1.sadd (2, 2, d2, 2, d3);
-  print (d1);
-
   d1 *= 4.;
   print (d1);
 
   deallog << "equ" << std::endl;
 
   d2.equ (.25, d1);
-  print (d2);
-
-  d2.equ (.25, d1, 2, d3);
   print (d2);
 
   d1.ratio (d1, d2);
@@ -159,7 +149,6 @@ int main()
   deallog << std::fixed;
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   Vector<double>      d1(N), d2(N);
   Vector<float>       f1(N), f2(N);

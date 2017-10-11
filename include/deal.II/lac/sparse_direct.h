@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__sparse_direct_h
-#define dealii__sparse_direct_h
+#ifndef dealii_sparse_direct_h
+#define dealii_sparse_direct_h
 
 
 #include <deal.II/base/config.h>
@@ -128,8 +128,8 @@ public:
    * spent in the factorization, so this functionality may not always be of
    * large benefit.
    *
-   * In contrast to the other direct solver classes, the initialisation method
-   * does nothing. Therefore initialise is not automatically called by this
+   * In contrast to the other direct solver classes, the initialization method
+   * does nothing. Therefore initialize is not automatically called by this
    * method, when the initialization step has not been performed yet.
    *
    * This function copies the contents of the matrix into its own storage; the
@@ -189,13 +189,13 @@ public:
                const BlockVector<double> &src) const;
 
   /**
-   * Return the dimension of the codomain (or range) space. To remember: the
+   * Return the dimension of the codomain (or range) space. Note that the
    * matrix is of dimension $m \times n$.
    */
   size_type m () const;
 
   /**
-   * Return the dimension of the domain space. To remember: the matrix is of
+   * Return the dimension of the domain space. Note that the matrix is of
    * dimension $m \times n$.
    */
   size_type n () const;
@@ -226,12 +226,14 @@ public:
    * If @p transpose is set to true this function solves for the transpose of
    * the matrix, i.e. $x=A^{-T}b$.
    */
-  void solve (Vector<double> &rhs_and_solution, bool transpose = false) const;
+  void solve (Vector<double> &rhs_and_solution,
+              const bool      transpose = false) const;
 
   /**
    * Same as before, but for block vectors.
    */
-  void solve (BlockVector<double> &rhs_and_solution, bool transpose = false) const;
+  void solve (BlockVector<double> &rhs_and_solution,
+              const bool           transpose = false) const;
 
   /**
    * Call the two functions factorize() and solve() in that order, i.e.
@@ -242,7 +244,7 @@ public:
   template <class Matrix>
   void solve (const Matrix   &matrix,
               Vector<double> &rhs_and_solution,
-              bool            transpose = false);
+              const bool      transpose = false);
 
   /**
    * Same as before, but for block vectors.
@@ -250,7 +252,7 @@ public:
   template <class Matrix>
   void solve (const Matrix        &matrix,
               BlockVector<double> &rhs_and_solution,
-              bool                 transpose = false);
+              const bool           transpose = false);
 
   /**
    * @}
@@ -351,4 +353,4 @@ private:
 
 DEAL_II_NAMESPACE_CLOSE
 
-#endif // dealii__sparse_direct_h
+#endif // dealii_sparse_direct_h

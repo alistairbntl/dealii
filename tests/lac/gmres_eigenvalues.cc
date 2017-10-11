@@ -22,7 +22,16 @@
 #include <deal.II/lac/solver_gmres.h>
 #include <deal.II/lac/precondition.h>
 
-
+template <class NUMBER>
+void output_eigenvalues(const std::vector<NUMBER> &eigenvalues,const std::string &text)
+{
+  deallog<< text;
+  for (unsigned int j = 0; j < eigenvalues.size(); ++j)
+    {
+      deallog<< ' ' << eigenvalues.at(j);
+    }
+  deallog << std::endl;
+}
 
 template <typename number>
 void test (unsigned int variant)
@@ -58,7 +67,7 @@ void test (unsigned int variant)
       }
   else
     Assert(false, ExcMessage("Invalid variant"));
-  if (types_are_equal<number,float>::value == true)
+  if (std::is_same<number,float>::value == true)
     Assert(variant < 4, ExcMessage("Invalid_variant"));
 
   deallog.push(Utilities::int_to_string(variant,1));
@@ -66,16 +75,19 @@ void test (unsigned int variant)
   SolverControl control(1000, variant==1?1e-4:1e-13);
   typename SolverGMRES<Vector<number> >::AdditionalData data;
   data.max_n_tmp_vectors = 80;
-  data.compute_eigenvalues = true;
 
   SolverGMRES<Vector<number> > solver(control, data);
+  solver.connect_eigenvalues_slot(
+    std::bind(output_eigenvalues<std::complex<double>>,
+              std::placeholders::_1,"Eigenvalue estimate: "));
   solver.solve(matrix, sol, rhs, PreconditionIdentity());
 
   if (variant == 0)
     {
-      typename SolverCG<Vector<number> >::AdditionalData cg_data;
-      cg_data.compute_eigenvalues = true;
-      SolverCG<Vector<number> > solver_cg(control, cg_data);
+      SolverCG<Vector<number> > solver_cg(control);
+      solver_cg.connect_eigenvalues_slot(
+        std::bind(output_eigenvalues<double>,
+                  std::placeholders::_1,"Eigenvalue estimate: "));
       sol = 0;
       solver_cg.solve(matrix, sol, rhs, PreconditionIdentity());
     }
@@ -103,7 +115,6 @@ int main()
   std::ofstream logfile("output");
   deallog << std::setprecision(2);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-8);
 
   deallog.push("double");
   test<double>(0);

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -22,8 +22,6 @@
 // compared with the exact one in the <1,2> case.
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 #include <string>
 
 // all include files needed for the program
@@ -44,7 +42,6 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/data_out.h>
 
-#include <cmath>
 
 
 
@@ -116,7 +113,6 @@ int main ()
 {
   logfile.precision (4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-12);
 
   deallog<<"Test <1,2>, Q1, Q2, Q3"<<std::endl;
   test<1,2>(SOURCE_DIR "/grids/circle_4.inp",1);

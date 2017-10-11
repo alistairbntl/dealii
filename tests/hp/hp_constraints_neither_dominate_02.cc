@@ -20,7 +20,6 @@
 // Check continuity across the face by evaluating the
 // field from both sides.
 
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/index_set.h>
 #include <deal.II/base/conditional_ostream.h>
@@ -45,7 +44,7 @@
 #include <deal.II/fe/fe_tools.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/lac/sparsity_tools.h>
-#include <deal.II/lac/compressed_simple_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/hp/fe_values.h>
 
 #include <deal.II/lac/petsc_parallel_vector.h>
@@ -67,7 +66,6 @@
 
 #include "../tests.h"
 
-#include <fstream>
 #include <iostream>
 
 //#define DEBUG_OUTPUT_VTK
@@ -102,7 +100,7 @@ struct less_than_key
 //  |-----| 2  |
 //  |1 |1 |    |
 //  ------------
-template<int dim>
+template <int dim>
 void test2cells(const FiniteElement<dim> &fe_0,
                 const FiniteElement<dim> &fe_1,
                 const FiniteElement<dim> &fe_2,
@@ -311,7 +309,6 @@ int main (int argc,char **argv)
   deallog << std::setprecision(4);
   deallog << std::fixed;
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
 
   try

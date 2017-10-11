@@ -19,7 +19,6 @@
 
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/function.h>
 #include <deal.II/lac/vector.h>
@@ -39,8 +38,6 @@
 #include <deal.II/numerics/data_out.h>
 
 // This is needed for C++ output:
-#include <fstream>
-#include <cmath>
 
 const double pi=std::acos(-1.);
 
@@ -92,7 +89,7 @@ void make_grid (Triangulation<2> &triangulation)
 }
 
 
-template<int dim>
+template <int dim>
 void test(const Triangulation<dim> &tria,
           const Mapping<dim> &mapping,
           const FiniteElement<dim> &fe1,
@@ -191,9 +188,7 @@ void test(const Triangulation<dim> &tria,
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   Triangulation<2> tria;
   MappingQGeneric<2> mapping(1);

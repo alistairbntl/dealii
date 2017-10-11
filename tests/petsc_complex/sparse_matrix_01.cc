@@ -17,9 +17,7 @@
 // check SparseMatrix::add(other, factor)
 
 #include "../tests.h"
-#include <deal.II/lac/petsc_vector.h>
 #include <deal.II/lac/petsc_sparse_matrix.h>
-#include <fstream>
 #include <iostream>
 #include <vector>
 
@@ -70,10 +68,8 @@ void test ()
 
 int main (int argc, char **argv)
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
+  initlog();
   deallog.depth_console(0);
-  deallog.threshold_double(1.e-10);
 
   try
     {

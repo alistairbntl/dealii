@@ -13,16 +13,16 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mg_smoother_h
-#define dealii__mg_smoother_h
+#ifndef dealii_mg_smoother_h
+#define dealii_mg_smoother_h
 
 
 #include <deal.II/base/config.h>
+#include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/smartpointer.h>
-#include <deal.II/lac/pointer_matrix.h>
+#include <deal.II/lac/linear_operator.h>
 #include <deal.II/lac/vector_memory.h>
 #include <deal.II/multigrid/mg_base.h>
-#include <deal.II/base/mg_level_object.h>
 #include <vector>
 
 DEAL_II_NAMESPACE_OPEN
@@ -136,11 +136,12 @@ public:
   /**
    * Implementation of the interface for @p Multigrid. This function does
    * nothing, which by comparison with the definition of this function means
-   * that the the smoothing operator equals the null operator.
+   * that the smoothing operator equals the null operator.
    */
   virtual void smooth (const unsigned int level,
                        VectorType         &u,
                        const VectorType   &rhs) const;
+
   virtual void clear ();
 };
 
@@ -176,7 +177,7 @@ namespace mg
    * @author Guido Kanschat,
    * @date 2003, 2009, 2010
    */
-  template<class RelaxationType, typename VectorType>
+  template <class RelaxationType, typename VectorType>
   class SmootherRelaxation : public MGLevelObject<RelaxationType>, public MGSmoother<VectorType>
   {
   public:
@@ -225,6 +226,25 @@ namespace mg
                          const VectorType   &rhs) const;
 
     /**
+     * The apply variant of smoothing, setting the vector u to zero before
+     * calling the smooth function. This function is equivalent to the
+     * following code
+     * @code
+     * u = 0;
+     * smooth(level, u, rhs);
+     * @endcode
+     *
+     * In the multigrid preconditioner interfaces, the apply() method is used for
+     * the pre-smoothing operation because the previous content in the solution
+     * vector needs to be overwritten for a new incoming residual. On the other
+     * hand, all subsequent operations need to smooth the content already present
+     * in the vector @p u given the right hand side, which is done by smooth().
+     */
+    virtual void apply (const unsigned int level,
+                        VectorType         &u,
+                        const VectorType   &rhs) const;
+
+    /**
      * Memory used by this object.
      */
     std::size_t memory_consumption () const;
@@ -262,7 +282,7 @@ namespace mg
  *
  * @author Guido Kanschat, 2003
  */
-template<typename MatrixType, class RelaxationType, typename VectorType>
+template <typename MatrixType, class RelaxationType, typename VectorType>
 class MGSmootherRelaxation : public MGSmoother<VectorType>
 {
 public:
@@ -342,6 +362,25 @@ public:
                        const VectorType   &rhs) const;
 
   /**
+   * The apply variant of smoothing, setting the vector u to zero before
+   * calling the smooth function. This function is equivalent to the
+   * following code
+   * @code
+   * u = 0;
+   * smooth(level, u, rhs);
+   * @endcode
+   *
+   * In the multigrid preconditioner interfaces, the apply() method is used for
+   * the pre-smoothing operation because the previous content in the solution
+   * vector needs to be overwritten for a new incoming residual. On the other
+   * hand, all subsequent operations need to smooth the content already present
+   * in the vector @p u given the right hand side, which is done by smooth().
+   */
+  virtual void apply (const unsigned int level,
+                      VectorType         &u,
+                      const VectorType   &rhs) const;
+
+  /**
    * Object containing relaxation methods.
    */
   MGLevelObject<RelaxationType> smoothers;
@@ -356,7 +395,7 @@ private:
   /**
    * Pointer to the matrices.
    */
-  MGLevelObject<PointerMatrix<MatrixType, VectorType> > matrices;
+  MGLevelObject<LinearOperator<VectorType> > matrices;
 
 };
 
@@ -392,7 +431,7 @@ private:
  *
  * @author Guido Kanschat, 2009
  */
-template<typename MatrixType, typename PreconditionerType, typename VectorType>
+template <typename MatrixType, typename PreconditionerType, typename VectorType>
 class MGSmootherPrecondition : public MGSmoother<VectorType>
 {
 public:
@@ -475,6 +514,25 @@ public:
                        const VectorType   &rhs) const;
 
   /**
+   * The apply variant of smoothing, setting the vector u to zero before
+   * calling the smooth function. This function is equivalent to the
+   * following code
+   * @code
+   * u = 0;
+   * smooth(level, u, rhs);
+   * @endcode
+   *
+   * In the multigrid preconditioner interfaces, the apply() method is used for
+   * the pre-smoothing operation because the previous content in the solution
+   * vector needs to be overwritten for a new incoming residual. On the other
+   * hand, all subsequent operations need to smooth the content already present
+   * in the vector @p u given the right hand side, which is done by smooth().
+   */
+  virtual void apply (const unsigned int level,
+                      VectorType         &u,
+                      const VectorType   &rhs) const;
+
+  /**
    * Object containing relaxation methods.
    */
   MGLevelObject<PreconditionerType> smoothers;
@@ -489,7 +547,7 @@ private:
   /**
    * Pointer to the matrices.
    */
-  MGLevelObject<PointerMatrix<MatrixType, VectorType> > matrices;
+  MGLevelObject<LinearOperator<VectorType> > matrices;
 
 };
 
@@ -586,7 +644,7 @@ namespace mg
   inline void
   SmootherRelaxation<RelaxationType, VectorType>::clear ()
   {
-    MGLevelObject<RelaxationType>::clear();
+    MGLevelObject<RelaxationType>::clear_elements();
   }
 
 
@@ -655,6 +713,42 @@ namespace mg
 
 
   template <class RelaxationType, typename VectorType>
+  inline void
+  SmootherRelaxation<RelaxationType, VectorType>::apply (const unsigned int  level,
+                                                         VectorType         &u,
+                                                         const VectorType   &rhs) const
+  {
+    unsigned int maxlevel = this->max_level();
+    unsigned int steps2 = this->steps;
+
+    if (this->variable)
+      steps2 *= (1<<(maxlevel-level));
+
+    bool T = this->transpose;
+    if (this->symmetric && (steps2 % 2 == 0))
+      T = false;
+    if (this->debug > 0)
+      deallog << 'S' << level << ' ';
+
+    if (T)
+      (*this)[level].Tvmult(u, rhs);
+    else
+      (*this)[level].vmult(u, rhs);
+    if (this->symmetric)
+      T = !T;
+    for (unsigned int i=1; i<steps2; ++i)
+      {
+        if (T)
+          (*this)[level].Tstep(u, rhs);
+        else
+          (*this)[level].step(u, rhs);
+        if (this->symmetric)
+          T = !T;
+      }
+  }
+
+
+  template <class RelaxationType, typename VectorType>
   inline
   std::size_t
   SmootherRelaxation<RelaxationType, VectorType>::
@@ -687,12 +781,12 @@ template <typename MatrixType, class RelaxationType, typename VectorType>
 inline void
 MGSmootherRelaxation<MatrixType, RelaxationType, VectorType>::clear ()
 {
-  smoothers.clear();
+  smoothers.clear_elements();
 
   unsigned int i=matrices.min_level(),
                max_level=matrices.max_level();
   for (; i<=max_level; ++i)
-    matrices[i]=0;
+    matrices[i] = LinearOperator<VectorType>();
 }
 
 
@@ -711,7 +805,11 @@ MGSmootherRelaxation<MatrixType, RelaxationType, VectorType>::initialize
 
   for (unsigned int i=min; i<=max; ++i)
     {
-      matrices[i] = &m[i];
+      // Workaround: Unfortunately, not every "m[i]" object has a rich
+      // enough interface to populate reinit_(domain|range)_vector. Thus,
+      // apply an empty LinearOperator exemplar.
+      matrices[i] =
+        linear_operator<VectorType>(LinearOperator<VectorType>(), m[i]);
       smoothers[i].initialize(m[i], data);
     }
 }
@@ -736,7 +834,11 @@ MGSmootherRelaxation<MatrixType, RelaxationType, VectorType>::initialize
 
   for (unsigned int i=min; i<=max; ++i)
     {
-      matrices[i] = &m[i];
+      // Workaround: Unfortunately, not every "m[i]" object has a rich
+      // enough interface to populate reinit_(domain|range)_vector. Thus,
+      // apply an empty LinearOperator exemplar.
+      matrices[i] =
+        linear_operator<VectorType>(LinearOperator<VectorType>(), m[i]);
       smoothers[i].initialize(m[i], data[i]);
     }
 }
@@ -758,7 +860,11 @@ MGSmootherRelaxation<MatrixType, RelaxationType, VectorType>::initialize
 
   for (unsigned int i=min; i<=max; ++i)
     {
-      matrices[i] = &(m[i].block(row, col));
+      // Workaround: Unfortunately, not every "m[i]" object has a rich
+      // enough interface to populate reinit_(domain|range)_vector. Thus,
+      // apply an empty LinearOperator exemplar.
+      matrices[i] = linear_operator<VectorType>(LinearOperator<VectorType>(),
+                                                m[i].block(row, col));
       smoothers[i].initialize(m[i].block(row, col), data);
     }
 }
@@ -785,7 +891,11 @@ MGSmootherRelaxation<MatrixType, RelaxationType, VectorType>::initialize
 
   for (unsigned int i=min; i<=max; ++i)
     {
-      matrices[i] = &(m[i].block(row, col));
+      // Workaround: Unfortunately, not every "m[i]" object has a rich
+      // enough interface to populate reinit_(domain|range)_vector. Thus,
+      // apply an empty LinearOperator exemplar.
+      matrices[i] = linear_operator<VectorType>(LinearOperator<VectorType>(),
+                                                m[i].block(row, col));
       smoothers[i].initialize(m[i].block(row, col), data[i]);
     }
 }
@@ -810,6 +920,42 @@ MGSmootherRelaxation<MatrixType, RelaxationType, VectorType>::smooth (const unsi
     deallog << 'S' << level << ' ';
 
   for (unsigned int i=0; i<steps2; ++i)
+    {
+      if (T)
+        smoothers[level].Tstep(u, rhs);
+      else
+        smoothers[level].step(u, rhs);
+      if (this->symmetric)
+        T = !T;
+    }
+}
+
+
+template <typename MatrixType, class RelaxationType, typename VectorType>
+inline void
+MGSmootherRelaxation<MatrixType, RelaxationType, VectorType>::apply (const unsigned int  level,
+    VectorType         &u,
+    const VectorType   &rhs) const
+{
+  unsigned int maxlevel = smoothers.max_level();
+  unsigned int steps2 = this->steps;
+
+  if (this->variable)
+    steps2 *= (1<<(maxlevel-level));
+
+  bool T = this->transpose;
+  if (this->symmetric && (steps2 % 2 == 0))
+    T = false;
+  if (this->debug > 0)
+    deallog << 'S' << level << ' ';
+
+  if (T)
+    smoothers[level].Tvmult(u, rhs);
+  else
+    smoothers[level].vmult(u, rhs);
+  if (this->symmetric)
+    T = !T;
+  for (unsigned int i=1; i<steps2; ++i)
     {
       if (T)
         smoothers[level].Tstep(u, rhs);
@@ -854,12 +1000,12 @@ template <typename MatrixType, typename PreconditionerType, typename VectorType>
 inline void
 MGSmootherPrecondition<MatrixType, PreconditionerType, VectorType>::clear ()
 {
-  smoothers.clear();
+  smoothers.clear_elements();
 
   unsigned int i=matrices.min_level(),
                max_level=matrices.max_level();
   for (; i<=max_level; ++i)
-    matrices[i]=0;
+    matrices[i]=LinearOperator<VectorType>();
 }
 
 
@@ -879,7 +1025,11 @@ MGSmootherPrecondition<MatrixType, PreconditionerType, VectorType>::initialize
 
   for (unsigned int i=min; i<=max; ++i)
     {
-      matrices[i] = &m[i];
+      // Workaround: Unfortunately, not every "m[i]" object has a rich
+      // enough interface to populate reinit_(domain|range)_vector. Thus,
+      // apply an empty LinearOperator exemplar.
+      matrices[i] =
+        linear_operator<VectorType>(LinearOperator<VectorType>(), m[i]);
       smoothers[i].initialize(m[i], data);
     }
 }
@@ -906,7 +1056,11 @@ MGSmootherPrecondition<MatrixType, PreconditionerType, VectorType>::initialize
 
   for (unsigned int i=min; i<=max; ++i)
     {
-      matrices[i] = &m[i];
+      // Workaround: Unfortunately, not every "m[i]" object has a rich
+      // enough interface to populate reinit_(domain|range)_vector. Thus,
+      // apply an empty LinearOperator exemplar.
+      matrices[i] =
+        linear_operator<VectorType>(LinearOperator<VectorType>(), m[i]);
       smoothers[i].initialize(m[i], data[i]);
     }
 }
@@ -997,13 +1151,8 @@ MGSmootherPrecondition<MatrixType, PreconditionerType, VectorType>::smooth
         {
           if (this->debug > 0)
             deallog << 'T';
-          if (i == 0 && u.all_zero())
-            *r = rhs;
-          else
-            {
-              matrices[level].Tvmult(*r,u);
-              r->sadd(-1.,1.,rhs);
-            }
+          matrices[level].Tvmult(*r,u);
+          r->sadd(-1.,1.,rhs);
           if (this->debug > 2)
             deallog << ' ' << r->l2_norm() << ' ';
           smoothers[level].Tvmult(*d, *r);
@@ -1014,13 +1163,86 @@ MGSmootherPrecondition<MatrixType, PreconditionerType, VectorType>::smooth
         {
           if (this->debug > 0)
             deallog << 'N';
-          if (i == 0 && u.all_zero())
-            *r = rhs;
-          else
-            {
-              matrices[level].vmult(*r,u);
-              r->sadd(-1.,rhs);
-            }
+          matrices[level].vmult(*r,u);
+          r->sadd(-1.,rhs);
+          if (this->debug > 2)
+            deallog << ' ' << r->l2_norm() << ' ';
+          smoothers[level].vmult(*d, *r);
+          if (this->debug > 1)
+            deallog << ' ' << d->l2_norm() << ' ';
+        }
+      u += *d;
+      if (this->symmetric)
+        T = !T;
+    }
+  if (this->debug > 0)
+    deallog << std::endl;
+}
+
+
+
+template <typename MatrixType, typename PreconditionerType, typename VectorType>
+inline void
+MGSmootherPrecondition<MatrixType, PreconditionerType, VectorType>::apply
+(const unsigned int level,
+ VectorType         &u,
+ const VectorType   &rhs) const
+{
+  unsigned int maxlevel = matrices.max_level();
+  unsigned int steps2 = this->steps;
+
+  if (this->variable)
+    steps2 *= (1<<(maxlevel-level));
+
+  bool T = this->transpose;
+  if (this->symmetric && (steps2 % 2 == 0))
+    T = false;
+  if (this->debug > 0)
+    deallog << 'S' << level << ' ';
+
+  // first step where we overwrite the result
+  if (this->debug > 2)
+    deallog << ' ' << rhs.l2_norm() << ' ';
+  if (this->debug > 0)
+    deallog << (T ? 'T' : 'N');
+  if (T)
+    smoothers[level].Tvmult(u, rhs);
+  else
+    smoothers[level].vmult(u, rhs);
+  if (this->debug > 1)
+    deallog << ' ' << u.l2_norm() << ' ';
+  if (this->symmetric)
+    T = !T;
+
+  typename VectorMemory<VectorType>::Pointer r(this->vector_memory);
+  typename VectorMemory<VectorType>::Pointer d(this->vector_memory);
+
+  if (steps2 > 1)
+    {
+      r->reinit(u,true);
+      d->reinit(u,true);
+    }
+
+  for (unsigned int i=1; i<steps2; ++i)
+    {
+      if (T)
+        {
+          if (this->debug > 0)
+            deallog << 'T';
+          matrices[level].Tvmult(*r,u);
+          r->sadd(-1.,1.,rhs);
+          if (this->debug > 2)
+            deallog << ' ' << r->l2_norm() << ' ';
+          smoothers[level].Tvmult(*d, *r);
+          if (this->debug > 1)
+            deallog << ' ' << d->l2_norm() << ' ';
+        }
+      else
+        {
+          if (this->debug > 0)
+            deallog << 'N';
+          matrices[level].vmult(*r,u);
+          r->sadd(-1.,rhs);
           if (this->debug > 2)
             deallog << ' ' << r->l2_norm() << ' ';
           smoothers[level].vmult(*d, *r);

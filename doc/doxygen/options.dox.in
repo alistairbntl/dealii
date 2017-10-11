@@ -1,4 +1,4 @@
-# This file contains project-specific configurations for the 
+# This file contains project-specific configurations for the
 # deal.II documentation.
 
 PROJECT_NAME           = "The deal.II Library"
@@ -83,6 +83,11 @@ ALIASES += dealiiRequiresUpdateFlags{1}="@note For this function to work properl
 
 ALIASES += dealiiOperationIsMultithreaded="@note If deal.II is configured with threads, this operation will run multi-threaded by splitting the work into smaller chunks (assuming there is enough work to make this worthwhile)."
 
+ALIASES += dealiiExceptionMessage{1}="@note The message that will be printed by this exception reads: <div class='doxygen-generated-exception-message'> \1 </div> "
+
+ALIASES += dealiiWriggersA{2}="@note For a discussion of the background of this function, see P. Wriggers: \"Nonlinear finite element methods\" (2008), and in particular formula (\2) on p. \1 (or thereabouts). "
+
+ALIASES += dealiiHolzapfelA{2}="@note For a discussion of the background of this function, see G. A. Holzapfel: \"Nonlinear solid mechanics. A Continuum Approach for Engineering\" (2007), and in particular formula (\2) on p. \1 (or thereabouts). "
 
 #---------------------------------------------------------------------------
 # configuration options related to source browsing
@@ -111,7 +116,7 @@ HTML_FILE_EXTENSION    = .html
 HTML_HEADER            = header.html
 HTML_FOOTER            = footer.html
 USE_MATHJAX            = @_use_mathjax@
-MATHJAX_RELPATH        = https://cdn.mathjax.org/mathjax/latest
+MATHJAX_RELPATH        = @_mathjax_relpath@
 MATHJAX_EXTENSIONS     = TeX/AMSmath TeX/AMSsymbols
 HTML_COLORSTYLE_HUE    = 220
 HTML_COLORSTYLE_SAT    = 200
@@ -150,7 +155,7 @@ ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = YES
 SEARCH_INCLUDES        = YES
-INCLUDE_PATH           = @CMAKE_SOURCE_DIR@/include/deal.II
+INCLUDE_PATH           = @CMAKE_SOURCE_DIR@/include @CMAKE_BINARY_DIR@/include
 INCLUDE_FILE_PATTERNS  =
 
 # set a few variables that help us generate documentation for
@@ -164,19 +169,24 @@ PREDEFINED             = DOXYGEN=1 \
                          DEBUG=1 \
                          DEAL_II_USE_MT_POSIX=1 \
                          DEAL_II_WITH_ARPACK=1 \
+                         DEAL_II_ARPACK_WITH_PARPACK=1 \
                          DEAL_II_WITH_BOOST=1 \
                          DEAL_II_WITH_CXX11=1 \
                          DEAL_II_WITH_CXX14=1 \
+                         DEAL_II_WITH_CUDA=1 \
+                         DEAL_II_WITH_GSL=1 \
                          DEAL_II_WITH_HDF5=1 \
                          DEAL_II_WITH_LAPACK=1 \
                          DEAL_II_WITH_METIS=1 \
                          DEAL_II_WITH_MPI=1 \
                          DEAL_II_WITH_MUPARSER=1 \
+                         DEAL_II_WITH_NANOFLANN=1 \
                          DEAL_II_WITH_NETCDF=1 \
                          DEAL_II_WITH_OPENCASCADE=1 \
                          DEAL_II_WITH_P4EST=1 \
                          DEAL_II_WITH_PETSC=1 \
                          DEAL_II_WITH_SLEPC=1 \
+                         DEAL_II_WITH_SUNDIALS=1 \
                          DEAL_II_WITH_THREADS=1 \
                          DEAL_II_WITH_TRILINOS=1 \
                          DEAL_II_WITH_UMFPACK=1 \
@@ -184,11 +194,14 @@ PREDEFINED             = DOXYGEN=1 \
                          DEAL_II_NAMESPACE_OPEN= \
                          DEAL_II_NAMESPACE_CLOSE= \
                          DEAL_II_ENABLE_EXTRA_DIAGNOSTICS= \
-                         DEAL_II_DISABLE_EXTRA_DIAGNOSTICS=
-
+                         DEAL_II_DISABLE_EXTRA_DIAGNOSTICS= \
+                         DEAL_II_DEPRECATED = \
+                         DEAL_II_P4EST_VERSION_GTE=1 \
+                         DEAL_II_TRILINOS_VERSION_GTE=1
 
 # do not expand exception declarations
-EXPAND_AS_DEFINED      = DeclException0 \
+EXPAND_AS_DEFINED      = DeclExceptionMsg \
+                         DeclException0 \
                          DeclException1 \
                          DeclException2 \
                          DeclException3 \

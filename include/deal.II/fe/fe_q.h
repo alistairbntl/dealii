@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__fe_q_h
-#define dealii__fe_q_h
+#ifndef dealii_fe_q_h
+#define dealii_fe_q_h
 
 #include <deal.II/base/config.h>
 #include <deal.II/base/tensor_product_polynomials.h>
@@ -572,7 +572,7 @@ public:
   FE_Q (const Quadrature<1> &points);
 
   /**
-   * Constructs a FE_Q_isoQ1 element. That element shares large parts of code
+   * Construct a FE_Q_isoQ1 element. That element shares large parts of code
    * with FE_Q so most of the construction work is done in this routine,
    * whereas the public constructor is in the class FE_Q_isoQ1.
    */
@@ -586,14 +586,21 @@ public:
    */
   virtual std::string get_name () const;
 
-protected:
+  virtual
+  std::unique_ptr<FiniteElement<dim,spacedim> >
+  clone() const;
 
   /**
-   * @p clone function instead of a copy constructor.
-   *
-   * This function is needed by the constructors of @p FESystem.
+   * Implementation of the corresponding function in the FiniteElement
+   * class.  Since the current element is interpolatory, the nodal
+   * values are exactly the support point values. Furthermore, since
+   * the current element is scalar, the support point values need to
+   * be vectors of length 1.
    */
-  virtual FiniteElement<dim,spacedim> *clone() const;
+  virtual
+  void
+  convert_generalized_support_point_values_to_dof_values (const std::vector<Vector<double> > &support_point_values,
+                                                          std::vector<double>                &nodal_values) const;
 };
 
 

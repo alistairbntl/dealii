@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2000 - 2015 by the deal.II authors
+// Copyright (C) 2000 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -20,8 +20,7 @@
 #include <deal.II/meshworker/assembler.h>
 #include <deal.II/meshworker/loop.h>
 
-#include <deal.II/base/logstream.h>
-#include <deal.II/lac/compressed_sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/sparsity_pattern.h>
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/grid/grid_generator.h>
@@ -31,8 +30,6 @@
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/multigrid/mg_tools.h>
 
-#include <fstream>
-#include <iomanip>
 
 using namespace dealii;
 
@@ -235,8 +232,8 @@ test_simple(DoFHandler<dim> &mgdofs)
   for (unsigned int level=mg_sparsity.min_level();
        level<=mg_sparsity.max_level(); ++level)
     {
-      CompressedSparsityPattern c_sparsity(mgdofs.n_dofs(level));
-      CompressedSparsityPattern ci_sparsity;
+      DynamicSparsityPattern c_sparsity(mgdofs.n_dofs(level));
+      DynamicSparsityPattern ci_sparsity;
       if (level>0)
         ci_sparsity.reinit(mgdofs.n_dofs(level-1), mgdofs.n_dofs(level));
 
@@ -257,11 +254,11 @@ test_simple(DoFHandler<dim> &mgdofs)
 }
 
 
-template<int dim>
+template <int dim>
 void
 test(const FiniteElement<dim> &fe)
 {
-  Triangulation<dim> tr;
+  Triangulation<dim> tr(Triangulation<dim>::limit_level_difference_at_vertices);
   GridGenerator::hyper_L(tr);
   tr.begin()->set_refine_flag();
   tr.execute_coarsening_and_refinement();
@@ -296,9 +293,9 @@ int main ()
   std::ofstream logfile(logname.c_str());
   deallog.attach(logfile);
 
-  std::vector<std_cxx11::shared_ptr<FiniteElement<2> > > fe2;
-  fe2.push_back(std_cxx11::shared_ptr<FiniteElement<2> >(new  FE_DGP<2>(1)));
-//  fe2.push_back(std_cxx11::shared_ptr<FiniteElement<2> >(new  FE_Q<2>(1)));
+  std::vector<std::shared_ptr<FiniteElement<2> > > fe2;
+  fe2.push_back(std::shared_ptr<FiniteElement<2> >(new  FE_DGP<2>(1)));
+//  fe2.push_back(std::shared_ptr<FiniteElement<2> >(new  FE_Q<2>(1)));
 
   for (unsigned int i=0; i<fe2.size(); ++i)
     test(*fe2[i]);

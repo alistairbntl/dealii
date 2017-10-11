@@ -37,6 +37,11 @@ std::ofstream logfile("output");
 #include <deal.II/base/function_lib.h>
 
 
+void output_double_number(double input,const std::string &text)
+{
+  deallog<<text<< input<<std::endl;
+}
+
 template <int dim, int fe_degree, typename Number>
 void
 mass_operator (const MatrixFree<dim,Number>  &data,
@@ -77,10 +82,10 @@ public:
               const Vector<Number> &src) const
   {
     dst = 0;
-    const std_cxx11::function<void(const MatrixFree<dim,Number> &,
-                                   Vector<Number> &,
-                                   const Vector<Number> &,
-                                   const std::pair<unsigned int,unsigned int> &)>
+    const std::function<void(const MatrixFree<dim,Number> &,
+                             Vector<Number> &,
+                             const Vector<Number> &,
+                             const std::pair<unsigned int,unsigned int> &)>
     wrap = mass_operator<dim,fe_degree,Number>;
     data.cell_loop (wrap, dst, src);
   };
@@ -127,9 +132,9 @@ void test (const FiniteElement<dim> &fe,
   // accumulate differently. Beware of this strange solver setting when seeing
   // "failure" in the output
   SolverControl control(n_iterations, 0);
-  typename SolverCG<>::AdditionalData data;
-  data.compute_condition_number = true;
-  SolverCG<> solver(control,data);
+  SolverCG<> solver(control);
+  solver.connect_condition_number_slot(
+    std::bind(output_double_number,std::placeholders::_1,"Condition number estimate: "));
   try
     {
       solver.solve(mf, out, in, PreconditionIdentity());
@@ -149,7 +154,6 @@ int main ()
 
   {
     // iterations taken from results at tolerance 1e-9
-    deallog.threshold_double(1.e-8);
     deallog.push("2d");
     test<2,1>(FE_Q<2>(1), 15);
     test<2,1>(FE_DGQ<2>(1), 3);

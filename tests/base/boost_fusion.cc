@@ -20,18 +20,13 @@
 // reminder that we can't do this again in the future
 
 #include "../tests.h"
-#include <iomanip>
-#include <fstream>
-#include <cmath>
 
 #include <boost/math/special_functions/erf.hpp>
 
 
 int main()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
   deallog << boost::math::erf (0.5) << std::endl;
 }

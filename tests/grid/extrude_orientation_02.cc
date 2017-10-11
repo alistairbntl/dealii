@@ -24,15 +24,12 @@
 // test this for a circle extruded to a cylinder
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/fe/fe_q.h>
 
-#include <fstream>
-#include <iomanip>
 
 
 void test(std::ostream &out)
@@ -74,7 +71,6 @@ int main()
 {
   std::ofstream logfile("output");
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   test(logfile);
 }

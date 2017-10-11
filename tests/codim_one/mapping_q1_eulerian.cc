@@ -18,8 +18,6 @@
 // computes points in real space starting from some quadrature points on the unit element
 
 #include "../tests.h"
-#include <fstream>
-#include <deal.II/base/logstream.h>
 
 // all include files you need here
 
@@ -34,7 +32,6 @@
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/lac/vector.h>
 
-#include <fstream>
 #include <string>
 
 std::ofstream logfile("output");
@@ -64,7 +61,7 @@ void test(std::string filename)
   grid_out.write_ucd (tria, logfile);
 
   QTrapez<dim> quad;
-  MappingQ1Eulerian<dim,Vector<double>,spacedim> mapping(shift, shift_dh);
+  MappingQ1Eulerian<dim,Vector<double>,spacedim> mapping(shift_dh, shift);
 
   typename Triangulation<dim,spacedim>::active_cell_iterator cell=tria.begin_active(),
                                                              endc=tria.end() ;

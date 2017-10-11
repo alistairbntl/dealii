@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------
-// $Id$
 //
-// Copyright (C) 2012 - 2015 by the deal.II authors
+// Copyright (C) 2012 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -57,7 +56,7 @@ TensorProductPolynomialsBubbles<dim>::compute_value (const unsigned int i,
 
 template <>
 double
-TensorProductPolynomialsBubbles<0>::compute_value (const unsigned int ,
+TensorProductPolynomialsBubbles<0>::compute_value (const unsigned int,
                                                    const Point<0> &) const
 {
   Assert (false, ExcNotImplemented());

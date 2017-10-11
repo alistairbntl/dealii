@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2010 - 2015 by the deal.II authors
+// Copyright (C) 2010 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,14 +17,12 @@
 // Test the SolverSelector class.
 
 #include "../tests.h"
-#include "testmatrix.h"
-#include <deal.II/base/logstream.h>
+#include "../testmatrix.h"
 #include <deal.II/lac/sparse_matrix.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/lac/vector_memory.h>
 #include <deal.II/lac/solver_selector.h>
 
-#include <fstream>
 
 template <typename MatrixType, typename VectorType>
 void
@@ -72,7 +70,6 @@ int main()
 //  logfile.setf(std::ios::fixed);
   deallog << std::setprecision(4);
   deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
 
   unsigned int size=37;
   unsigned int dim = (size-1)*(size-1);

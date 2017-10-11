@@ -21,13 +21,11 @@
 // University of Texas at Austin
 
 #include "../tests.h"
-#include <deal.II/base/logstream.h>
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_dgp.h>
 #include <deal.II/fe/fe_nedelec.h>
 #include <deal.II/fe/fe_system.h>
-#include <fstream>
 
 
 template <int dim>
@@ -75,9 +73,7 @@ void check ()
 
 int main ()
 {
-  std::ofstream logfile("output");
-  deallog.attach(logfile);
-  deallog.threshold_double(1.e-10);
+  initlog();
 
 //  check<1> ();
   check<2> ();

@@ -13,8 +13,8 @@
 //
 // ---------------------------------------------------------------------
 
-#ifndef dealii__mesh_worker_vector_selector_h
-#define dealii__mesh_worker_vector_selector_h
+#ifndef dealii_mesh_worker_vector_selector_h
+#define dealii_mesh_worker_vector_selector_h
 
 #include <deal.II/algorithms/any_data.h>
 #include <deal.II/algorithms/named_selection.h>
@@ -24,7 +24,7 @@
 
 DEAL_II_NAMESPACE_OPEN
 
-template<int,int> class FEValuesBase;
+template <int,int> class FEValuesBase;
 
 namespace MeshWorker
 {
@@ -87,17 +87,17 @@ namespace MeshWorker
     bool empty () const;
 
     /**
-     * Returns true if values are selected for any vector.
+     * Return true if values are selected for any vector.
      */
     bool has_values () const;
 
     /**
-     * Returns true if gradients are selected for any vector.
+     * Return true if gradients are selected for any vector.
      */
     bool has_gradients () const;
 
     /**
-     * Returns true if hessians are selected for any vector.
+     * Return true if hessians are selected for any vector.
      */
     bool has_hessians () const;
 
@@ -180,7 +180,7 @@ namespace MeshWorker
     /**
      * Constructor
      */
-    VectorDataBase();
+    VectorDataBase() = default;
 
     /**
      * Constructor from a base class object
@@ -199,7 +199,7 @@ namespace MeshWorker
     /**
      * Virtual, but empty destructor.
      */
-    virtual ~VectorDataBase();
+    virtual ~VectorDataBase() = default;
 
     /**
      * The only function added to VectorSelector is an abstract virtual
@@ -241,8 +241,8 @@ namespace MeshWorker
      */
     virtual void fill(
       std::vector<std::vector<std::vector<Number> > > &values,
-      std::vector<std::vector<std::vector<Tensor<1,dim,Number> > > > &gradients,
-      std::vector<std::vector<std::vector<Tensor<2,dim,Number> > > > &hessians,
+      std::vector<std::vector<std::vector<Tensor<1,spacedim,Number> > > > &gradients,
+      std::vector<std::vector<std::vector<Tensor<2,spacedim,Number> > > > &hessians,
       const FEValuesBase<dim,spacedim> &fe,
       const std::vector<types::global_dof_index> &index,
       const unsigned int component,
@@ -258,8 +258,8 @@ namespace MeshWorker
      */
     virtual void mg_fill(
       std::vector<std::vector<std::vector<Number> > > &values,
-      std::vector<std::vector<std::vector<Tensor<1,dim,Number> > > > &gradients,
-      std::vector<std::vector<std::vector<Tensor<2,dim,Number> > > > &hessians,
+      std::vector<std::vector<std::vector<Tensor<1,spacedim,Number> > > > &gradients,
+      std::vector<std::vector<std::vector<Tensor<2,spacedim,Number> > > > &hessians,
       const FEValuesBase<dim,spacedim> &fe,
       const unsigned int level,
       const std::vector<types::global_dof_index> &index,
@@ -293,7 +293,8 @@ namespace MeshWorker
     /**
      * Constructor.
      */
-    VectorData();
+    VectorData() = default;
+
     /**
      * Constructor using a prefilled VectorSelector
      */
@@ -315,8 +316,8 @@ namespace MeshWorker
 
     virtual void fill(
       std::vector<std::vector<std::vector<typename VectorType::value_type> > > &values,
-      std::vector<std::vector<std::vector<Tensor<1,dim,typename VectorType::value_type> > > > &gradients,
-      std::vector<std::vector<std::vector<Tensor<2,dim,typename VectorType::value_type> > > > &hessians,
+      std::vector<std::vector<std::vector<Tensor<1,spacedim,typename VectorType::value_type> > > > &gradients,
+      std::vector<std::vector<std::vector<Tensor<2,spacedim,typename VectorType::value_type> > > > &hessians,
       const FEValuesBase<dim,spacedim> &fe,
       const std::vector<types::global_dof_index> &index,
       const unsigned int component,
@@ -326,8 +327,8 @@ namespace MeshWorker
 
     virtual void mg_fill(
       std::vector<std::vector<std::vector<typename VectorType::value_type> > > &values,
-      std::vector<std::vector<std::vector<Tensor<1,dim,typename VectorType::value_type> > > > &gradients,
-      std::vector<std::vector<std::vector<Tensor<2,dim,typename VectorType::value_type> > > > &hessians,
+      std::vector<std::vector<std::vector<Tensor<1,spacedim,typename VectorType::value_type> > > > &gradients,
+      std::vector<std::vector<std::vector<Tensor<2,spacedim,typename VectorType::value_type> > > > &hessians,
       const FEValuesBase<dim,spacedim> &fe,
       const unsigned int level,
       const std::vector<types::global_dof_index> &index,
@@ -359,7 +360,7 @@ namespace MeshWorker
     /**
      * Constructor.
      */
-    MGVectorData();
+    MGVectorData() = default;
 
     /**
      * Constructor using a prefilled VectorSelector

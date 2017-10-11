@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2015 by the deal.II authors
+// Copyright (C) 1999 - 2016 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -106,6 +106,8 @@ GeometryInfo<4>::opposite_face[faces_per_cell]
   = { 1, 0, 3, 2, 5, 4, 7, 6 };
 
 
+const unsigned int GeometryInfo<0>::ucd_to_deal[GeometryInfo<0>::vertices_per_cell]
+  = {0};
 
 template <>
 const unsigned int GeometryInfo<1>::ucd_to_deal[GeometryInfo<1>::vertices_per_cell]
@@ -139,6 +141,9 @@ const unsigned int GeometryInfo<4>::ucd_to_deal[GeometryInfo<4>::vertices_per_ce
        invalid_unsigned_int
     };
 
+
+const unsigned int GeometryInfo<0>::dx_to_deal[GeometryInfo<0>::vertices_per_cell]
+  = {0};
 
 template <>
 const unsigned int GeometryInfo<1>::dx_to_deal[GeometryInfo<1>::vertices_per_cell]
@@ -223,7 +228,7 @@ const unsigned int GeometryInfo<4>::vertex_to_face
 };
 
 
-template<int dim>
+template <int dim>
 unsigned int
 GeometryInfo<dim>::n_children(const RefinementCase<dim> &ref_case)
 {
@@ -234,7 +239,7 @@ GeometryInfo<dim>::n_children(const RefinementCase<dim> &ref_case)
 }
 
 
-template<>
+template <>
 unsigned int
 GeometryInfo<1>::n_subfaces(const internal::SubfaceCase<1> &)
 {
@@ -244,7 +249,7 @@ GeometryInfo<1>::n_subfaces(const internal::SubfaceCase<1> &)
 
 
 
-template<>
+template <>
 unsigned int
 GeometryInfo<2>::n_subfaces(const internal::SubfaceCase<2> &subface_case)
 {
@@ -253,7 +258,7 @@ GeometryInfo<2>::n_subfaces(const internal::SubfaceCase<2> &subface_case)
 
 
 
-template<>
+template <>
 unsigned int
 GeometryInfo<3>::n_subfaces(const internal::SubfaceCase<3> &subface_case)
 {
@@ -263,7 +268,7 @@ GeometryInfo<3>::n_subfaces(const internal::SubfaceCase<3> &subface_case)
 }
 
 
-template<>
+template <>
 double
 GeometryInfo<1>::subface_ratio(const internal::SubfaceCase<1> &,
                                const unsigned int)
@@ -272,7 +277,7 @@ GeometryInfo<1>::subface_ratio(const internal::SubfaceCase<1> &,
 }
 
 
-template<>
+template <>
 double
 GeometryInfo<2>::subface_ratio(const internal::SubfaceCase<2> &subface_case,
                                const unsigned int)
@@ -314,7 +319,7 @@ GeometryInfo<2>::subface_ratio(const internal::SubfaceCase<2> &subface_case,
 }
 
 
-template<>
+template <>
 double
 GeometryInfo<3>::subface_ratio(const internal::SubfaceCase<3> &subface_case,
                                const unsigned int subface_no)
@@ -374,7 +379,7 @@ GeometryInfo<3>::subface_ratio(const internal::SubfaceCase<3> &subface_case,
 
 
 
-template<>
+template <>
 RefinementCase<0>
 GeometryInfo<1>::face_refinement_case(const RefinementCase<1> &,
                                       const unsigned int,
@@ -388,7 +393,7 @@ GeometryInfo<1>::face_refinement_case(const RefinementCase<1> &,
 }
 
 
-template<>
+template <>
 RefinementCase<1>
 GeometryInfo<2>::face_refinement_case(const RefinementCase<2> &cell_refinement_case,
                                       const unsigned int face_no,
@@ -430,7 +435,7 @@ GeometryInfo<2>::face_refinement_case(const RefinementCase<2> &cell_refinement_c
 }
 
 
-template<>
+template <>
 RefinementCase<2>
 GeometryInfo<3>::face_refinement_case(const RefinementCase<3> &cell_refinement_case,
                                       const unsigned int face_no,
@@ -523,7 +528,7 @@ GeometryInfo<3>::face_refinement_case(const RefinementCase<3> &cell_refinement_c
 
 
 
-template<>
+template <>
 RefinementCase<1>
 GeometryInfo<1>::line_refinement_case(const RefinementCase<1> &cell_refinement_case,
                                       const unsigned int line_no)
@@ -540,7 +545,7 @@ GeometryInfo<1>::line_refinement_case(const RefinementCase<1> &cell_refinement_c
 }
 
 
-template<>
+template <>
 RefinementCase<1>
 GeometryInfo<2>::line_refinement_case(const RefinementCase<2> &cell_refinement_case,
                                       const unsigned int line_no)
@@ -550,7 +555,7 @@ GeometryInfo<2>::line_refinement_case(const RefinementCase<2> &cell_refinement_c
 }
 
 
-template<>
+template <>
 RefinementCase<1>
 GeometryInfo<3>::line_refinement_case(const RefinementCase<3> &cell_refinement_case,
                                       const unsigned int line_no)
@@ -586,7 +591,7 @@ GeometryInfo<3>::line_refinement_case(const RefinementCase<3> &cell_refinement_c
 
 
 
-template<>
+template <>
 RefinementCase<1>
 GeometryInfo<1>::min_cell_refinement_case_for_face_refinement(const RefinementCase<0> &,
     const unsigned int,
@@ -601,7 +606,7 @@ GeometryInfo<1>::min_cell_refinement_case_for_face_refinement(const RefinementCa
 }
 
 
-template<>
+template <>
 RefinementCase<2>
 GeometryInfo<2>::min_cell_refinement_case_for_face_refinement(const RefinementCase<1> &face_refinement_case,
     const unsigned int face_no,
@@ -622,7 +627,7 @@ GeometryInfo<2>::min_cell_refinement_case_for_face_refinement(const RefinementCa
 }
 
 
-template<>
+template <>
 RefinementCase<3>
 GeometryInfo<3>::min_cell_refinement_case_for_face_refinement(const RefinementCase<2> &face_refinement_case,
     const unsigned int face_no,
@@ -688,7 +693,7 @@ GeometryInfo<3>::min_cell_refinement_case_for_face_refinement(const RefinementCa
 
 
 
-template<>
+template <>
 RefinementCase<1>
 GeometryInfo<1>::min_cell_refinement_case_for_line_refinement(const unsigned int line_no)
 {
@@ -699,7 +704,7 @@ GeometryInfo<1>::min_cell_refinement_case_for_line_refinement(const unsigned int
 }
 
 
-template<>
+template <>
 RefinementCase<2>
 GeometryInfo<2>::min_cell_refinement_case_for_line_refinement(const unsigned int line_no)
 {
@@ -712,7 +717,7 @@ GeometryInfo<2>::min_cell_refinement_case_for_line_refinement(const unsigned int
 }
 
 
-template<>
+template <>
 RefinementCase<3>
 GeometryInfo<3>::min_cell_refinement_case_for_line_refinement(const unsigned int line_no)
 {
@@ -1106,16 +1111,16 @@ GeometryInfo<2>::child_cell_on_face (const RefinementCase<2> &ref_case,
   subcells[2][RefinementCase<2>::isotropic_refinement][faces_per_cell][max_children_per_face] =
   {
     {
-      // Normal orientation (face_filp = false)
+      // Normal orientation (face_flip = false)
       {{0,0},{1,1},{0,1},{0,1}},          // cut_x
       {{0,1},{0,1},{0,0},{1,1}},          // cut_y
-      {{0,2},{1,3},{0,1},{2,3}}           // cut_z
+      {{0,2},{1,3},{0,1},{2,3}}           // cut_xy, i.e., isotropic
     },
     {
       // Flipped orientation (face_flip = true)
       {{0,0},{1,1},{1,0},{1,0}},          // cut_x
       {{1,0},{1,0},{0,0},{1,1}},          // cut_y
-      {{2,0},{3,1},{1,0},{3,2}}           // cut_z
+      {{2,0},{3,1},{1,0},{3,2}}           // cut_xy, i.e., isotropic
     }
   };
 
@@ -1412,65 +1417,6 @@ GeometryInfo<4>::child_cell_on_face (const RefinementCase<4> &,
 
 template <>
 unsigned int
-GeometryInfo<1>::line_to_cell_vertices (const unsigned int line,
-                                        const unsigned int vertex)
-{
-  (void)line;
-  Assert (line<lines_per_cell, ExcIndexRange(line, 0, lines_per_cell));
-  Assert (vertex<2, ExcIndexRange(vertex, 0, 2));
-
-  return vertex;
-}
-
-
-template <>
-unsigned int
-GeometryInfo<2>::line_to_cell_vertices (const unsigned int line,
-                                        const unsigned int vertex)
-{
-  return child_cell_on_face(RefinementCase<2>::isotropic_refinement, line, vertex);
-}
-
-
-
-template <>
-unsigned int
-GeometryInfo<3>::line_to_cell_vertices (const unsigned int line,
-                                        const unsigned int vertex)
-{
-  Assert (line<lines_per_cell, ExcIndexRange(line, 0, lines_per_cell));
-  Assert (vertex<2, ExcIndexRange(vertex, 0, 2));
-
-  static const unsigned
-  vertices[lines_per_cell][2] = {{0, 2},  // bottom face
-    {1, 3},
-    {0, 1},
-    {2, 3},
-    {4, 6},  // top face
-    {5, 7},
-    {4, 5},
-    {6, 7},
-    {0, 4},  // connects of bottom
-    {1, 5},  //   top face
-    {2, 6},
-    {3, 7}
-  };
-  return vertices[line][vertex];
-}
-
-
-template <>
-unsigned int
-GeometryInfo<4>::line_to_cell_vertices (const unsigned int,
-                                        const unsigned int)
-{
-  Assert(false, ExcNotImplemented());
-  return invalid_unsigned_int;
-}
-
-
-template <>
-unsigned int
 GeometryInfo<1>::face_to_cell_lines (const unsigned int face,
                                      const unsigned int line,
                                      const bool, const bool, const bool)
@@ -1530,7 +1476,7 @@ GeometryInfo<3>::face_to_cell_lines (const unsigned int face,
 
 
 
-template<int dim>
+template <int dim>
 unsigned int
 GeometryInfo<dim>::face_to_cell_lines (const unsigned int,
                                        const unsigned int,
@@ -1608,6 +1554,7 @@ d_linear_shape_function (const Point<dim> &xi,
         case 1:
           return x;
         }
+      break;
     }
 
     case 2:
@@ -1625,6 +1572,7 @@ d_linear_shape_function (const Point<dim> &xi,
         case 3:
           return x*y;
         }
+      break;
     }
 
     case 3:
@@ -1651,6 +1599,7 @@ d_linear_shape_function (const Point<dim> &xi,
         case 7:
           return x*y*z;
         }
+      break;
     }
 
     default:

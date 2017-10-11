@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 2005 - 2015 by the deal.II authors
+// Copyright (C) 2005 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -15,14 +15,14 @@
 
 
 #include <deal.II/base/mpi.h>
+#include <deal.II/base/mpi.templates.h>
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/lac/vector_memory.h>
-#include <deal.II/lac/parallel_vector.h>
-#include <deal.II/lac/parallel_block_vector.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/base/multithread_info.h>
 
-#include <cstddef>
 #include <iostream>
 
 #ifdef DEAL_II_WITH_TRILINOS
@@ -30,24 +30,23 @@
 #    include <Epetra_MpiComm.h>
 #    include <deal.II/lac/vector_memory.h>
 #    include <deal.II/lac/trilinos_vector.h>
-#    include <deal.II/lac/trilinos_block_vector.h>
+#    include <deal.II/lac/trilinos_parallel_block_vector.h>
 #  endif
 #endif
 
 #ifdef DEAL_II_WITH_PETSC
-#  ifdef DEAL_II_WITH_MPI
-#    include <petscsys.h>
-#    include <deal.II/lac/petsc_block_vector.h>
-#    include <deal.II/lac/petsc_parallel_block_vector.h>
-#    include <deal.II/lac/petsc_vector.h>
-#    include <deal.II/lac/petsc_parallel_vector.h>
-#  endif
+#  include <petscsys.h>
+#  include <deal.II/lac/petsc_parallel_block_vector.h>
+#  include <deal.II/lac/petsc_parallel_vector.h>
 #endif
 
 #ifdef DEAL_II_WITH_SLEPC
-#  ifdef DEAL_II_WITH_MPI
 #    include <slepcsys.h>
-#  endif
+#    include <deal.II/lac/slepc_solver.h>
+#endif
+
+#ifdef DEAL_II_WITH_P4EST
+#   include <p4est_bits.h>
 #endif
 
 DEAL_II_NAMESPACE_OPEN
@@ -59,43 +58,11 @@ namespace Utilities
   namespace MPI
   {
 #ifdef DEAL_II_WITH_MPI
-    // Unfortunately, we have to work
-    // around an oddity in the way PETSc
-    // and some gcc versions interact. If
-    // we use PETSc's MPI dummy
-    // implementation, it expands the
-    // calls to the two MPI functions
-    // basically as ``(n_jobs=1, 0)'',
-    // i.e. it assigns the number one to
-    // the variable holding the number of
-    // jobs, and then uses the comma
-    // operator to let the entire
-    // expression have the value zero. The
-    // latter is important, since
-    // ``MPI_Comm_size'' returns an error
-    // code that we may want to check (we
-    // don't here, but one could in
-    // principle), and the trick with the
-    // comma operator makes sure that both
-    // the number of jobs is correctly
-    // assigned, and the return value is
-    // zero. Unfortunately, if some recent
-    // versions of gcc detect that the
-    // comma expression just stands by
-    // itself, i.e. the result is not
-    // assigned to another variable, then
-    // they warn ``right-hand operand of
-    // comma has no effect''. This
-    // unwanted side effect can be
-    // suppressed by casting the result of
-    // the entire expression to type
-    // ``void'' -- not beautiful, but
-    // helps calming down unwarranted
-    // compiler warnings...
     unsigned int n_mpi_processes (const MPI_Comm &mpi_communicator)
     {
       int n_jobs=1;
-      (void) MPI_Comm_size (mpi_communicator, &n_jobs);
+      const int ierr = MPI_Comm_size (mpi_communicator, &n_jobs);
+      AssertThrowMPI(ierr);
 
       return n_jobs;
     }
@@ -104,7 +71,8 @@ namespace Utilities
     unsigned int this_mpi_process (const MPI_Comm &mpi_communicator)
     {
       int rank=0;
-      (void) MPI_Comm_rank (mpi_communicator, &rank);
+      const int ierr = MPI_Comm_rank (mpi_communicator, &rank);
+      AssertThrowMPI(ierr);
 
       return rank;
     }
@@ -113,7 +81,8 @@ namespace Utilities
     MPI_Comm duplicate_communicator (const MPI_Comm &mpi_communicator)
     {
       MPI_Comm new_communicator;
-      MPI_Comm_dup (mpi_communicator, &new_communicator);
+      const int ierr = MPI_Comm_dup (mpi_communicator, &new_communicator);
+      AssertThrowMPI(ierr);
       return new_communicator;
     }
 
@@ -122,8 +91,8 @@ namespace Utilities
     compute_point_to_point_communication_pattern (const MPI_Comm &mpi_comm,
                                                   const std::vector<unsigned int> &destinations)
     {
-      unsigned int myid = Utilities::MPI::this_mpi_process(mpi_comm);
-      unsigned int n_procs = Utilities::MPI::n_mpi_processes(mpi_comm);
+      const unsigned int myid = Utilities::MPI::this_mpi_process(mpi_comm);
+      const unsigned int n_procs = Utilities::MPI::n_mpi_processes(mpi_comm);
 
       for (unsigned int i=0; i<destinations.size(); ++i)
         {
@@ -134,10 +103,8 @@ namespace Utilities
         }
 
 
-      // let all processors
-      // communicate the maximal
-      // number of destinations they
-      // have
+      // let all processors communicate the maximal number of destinations
+      // they have
       const unsigned int max_n_destinations
         = Utilities::MPI::max (destinations.size(), mpi_comm);
 
@@ -145,36 +112,26 @@ namespace Utilities
         // all processes have nothing to send/receive:
         return std::vector<unsigned int>();
 
-      // now that we know the number
-      // of data packets every
-      // processor wants to send, set
-      // up a buffer with the maximal
-      // size and copy our
-      // destinations in there,
-      // padded with -1's
+      // now that we know the number of data packets every processor wants to
+      // send, set up a buffer with the maximal size and copy our destinations
+      // in there, padded with -1's
       std::vector<unsigned int> my_destinations(max_n_destinations,
                                                 numbers::invalid_unsigned_int);
       std::copy (destinations.begin(), destinations.end(),
                  my_destinations.begin());
 
-      // now exchange these (we could
-      // communicate less data if we
-      // used MPI_Allgatherv, but
-      // we'd have to communicate
-      // my_n_destinations to all
-      // processors in this case,
-      // which is more expensive than
-      // the reduction operation
-      // above in MPI_Allreduce)
+      // now exchange these (we could communicate less data if we used
+      // MPI_Allgatherv, but we'd have to communicate my_n_destinations to all
+      // processors in this case, which is more expensive than the reduction
+      // operation above in MPI_Allreduce)
       std::vector<unsigned int> all_destinations (max_n_destinations * n_procs);
-      MPI_Allgather (&my_destinations[0], max_n_destinations, MPI_UNSIGNED,
-                     &all_destinations[0], max_n_destinations, MPI_UNSIGNED,
-                     mpi_comm);
+      const int ierr = MPI_Allgather (&my_destinations[0], max_n_destinations, MPI_UNSIGNED,
+                                      &all_destinations[0], max_n_destinations, MPI_UNSIGNED,
+                                      mpi_comm);
+      AssertThrowMPI(ierr);
 
-      // now we know who is going to
-      // communicate with
-      // whom. collect who is going
-      // to communicate with us!
+      // now we know who is going to communicate with whom. collect who is
+      // going to communicate with us!
       std::vector<unsigned int> origins;
       for (unsigned int i=0; i<n_procs; ++i)
         for (unsigned int j=0; j<max_n_destinations; ++j)
@@ -263,7 +220,7 @@ namespace Utilities
 
       MPI_Op op;
       int ierr = MPI_Op_create((MPI_User_function *)&max_reduce, true, &op);
-      AssertThrow(ierr == MPI_SUCCESS, ExcInternalError());
+      AssertThrowMPI(ierr);
 
       MinMaxAvg in;
       in.sum = in.min = in.max = my_value;
@@ -275,17 +232,18 @@ namespace Utilities
       MPI_Datatype types[]= {MPI_DOUBLE, MPI_INT};
 
       ierr = MPI_Type_struct(2, lengths, displacements, types, &type);
-      AssertThrow(ierr == MPI_SUCCESS, ExcInternalError());
+      AssertThrowMPI(ierr);
 
       ierr = MPI_Type_commit(&type);
+      AssertThrowMPI(ierr);
       ierr = MPI_Allreduce (&in, &result, 1, type, op, mpi_communicator);
-      AssertThrow(ierr == MPI_SUCCESS, ExcInternalError());
+      AssertThrowMPI(ierr);
 
       ierr = MPI_Type_free (&type);
-      AssertThrow(ierr == MPI_SUCCESS, ExcInternalError());
+      AssertThrowMPI(ierr);
 
       ierr = MPI_Op_free(&op);
-      AssertThrow(ierr == MPI_SUCCESS, ExcInternalError());
+      AssertThrowMPI(ierr);
 
       result.avg = result.sum / numproc;
 
@@ -345,33 +303,34 @@ namespace Utilities
                           "in a program since it initializes the MPI system."));
 
 
-
+      int ierr;
 #ifdef DEAL_II_WITH_MPI
       // if we have PETSc, we will initialize it and let it handle MPI.
       // Otherwise, we will do it.
       int MPI_has_been_started = 0;
-      MPI_Initialized(&MPI_has_been_started);
+      ierr = MPI_Initialized(&MPI_has_been_started);
+      AssertThrowMPI(ierr);
       AssertThrow (MPI_has_been_started == 0,
                    ExcMessage ("MPI error. You can only start MPI once!"));
 
-      int mpi_err, provided;
-      // this works like mpi_err = MPI_Init (&argc, &argv); but tells MPI that
+      int provided;
+      // this works like ierr = MPI_Init (&argc, &argv); but tells MPI that
       // we might use several threads but never call two MPI functions at the
       // same time. For an explanation see on why we do this see
       // http://www.open-mpi.org/community/lists/users/2010/03/12244.php
       int wanted = MPI_THREAD_SERIALIZED;
-      mpi_err = MPI_Init_thread(&argc, &argv, wanted, &provided);
-      AssertThrow (mpi_err == 0,
-                   ExcMessage ("MPI could not be initialized."));
+      ierr = MPI_Init_thread(&argc, &argv, wanted, &provided);
+      AssertThrowMPI(ierr);
 
-      // disable for now because at least some implementations always return MPI_THREAD_SINGLE.
+      // disable for now because at least some implementations always return
+      // MPI_THREAD_SINGLE.
       //Assert(max_num_threads==1 || provided != MPI_THREAD_SINGLE,
       //    ExcMessage("MPI reports that we are not allowed to use multiple threads."));
 #else
-      // make sure the compiler doesn't warn
-      // about these variables
+      // make sure the compiler doesn't warn about these variables
       (void)argc;
       (void)argv;
+      (void)ierr;
 #endif
 
       // we are allowed to call MPI_Init ourselves and PETScInitialize will
@@ -379,11 +338,23 @@ namespace Utilities
 #ifdef DEAL_II_WITH_PETSC
 #  ifdef DEAL_II_WITH_SLEPC
       // Initialize SLEPc (with PETSc):
-      SlepcInitialize(&argc, &argv, PETSC_NULL, PETSC_NULL);
+      ierr = SlepcInitialize(&argc, &argv, nullptr, nullptr);
+      AssertThrow (ierr == 0, SLEPcWrappers::SolverBase::ExcSLEPcError(ierr));
 #  else
       // or just initialize PETSc alone:
-      PetscInitialize(&argc, &argv, PETSC_NULL, PETSC_NULL);
+      ierr = PetscInitialize(&argc, &argv, nullptr, nullptr);
+      AssertThrow (ierr == 0, ExcPETScError(ierr));
 #  endif
+
+      // Disable PETSc exception handling. This just prints a large wall
+      // of text that is not particularly helpful for what we do:
+      PetscPopSignalHandler();
+#endif
+
+#ifdef DEAL_II_WITH_P4EST
+      //Initialize p4est and libsc components
+      sc_init(MPI_COMM_WORLD, 0, 0, nullptr, SC_LP_SILENT);
+      p4est_init (nullptr, SC_LP_SILENT);
 #endif
 
       constructor_has_already_run = true;
@@ -393,19 +364,18 @@ namespace Utilities
       if (max_num_threads != numbers::invalid_unsigned_int)
         {
           // set maximum number of threads (also respecting the environment
-          // variable that the called function evaluates) based on what
-          // the user asked
+          // variable that the called function evaluates) based on what the
+          // user asked
           MultithreadInfo::set_thread_limit(max_num_threads);
         }
       else
         // user wants automatic choice
         {
 #ifdef DEAL_II_WITH_MPI
-          // we need to figure out how many MPI processes there
-          // are on the current node, as well as how many CPU cores
-          // we have. for the first task, check what get_hostname()
-          // returns and then to an allgather so each processor
-          // gets the answer
+          // we need to figure out how many MPI processes there are on the
+          // current node, as well as how many CPU cores we have. for the
+          // first task, check what get_hostname() returns and then to an
+          // allgather so each processor gets the answer
           //
           // in calculating the length of the string, don't forget the
           // terminating \0 on C-style strings
@@ -418,12 +388,13 @@ namespace Utilities
 
           std::vector<char> all_hostnames(max_hostname_size *
                                           MPI::n_mpi_processes(MPI_COMM_WORLD));
-          MPI_Allgather (&hostname_array[0], max_hostname_size, MPI_CHAR,
-                         &all_hostnames[0], max_hostname_size, MPI_CHAR,
-                         MPI_COMM_WORLD);
+          const int ierr = MPI_Allgather (&hostname_array[0], max_hostname_size, MPI_CHAR,
+                                          &all_hostnames[0], max_hostname_size, MPI_CHAR,
+                                          MPI_COMM_WORLD);
+          AssertThrowMPI(ierr);
 
-          // search how often our own hostname appears and the
-          // how-manyth instance the current process represents
+          // search how often our own hostname appears and the how-manyth
+          // instance the current process represents
           unsigned int n_local_processes=0;
           unsigned int nth_process_on_host = 0;
           for (unsigned int i=0; i<MPI::n_mpi_processes(MPI_COMM_WORLD); ++i)
@@ -436,12 +407,12 @@ namespace Utilities
           Assert (nth_process_on_host > 0, ExcInternalError());
 
 
-          // compute how many cores each process gets. if the number does
-          // not divide evenly, then we get one more core if we are
-          // among the first few processes
+          // compute how many cores each process gets. if the number does not
+          // divide evenly, then we get one more core if we are among the
+          // first few processes
           //
-          // if the number would be zero, round up to one since every
-          // process needs to have at least one thread
+          // if the number would be zero, round up to one since every process
+          // needs to have at least one thread
           const unsigned int n_threads
             = std::max(MultithreadInfo::n_cores() / n_local_processes
                        +
@@ -463,22 +434,21 @@ namespace Utilities
 
     MPI_InitFinalize::~MPI_InitFinalize()
     {
-      // make memory pool release all PETSc/Trilinos/MPI-based vectors that are no
-      // longer used at this point. this is relevant because the
-      // static object destructors run for these vectors at the end of
-      // the program would run after MPI_Finalize is called, leading
-      // to errors
+      // make memory pool release all PETSc/Trilinos/MPI-based vectors that
+      // are no longer used at this point. this is relevant because the static
+      // object destructors run for these vectors at the end of the program
+      // would run after MPI_Finalize is called, leading to errors
 
 #ifdef DEAL_II_WITH_MPI
       // Start with the deal.II MPI vectors (need to do this before finalizing
       // PETSc because it finalizes MPI).  Delete vectors from the pools:
-      GrowingVectorMemory<parallel::distributed::Vector<double> >
+      GrowingVectorMemory<LinearAlgebra::distributed::Vector<double> >
       ::release_unused_memory ();
-      GrowingVectorMemory<parallel::distributed::BlockVector<double> >
+      GrowingVectorMemory<LinearAlgebra::distributed::BlockVector<double> >
       ::release_unused_memory ();
-      GrowingVectorMemory<parallel::distributed::Vector<float> >
+      GrowingVectorMemory<LinearAlgebra::distributed::Vector<float> >
       ::release_unused_memory ();
-      GrowingVectorMemory<parallel::distributed::BlockVector<float> >
+      GrowingVectorMemory<LinearAlgebra::distributed::BlockVector<float> >
       ::release_unused_memory ();
 
       // Next with Trilinos:
@@ -491,8 +461,8 @@ namespace Utilities
 #endif
 
 
-      // Now deal with PETSc (with or without MPI). Only delete the vectors if finalize hasn't
-      // been called yet, otherwise this will lead to errors.
+      // Now deal with PETSc (with or without MPI). Only delete the vectors if
+      // finalize hasn't been called yet, otherwise this will lead to errors.
 #ifdef DEAL_II_WITH_PETSC
       if ((PetscInitializeCalled == PETSC_TRUE)
           &&
@@ -501,10 +471,6 @@ namespace Utilities
           GrowingVectorMemory<PETScWrappers::MPI::Vector>
           ::release_unused_memory ();
           GrowingVectorMemory<PETScWrappers::MPI::BlockVector>
-          ::release_unused_memory ();
-          GrowingVectorMemory<PETScWrappers::Vector>
-          ::release_unused_memory ();
-          GrowingVectorMemory<PETScWrappers::BlockVector>
           ::release_unused_memory ();
 
 #  ifdef DEAL_II_WITH_SLEPC
@@ -517,10 +483,16 @@ namespace Utilities
         }
 #endif
 
+#ifdef DEAL_II_WITH_P4EST
+      // now end p4est and libsc
+      // Note: p4est has no finalize function
+      sc_finalize ();
+#endif
+
 
       // only MPI_Finalize if we are running with MPI. We also need to do this
-      // when running PETSc, because we initialize MPI ourselves before calling
-      // PetscInitialize
+      // when running PETSc, because we initialize MPI ourselves before
+      // calling PetscInitialize
 #ifdef DEAL_II_WITH_MPI
       if (job_supports_mpi() == true)
         {
@@ -533,17 +505,32 @@ namespace Utilities
             }
           else
             {
-              const int mpi_err = MPI_Finalize();
-              AssertThrow (mpi_err == 0,
-                           ExcMessage ("An error occurred while calling MPI_Finalize()"));
+              const int ierr = MPI_Finalize();
+              AssertThrowMPI(ierr);
             }
         }
 #endif
     }
 
 
-  } // end of namespace MPI
 
+    bool job_supports_mpi ()
+    {
+#ifdef DEAL_II_WITH_MPI
+      int MPI_has_been_started = 0;
+      const int ierr = MPI_Initialized(&MPI_has_been_started);
+      AssertThrowMPI(ierr);
+
+      return (MPI_has_been_started > 0);
+#else
+      return false;
+#endif
+    }
+
+
+
+#include "mpi.inst"
+  } // end of namespace MPI
 } // end of namespace Utilities
 
 DEAL_II_NAMESPACE_CLOSE

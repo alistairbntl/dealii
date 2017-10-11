@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 //
-// Copyright (C) 1999 - 2014 by the deal.II authors
+// Copyright (C) 1999 - 2017 by the deal.II authors
 //
 // This file is part of the deal.II library.
 //
@@ -17,10 +17,6 @@
 #include <cmath>
 
 DEAL_II_NAMESPACE_OPEN
-
-ConvergenceTable::ConvergenceTable()
-{}
-
 
 void ConvergenceTable::evaluate_convergence_rates(const std::string &data_column_key,
                                                   const std::string &reference_column_key,
@@ -60,8 +56,7 @@ void ConvergenceTable::evaluate_convergence_rates(const std::string &data_column
 
   switch (rate_mode)
     {
-    case none:
-      break;
+    // case none: already considered above
     case reduction_rate:
       rate_key += "red.rate";
       no_rate_entries = columns[rate_key].entries.size();
@@ -106,7 +101,7 @@ void ConvergenceTable::evaluate_convergence_rates(const std::string &data_column
   columns[rate_key].flag = 1;
   set_precision(rate_key, 2);
 
-  std::string superkey = data_column_key;
+  const std::string &superkey = data_column_key;
   if (!supercolumns.count(superkey))
     {
       add_column_to_supercolumn(data_column_key, superkey);
@@ -194,7 +189,7 @@ ConvergenceTable::evaluate_convergence_rates(const std::string &data_column_key,
   set_precision(rate_key, 2);
 
   // set the superkey equal to the key
-  std::string superkey=data_column_key;
+  const std::string &superkey=data_column_key;
   // and set the tex caption of the supercolumn to the tex caption of the
   // data_column.
   if (!supercolumns.count(superkey))
